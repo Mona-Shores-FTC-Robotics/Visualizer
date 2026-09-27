@@ -93,6 +93,7 @@
     clamp,
     clampFieldCoordinate,
     distanceBetweenPoints,
+    getCurvePoint,
   } from "./utils/math";
   import {
     buildPathPointMarkers,
@@ -2516,7 +2517,12 @@
       heading: { type: "tangential" as const, reverse: false },
       color: "#facc15",
     };
-    const anchors = lineCurvePoints(previewPoints[0], previewLine).map(
+    // lineCurvePoints gives a Bezier control polygon; sample the curve itself.
+    const controlPolygon = lineCurvePoints(previewPoints[0], previewLine);
+    const sampledCurve = Array.from({ length: 61 }, (_, i) =>
+      getCurvePoint(i / 60, controlPolygon),
+    );
+    const anchors = sampledCurve.map(
       (point, index) =>
         new Two.Anchor(
           x(point.x),

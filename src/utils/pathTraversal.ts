@@ -6,8 +6,8 @@ import type {
   Path,
 } from "../types";
 import {
+  bezierThroughPoints,
   clamp,
-  curveThroughPoints,
   getCurvePoint,
   radiansToDegrees,
 } from "./math";
@@ -25,21 +25,13 @@ export function lineCurvePoints(
     return [startPoint, ...line.controlPoints, line.endPoint];
   }
 
-  const poses = [startPoint, ...line.throughPoints, line.endPoint];
-  const cubicSegments = curveThroughPoints(1, poses);
-  const sampled: BasePoint[] = [{ ...startPoint }];
-  cubicSegments.forEach((segment) => {
-    const cubic = [
-      sampled[sampled.length - 1],
-      segment.cp1,
-      segment.cp2,
-      segment.end,
-    ];
-    for (let sample = 1; sample <= 20; sample += 1) {
-      sampled.push(getCurvePoint(sample / 20, cubic));
-    }
-  });
-  return sampled;
+  // Pedro 3 follows one Bezier through these points (`Paths.through`), so the
+  // control polygon is that curve's, not a spline drawn only for display.
+  return bezierThroughPoints([
+    startPoint,
+    ...line.throughPoints,
+    line.endPoint,
+  ]);
 }
 
 export function approximateCurveLength(

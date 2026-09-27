@@ -164,6 +164,57 @@ export function catmullToCubic(
 }
 
 /**
+ * The control points of the single Bezier curve Pedro Pathing 3 follows for
+ * `Paths.through(...)`, so the preview is the path the robot drives.
+ *
+ * Mirrors `BezierCurve.through` in Pedro Pathing core 3.0.x: the curve has as
+ * many control points as there are poses, and passes through pose i at
+ * t = i / (n - 1). Solving B · P = poses for P, where B holds the Bernstein
+ * basis at those t values, gives the control points.
+ *
+ * Two poses give a straight line, as `Paths.through` does.
+ */
+export function bezierThroughPoints(
+  poses: { x: number; y: number }[],
+): { x: number; y: number }[] {
+  const n = poses.length;
+  if (n < 3) return poses.map((pose) => ({ x: pose.x, y: pose.y }));
+
+  const degree = n - 1;
+  const binomial: number[] = [1];
+  for (let k = 1; k <= degree; k++) {
+    binomial[k] = (binomial[k - 1] * (degree - k + 1)) / k;
+  }
+
+  // Augmented matrix [B | x | y], solved by Gaussian elimination with
+  // partial pivoting. B is a Bernstein collocation matrix at distinct t, so it
+  // is always invertible.
+  const rows = poses.map((pose, i) => {
+    const t = i / degree;
+    const row = binomial.map(
+      (c, j) => c * Math.pow(t, j) * Math.pow(1 - t, degree - j),
+    );
+    return [...row, pose.x, pose.y];
+  });
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(rows[r][col]) > Math.abs(rows[pivot][col])) pivot = r;
+    }
+    [rows[col], rows[pivot]] = [rows[pivot], rows[col]];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const factor = rows[r][col] / rows[col][col];
+      for (let c = col; c < n + 2; c++) rows[r][c] -= factor * rows[col][c];
+    }
+  }
+  return rows.map((row, i) => ({
+    x: row[n] / row[i],
+    y: row[n + 1] / row[i],
+  }));
+}
+
+/**
  * Given an array of points (poses), generate cubic Bezier segments that pass
  * through the interior points using Catmull-Rom to Bezier conversion.
  *
