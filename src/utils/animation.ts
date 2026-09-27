@@ -5,6 +5,7 @@ import {
   radiansToDegrees,
 } from "./math";
 import { getRobotCorners } from "./geometry";
+import { runDistanceAt } from "./timeCalculator";
 import { evaluatePiecewiseHeading } from "./headingInterpolation";
 import {
   CURVE_SAMPLES,
@@ -162,72 +163,20 @@ export function calculateRobotState(
       currentLine,
     );
 
-    // If settings provide a motion profile, compute distance fraction accordingly
-    if (
-      settings &&
-      settings.maxVelocity !== undefined &&
-      settings.maxAcceleration !== undefined
-    ) {
-      const maxV = settings.maxVelocity;
-      const maxA = settings.maxAcceleration;
-      const maxD = settings.maxDeceleration ?? settings.maxAcceleration;
-
-      // Build profile parameters
-      const accTime = maxV / maxA;
-      const decTime = maxV / maxD;
-      const accDist = 0.5 * maxA * accTime * accTime;
-      const decDist = 0.5 * maxD * decTime * decTime;
-
-      let constTime: number;
-      let constDist = 0;
-      let totalTime = 0;
-
-      if (segLength >= accDist + decDist) {
-        constDist = Math.max(0, segLength - accDist - decDist);
-        constTime = constDist / maxV;
-        totalTime = accTime + constTime + decTime;
-      } else {
-        // Triangular profile
-        const vPeak = Math.sqrt((2 * segLength * maxA * maxD) / (maxA + maxD));
-        constTime = 0;
-        const accT = vPeak / maxA;
-        const decT = vPeak / maxD;
-        totalTime = accT + decT;
-      }
-
-      // Clamp timeIntoEvent to event duration
-      const t = Math.max(0, Math.min(timeIntoEvent, activeEvent.duration));
-
-      // Compute distance traveled at time t. A zero-length segment leaves this
-      // at 0, which the fraction below turns into 0 anyway.
-      let dist = 0;
-      if (segLength === 0) {
-        // nothing to travel
-      } else if (segLength >= accDist + decDist) {
-        if (t <= accTime) {
-          dist = 0.5 * maxA * t * t;
-        } else if (t <= accTime + constTime) {
-          dist = accDist + maxV * (t - accTime);
-        } else {
-          const rem = t - (accTime + constTime);
-          dist = accDist + constDist + maxV * rem - 0.5 * maxD * rem * rem;
-        }
-      } else {
-        // triangular
-        const vPeak = Math.sqrt((2 * segLength * maxA * maxD) / (maxA + maxD));
-        const accT = vPeak / maxA;
-        if (t <= accT) {
-          dist = 0.5 * maxA * t * t;
-        } else {
-          const rem = t - accT;
-          dist =
-            0.5 * maxA * accT * accT + vPeak * rem - 0.5 * maxD * rem * rem;
-        }
-      }
-
-      linePercent = Math.max(0, Math.min(1, dist / Math.max(1e-9, segLength)));
+    const run = activeEvent.run;
+    if (run) {
+      // This segment is one stretch of a longer path the robot follows
+      // without stopping: find the robot on that path's single profile, then
+      // on this segment.
+      const runTime =
+        run.startTime +
+        Math.max(0, Math.min(timeIntoEvent, activeEvent.duration));
+      const along =
+        runDistanceAt(run, runTime, settings, easeInOutQuad) -
+        run.startDistance;
+      linePercent = Math.max(0, Math.min(1, along / Math.max(1e-9, segLength)));
     } else {
-      // Fallback: use easing over the event duration (preserves previous behaviour)
+      // Timelines built elsewhere without run data: ease over the event.
       const timeProgress = timeIntoEvent / activeEvent.duration;
       linePercent = easeInOutQuad(Math.max(0, Math.min(1, timeProgress)));
     }

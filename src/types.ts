@@ -168,9 +168,26 @@ export interface TimelineEvent {
   name?: string;
   waitPosition?: "before" | "after";
   lineId?: string; // for travel
+  /**
+   * For travel: where this segment sits in the path the robot actually
+   * follows. The segments of one exported path share one motion profile, so
+   * the robot carries its speed through the joins instead of stopping.
+   */
+  run?: TravelRun;
   startHeading?: number;
   targetHeading?: number;
   atPoint?: BasePoint;
+}
+
+export interface TravelRun {
+  /** Length of the whole exported path, in inches. */
+  totalLength: number;
+  /** Time the whole exported path takes, in seconds. */
+  totalTime: number;
+  /** Distance along the exported path where this segment starts. */
+  startDistance: number;
+  /** Time into the exported path's profile where this segment starts. */
+  startTime: number;
 }
 
 export interface TimePrediction {
