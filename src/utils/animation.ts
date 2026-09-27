@@ -11,6 +11,7 @@ import {
   CURVE_SAMPLES,
   approximateCurveLength,
   curveCompletionAt,
+  curveParameterAt,
   effectiveHeadingAt,
   flattenToAtomicSegments,
   type FlatSegment,
@@ -181,8 +182,12 @@ export function calculateRobotState(
       linePercent = easeInOutQuad(Math.max(0, Math.min(1, timeProgress)));
     }
 
+    // linePercent is distance travelled; the curve's own parameter is not
+    // spread evenly along it, so convert before placing the robot.
+    const curveT = curveParameterAt(curvePoints as BasePoint[], linePercent);
+
     // Calculate Position
-    const robotInchesXY = getCurvePoint(linePercent, curvePoints);
+    const robotInchesXY = getCurvePoint(curveT, curvePoints);
 
     const robotXY = { x: xScale(robotInchesXY.x), y: yScale(robotInchesXY.y) };
     let robotHeading = 0;
@@ -198,7 +203,7 @@ export function calculateRobotState(
     const headingT = effective.t;
     const lineTraversal = getPointAndTangentAtProgress(
       curvePoints as BasePoint[],
-      linePercent,
+      curveT,
       lineHeading.type === "tangential" ? lineHeading.reverse : undefined,
     );
 
@@ -223,7 +228,7 @@ export function calculateRobotState(
           break;
         case "tangential": {
           const nextPointInches = getCurvePoint(
-            linePercent + (lineHeading.reverse ? -0.01 : 0.01),
+            curveT + (lineHeading.reverse ? -0.01 : 0.01),
             curvePoints,
           );
           const nextPoint = {
@@ -248,7 +253,7 @@ export function calculateRobotState(
       x: robotXY.x,
       y: robotXY.y,
       heading: robotHeading,
-      t: linePercent,
+      t: curveT,
     };
   }
 }
