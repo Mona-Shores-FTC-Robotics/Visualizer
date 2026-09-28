@@ -161,6 +161,7 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { debounce } from "lodash";
   import { createHistory, type AppState } from "./utils/history";
+  import { autoSection, loadAutoFrom } from "./lib/auto/store";
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
 
@@ -570,6 +571,7 @@
         fieldPoints,
         activePaths: $activePaths,
         settings,
+        auto: $autoSection,
       },
       overrides,
     );
@@ -583,6 +585,7 @@
       sequence,
       settings,
       fieldPoints,
+      auto: $autoSection,
     };
   }
 
@@ -599,6 +602,7 @@
       sequence = prev.sequence;
       settings = prev.settings;
       fieldPoints = prev.fieldPoints;
+      autoSection.set(prev.auto ?? null);
       isUnsaved.set(true);
       two?.update();
     }
@@ -615,6 +619,7 @@
       sequence = next.sequence;
       settings = next.settings;
       fieldPoints = next.fieldPoints;
+      autoSection.set(next.auto ?? null);
       isUnsaved.set(true);
       two?.update();
     }
@@ -685,6 +690,7 @@
       secondSequence,
       secondShapes,
       activePaths: $activePaths,
+      auto: $autoSection,
       timestamp: new Date().toISOString(),
     };
   }
@@ -708,6 +714,8 @@
     secondShapes = snapshot.secondShapes;
 
     activePaths.set(snapshot.activePaths);
+    const autoProblems = loadAutoFrom(snapshot);
+    if (autoProblems.length) console.warn("Auto recovery:", autoProblems);
     isUnsaved.set(true);
 
     return true;
@@ -1815,6 +1823,11 @@
 
       activePaths.set(Array.isArray(data.activePaths) ? data.activePaths : []);
 
+      const autoProblems = loadAutoFrom(data);
+      if (autoProblems.length) {
+        showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
+      }
+
       isUnsaved.set(false);
       recordChange();
 
@@ -2675,7 +2688,7 @@
   );
   // Reactively trigger when any saveable data changes
   $effect.pre(() => {
-    if (isLoaded && (lines || shapes || startPoint || settings)) {
+    if (isLoaded && (lines || shapes || startPoint || settings || $autoSection)) {
       isUnsaved.set(true);
     }
   });

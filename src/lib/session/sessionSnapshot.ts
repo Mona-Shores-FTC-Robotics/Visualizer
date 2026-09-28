@@ -28,6 +28,8 @@ export interface SessionSnapshot {
   secondSequence: SequenceItem[];
   secondShapes: Shape[];
   activePaths: string[];
+  /** The Auto builder's section, kept raw; normalized when restored. */
+  auto?: unknown;
   timestamp: string;
 }
 
@@ -77,6 +79,7 @@ export function loadSessionSnapshot(): SessionSnapshot | null {
       ),
       secondShapes: parsed.secondShapes || [],
       activePaths: parsed.activePaths || [],
+      auto: parsed.auto ?? null,
       timestamp: parsed.timestamp,
     };
   } catch (error) {

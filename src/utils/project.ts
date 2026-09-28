@@ -1,5 +1,7 @@
 import type { Path, SequenceItem, Settings, Shape, StartPose } from "../types";
 import type { FieldPoint } from "./fieldPoints";
+import type { AutoSection } from "../lib/auto/types";
+import { serializeAuto } from "../lib/auto/normalize";
 
 export const PROJECT_VERSION = "1.5.0";
 
@@ -39,14 +41,18 @@ export interface ProjectDoc {
   fieldPoints?: FieldPoint[];
   settings?: Settings;
   activePaths?: string[];
+  /** The Auto builder's section; omitted from the file when there is none. */
+  auto?: AutoSection | null;
 }
 
 export function buildProject(
   doc: ProjectDoc,
   overrides: Record<string, unknown> = {},
 ) {
+  const { auto, ...rest } = doc;
   return {
-    ...doc,
+    ...rest,
+    ...(auto ? { auto: serializeAuto(auto) } : {}),
     version: PROJECT_VERSION,
     timestamp: new Date().toISOString(),
     ...overrides,

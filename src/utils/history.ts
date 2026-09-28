@@ -6,6 +6,7 @@ import type {
   Settings,
   StartPose,
 } from "../types";
+import type { AutoSection } from "../lib/auto/types";
 import { writable } from "svelte/store";
 
 export type AppState = {
@@ -15,6 +16,8 @@ export type AppState = {
   sequence: SequenceItem[];
   settings: Settings;
   fieldPoints: FieldPoint[];
+  /** The Auto builder's section, when the project has one. */
+  auto?: AutoSection | null;
 };
 
 function deepClone<T>(obj: T): T {

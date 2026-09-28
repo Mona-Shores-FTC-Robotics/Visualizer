@@ -1,0 +1,156 @@
+# The `auto` section of a `.pp` file
+
+This fork of the Pedro Pathing Visualizer adds an **Auto mode**: the Path List
+becomes a whole 30-second Autonomous made of cards (actions, waits, decisions
+with branches, path cards with while-driving actions and events, an endgame
+guard), previewed on the field and exported as Java for the robot's `autokit`
+library.
+
+A `.pp` file stays a normal Visualizer 1.5.0 file plus **one** new top-level
+key, `auto`. Everything the Auto builder adds lives under it, so:
+
+- the stock Visualizer opens our files (it ignores `auto`), and
+- a project without an Auto is written exactly as before (no `auto` key).
+
+## Shape
+
+```json
+"auto": {
+  "version": 1,
+  "drawnFor": "BLUE",
+  "exportName": "hive-rush",
+  "registry": { "actions": ["ShootAll", "SpinUp"], "conditions": ["LauncherReady", "HiveTipped"] },
+  "points": { "ShootSpot": [38, 71], "UpCellShot": [108, 84, 45] },
+  "cards": [
+    { "id": "c1", "kind": "action", "name": "SpinUp" },
+    { "id": "c2", "kind": "firstOf", "label": "Wait for LauncherReady",
+      "rows": [ { "when": ["LauncherReady"], "cards": [] }, { "afterMs": 800, "cards": [] } ] },
+    { "id": "c3", "kind": "path", "lineId": "<top-level path id>", "while": ["SpinDown"],
+      "events": [ { "at": 0.6, "action": "IntakeOn" } ], "park": false },
+    { "id": "c4", "kind": "firstOf", "label": "Did the HIVE tip?",
+      "rows": [ { "when": ["HiveTipped", "CameraBlind"], "label": "If tipped", "cards": [ ... ] },
+                { "afterMs": 1500, "label": "If not tipped", "cards": [ ... ] } ] }
+  ]
+}
+```
+
+A complete example that uses every card and row kind is
+`src/lib/auto/fixtures/hive-rush.pp`; its exported Java is the golden file
+`src/lib/codegen/auto/fixtures/HiveRushAuto.java`.
+
+### Top level
+
+| Key | Type | Meaning |
+|---|---|---|
+| `version` | `1` | Format version. A newer version loads with a warning. |
+| `drawnFor` | `"RED"` \| `"BLUE"` | The alliance the Auto is drawn for. The robot mirrors it for the other alliance (`PoseFactory.mirrorX(70.75)`). |
+| `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
+| `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
+| `registry.conditions` | string[] | Registered true/false conditions, likewise. |
+| `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
+| `cards` | card[] | The Auto, top to bottom (the "trunk"). |
+
+### Cards
+
+Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
+
+| `kind` | Fields | Meaning |
+|---|---|---|
+| `action` | `name`, `previewMs?` | Runs a registered action. `previewMs` is only used by the preview (how long the action keeps the robot busy); it is not exported. |
+| `path` | `lineId`, `while`, `events`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `while`: actions started with the path. `events`: `{at, action}` with `at` in 0..1 of the path's length. `park`: this is the branch's park path for the endgame guard. |
+| `firstOf` | `label`, `rows` | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. |
+
+### Rows
+
+Each row has exactly one condition key, plus `cards` (possibly empty) and an
+optional `label` (the branch's name; defaults to one made from the condition).
+
+| Row | Becomes true |
+|---|---|
+| `{"when": ["A", "B"]}` | when any of the registered conditions is true (OR) |
+| `{"afterMs": 800}` | 800 ms after the card started |
+| `{"timeLeftBelowS": 5}` | when less than 5 s of the 30 s Auto remain |
+| `{"otherwise": true}` | at once (= `afterMs: 0`): the "else" of an if |
+| `{"nearPoint": "ShootSpot", "radiusIn": 6}` | when the robot is within 6 in of the named point |
+| `{"inArea": ["CornerA", "CornerB"]}` | when the robot is inside the axis-aligned box with those named corners |
+
+Rules the editor enforces (errors block the Java export):
+
+- every `firstOf` has at least one **time row** (`afterMs`, `timeLeftBelowS`
+  or `otherwise`), so nothing can wait forever;
+- every action and condition name used anywhere is in the registry;
+- a path card names a top-level path that exists;
+- a list of cards has at most one park card.
+
+Warnings (shown, not blocking): a path that starts more than 2 in from where
+the robot can be when it starts; a park card that is not last in its branch;
+rows that can never fire because an earlier `otherwise` always wins; a
+branch whose worst case runs past 30 s.
+
+### Loading
+
+`normalizeAuto` (`src/lib/auto/normalize.ts`) never throws. It keeps what it
+can, re-issues missing or duplicate ids, sorts events by `at`, and returns a
+list of plain-English problems for anything it dropped (unknown card kinds,
+rows with zero or two conditions, malformed points, …); the app shows them as
+a toast. `serializeAuto` writes keys in a fixed order, so saving twice gives
+the same bytes.
+
+### Geometry
+
+A path card uses exactly the geometry the stock Visualizer draws and exports:
+a path starts where the previous path **in the Path List** ends. So two
+branches that both leave the same spot need the Path List to reach that spot
+before each of them; the discontinuity warning says when a card would start
+somewhere the robot is not.
+
+## Generated Java
+
+"Export Auto (Java)" writes `<ExportName>Auto.java` in package
+`org.firstinspires.ftc.teamcode.opmodes.auto.generated`, following the
+contract with the robot's `autokit` library:
+
+- `SOURCE`, `ACTIONS`, `CONDITIONS` (every registered name used, sorted, no
+  duplicates), `DRAWN_FOR`, `startPose(boolean mirrored)`, a private
+  `poses(boolean mirrored)` factory and `build(AutoKit kit, boolean mirrored)`;
+- every pose is a `Pose` local built with `p.of(...)` so mirroring applies to
+  all of them; named points first, then the other poses the paths need;
+- shapes become `kit.keepOut(...)` with their corners in order;
+- paths are `Path` locals using the same expressions as the stock export
+  (`Paths.line/curve/through/path` plus a heading suffix); `Interpolator` is
+  imported only when a piecewise heading is used;
+- the cards become one `kit.sequence(...)`; a `firstOf` becomes
+  `kit.firstOf(label, rows...)`; a row with cards is `kit.when(...).then(...)`;
+- a list that directly contains a park card is wrapped
+  `kit.guarded(label, parkPath, seconds, cards...)`, where `seconds` is the
+  park path's drive time by the preview's motion model, rounded **up** to
+  0.1 s; the trunk's guard label is `"Auto"`, a branch's is its row label.
+
+## Preview
+
+The preview runs the card tree against a **scenario**: for each registered
+condition, whether it becomes true and when (N s after the waiting card
+starts, or N s into the Auto). Decisions pick the first row that fires; the
+robot drives the chosen paths with the app's own motion profile; the field
+highlights the branches taken and dashes the others; a log lists each card,
+row and event with its time against the 30 s budget.
+
+Each branch also shows its **worst case**: the Auto's end time if that branch
+is taken and every later wait runs to its time row. Over 30 s it is flagged.
+
+The endgame guard is previewed at card boundaries and during waits: once the
+time left is no more than the park path's seconds, the rest of the branch is
+skipped and the park path is driven.
+
+## Upstream files touched
+
+New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
+`src/lib/testing/` and `scripts/run-tests.mjs`. Hook edits to upstream files:
+
+- `src/utils/project.ts` — `ProjectDoc.auto`; `buildProject` writes it only when present.
+- `src/utils/history.ts` — `AppState.auto`, so undo/redo cover the Auto.
+- `src/lib/session/sessionSnapshot.ts` — the recovery snapshot carries `auto`.
+- `src/App.svelte` — load, save, undo/redo, session recovery.
+- `src/lib/FileManager.svelte` — load, save, new file, mirror.
+- `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
+- `package.json` — `test` script.

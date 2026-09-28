@@ -36,6 +36,7 @@
   } from "../config";
   import { showToast } from "./toast";
   import NameDialog from "./components/NameDialog.svelte";
+  import { currentAuto, loadAutoFrom, mirrorAutoData } from "./auto/store";
   import FileListItem from "./components/FileListItem.svelte";
   import FileActionsPanel from "./components/FileActionsPanel.svelte";
 
@@ -124,6 +125,7 @@
       shapes,
       sequence,
       fieldPoints,
+      auto: currentAuto(),
     });
     await browserFileStore.writeFile($currentFilePath, content);
     isUnsaved.set(false);
@@ -232,6 +234,7 @@
           shapes: renamingPrimary ? shapes : secondShapes,
           sequence: renamingPrimary ? sequence : secondSequence,
           fieldPoints,
+          auto: renamingPrimary ? currentAuto() : null,
         });
         await browserFileStore.writeFile(renamingFile.path, currentContent);
       }
@@ -312,6 +315,7 @@
         shapes: data.shapes || [],
         sequence: deriveSequence(data, normalizedLines),
         fieldPoints: hydrateFieldPoints(data),
+        raw: data,
       };
     } catch (error) {
       const errMsg = getErrorMessage(error);
@@ -334,6 +338,10 @@
     shapes = doc.shapes;
     sequence = doc.sequence;
     fieldPoints = doc.fieldPoints;
+    const autoProblems = loadAutoFrom(doc.raw);
+    if (autoProblems.length) {
+      showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
+    }
 
     currentFilePath.set(file.path);
     isUnsaved.set(false);
@@ -384,6 +392,7 @@
         shapes,
         sequence,
         fieldPoints,
+        auto: currentAuto(),
       });
 
       await browserFileStore.writeFile(selectedFile.path, content);
@@ -401,7 +410,7 @@
   function downloadCurrentToDisk() {
     try {
       const content = serializeProject(
-        { startPoint, lines, shapes, sequence, fieldPoints },
+        { startPoint, lines, shapes, sequence, fieldPoints, auto: currentAuto() },
         { pretty: true },
       );
 
@@ -441,7 +450,7 @@
       const writable = await handle.createWritable();
 
       const content = serializeProject(
-        { startPoint, lines, shapes, sequence, fieldPoints },
+        { startPoint, lines, shapes, sequence, fieldPoints, auto: currentAuto() },
         { pretty: true },
       );
 
@@ -514,6 +523,7 @@
       shapes = defaultShapes;
       sequence = defaultSequence;
       fieldPoints = defaultFieldPoints;
+      loadAutoFrom({});
 
       selectedFile = files.find((f) => f.name === fileName) || null;
       if (selectedFile) {
@@ -820,6 +830,10 @@
     };
     if (mirrored.lines && Array.isArray(mirrored.lines)) {
       mirrorPaths(mirrored.lines);
+    }
+
+    if (mirrored.auto !== undefined) {
+      mirrored.auto = mirrorAutoData(mirrored.auto);
     }
 
     // Don't mirror shapes/obstacles - they should remain in their original positions
