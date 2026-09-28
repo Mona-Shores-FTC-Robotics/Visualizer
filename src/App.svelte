@@ -161,7 +161,20 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { debounce } from "lodash";
   import { createHistory, type AppState } from "./utils/history";
-  import { autoSection, loadAutoFrom } from "./lib/auto/store";
+  import {
+    autoMode,
+    autoSection,
+    loadAutoFrom,
+    previewScenario,
+    setAutoRecorder,
+  } from "./lib/auto/store";
+  import { buildPathCatalog } from "./lib/auto/geometry";
+  import { validateAuto } from "./lib/auto/validate";
+  import { simulateAuto, worstCase } from "./lib/auto/simulate";
+  import { exportAutoJava } from "./lib/auto/exportAction";
+  import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
+  import AutoControlPanel from "./lib/auto/components/AutoControlPanel.svelte";
+  import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
 
@@ -592,6 +605,7 @@
   function recordChange() {
     history.record(getAppState());
   }
+  setAutoRecorder(recordChange);
 
   function undoAction() {
     const prev = history.undo();
@@ -2293,8 +2307,37 @@
   // Use the stores for reactivity
   let canUndo = $derived($canUndoStore);
   let canRedo = $derived($canRedoStore);
+  // Auto mode: the whole Auto is previewed, so the playback bar and the
+  // robot follow the preview's timeline instead of the Path List's.
+  let autoActive = $derived($autoMode && $autoSection !== null);
+  let showUntakenBranches = $state(true);
+  let autoCatalog = $derived(
+    autoActive ? buildPathCatalog(startPoint, lines, settings) : null,
+  );
+  let autoIssues = $derived(
+    autoActive && autoCatalog && $autoSection
+      ? validateAuto($autoSection, autoCatalog, startPoint)
+      : [],
+  );
+  let autoPreview = $derived(
+    autoActive && autoCatalog && $autoSection
+      ? simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario)
+      : null,
+  );
+  let autoWorst = $derived(
+    autoActive && autoCatalog && $autoSection
+      ? worstCase($autoSection, autoCatalog)
+      : null,
+  );
   let timePrediction = $derived(
-    calculateVisualizationPathTime(startPoint, lines, settings, sequence),
+    autoPreview
+      ? {
+          totalTime: autoPreview.endTime,
+          segmentTimes: [],
+          totalDistance: 0,
+          timeline: autoPreview.timeline,
+        }
+      : calculateVisualizationPathTime(startPoint, lines, settings, sequence),
   );
   let animationDuration = $derived(
     getAnimationDuration(timePrediction.totalTime / 1000),
@@ -2405,7 +2448,8 @@
   let scene = $derived.by(() => {
     const registry = new PointRegistry();
     // Hide main path when in multi-path mode (isolated visualization)
-    const pathElements = isMultiPathMode
+    // Auto mode draws the paths itself, coloured by branch.
+    const pathElements = isMultiPathMode || autoActive
       ? []
       : buildPathElements(
           { startPoint, lines, idPrefix: "line" },
@@ -2924,6 +2968,7 @@
     {rightPanelHidden}
     onToggleLeftPanel={toggleLeftPanelVisibility}
     onToggleRightPanel={toggleRightPanelVisibility}
+    autoPreviewSeconds={autoPreview ? autoPreview.endTime : null}
   />
 
   <SaveDialog
@@ -2971,7 +3016,22 @@
         onGroup={groupSelectedPaths}
         onUngroup={ungroupSelectedPath}
         onReorderPath={reorderPath}
+        listOverride={autoActive && $autoSection && autoCatalog
+          ? autoListSnippet
+          : undefined}
       />
+
+      {#snippet autoListSnippet()}
+        {#if $autoSection && autoCatalog}
+          <AutoCardList
+            auto={$autoSection}
+            catalog={autoCatalog}
+            issues={autoIssues}
+            preview={autoPreview}
+            worst={autoWorst}
+          />
+        {/if}
+      {/snippet}
 
       <PanelDivider
         side="left"
@@ -2983,7 +3043,14 @@
       <main class="panel-box center-stage">
         <div class="module-header-row mb-2">
           <h3 class="module-title">Field</h3>
-          <span class="module-caption">Click a line or point to select it</span>
+          {#if autoActive}
+            <label class="module-caption flex items-center gap-2">
+              <input type="checkbox" bind:checked={showUntakenBranches} />
+              Show untaken branches (dashed)
+            </label>
+          {:else}
+            <span class="module-caption">Click a line or point to select it</span>
+          {/if}
         </div>
         <FieldToolbar
           {playing}
@@ -3034,6 +3101,16 @@
               class="absolute top-0 left-0 w-full h-full z-15 pointer-events-none"
               aria-hidden="true"
             ></canvas>
+            {#if autoActive && $autoSection && autoCatalog}
+              <AutoFieldOverlay
+                auto={$autoSection}
+                catalog={autoCatalog}
+                preview={autoPreview}
+                {x}
+                {y}
+                showUntaken={showUntakenBranches}
+              />
+            {/if}
             <MathTools {x} {y} {twoElement} {robotXY} />
             <!-- Main robot: only show in normal mode -->
             {#if !isMultiPathMode}
@@ -3128,6 +3205,35 @@
             </button>
           </div>
         </div>
+        {#if autoActive && $autoSection && autoCatalog && autoPreview}
+          <AutoControlPanel
+            auto={$autoSection}
+            catalog={autoCatalog}
+            issues={autoIssues}
+            preview={autoPreview}
+            worst={autoWorst}
+            bind:startPoint
+            {robotXY}
+            {robotHeading}
+            {x}
+            {y}
+            {playing}
+            {play}
+            {pause}
+            bind:percent
+            {handleSeek}
+            bind:loopAnimation
+            defaultExportName={pathStem($currentFilePath) || "untitled"}
+            onExport={() =>
+              exportAutoJava({
+                startPoint,
+                lines,
+                shapes,
+                settings,
+                sourceFileName: basename($currentFilePath) || "untitled.pp",
+              })}
+          />
+        {:else}
         <ControlTab
           bind:playing
           {play}
@@ -3151,6 +3257,7 @@
           bind:loopAnimation
           {recordChange}
         />
+        {/if}
       </aside>
     </div>
   </div>

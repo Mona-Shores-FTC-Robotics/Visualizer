@@ -1,6 +1,8 @@
 import { get, writable } from "svelte/store";
 import { FIELD_SIZE } from "../../config";
+import { isUnsaved } from "../../stores";
 import { normalizeAuto } from "./normalize";
+import type { Scenario } from "./simulate";
 import type { AutoSection, NamedPoint } from "./types";
 
 /**
@@ -13,8 +15,52 @@ export const autoSection = writable<AutoSection | null>(null);
 /** Whether the left and right panels show the Auto instead of the paths. */
 export const autoMode = writable(false);
 
-/** The card whose editor the Controls panel shows. */
+/**
+ * What is selected in the card list: a card id, or `<decision id>#<row>` for
+ * a branch (new cards then go at the end of that branch).
+ */
 export const selectedCardId = writable<string | null>(null);
+
+/** The preview's scenario: when each registered condition becomes true. */
+export const previewScenario = writable<Scenario>({});
+
+let recorder: (() => void) | null = null;
+
+/** The app's undo recorder, called after each committed Auto edit. */
+export function setAutoRecorder(record: () => void): void {
+  recorder = record;
+}
+
+/**
+ * Edit the Auto: `mutate` works on a copy, which then replaces the store's
+ * value. Pass `record: false` while typing and call `commitAuto()` when the
+ * edit is done, so undo gets one step per edit rather than per keystroke.
+ */
+export function updateAuto(mutate: (auto: AutoSection) => void, record = true): void {
+  const current = get(autoSection);
+  if (!current) return;
+  const draft = JSON.parse(JSON.stringify(current)) as AutoSection;
+  mutate(draft);
+  autoSection.set(draft);
+  isUnsaved.set(true);
+  if (record) recorder?.();
+}
+
+export function commitAuto(): void {
+  recorder?.();
+}
+
+export function parseSelection(
+  selection: string | null,
+): { cardId: string | null; rowIndex: number | null } {
+  if (!selection) return { cardId: null, rowIndex: null };
+  const hash = selection.lastIndexOf("#");
+  if (hash < 0) return { cardId: selection, rowIndex: null };
+  return {
+    cardId: selection.slice(0, hash),
+    rowIndex: Number(selection.slice(hash + 1)),
+  };
+}
 
 /**
  * Replace the Auto with the one in a freshly read file. Returns what the

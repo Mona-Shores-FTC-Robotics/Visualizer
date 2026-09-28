@@ -147,7 +147,8 @@ function normalizeCards(
 function cardId(raw: Record<string, unknown>, seenIds: Set<string>): string {
   let id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : "";
   // Ids address cards in the editor, so a duplicate would make two cards one.
-  if (!id || seenIds.has(id)) id = makeCardId();
+  // "#" separates a card from its row in the editor's selection.
+  if (!id || seenIds.has(id) || id.includes("#")) id = makeCardId();
   seenIds.add(id);
   return id;
 }

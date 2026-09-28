@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { PathListItem } from "../../types";
 
   interface Props {
@@ -25,6 +26,8 @@
       targetId: string,
       position: "before" | "after",
     ) => void;
+    /** Shown in place of the Path List (Auto mode's card list). */
+    listOverride?: Snippet;
   }
 
   let {
@@ -42,6 +45,7 @@
     onGroup,
     onUngroup,
     onReorderPath,
+    listOverride,
   }: Props = $props();
 
   /** Groups the user has folded away, keyed by id. */
@@ -196,6 +200,9 @@
     <div class="module-mono">{fileName}</div>
   </section>
 
+  {#if listOverride}
+    {@render listOverride()}
+  {:else}
   <section class="module-box module-fill">
     <div class="module-header-row">
       <h3 class="module-title">Path List</h3>
@@ -235,4 +242,5 @@
       {/if}
     </div>
   </section>
+  {/if}
 </aside>

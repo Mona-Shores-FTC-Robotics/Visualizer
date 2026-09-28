@@ -12,6 +12,23 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 - the stock Visualizer opens our files (it ignores `auto`), and
 - a project without an Auto is written exactly as before (no `auto` key).
 
+## Using Auto mode
+
+- **Auto** in the top bar swaps the Path List for the Auto's card list and the
+  Controls panel for the Auto panel (the first time, it adds an empty `auto`
+  section). Paths are still drawn and edited on the field as usual.
+- **+ Action / + Wait for / + Decision / + Path** add a card after the selected
+  card; select a decision's branch header to add at the end of that branch.
+  The selected card has ↑ ↓ ✕ in the list and Duplicate / Delete in the panel.
+- The panel edits the selected card: the action; a path card's path,
+  while-driving chips, events bar (click to add, drag to move, arrow keys to
+  nudge) and park checkbox; a wait's or decision's rows.
+- **Robot actions & conditions** is the registry, plus the alliance the Auto
+  is drawn for, the export name and the named points.
+- **Preview as** sets the scenario; the playback bar, robot and log follow it.
+  Untaken branches are dashed on the field and dimmed in the list.
+- **Export .java** (or Export → Export Auto (Java)) downloads the class.
+
 ## Shape
 
 ```json
@@ -149,9 +166,11 @@ row and event with its time against the 30 s budget.
 Each branch also shows its **worst case**: the Auto's end time if that branch
 is taken and every later wait runs to its time row. Over 30 s it is flagged.
 
-The endgame guard is previewed at card boundaries and during waits: once the
-time left is no more than the park path's seconds, the rest of the branch is
-skipped and the park path is driven.
+The endgame guard is previewed the way `kit.guarded` is meant to work: once
+the time left is no more than the park path's seconds, whatever is running
+(a wait, an action, a path part-way) stops, the rest of the branch is
+skipped and the park path is driven. The robot then jumps to the park path's
+start in the preview, because a path always starts where the Path List says.
 
 ## Upstream files touched
 
@@ -164,5 +183,11 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 - `src/App.svelte` — load, save, undo/redo, session recovery.
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.
 - `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
-- `src/lib/Navbar.svelte` — "Export Auto (Java)" in the export menu; reset clears the Auto.
+- `src/lib/Navbar.svelte` — the Auto toggle; "Export Auto (Java)" in the export menu;
+  the time readout shows the preview's length in Auto mode; reset clears the Auto.
+- `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
+  place of the Path List (Auto mode's card list).
+- `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
+  timeline, the stock path strokes are hidden (the overlay draws them by branch),
+  and the Controls panel shows the Auto panel instead of `ControlTab`.
 - `package.json` — `test` script.
