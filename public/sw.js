@@ -1,24 +1,27 @@
-// IMPORTANT: bump this whenever you ship a new build. The service worker uses
+// IMPORTANT: this must change with every build. The service worker uses
 // cache-first for the JS/CSS bundle, so a stale cache (same VERSION) will keep
-// serving the previous build forever. Bumping forces old caches to be purged.
-const VERSION = "v5";
-const CACHE_NAME = `pedro-visualizer-${VERSION}`;
+// serving the previous build forever. The GitHub Pages workflow replaces
+// "dev" with the commit it builds, so every deploy purges the old cache.
+const VERSION = "dev";
+const CACHE_NAME = `auto-builder-${VERSION}`;
 
 const APP_STATIC_RESOURCES = [
-  "/",
-  "/manifest.webmanifest",
-  "/favicon.ico",
-  "/fields/centerstage.webp",
-  "/fields/intothedeep.webp",
-  "/fields/decode.webp",
-  "/fields/biobuzz.webp",
-  "/robot.png",
-  "/assets/index.js",
-  "/assets/index.css",
-  "/fonts/Poppins-Regular.ttf",
-  "/fonts/Poppins-SemiBold.ttf",
-  "/fonts/Poppins-Light.ttf",
-  "/fonts/Poppins-ExtraLight.ttf",
+  // Relative, so they resolve against this worker's own folder: the app may be
+  // served from a sub-path (https://<org>.github.io/Visualizer/).
+  "./",
+  "./manifest.webmanifest",
+  "./favicon.ico",
+  "./fields/centerstage.webp",
+  "./fields/intothedeep.webp",
+  "./fields/decode.webp",
+  "./fields/biobuzz.webp",
+  "./robot.png",
+  "./assets/index.js",
+  "./assets/index.css",
+  "./fonts/Poppins-Regular.ttf",
+  "./fonts/Poppins-SemiBold.ttf",
+  "./fonts/Poppins-Light.ttf",
+  "./fonts/Poppins-ExtraLight.ttf",
 ];
 
 // On install, cache the static resources
@@ -60,7 +63,7 @@ self.addEventListener("fetch", (event) => {
           return await fetch(event.request);
         } catch (error) {
           const cache = await caches.open(CACHE_NAME);
-          const fallback = await cache.match("/");
+          const fallback = await cache.match("./");
           return fallback || new Response("Offline", { status: 503 });
         }
       })(),

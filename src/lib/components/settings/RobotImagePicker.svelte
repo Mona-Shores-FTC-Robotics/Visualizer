@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publicAsset } from "../../../utils/publicAsset";
   import type { Settings } from "../../../types";
   import { imageToBase64 } from "../../../utils/file";
   import { showToast } from "../../toast";
@@ -61,12 +62,12 @@
       class="relative w-20 h-20 border-2 border-neutral-300 dark:border-neutral-600 overflow-hidden bg-white dark:bg-neutral-900"
     >
       <img
-        src={settings.robotImage || DEFAULT_ROBOT_IMAGE}
+        src={publicAsset(settings.robotImage || DEFAULT_ROBOT_IMAGE)}
         alt="Robot Preview"
         class="w-full h-full object-contain"
         onerror={(e) => {
           console.error("Failed to load robot image:", settings.robotImage);
-          (e.currentTarget as HTMLImageElement).src = DEFAULT_ROBOT_IMAGE;
+          (e.currentTarget as HTMLImageElement).src = publicAsset(DEFAULT_ROBOT_IMAGE);
         }}
       />
       {#if isCustom}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publicAsset } from "../../utils/publicAsset";
   import type { BasePoint, Settings } from "../../types";
 
   interface Props {
@@ -41,7 +42,7 @@
 </script>
 
 <img
-  src={settings.robotImage || DEFAULT_ROBOT_IMAGE}
+  src={publicAsset(settings.robotImage || DEFAULT_ROBOT_IMAGE)}
   {alt}
   style={`position: absolute; top: ${xy.y}px;
 left: ${xy.x}px; transform: translate(-50%, -50%) rotate(${heading}deg); z-index: ${zIndex}; width: ${widthPx}px; height: ${heightPx}px;user-select: none; -webkit-user-select: none; -moz-user-select: none;-ms-user-select: none;
@@ -51,7 +52,7 @@ pointer-events: none; opacity: ${opacity};`}
   onerror={(e) => {
     console.error("Failed to load robot image:", settings.robotImage);
     onImageSettled();
-    (e.currentTarget as HTMLImageElement).src = DEFAULT_ROBOT_IMAGE;
+    (e.currentTarget as HTMLImageElement).src = publicAsset(DEFAULT_ROBOT_IMAGE);
   }}
   ondragstart={(e) => e.preventDefault()}
   onselectstart={(e) => e.preventDefault()}

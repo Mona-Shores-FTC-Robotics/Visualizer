@@ -349,7 +349,8 @@
         </svg>
       </button>
 
-      <span>Pedro Pathing Visualizer</span>
+      <span>Visualizer</span>
+      <span class="text-xs font-normal text-neutral-400">Auto Builder fork</span>
       <!-- GitHub Repo Link (moved next to title) -->
       <a
         target="_blank"

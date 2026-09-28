@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publicAsset } from "../../utils/publicAsset";
   interface Props {
     src: string;
     fieldMapName: string | undefined;
@@ -11,7 +12,7 @@
 </script>
 
 <img
-  {src}
+  src={publicAsset(src)}
   alt="Field"
   class="absolute top-0 left-0 w-full h-full rounded-lg z-10"
   style="
@@ -34,7 +35,7 @@
   onerror={(e) => {
     console.error("Failed to load field map:", fieldMapName);
     onSettled();
-    (e.currentTarget as HTMLImageElement).src = FALLBACK_FIELD_MAP;
+    (e.currentTarget as HTMLImageElement).src = publicAsset(FALLBACK_FIELD_MAP);
   }}
   ondragstart={(e) => e.preventDefault()}
   onselectstart={(e) => e.preventDefault()}

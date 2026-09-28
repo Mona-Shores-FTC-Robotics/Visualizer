@@ -117,7 +117,7 @@
     <h2 id="settings-title" class="text-xl font-semibold text-[#e8e8e8]">
       Settings
     </h2>
-    <span class="text-xs text-[#888888] mt-1"> Pedro Pathing Visualizer </span>
+    <span class="text-xs text-[#888888] mt-1"> Pedro Pathing Visualizer, BIOBUZZ Auto Builder fork </span>
     <button
       onclick={() => (isOpen = false)}
       aria-label="Close settings"

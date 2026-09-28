@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publicAsset } from "./utils/publicAsset";
   import { run } from "svelte/legacy";
 
   import type {
@@ -941,13 +942,13 @@
       const scale = GIF_EXPORT_SCALE;
       const loadImage = createImageLoader();
 
-      const fieldImage = await loadImage(fieldMapSrc).catch(async () => {
-        return loadImage("/fields/decode.webp");
+      const fieldImage = await loadImage(publicAsset(fieldMapSrc)).catch(async () => {
+        return loadImage(publicAsset("/fields/decode.webp"));
       });
       const robotImage = await loadImage(
-        settings.robotImage || "/robot.png",
+        publicAsset(settings.robotImage || "/robot.png"),
       ).catch(async () => {
-        return loadImage("/robot.png");
+        return loadImage(publicAsset("/robot.png"));
       });
 
       const drawRobot = createRobotDrawer(
