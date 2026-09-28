@@ -69,6 +69,7 @@
     clampPanelWidth,
     getCenterWidth,
     getLeftPanelMinWidth,
+    AUTO_LEFT_PANEL_MIN_WIDTH,
     getMinCenterWidthForSquare,
     getRightPanelMinWidth,
     getTotalAvailableWidth,
@@ -2278,7 +2279,10 @@
     const availableForPanels =
       getTotalAvailableWidth() - getMinCenterWidthForSquare();
     const rightMinWidth = getRightPanelMinWidth(settings);
-    const leftMinWidth = getLeftPanelMinWidth(settings);
+    const leftMinWidth = Math.max(
+      getLeftPanelMinWidth(settings),
+      $autoMode ? AUTO_LEFT_PANEL_MIN_WIDTH : 0,
+    );
 
     if (!leftPanelHidden) {
       const rightWidth = rightPanelHidden

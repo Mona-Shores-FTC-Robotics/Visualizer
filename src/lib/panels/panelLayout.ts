@@ -6,6 +6,12 @@ export const CENTER_MIN_WIDTH = 300;
 export const PANEL_DIVIDER_WIDTH = 18;
 
 /**
+ * In Auto mode the left panel holds the card list, which is unreadable when narrow. Below this
+ * width the right panel gives up space instead of the left one.
+ */
+export const AUTO_LEFT_PANEL_MIN_WIDTH = 320;
+
+/**
  * Minimum center width needed to keep the field square or wider. The field
  * height is set by the center-stage layout, roughly: window height minus
  * navbar (~80px), ui-shell padding (~24px), center-stage padding (~20px),
