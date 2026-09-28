@@ -15,6 +15,9 @@ What the fork adds:
 - **Export Auto (Java).** Writes a class for the `autokit` library in the robot code. The format of
   the `auto` section of `.pp` files is in [`docs/auto-format.md`](docs/auto-format.md); the stock
   Visualizer still opens these files and ignores that section.
+- **Share links.** Export → Share Link makes a link that opens a copy of the project, Auto
+  included, for GitHub issues and pull requests. It is a snapshot, not the version in git; see
+  [`docs/auto-format.md`](docs/auto-format.md#share-links).
 - **Preview fixes**, meant to be offered upstream: each exported path is timed as one motion
   (the robot no longer stops at every sub-path), the robot is placed by distance travelled, and
   "through" curves are drawn the way Pedro 3 follows them.

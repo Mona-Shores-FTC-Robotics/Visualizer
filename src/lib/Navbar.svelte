@@ -27,6 +27,13 @@
   import SettingsDialog from "./components/SettingsDialog.svelte";
   import ExportCodeDialog from "./components/ExportCodeDialog.svelte";
   import MultiplePathsDialog from "./components/MultiplePathsDialog.svelte";
+  import ShareLinkDialog from "./components/ShareLinkDialog.svelte";
+  import { buildProject } from "../utils/project";
+  import {
+    encodeShareHash,
+    projectSettings,
+    shareUrl,
+  } from "../utils/shareLink";
   import { atomicSegments, calculatePathTime, formatTime } from "../utils";
   import { basename, pathStem } from "../utils/filename";
   import { downloadBlob } from "../utils/download";
@@ -118,6 +125,8 @@
   let exportDialogOpen = $state(false);
   let exportDialog = $state<ExportCodeDialog>()!;
   let multiplePathsDialogOpen = $state(false);
+  let shareLinkDialogOpen = $state(false);
+  let shareLinkDialog = $state<ShareLinkDialog>()!;
   // Hide sequential export UI by default; backend generator remains available
   const showSequentialExport = false;
 
@@ -190,6 +199,29 @@
     exportMenuOpen = false;
     fileManagerOpen = false; // ensure file manager is closed before opening export dialog
     exportDialog.openWithFormat(format);
+  }
+
+  async function openShareLinkDialog() {
+    exportMenuOpen = false;
+    const project = buildProject({
+      startPoint,
+      lines,
+      shapes,
+      sequence,
+      fieldPoints,
+      settings: projectSettings(settings) as unknown as Settings,
+      auto: $autoSection,
+    });
+    try {
+      const hash = await encodeShareHash({
+        name: basename($currentFilePath) || null,
+        project,
+      });
+      shareLinkDialog.open(shareUrl(hash, window.location));
+    } catch (error) {
+      console.error("Share link failed:", error);
+      showToast("This browser cannot make share links.", "error");
+    }
   }
 
   async function exportFieldAsImage() {
@@ -350,7 +382,8 @@
       </button>
 
       <span>Visualizer</span>
-      <span class="text-xs font-normal text-neutral-400">Auto Builder fork</span>
+      <span class="text-xs font-normal text-neutral-400">Auto Builder fork</span
+      >
       <!-- GitHub Repo Link (moved next to title) -->
       <a
         target="_blank"
@@ -568,7 +601,11 @@
           stroke="currentColor"
           class="size-5"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h7M4 12h4m-4 7h7M15 5l5 7-5 7M11 12h9" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 5h7M4 12h4m-4 7h7M15 5l5 7-5 7M11 12h9"
+          />
         </svg>
         <span>Auto</span>
       </div>
@@ -808,6 +845,13 @@
             >
               Export Auto (Java)
             </button>
+            <button
+              onclick={openShareLinkDialog}
+              class="console-menu-item"
+              title="A link that opens a copy of this project, for GitHub issues and pull requests"
+            >
+              Share Link
+            </button>
             {#if showSequentialExport}
               <button
                 onclick={() => handleExport("sequential")}
@@ -895,6 +939,10 @@
 </div>
 
 <MultiplePathsDialog bind:isOpen={multiplePathsDialogOpen} />
+<ShareLinkDialog
+  bind:this={shareLinkDialog}
+  bind:isOpen={shareLinkDialogOpen}
+/>
 
 <style>
   @keyframes rainbow-glow {

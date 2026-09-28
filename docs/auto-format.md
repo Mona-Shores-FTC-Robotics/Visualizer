@@ -217,21 +217,62 @@ the time left is no more than the park path's seconds, whatever is running
 skipped and the park path is driven. The robot then jumps to the park path's
 start in the preview, because a path always starts where the Path List says.
 
+## Share links
+
+Export → **Share Link** makes a link that opens a copy of the project, Auto
+included: `…/Visualizer/#data=1.<data>`. It is meant for GitHub issues and
+pull requests, so reviewers see the paths next to the Java. It is a
+snapshot: git holds the Auto that runs.
+
+- **What it carries.** The `.pp` document exactly as a save writes it (paths,
+  shapes, sequence, field points, `auto`), the file name, and only the
+  settings that change what the Auto means: robot size and the motion model
+  (they time the preview and the park guard's seconds) and the field map.
+  Display preferences stay the viewer's. Nothing is converted: coordinates
+  stay in Pedro's field frame, as in the file.
+- **Encoding.** The payload `{name, project}` as JSON, zlib-deflated with
+  `CompressionStream`, then base64url. `1` is the link format version. The
+  fragment never reaches the server, but a forwarded link carries the whole
+  project.
+- **Length.** The `hive-rush` sample is about 2,100 characters, over a
+  Discord message (2,000), so send the `.pp` file there; an 18-path Auto is
+  3,000 to 5,000. GitHub comments take 65,536. The dialog shows the length.
+- **Opening one.** The copy is shown with a banner and no file open. The
+  viewer's own work, recovered session and saved settings are set aside, not
+  saved over, until **Close and return to my work**. Save (the button,
+  Ctrl+S, Save As) writes a new file, never the one that was open. Opening
+  another file ends the copy like any file load.
+- **Old and broken links.** Format 1 links keep loading; the project inside
+  goes through the same normalizers as an old file, and a project from a
+  newer build gets the usual warning. A newer link format, a link cut off
+  when pasted (the zlib checksum catches it) or one without a project is
+  refused with a message saying why. `src/utils/fixtures/hive-rush.v1.link`
+  is a frozen format-1 link; its test must keep passing.
+- Phones cannot open links: the app shows its phone block page.
+
+Code: `src/utils/shareLink.ts` (encode/decode, no DOM),
+`src/lib/session/sharedCopy.ts`, `ShareLinkDialog.svelte`,
+`SharedCopyBanner.svelte`.
+
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 `src/lib/testing/` and `scripts/run-tests.mjs`. Hook edits to upstream files:
 
 - `src/utils/project.ts` — `ProjectDoc.auto`; `buildProject` writes it only when present.
-- `src/utils/history.ts` — `AppState.auto`, so undo/redo cover the Auto.
+- `src/utils/history.ts` — `AppState.auto`, so undo/redo cover the Auto; `reset()`
+  for opening and closing a shared copy.
 - `src/lib/session/sessionSnapshot.ts` — the recovery snapshot carries `auto`.
-- `src/App.svelte` — load, save, undo/redo, session recovery.
+- `src/App.svelte` — load, save, undo/redo, session recovery; opening a share
+  link as a shared copy (session and settings are not persisted while it is shown,
+  and saves go to a new file).
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.
 - `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
 - `src/utils/timeCalculator.ts` — exports `calculateMotionProfileTime`, so routine
   patterns and straight drives are timed on the same profile as paths.
 - `src/lib/Navbar.svelte` — the Auto toggle; "Export Auto (Java)" in the export menu;
-  the time readout shows the preview's length in Auto mode; reset clears the Auto.
+  the time readout shows the preview's length in Auto mode; reset clears the Auto;
+  "Share Link" in the export menu.
 - `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
   place of the Path List (Auto mode's card list).
 - `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
