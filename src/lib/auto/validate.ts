@@ -139,6 +139,54 @@ export function validateAuto(
           at = distinct(ends);
           break;
         }
+        case "routine": {
+          const routine = auto.routines[card.routine];
+          const start = auto.points[card.at];
+          if (!routine) {
+            error(card.id, card.routine ? `Routine "${card.routine}" is not defined.` : "No routine chosen.");
+          } else {
+            if (routine.steps.length === 0) error(card.id, `Routine "${card.routine}" has no steps.`);
+            if (!routine.endsWhen) error(card.id, `Routine "${card.routine}" needs a condition that ends it.`);
+            else if (!conditions.has(routine.endsWhen))
+              error(card.id, `Routine "${card.routine}" ends on "${routine.endsWhen}", which is not a registered condition.`);
+            routine.while.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (while)`, name));
+            routine.exit.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (on exit)`, name));
+          }
+          if (!start) error(card.id, card.at ? `Start point "${card.at}" is not defined.` : "No start point chosen.");
+          if (!auto.points[card.exit])
+            error(card.id, card.exit ? `Exit point "${card.exit}" is not defined.` : "No exit point chosen.");
+          if (start) {
+            const from = farthest(at, { x: start[0], y: start[1] });
+            const gap = Math.hypot(start[0] - from.x, start[1] - from.y);
+            if (gap > DISCONTINUITY_LIMIT_IN)
+              warn(card.id, `The routine starts at ${card.at}, ${gap.toFixed(1)} in from where the robot can be.`);
+          }
+          const exit = auto.points[card.exit];
+          if (exit) at = [{ x: exit[0], y: exit[1] }];
+          break;
+        }
+        case "goTo": {
+          const target = auto.points[card.point];
+          if (!target) error(card.id, card.point ? `Point "${card.point}" is not defined.` : "No point chosen.");
+          if (!(card.maxDistanceIn > 0)) error(card.id, "The farthest distance must be more than 0 in.");
+          const refused = walk(card.ifRefused, at, `"If refused" of ${card.label || "Go to"}`);
+          at = distinct([...(target ? [{ x: target[0], y: target[1] }] : []), ...refused]);
+          break;
+        }
+        case "together": {
+          const drivers = card.cards.filter(
+            (child) => child.kind === "path" || child.kind === "routine" || child.kind === "goTo",
+          );
+          if (drivers.length > 1)
+            warn(card.id, "More than one card here drives the robot; it can follow only one at a time.");
+          if (card.cards.some((child) => child.kind === "path" && child.park))
+            error(card.id, "A park path cannot run alongside other cards; put it in a branch or the main sequence.");
+          const ends: BasePoint[] = [];
+          card.cards.forEach((child) => ends.push(...walk([child], at, card.label || "Together")));
+          const moved = ends.filter((end) => !at.includes(end));
+          at = distinct(moved.length ? moved : at);
+          break;
+        }
       }
     }
     return at;

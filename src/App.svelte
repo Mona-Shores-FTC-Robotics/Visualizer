@@ -170,7 +170,7 @@
   } from "./lib/auto/store";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
-  import { simulateAuto, worstCase } from "./lib/auto/simulate";
+  import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
   import AutoControlPanel from "./lib/auto/components/AutoControlPanel.svelte";
@@ -2782,6 +2782,16 @@
       robotXY = { x: state.x, y: state.y };
       robotHeading = state.heading;
       robotT = state.t ?? null;
+      // Routine patterns and straight drives are not project paths; the
+      // preview places the robot on them itself.
+      const motion = autoPreview
+        ? motionPoseAt(autoPreview, (percent / 100) * autoPreview.endTime)
+        : null;
+      if (motion) {
+        robotXY = { x: x(motion.x), y: y(motion.y) };
+        robotHeading = -motion.headingDeg;
+        robotT = null;
+      }
     } else {
       // Fallback for initialization or empty state
       robotXY = { x: x(startPoint.x), y: y(startPoint.y) };
@@ -3224,6 +3234,7 @@
             {handleSeek}
             bind:loopAnimation
             defaultExportName={pathStem($currentFilePath) || "untitled"}
+            {shapes}
             onExport={() =>
               exportAutoJava({
                 startPoint,

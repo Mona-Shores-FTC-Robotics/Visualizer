@@ -20,7 +20,7 @@ import {
 /**
  * Calculate time for a motion profile (trapezoidal or triangular)
  */
-function calculateMotionProfileTime(
+export function calculateMotionProfileTime(
   distance: number,
   maxVel: number,
   maxAcc: number,

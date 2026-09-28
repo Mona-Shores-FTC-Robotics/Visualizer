@@ -71,6 +71,12 @@ public final class HiveRushAuto {
         Path toUpCellShot = Paths.line(point5, upCellShot).heading(Interpolator.piecewise().until(0.5, Interpolator.constant(toUpCellShotSegment1Heading)).until(1, Interpolator.linear(toUpCellShotSegment2Start, upCellShot)));
         Path parkFarPath = Paths.curve(upCellShot, parkFarPathControl1, parkFar).tangent();
 
+        // Routine patterns, placed where their cards start them; heading held at the start.
+        Pose collectFarPatternP1 = p.of(128, 120, 0);
+        Pose collectFarPatternP2 = p.of(128, 104, 0);
+        Pose collectFarPatternC2 = p.of(134, 112, 0);
+        Path collectFarPattern = Paths.path(Paths.line(farPickup, collectFarPatternP1).constant(farPickup), Paths.curve(collectFarPatternP1, collectFarPatternC2, collectFarPatternP2).constant(farPickup));
+
         return kit.sequence(
                 kit.action("SpinUp"),
                 kit.firstOf("Wait for LauncherReady",
@@ -81,9 +87,7 @@ public final class HiveRushAuto {
                         kit.when("HiveTipped", "CameraBlind").then(
                                 kit.guarded("If tipped", parkFarPath, 2.1,
                                         kit.path("ToFarPickups", toFarPickups, new String[] {"SpinDown"}, AutoKit.at(0.6, "IntakeOn")),
-                                        kit.path("CollectFar", collectFar, new String[] {"IntakeOn"}),
-                                        kit.action("IntakeOff"),
-                                        kit.path("ToUpCellShot", toUpCellShot, new String[] {"SpinUp"}),
+                                        kit.routine("CollectFar at FarPickup", collectFarPattern, "IntakeFull", 2500, new String[] {"IntakeOn"}, new String[] {"IntakeOff", "SpinUp"}, upCellShot),
                                         kit.action("ShootAll"),
                                         kit.path("ParkFarPath", parkFarPath))),
                         kit.afterMs(1500).then(
@@ -91,7 +95,9 @@ public final class HiveRushAuto {
                                 kit.firstOf("Wait for IntakeFull",
                                         kit.when("IntakeFull"),
                                         kit.afterMs(1800)),
-                                kit.path("BackToShoot", backToShoot, new String[] {"IntakeOff", "SpinUp"}),
+                                kit.together("Back and spin up", AutoKit.Ends.ALL,
+                                        kit.path("BackToShoot", backToShoot, new String[] {"IntakeOff"}),
+                                        kit.action("SpinUp")),
                                 kit.action("ShootAll"),
                                 kit.firstOf("Did it tip this time?",
                                         kit.when("HiveTipped").then(
@@ -103,7 +109,8 @@ public final class HiveRushAuto {
                                                         kit.action("ShootAll"),
                                                         kit.path("ParkFarPath", parkFarPath))),
                                         kit.timeLeftBelow(6).then(
-                                                kit.action("SpinDown")),
+                                                kit.goTo("Hold at ShootSpot", shootSpot, 6,
+                                                        kit.action("SpinDown"))),
                                         kit.otherwise()))));
     }
 }

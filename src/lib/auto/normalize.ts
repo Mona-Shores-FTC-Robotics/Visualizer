@@ -6,6 +6,8 @@ import {
   type AutoSection,
   type NamedPoint,
   type PathEvent,
+  type RoutineDef,
+  type RoutineStep,
 } from "./types";
 import { makeCardId } from "./tree";
 
@@ -28,6 +30,7 @@ export function createEmptyAuto(drawnFor: Alliance = "BLUE"): AutoSection {
     drawnFor,
     registry: { actions: [], conditions: [] },
     points: {},
+    routines: {},
     cards: [],
   };
 }
@@ -109,6 +112,16 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     }
   }
 
+  const routines: Record<string, RoutineDef> = {};
+  if (raw.routines !== undefined && !isObject(raw.routines)) {
+    problems.push("routines is not an object of name → routine; ignored it.");
+  } else if (isObject(raw.routines)) {
+    for (const [name, value] of Object.entries(raw.routines)) {
+      const routine = normalizeRoutine(value, `routines.${name}`, problems);
+      if (routine && name.trim()) routines[name.trim()] = routine;
+    }
+  }
+
   const seenIds = new Set<string>();
   const cards = normalizeCards(raw.cards, "cards", problems, seenIds);
 
@@ -117,6 +130,7 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     drawnFor,
     registry,
     points,
+    routines,
     cards,
   };
   if (typeof raw.exportName === "string" && raw.exportName.trim()) {
@@ -224,12 +238,78 @@ function normalizeCard(
         rows,
       };
     }
+    case "routine":
+      return {
+        id: cardId(raw, seenIds),
+        kind: "routine",
+        routine: typeof raw.routine === "string" ? raw.routine : "",
+        at: typeof raw.at === "string" ? raw.at : "",
+        facingDeg: finite(raw.facingDeg) ? raw.facingDeg : 0,
+        mirror: raw.mirror === true,
+        exit: typeof raw.exit === "string" ? raw.exit : "",
+      };
+    case "goTo":
+      return {
+        id: cardId(raw, seenIds),
+        kind: "goTo",
+        label: typeof raw.label === "string" ? raw.label : "",
+        point: typeof raw.point === "string" ? raw.point : "",
+        maxDistanceIn: finite(raw.maxDistanceIn) && raw.maxDistanceIn > 0 ? raw.maxDistanceIn : 24,
+        ifRefused: normalizeCards(raw.ifRefused, `${where}.ifRefused`, problems, seenIds),
+      };
+    case "together":
+      if (raw.ends !== undefined && raw.ends !== "ALL" && raw.ends !== "FIRST") {
+        problems.push(`${where}: ends must be "ALL" or "FIRST"; used ALL.`);
+      }
+      return {
+        id: cardId(raw, seenIds),
+        kind: "together",
+        label: typeof raw.label === "string" ? raw.label : "",
+        ends: raw.ends === "FIRST" ? "FIRST" : "ALL",
+        cards: normalizeCards(raw.cards, `${where}.cards`, problems, seenIds),
+      };
     default:
       problems.push(
-        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path and firstOf).`,
+        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path, firstOf, routine, goTo and together).`,
       );
       return null;
   }
+}
+
+function normalizeRoutine(
+  raw: unknown,
+  where: string,
+  problems: string[],
+): RoutineDef | null {
+  if (!isObject(raw)) {
+    problems.push(`${where} is not a routine; dropped it.`);
+    return null;
+  }
+  const steps: RoutineStep[] = [];
+  if (Array.isArray(raw.steps)) {
+    raw.steps.forEach((step, index) => {
+      if (isObject(step) && finite(step.forward) && finite(step.left)) {
+        const out: RoutineStep = { forward: step.forward, left: step.left };
+        if (
+          Array.isArray(step.control) &&
+          step.control.length === 2 &&
+          step.control.every(finite)
+        ) {
+          out.control = [step.control[0], step.control[1]];
+        }
+        steps.push(out);
+      } else {
+        problems.push(`${where}.steps[${index}] needs numbers "forward" and "left"; dropped it.`);
+      }
+    });
+  }
+  return {
+    steps,
+    endsWhen: typeof raw.endsWhen === "string" ? raw.endsWhen.trim() : "",
+    timeoutMs: finite(raw.timeoutMs) && raw.timeoutMs > 0 ? raw.timeoutMs : 3000,
+    while: nameList(raw.while, `${where}.while`, problems),
+    exit: nameList(raw.exit, `${where}.exit`, problems),
+  };
 }
 
 const ROW_KEYS = [
@@ -336,6 +416,33 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           label: c.label,
           rows: c.rows.map(row),
         };
+      case "routine":
+        return {
+          id: c.id,
+          kind: "routine",
+          routine: c.routine,
+          at: c.at,
+          facingDeg: c.facingDeg,
+          mirror: c.mirror,
+          exit: c.exit,
+        };
+      case "goTo":
+        return {
+          id: c.id,
+          kind: "goTo",
+          label: c.label,
+          point: c.point,
+          maxDistanceIn: c.maxDistanceIn,
+          ifRefused: c.ifRefused.map(card),
+        };
+      case "together":
+        return {
+          id: c.id,
+          kind: "together",
+          label: c.label,
+          ends: c.ends,
+          cards: c.cards.map(card),
+        };
     }
   };
   const row = (r: AutoRow): AutoRow => {
@@ -355,8 +462,28 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     points: Object.fromEntries(
       Object.entries(auto.points).map(([name, point]) => [name, [...point]]),
     ) as Record<string, NamedPoint>,
+    routines: Object.fromEntries(
+      Object.entries(auto.routines).map(([name, routine]) => [
+        name,
+        {
+          steps: routine.steps.map((step) =>
+            step.control
+              ? { forward: step.forward, left: step.left, control: [step.control[0], step.control[1]] }
+              : { forward: step.forward, left: step.left },
+          ),
+          endsWhen: routine.endsWhen,
+          timeoutMs: routine.timeoutMs,
+          while: [...routine.while],
+          exit: [...routine.exit],
+        },
+      ]),
+    ) as Record<string, RoutineDef>,
     cards: auto.cards.map(card),
   };
+  // Written only when there are some, so files without routines stay as they were.
+  if (Object.keys(out.routines).length === 0) {
+    delete (out as Partial<AutoSection>).routines;
+  }
   if (auto.exportName) out.exportName = auto.exportName;
   return out;
 }

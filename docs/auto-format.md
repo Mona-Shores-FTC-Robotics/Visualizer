@@ -17,12 +17,16 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 - **Auto** in the top bar swaps the Path List for the Auto's card list and the
   Controls panel for the Auto panel (the first time, it adds an empty `auto`
   section). Paths are still drawn and edited on the field as usual.
-- **+ Action / + Wait for / + Decision / + Path** add a card after the selected
+- **+ Action / + Wait for / + Decision / + Path / + Routine / + Go to /
+  + Together** add a card after the selected
   card; select a decision's branch header to add at the end of that branch.
   The selected card has ↑ ↓ ✕ in the list and Duplicate / Delete in the panel.
 - The panel edits the selected card: the action; a path card's path,
   while-driving chips, events bar (click to add, drag to move, arrow keys to
-  nudge) and park checkbox; a wait's or decision's rows.
+  nudge) and park checkbox; a wait's or decision's rows; a routine's placement,
+  with a fit check against the walls and keep-out zones, and the **routine
+  editor** (steps table, a pattern canvas whose points drag, end condition,
+  timeout, while and exit actions).
 - **Robot actions & conditions** is the registry, plus the alliance the Auto
   is drawn for, the export name and the named points.
 - **Preview as** sets the scenario; the playback bar, robot and log follow it.
@@ -76,6 +80,32 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 | `action` | `name`, `previewMs?` | Runs a registered action. `previewMs` is only used by the preview (how long the action keeps the robot busy); it is not exported. |
 | `path` | `lineId`, `while`, `events`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `while`: actions started with the path. `events`: `{at, action}` with `at` in 0..1 of the path's length. `park`: this is the branch's park path for the endgame guard. |
 | `firstOf` | `label`, `rows` | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. |
+| `routine` | `routine`, `at`, `facingDeg`, `mirror`, `exit` | Runs the named routine (see below) placed at the named point `at`, facing `facingDeg`, optionally mirrored left↔right; then drives straight to the named point `exit`. |
+| `goTo` | `label`, `point`, `maxDistanceIn`, `ifRefused` | Drives straight to the named point if it is at most `maxDistanceIn` away; otherwise runs the `ifRefused` cards. |
+| `together` | `label`, `ends`, `cards` | Starts its cards at once; done when `"ALL"` of them are, or the `"FIRST"` one is. Only one of them should drive. |
+
+### Routines
+
+`routines` (optional; written only when there are some) maps a name to a
+pattern defined **relative to where it starts**, so one routine can be placed
+at several points:
+
+```json
+"routines": {
+  "CollectFar": {
+    "steps": [ { "forward": 12, "left": 0 }, { "forward": 12, "left": -16, "control": [18, -8] } ],
+    "endsWhen": "IntakeFull", "timeoutMs": 2500,
+    "while": ["IntakeOn"], "exit": ["IntakeOff", "SpinUp"]
+  }
+}
+```
+
+`steps` follow the implicit start at (0, 0): `forward` along the facing, `left`
+to the robot's left, in inches; a step with `control` is a curve through that
+control point. The heading is held at the facing for the whole pattern. The
+routine ends when `endsWhen` (a registered condition) turns true, after
+`timeoutMs`, or when the pattern is done; `while` actions run during it and
+`exit` actions as it leaves for the card's exit point.
 
 ### Rows
 
@@ -97,7 +127,9 @@ Rules the editor enforces (errors block the Java export):
   or `otherwise`), so nothing can wait forever;
 - every action and condition name used anywhere is in the registry;
 - a path card names a top-level path that exists;
-- a list of cards has at most one park card.
+- a list of cards has at most one park card, and a `together` holds none;
+- a routine card names a defined routine with steps and a registered
+  `endsWhen`, and its start and exit points exist; a `goTo` names a point.
 
 Warnings (shown, not blocking): a path that starts more than 2 in from where
 the robot can be when it starts; a park card that is not last in its branch;
@@ -138,6 +170,13 @@ contract with the robot's `autokit` library:
   imported only when a piecewise heading is used;
 - the cards become one `kit.sequence(...)`; a `firstOf` becomes
   `kit.firstOf(label, rows...)`; a row with cards is `kit.when(...).then(...)`;
+- a routine card becomes `kit.routine(label, pattern, endsWhen, timeoutMs,
+  while[], exit[], exitPose)`, where `pattern` is a `Path` local placed on the
+  field (`Paths.line/curve(...).constant(start)`, joined with `Paths.path`),
+  and the label is `"<routine> at <point>"`;
+- a `goTo` becomes `kit.goTo(label, point, maxDistanceIn, ifRefused)`, where
+  `ifRefused` is the one card, or `kit.sequence(...)` of several;
+- a `together` becomes `kit.together(label, AutoKit.Ends.ALL|FIRST, cards...)`;
 - a list that directly contains a park card is wrapped
   `kit.guarded(label, parkPath, seconds, cards...)`, where `seconds` is the
   park path's drive time by the preview's motion model, rounded **up** to
@@ -166,6 +205,12 @@ row and event with its time against the 30 s budget.
 Each branch also shows its **worst case**: the Auto's end time if that branch
 is taken and every later wait runs to its time row. Over 30 s it is flagged.
 
+Routines run their placed pattern until the condition (from the scenario),
+the timeout or the pattern's end, then drive straight to the exit point. A
+`goTo` drives straight to its point or runs its fallback. A `together` follows
+the card that drives and counts the others' time; with `FIRST` it stops at
+the first card's end.
+
 The endgame guard is previewed the way `kit.guarded` is meant to work: once
 the time left is no more than the park path's seconds, whatever is running
 (a wait, an action, a path part-way) stops, the rest of the branch is
@@ -183,11 +228,14 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 - `src/App.svelte` — load, save, undo/redo, session recovery.
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.
 - `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
+- `src/utils/timeCalculator.ts` — exports `calculateMotionProfileTime`, so routine
+  patterns and straight drives are timed on the same profile as paths.
 - `src/lib/Navbar.svelte` — the Auto toggle; "Export Auto (Java)" in the export menu;
   the time readout shows the preview's length in Auto mode; reset clears the Auto.
 - `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
   place of the Path List (Auto mode's card list).
 - `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
-  timeline, the stock path strokes are hidden (the overlay draws them by branch),
-  and the Controls panel shows the Auto panel instead of `ControlTab`.
+  timeline (and its routine/straight drives), the stock path strokes are hidden (the
+  overlay draws them by branch), and the Controls panel shows the Auto panel instead
+  of `ControlTab`.
 - `package.json` — `test` script.

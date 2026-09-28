@@ -11,8 +11,25 @@ import { rowKind } from "./types";
 export interface CardLocation {
   list: AutoCard[];
   index: number;
-  /** The decision and row that own the list; null for the top level. */
-  parent: { card: FirstOfCard; rowIndex: number } | null;
+  /**
+   * The card that owns the list and which of its lists it is (a decision's
+   * row, a goTo's "if refused", a together's cards); null for the top level.
+   */
+  parent: { card: AutoCard; rowIndex: number } | null;
+}
+
+/** The card lists a card holds: a decision's rows, a goTo's fallback, a together's cards. */
+export function childLists(card: AutoCard): AutoCard[][] {
+  switch (card.kind) {
+    case "firstOf":
+      return card.rows.map((row) => row.cards);
+    case "goTo":
+      return [card.ifRefused];
+    case "together":
+      return [card.cards];
+    default:
+      return [];
+  }
 }
 
 export function makeCardId(): string {
@@ -25,7 +42,7 @@ export function allCards(cards: AutoCard[]): AutoCard[] {
   const walk = (list: AutoCard[]) => {
     for (const card of list) {
       out.push(card);
-      if (card.kind === "firstOf") card.rows.forEach((row) => walk(row.cards));
+      childLists(card).forEach(walk);
     }
   };
   walk(cards);
@@ -40,12 +57,9 @@ export function locateCard(
   const index = cards.findIndex((card) => card.id === id);
   if (index >= 0) return { list: cards, index, parent };
   for (const card of cards) {
-    if (card.kind !== "firstOf") continue;
-    for (let rowIndex = 0; rowIndex < card.rows.length; rowIndex++) {
-      const found = locateCard(card.rows[rowIndex].cards, id, {
-        card,
-        rowIndex,
-      });
+    const lists = childLists(card);
+    for (let rowIndex = 0; rowIndex < lists.length; rowIndex++) {
+      const found = locateCard(lists[rowIndex], id, { card, rowIndex });
       if (found) return found;
     }
   }
@@ -63,7 +77,7 @@ export function cloneCard(card: AutoCard): AutoCard {
   const copy = JSON.parse(JSON.stringify(card)) as AutoCard;
   const refresh = (c: AutoCard) => {
     c.id = makeCardId();
-    if (c.kind === "firstOf") c.rows.forEach((row) => row.cards.forEach(refresh));
+    childLists(c).forEach((list) => list.forEach(refresh));
   };
   refresh(copy);
   return copy;
@@ -88,6 +102,14 @@ export function usedNames(auto: AutoSection): {
     if (card.kind === "firstOf") {
       for (const row of card.rows) {
         if ("when" in row) row.when.forEach((name) => bump(conditions, name));
+      }
+    }
+    if (card.kind === "routine") {
+      const routine = auto.routines[card.routine];
+      if (routine) {
+        if (routine.endsWhen) bump(conditions, routine.endsWhen);
+        routine.while.forEach((name) => bump(actions, name));
+        routine.exit.forEach((name) => bump(actions, name));
       }
     }
   }
@@ -147,7 +169,22 @@ export function cardTitle(card: AutoCard, pathName?: string): string {
       return pathName ?? "(missing path)";
     case "firstOf":
       return card.label || "First of";
+    case "routine":
+      return `${card.routine} at ${card.at}`;
+    case "goTo":
+      return card.label || `Go to ${card.point}`;
+    case "together":
+      return card.label || "Together";
   }
+}
+
+/** Label used for a card list's endgame guard and in the editor. */
+export function listLabel(parent: { card: AutoCard; rowIndex: number } | null): string {
+  if (!parent) return "Auto";
+  const { card, rowIndex } = parent;
+  if (card.kind === "firstOf") return rowLabel(card.rows[rowIndex]);
+  if (card.kind === "goTo") return `${cardTitle(card)}: if refused`;
+  return cardTitle(card);
 }
 
 /** True when no row has cards: shown as a "Wait for" card, not a decision. */

@@ -311,6 +311,33 @@
         28
       ]
     },
+    "routines": {
+      "CollectFar": {
+        "steps": [
+          {
+            "forward": 12,
+            "left": 0
+          },
+          {
+            "forward": 12,
+            "left": -16,
+            "control": [
+              18,
+              -8
+            ]
+          }
+        ],
+        "endsWhen": "IntakeFull",
+        "timeoutMs": 2500,
+        "while": [
+          "IntakeOn"
+        ],
+        "exit": [
+          "IntakeOff",
+          "SpinUp"
+        ]
+      }
+    },
     "cards": [
       {
         "id": "spin-up",
@@ -369,28 +396,12 @@
               },
               {
                 "id": "tip-2",
-                "kind": "path",
-                "lineId": "far-collect",
-                "while": [
-                  "IntakeOn"
-                ],
-                "events": [],
-                "park": false
-              },
-              {
-                "id": "tip-3",
-                "kind": "action",
-                "name": "IntakeOff"
-              },
-              {
-                "id": "tip-4",
-                "kind": "path",
-                "lineId": "far-up",
-                "while": [
-                  "SpinUp"
-                ],
-                "events": [],
-                "park": false
+                "kind": "routine",
+                "routine": "CollectFar",
+                "at": "FarPickup",
+                "facingDeg": 0,
+                "mirror": false,
+                "exit": "UpCellShot"
               },
               {
                 "id": "tip-5",
@@ -444,14 +455,27 @@
               },
               {
                 "id": "near-3",
-                "kind": "path",
-                "lineId": "near-back",
-                "while": [
-                  "IntakeOff",
-                  "SpinUp"
-                ],
-                "events": [],
-                "park": false
+                "kind": "together",
+                "label": "Back and spin up",
+                "ends": "ALL",
+                "cards": [
+                  {
+                    "id": "near-3a",
+                    "kind": "path",
+                    "lineId": "near-back",
+                    "while": [
+                      "IntakeOff"
+                    ],
+                    "events": [],
+                    "park": false
+                  },
+                  {
+                    "id": "near-3b",
+                    "kind": "action",
+                    "name": "SpinUp",
+                    "previewMs": 900
+                  }
+                ]
               },
               {
                 "id": "near-4",
@@ -531,9 +555,18 @@
                     "label": "Out of time",
                     "cards": [
                       {
-                        "id": "late-out",
-                        "kind": "action",
-                        "name": "SpinDown"
+                        "id": "late-hold",
+                        "kind": "goTo",
+                        "label": "Hold at ShootSpot",
+                        "point": "ShootSpot",
+                        "maxDistanceIn": 6,
+                        "ifRefused": [
+                          {
+                            "id": "late-out",
+                            "kind": "action",
+                            "name": "SpinDown"
+                          }
+                        ]
                       }
                     ]
                   },

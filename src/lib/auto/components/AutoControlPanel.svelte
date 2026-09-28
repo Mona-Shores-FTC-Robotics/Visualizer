@@ -1,6 +1,6 @@
 <script lang="ts">
   import type * as d3 from "d3";
-  import type { BasePoint, StartPose } from "../../../types";
+  import type { BasePoint, Shape, StartPose } from "../../../types";
   import type { PathCatalog } from "../geometry";
   import type { AutoIssue } from "../validate";
   import type { PreviewResult, WorstCase } from "../simulate";
@@ -33,6 +33,7 @@
     loopAnimation: boolean;
     defaultExportName: string;
     onExport: () => void;
+    shapes: Shape[];
   }
 
   let {
@@ -54,6 +55,7 @@
     loopAnimation = $bindable(),
     defaultExportName,
     onExport,
+    shapes,
   }: Props = $props();
 
   let errors = $derived(issues.filter((issue) => issue.level === "error"));
@@ -86,7 +88,7 @@
       </div>
     </div>
 
-    <CardEditor {auto} {catalog} {issues} {preview} {worst} />
+    <CardEditor {auto} {catalog} {issues} {preview} {worst} {shapes} />
 
     <AutoPreviewPanel {auto} {preview} {worst} {now} />
 

@@ -53,6 +53,8 @@ export interface PathCatalog {
   nestedIds: Set<string>;
   /** Display name of every path and group, nested ones included. */
   names: Map<string, string>;
+  /** The robot settings the times were computed with. */
+  settings: Settings;
 }
 
 /** Names as the Path List shows them: "Path N" counts segments, "Group N" groups. */
@@ -170,6 +172,7 @@ export function buildPathCatalog(
     byId: new Map(paths.map((path) => [path.id, path])),
     nestedIds,
     names,
+    settings,
   };
 }
 

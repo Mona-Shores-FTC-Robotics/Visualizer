@@ -1,6 +1,6 @@
 import type { BasePoint } from "../../types";
 import type { PathCatalog } from "./geometry";
-import { cloneCard, locateCard, makeCardId } from "./tree";
+import { childLists, cloneCard, locateCard, makeCardId } from "./tree";
 import {
   type AutoCard,
   type AutoRow,
@@ -14,7 +14,14 @@ import {
  * select afterwards, or null to keep the selection.
  */
 
-export type NewCardKind = "action" | "wait" | "decision" | "path";
+export type NewCardKind =
+  | "action"
+  | "wait"
+  | "decision"
+  | "path"
+  | "routine"
+  | "goTo"
+  | "together";
 
 /** Where a new card goes: after the selected card, into a selected branch, or at the end. */
 function insertionPoint(
@@ -26,10 +33,8 @@ function insertionPoint(
     const location = locateCard(auto.cards, cardId);
     if (location) {
       const card = location.list[location.index];
-      if (rowIndex !== null && card.kind === "firstOf" && card.rows[rowIndex]) {
-        const list = card.rows[rowIndex].cards;
-        return { list, index: list.length };
-      }
+      const list = rowIndex !== null ? childLists(card)[rowIndex] : undefined;
+      if (list) return { list, index: list.length };
       return { list: location.list, index: location.index + 1 };
     }
   }
@@ -57,15 +62,27 @@ function findOwner(
   list: AutoCard[],
 ): { list: AutoCard[]; index: number } | null {
   for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
-    if (card.kind !== "firstOf") continue;
-    for (const row of card.rows) {
-      if (row.cards === list) return { list: cards, index: i };
-      const deeper = findOwner(row.cards, list);
+    for (const child of childLists(cards[i])) {
+      if (child === list) return { list: cards, index: i };
+      const deeper = findOwner(child, list);
       if (deeper) return deeper;
     }
   }
   return null;
+}
+
+function nearestPoint(auto: AutoSection, from: BasePoint | null): string | null {
+  if (!from) return null;
+  let best: string | null = null;
+  let bestDistance = Infinity;
+  for (const [name, point] of Object.entries(auto.points)) {
+    const distance = Math.hypot(point[0] - from.x, point[1] - from.y);
+    if (distance < bestDistance) {
+      best = name;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 export function newCard(
@@ -100,6 +117,44 @@ export function newCard(
           { otherwise: true, cards: [] },
         ],
       };
+    case "routine": {
+      const from = robotBefore(auto, at.list, at.index, catalog);
+      const point = nearestPoint(auto, from) ?? Object.keys(auto.points)[0] ?? "";
+      let routine = Object.keys(auto.routines)[0];
+      if (!routine) {
+        routine = "NewRoutine";
+        auto.routines[routine] = {
+          steps: [
+            { forward: 12, left: 0 },
+            { forward: 12, left: -12 },
+          ],
+          endsWhen: auto.registry.conditions[0] ?? "",
+          timeoutMs: 2000,
+          while: [],
+          exit: [],
+        };
+      }
+      return {
+        id: makeCardId(),
+        kind: "routine",
+        routine,
+        at: point,
+        facingDeg: auto.points[point]?.[2] ?? 0,
+        mirror: false,
+        exit: point,
+      };
+    }
+    case "goTo":
+      return {
+        id: makeCardId(),
+        kind: "goTo",
+        label: "",
+        point: Object.keys(auto.points)[0] ?? "",
+        maxDistanceIn: 24,
+        ifRefused: [],
+      };
+    case "together":
+      return { id: makeCardId(), kind: "together", label: "", ends: "ALL", cards: [] };
     case "path": {
       const from = robotBefore(auto, at.list, at.index, catalog);
       const fits = from

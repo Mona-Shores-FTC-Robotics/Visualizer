@@ -58,7 +58,51 @@ export interface FirstOfCard {
   rows: AutoRow[];
 }
 
-export type AutoCard = ActionCard | PathCard | FirstOfCard;
+/**
+ * Runs a routine (a pattern defined relative to where it starts) placed at a
+ * named point, facing `facingDeg`, optionally mirrored left↔right. It ends
+ * when the routine's condition turns true, its time runs out or the pattern
+ * is done, then drives straight to the `exit` point.
+ */
+export interface RoutineCard {
+  id: string;
+  kind: "routine";
+  routine: string;
+  at: string;
+  facingDeg: number;
+  mirror: boolean;
+  exit: string;
+}
+
+/**
+ * Drives straight to a named point if it is no more than `maxDistanceIn`
+ * away; otherwise runs the `ifRefused` cards instead.
+ */
+export interface GoToCard {
+  id: string;
+  kind: "goTo";
+  label: string;
+  point: string;
+  maxDistanceIn: number;
+  ifRefused: AutoCard[];
+}
+
+/** Runs its cards at the same time; done when ALL are, or the FIRST is. */
+export interface TogetherCard {
+  id: string;
+  kind: "together";
+  label: string;
+  ends: "ALL" | "FIRST";
+  cards: AutoCard[];
+}
+
+export type AutoCard =
+  | ActionCard
+  | PathCard
+  | FirstOfCard
+  | RoutineCard
+  | GoToCard
+  | TogetherCard;
 export type AutoCardKind = AutoCard["kind"];
 
 interface RowCommon {
@@ -90,6 +134,28 @@ export type RowKind =
   | "nearPoint"
   | "inArea";
 
+/**
+ * One step of a routine's pattern, in inches relative to where the routine
+ * starts: `forward` along its facing, `left` to its left. With `control` the
+ * step is a curve through that control point, otherwise a straight line.
+ */
+export interface RoutineStep {
+  forward: number;
+  left: number;
+  control?: [number, number];
+}
+
+export interface RoutineDef {
+  /** The pattern, after the implicit start at (0, 0). */
+  steps: RoutineStep[];
+  /** Registered condition that ends the routine early. */
+  endsWhen: string;
+  timeoutMs: number;
+  while: string[];
+  /** Actions started as the robot leaves for the exit point. */
+  exit: string[];
+}
+
 export interface AutoSection {
   version: typeof AUTO_FORMAT_VERSION;
   /** The alliance the Auto is drawn for; the robot mirrors it for the other. */
@@ -98,6 +164,8 @@ export interface AutoSection {
   exportName?: string;
   registry: AutoRegistry;
   points: Record<string, NamedPoint>;
+  /** Routine definitions by name; placed on the field by routine cards. */
+  routines: Record<string, RoutineDef>;
   cards: AutoCard[];
 }
 

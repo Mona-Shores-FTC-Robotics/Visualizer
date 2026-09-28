@@ -1,13 +1,25 @@
 import type { BasePoint, StartPose, TimelineEvent } from "../../types";
 import { pointAlong, timeAtFraction, type PathCatalog, type PathInfo } from "./geometry";
-import { describeRow, parkCardOf, rowLabel } from "./tree";
+import { cardTitle, describeRow, parkCardOf, rowLabel } from "./tree";
+import {
+  motionAlong,
+  placementAt,
+  placeRoutine,
+  poseAlong,
+  segmentSamples,
+  straightMotion,
+  type Motion,
+} from "./motion";
 import {
   rowKind,
   type AutoCard,
   type AutoRow,
   type AutoSection,
   type FirstOfCard,
+  type GoToCard,
   type PathCard,
+  type RoutineCard,
+  type TogetherCard,
 } from "./types";
 
 /** Length of the Autonomous period, as `AutoKit.AUTO_LENGTH_S`. */
@@ -48,6 +60,14 @@ export interface DriveRecord {
   t1: number;
 }
 
+/** A drive that is not a project path (routine pattern, exit, goTo). */
+export interface MotionRecord {
+  cardId: string;
+  t0: number;
+  t1: number;
+  motion: Motion;
+}
+
 export interface PreviewResult {
   /** Robot motion in the app's own timeline format, for the playback bar. */
   timeline: TimelineEvent[];
@@ -58,6 +78,11 @@ export interface PreviewResult {
   /** Decision id → index of the row that fired. */
   taken: Map<string, number>;
   drives: DriveRecord[];
+  /**
+   * Drives that are not project paths. The timeline holds a stand-in wait
+   * for each; `motionPoseAt` gives the robot's pose during them.
+   */
+  motions: MotionRecord[];
   /** Set when the endgame guard cut a branch short. */
   guard: { t: number; label: string } | null;
   /** True when a wait had no row that could ever fire. */
@@ -90,6 +115,8 @@ export function simulateAuto(
   const ran = new Set<string>();
   const taken = new Map<string, number>();
   const drives: DriveRecord[] = [];
+  const motions: MotionRecord[] = [];
+  const settings = catalog.settings;
   let guardFired: PreviewResult["guard"] = null;
   let stalled = false;
 
@@ -154,15 +181,40 @@ export function simulateAuto(
     }
   };
 
+  /** Drive a motion, or only its first `until` seconds when cut short. */
+  const move = (cardId: string, motion: Motion, until = Infinity) => {
+    const seconds = Math.min(motion.seconds, until);
+    const end = poseAlong(motion, motion.distanceAt(seconds));
+    if (seconds > 1e-6) {
+      timeline.push({
+        type: "wait",
+        duration: seconds,
+        startTime: t,
+        endTime: t + seconds,
+        startHeading: heading,
+        targetHeading: end.headingDeg,
+        atPoint: { ...pos },
+      });
+      motions.push({ cardId, t0: t, t1: t + seconds, motion });
+      t += seconds;
+    }
+    pos = { x: end.x, y: end.y };
+    heading = end.headingDeg;
+  };
+
+  /** When a registered condition turns true, for a card that started at t0. */
+  const conditionTime = (name: string, t0: number): number => {
+    const sc = scenario[name] ?? DEFAULT_CONDITION;
+    if (!sc.enabled) return Infinity;
+    return sc.from === "card" ? t0 + sc.seconds : Math.max(t0, sc.seconds);
+  };
+
   const fireTime = (row: AutoRow, t0: number): number => {
     switch (rowKind(row)) {
       case "when": {
         let best = Infinity;
         for (const name of (row as { when: string[] }).when) {
-          const sc = scenario[name] ?? DEFAULT_CONDITION;
-          if (!sc.enabled) continue;
-          const at = sc.from === "card" ? t0 + sc.seconds : Math.max(t0, sc.seconds);
-          best = Math.min(best, at);
+          best = Math.min(best, conditionTime(name, t0));
         }
         return best;
       }
@@ -302,7 +354,157 @@ export function simulateAuto(
       }
       case "firstOf":
         return runFirstOf(card, guards);
+      case "routine":
+        return runRoutine(card, guards);
+      case "goTo":
+        return runGoTo(card, guards);
+      case "together":
+        return runTogether(card, guards);
     }
+  };
+
+  /** Move, unless the endgame guard's deadline comes first. */
+  const guardedMove = (cardId: string, motion: Motion, until: number, guards: Guard[], what: string): Signal => {
+    const deadline = pendingDeadline(guards);
+    const seconds = Math.min(motion.seconds, until);
+    if (deadline && deadline.deadline < t + seconds - 1e-9) {
+      move(cardId, motion, Math.max(0, deadline.deadline - t));
+      note(`${what}: stopped by the endgame guard`, "warn", cardId);
+      return { abortTo: deadline };
+    }
+    move(cardId, motion, seconds);
+    return null;
+  };
+
+  const runRoutine = (card: RoutineCard, guards: Guard[]): Signal => {
+    const routine = auto.routines[card.routine];
+    const placement = placementAt(auto.points, card.at, card.facingDeg, card.mirror);
+    const exit = auto.points[card.exit];
+    const title = cardTitle(card);
+    if (!routine || !placement || routine.steps.length === 0) {
+      note(`${title}: routine or point missing; skipped`, "warn", card.id);
+      return null;
+    }
+    const origin = { x: placement.x, y: placement.y };
+    pos = origin;
+    heading = card.facingDeg;
+    const motion = motionAlong(segmentSamples(placeRoutine(routine, placement), origin), settings, card.facingDeg);
+    const t0 = t;
+    const condition = routine.endsWhen ? conditionTime(routine.endsWhen, t0) : Infinity;
+    const timeout = t0 + routine.timeoutMs / 1000;
+    const done = t0 + motion.seconds;
+    const end = Math.min(condition, timeout, done);
+    note(
+      `Routine ${title}${routine.while.length ? ` · while ${routine.while.join(", ")}` : ""}`,
+      "card",
+      card.id,
+    );
+    const signal = guardedMove(card.id, motion, end - t0, guards, title);
+    if (signal) return signal;
+    note(
+      end === condition
+        ? `${title}: ${routine.endsWhen} after ${(end - t0).toFixed(2)} s`
+        : end === timeout
+          ? `${title}: timed out at ${routine.timeoutMs} ms`
+          : `${title}: pattern done (${(end - t0).toFixed(2)} s), ${routine.endsWhen || "no condition"} not true`,
+      end === condition ? "row" : "warn",
+      card.id,
+    );
+    if (!exit) return null;
+    note(
+      `Exit to ${card.exit}${routine.exit.length ? ` · ${routine.exit.join(", ")}` : ""}`,
+      "card",
+      card.id,
+    );
+    return guardedMove(card.id, straightMotion(pos, { x: exit[0], y: exit[1] }, settings), Infinity, guards, `${title} exit`);
+  };
+
+  const runGoTo = (card: GoToCard, guards: Guard[]): Signal => {
+    const target = auto.points[card.point];
+    const title = cardTitle(card);
+    if (!target) {
+      note(`${title}: point missing; skipped`, "warn", card.id);
+      return null;
+    }
+    const distance = Math.hypot(target[0] - pos.x, target[1] - pos.y);
+    if (distance <= card.maxDistanceIn) {
+      note(`${title} (${distance.toFixed(1)} in)`, "card", card.id);
+      const motion = motionAlong([pos, { x: target[0], y: target[1] }], settings, target[2] ?? heading);
+      return guardedMove(card.id, motion, Infinity, guards, title);
+    }
+    taken.set(card.id, 0);
+    note(`${title}: refused, ${distance.toFixed(1)} in is over ${card.maxDistanceIn} in`, "row", card.id);
+    return runList(card.ifRefused, guards, `${title}: if refused`);
+  };
+
+  const moves = (card: AutoCard): boolean =>
+    card.kind === "path" || card.kind === "routine" || card.kind === "goTo";
+
+  const runTogether = (card: TogetherCard, guards: Guard[]): Signal => {
+    const title = cardTitle(card);
+    note(`${title} (${card.ends === "ALL" ? "until all are done" : "until the first is done"})`, "card", card.id);
+    if (card.cards.length === 0) return null;
+    // The robot follows one card; the others' time counts but not their motion.
+    const lead = Math.max(0, card.cards.findIndex(moves));
+    const t0 = t;
+    const start = { pos: { ...pos }, heading };
+    const ends: number[] = [];
+    card.cards.forEach((child, index) => {
+      if (index === lead) return;
+      const mark = { timeline: timeline.length, motions: motions.length, drives: drives.length };
+      t = t0;
+      pos = { ...start.pos };
+      heading = start.heading;
+      runCard(child, []);
+      ends.push(t);
+      timeline.length = mark.timeline;
+      motions.length = mark.motions;
+      drives.length = mark.drives;
+    });
+    t = t0;
+    pos = { ...start.pos };
+    heading = start.heading;
+    const signal = runCard(card.cards[lead], guards);
+    if (signal) return signal;
+    const leadEnd = t;
+    const end = card.ends === "ALL" ? Math.max(leadEnd, ...ends) : Math.min(leadEnd, ...ends);
+    if (end > leadEnd) stay(end - leadEnd);
+    else if (end < leadEnd - 1e-9) cutAt(end);
+    note(`${title}: done after ${(end - t0).toFixed(2)} s`, "row", card.id);
+    return null;
+  };
+
+  /** Stop the robot at `end`: drop what happens after it and put the robot there. */
+  const cutAt = (end: number) => {
+    const at = poseAt(end);
+    while (timeline.length && timeline[timeline.length - 1].startTime >= end - 1e-9) timeline.pop();
+    const last = timeline[timeline.length - 1];
+    if (last && last.endTime > end) {
+      last.endTime = end;
+      last.duration = end - last.startTime;
+    }
+    for (const record of motions) if (record.t1 > end) record.t1 = end;
+    for (const record of drives) if (record.t1 > end) record.t1 = end;
+    t = end;
+    pos = { x: at.x, y: at.y };
+    heading = at.headingDeg;
+  };
+
+  /** Where the preview has put the robot at `time` so far. */
+  const poseAt = (time: number): { x: number; y: number; headingDeg: number } => {
+    for (const record of motions) {
+      if (time >= record.t0 && time <= record.t1) {
+        return poseAlong(record.motion, record.motion.distanceAt(time - record.t0));
+      }
+    }
+    for (const record of drives) {
+      if (time >= record.t0 && time <= record.t1) {
+        const path = catalog.byId.get(record.pathId)!;
+        const along = path.distanceAt(time - record.t0);
+        return { ...pointAlong(path, path.length > 0 ? along / path.length : 1), headingDeg: heading };
+      }
+    }
+    return { x: pos.x, y: pos.y, headingDeg: heading };
   };
 
   const runList = (list: AutoCard[], outer: Guard[], label: string): Signal => {
@@ -359,7 +561,20 @@ export function simulateAuto(
     t <= AUTO_LENGTH_S && !stalled ? "end" : "warn",
   );
   log.sort((a, b) => a.t - b.t);
-  return { timeline, log, endTime: t, ran, taken, drives, guard: guardFired, stalled };
+  return { timeline, log, endTime: t, ran, taken, drives, motions, guard: guardFired, stalled };
+}
+
+/** The robot's pose during a preview motion (routine, exit, goTo), else null. */
+export function motionPoseAt(
+  preview: PreviewResult,
+  time: number,
+): { x: number; y: number; headingDeg: number } | null {
+  for (const record of preview.motions) {
+    if (time >= record.t0 - 1e-9 && time <= record.t1 + 1e-9) {
+      return poseAlong(record.motion, record.motion.distanceAt(time - record.t0));
+    }
+  }
+  return null;
 }
 
 // --- worst case -------------------------------------------------------------
@@ -405,13 +620,41 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
     rows.set(id, list);
   };
 
+  const straightSeconds = (distance: number) =>
+    straightMotion({ x: 0, y: 0 }, { x: distance, y: 0 }, catalog.settings).seconds;
+
+  /** Upper bound on a routine's time: pattern or timeout, then the longest exit. */
+  const routineSeconds = (card: RoutineCard): number => {
+    const routine = auto.routines[card.routine];
+    const placement = placementAt(auto.points, card.at, card.facingDeg, card.mirror);
+    if (!routine || !placement) return 0;
+    const origin = { x: placement.x, y: placement.y };
+    const samples = segmentSamples(placeRoutine(routine, placement), origin);
+    const pattern = motionAlong(samples, catalog.settings, card.facingDeg).seconds;
+    const exit = auto.points[card.exit];
+    const longestExit = exit
+      ? Math.max(...samples.map((s) => Math.hypot(exit[0] - s.x, exit[1] - s.y)))
+      : 0;
+    return Math.min(pattern, routine.timeoutMs / 1000) + straightSeconds(longestExit);
+  };
+
   const endOf = (list: AutoCard[], start: number, index: number, rest: (t: number) => number): number => {
     let t = start;
     for (let i = index; i < list.length; i++) {
       const card = list[i];
       if (card.kind === "action") t += (card.previewMs ?? 0) / 1000;
       else if (card.kind === "path") t += catalog.byId.get(card.lineId)?.seconds ?? 0;
-      else {
+      else if (card.kind === "routine") t += routineSeconds(card);
+      else if (card.kind === "together") {
+        const lengths = card.cards.map((child) => endOf([child], 0, 0, (x) => x));
+        if (lengths.length) t += card.ends === "ALL" ? Math.max(...lengths) : Math.min(...lengths);
+      } else if (card.kind === "goTo") {
+        const after = (end: number) => endOf(list, end, i + 1, rest);
+        const drove = after(t + straightSeconds(card.maxDistanceIn));
+        const refused = endOf(card.ifRefused, t, 0, after);
+        record(card.id, 0, 1, refused);
+        return Math.max(drove, refused);
+      } else {
         const limit = waitLimit(card, t);
         if (!Number.isFinite(limit)) return Infinity;
         const after = (end: number) => endOf(list, end, i + 1, rest);
