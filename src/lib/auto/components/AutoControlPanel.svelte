@@ -59,7 +59,7 @@
   let errors = $derived(issues.filter((issue) => issue.level === "error"));
   let warnings = $derived(issues.filter((issue) => issue.level === "warning"));
   let now = $derived((percent / 100) * preview.endTime);
-  let robotInches = $derived({ x: x.invert(robotXY.x), y: y.invert(robotXY.y), headingDeg: -robotHeading });
+  let robotInches = $derived({ x: x.invert(robotXY.x), y: y.invert(robotXY.y) });
   let markers = $derived(
     preview.endTime > 0
       ? preview.log

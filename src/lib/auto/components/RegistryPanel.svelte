@@ -7,7 +7,8 @@
   interface Props {
     auto: AutoSection;
     defaultExportName: string;
-    robotAt: { x: number; y: number; headingDeg: number };
+    /** Where the robot is now; "Add at robot" puts a new point there. */
+    robotAt: { x: number; y: number };
   }
 
   let { auto, defaultExportName, robotAt }: Props = $props();
