@@ -469,7 +469,11 @@ export function simulateAuto(
     const leadEnd = t;
     const end = card.ends === "ALL" ? Math.max(leadEnd, ...ends) : Math.min(leadEnd, ...ends);
     if (end > leadEnd) stay(end - leadEnd);
-    else if (end < leadEnd - 1e-9) cutAt(end);
+    else if (end < leadEnd - 1e-9) {
+      cutAt(end);
+      // What would have happened after the first card finished did not.
+      for (let i = log.length - 1; i >= 0; i--) if (log[i].t > end + 1e-9) log.splice(i, 1);
+    }
     note(`${title}: done after ${(end - t0).toFixed(2)} s`, "row", card.id);
     return null;
   };
@@ -646,7 +650,7 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
       else if (card.kind === "path") t += catalog.byId.get(card.lineId)?.seconds ?? 0;
       else if (card.kind === "routine") t += routineSeconds(card);
       else if (card.kind === "together") {
-        const lengths = card.cards.map((child) => endOf([child], 0, 0, (x) => x));
+        const lengths = card.cards.map((child) => endOf([child], t, 0, (x) => x) - t);
         if (lengths.length) t += card.ends === "ALL" ? Math.max(...lengths) : Math.min(...lengths);
       } else if (card.kind === "goTo") {
         const after = (end: number) => endOf(list, end, i + 1, rest);
