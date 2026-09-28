@@ -126,6 +126,17 @@ contract with the robot's `autokit` library:
   park path's drive time by the preview's motion model, rounded **up** to
   0.1 s; the trunk's guard label is `"Auto"`, a branch's is its row label.
 
+From the command line, without opening the app:
+
+```
+node scripts/export-auto.mjs path/to/hive-rush.pp [outDir]
+```
+
+`npm test` runs the unit tests, including a golden test that exports the
+sample and compares it with `HiveRushAuto.java` line by line. That golden file
+compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
+`autokit` signatures, and its `build()` runs for both alliances.
+
 ## Preview
 
 The preview runs the card tree against a **scenario**: for each registered
@@ -153,4 +164,5 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 - `src/App.svelte` — load, save, undo/redo, session recovery.
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.
 - `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
+- `src/lib/Navbar.svelte` — "Export Auto (Java)" in the export menu; reset clears the Auto.
 - `package.json` — `test` script.

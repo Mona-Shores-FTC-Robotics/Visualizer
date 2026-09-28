@@ -34,6 +34,8 @@
   import ViewToggles from "./components/ViewToggles.svelte";
   import { showToast } from "./toast";
   import { exportElementAsPng } from "../utils/exportImage";
+  import { exportAutoJava } from "./auto/exportAction";
+  import { loadAutoFrom } from "./auto/store";
 
   interface Props {
     loadFile: (evt: any) => any;
@@ -217,6 +219,7 @@
     shapes = getDefaultShapes();
     activePaths.set([]);
     dualPathMode.set(false);
+    loadAutoFrom({});
   }
 
   function handleResetPathWithConfirmation() {
@@ -741,6 +744,22 @@
               class="console-menu-item"
             >
               Points Array
+            </button>
+            <button
+              onclick={() => {
+                exportMenuOpen = false;
+                exportAutoJava({
+                  startPoint,
+                  lines,
+                  shapes,
+                  settings,
+                  sourceFileName: basename($currentFilePath) || "untitled.pp",
+                });
+              }}
+              class="console-menu-item"
+              title="Generate the whole Auto as Java for the robot's autokit library"
+            >
+              Export Auto (Java)
             </button>
             {#if showSequentialExport}
               <button

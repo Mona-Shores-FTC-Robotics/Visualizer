@@ -70,6 +70,11 @@ const RESERVED = new Set([
   "null",
 ]);
 
+/** True for a Java or Kotlin keyword or literal, which cannot name a variable. */
+export function isReservedWord(name: string): boolean {
+  return RESERVED.has(name);
+}
+
 /** Strips everything that cannot appear in an identifier. */
 export function sanitizeIdentifier(
   input: string | undefined,
