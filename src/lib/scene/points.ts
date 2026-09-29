@@ -31,6 +31,11 @@ export interface PointMarkerOptions {
   container?: PointContainer;
   /** Distinguishes registry keys between paths rendered side by side. */
   scope?: string;
+  /**
+   * When set, only these segments show their control-point markers (Auto mode
+   * shows them for the selected path only); end points are always shown.
+   */
+  controlPointsFor?: Set<string>;
 }
 
 function circle(
@@ -94,6 +99,7 @@ export function buildPathPointMarkers(
     registry,
     container = "main",
     scope = idPrefix,
+    controlPointsFor,
   } = options;
 
   const radius = POINT_RADIUS * radiusScale;
@@ -135,7 +141,9 @@ export function buildPathPointMarkers(
     if (!line || !line.endPoint) return;
     const isSelectedLine = selection?.lineId === line.id;
 
+    const handles = !controlPointsFor || controlPointsFor.has(line.id);
     [line.endPoint, ...(line.throughPoints ?? line.controlPoints)].forEach((point, idx1) => {
+      if (idx1 > 0 && !handles) return;
       const baseId = `${idPrefix}-${idx + 1}-${idx1}`;
       const fill = color || line.color;
       // A point is locked if its segment is locked or it is locked itself.

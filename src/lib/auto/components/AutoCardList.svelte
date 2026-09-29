@@ -39,6 +39,9 @@
     walk(auto.cards);
     return count;
   });
+  /** Whether the less common card kinds (routine, go to, together) are offered. */
+  let showMore = $state(false);
+
   let parkBranches = $derived.by(() => {
     const labels: string[] = [];
     const walk = (list: AutoCard[], label: string) => {
@@ -342,38 +345,37 @@
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
     <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
     <button type="button" class="path-list-action" onclick={() => add("path")} disabled={catalog.paths.length === 0} title="Drive one of the project's paths">+ Path</button>
-    <button type="button" class="path-list-action" onclick={() => add("routine")} title="Run a routine placed at a named point">+ Routine</button>
-    <button type="button" class="path-list-action" onclick={() => add("goTo")} title="Drive straight to a named point, if it is close enough">+ Go to</button>
-    <button type="button" class="path-list-action" onclick={() => add("together")} title="Run several cards at the same time">+ Together</button>
-  </div>
-  <div class="module-caption auto-add-hint">
-    {#if selection.cardId && selection.rowIndex !== null}
-      New cards go at the end of the selected branch.
-    {:else if selection.cardId}
-      New cards go after the selected card.
-    {:else}
-      New cards go at the end. Select a card or a branch to add there.
+    <button type="button" class="path-list-action" onclick={() => (showMore = !showMore)} aria-expanded={showMore}
+      title="Routines, go-to and cards that run together">{showMore ? "Less ▴" : "More ▾"}</button>
+    {#if showMore}
+      <button type="button" class="path-list-action" onclick={() => add("routine")} title="Run a routine placed at a named point">+ Routine</button>
+      <button type="button" class="path-list-action" onclick={() => add("goTo")} title="Drive straight to a named point, if it is close enough">+ Go to</button>
+      <button type="button" class="path-list-action" onclick={() => add("together")} title="Run several cards at the same time">+ Together</button>
     {/if}
   </div>
+  {#if selection.cardId}
+    <div class="module-caption auto-add-hint">
+      {selection.rowIndex !== null ? "New cards go at the end of the selected branch." : "New cards go after the selected card."}
+    </div>
+  {/if}
   <div class="module-list" role="list">
     {@render cardList(auto.cards)}
     {#if auto.cards.length === 0}
       <div class="list-empty">No cards yet. Start with + Action or + Path.</div>
     {/if}
+    <!-- The endgame guard shows once a branch has a park path to use. -->
+    {#if parkBranches.length}
     <div class="list-item-box compact auto-guard">
       <div class="list-item-top">
         <span class="auto-icon auto-icon--wait" aria-hidden="true">⏱</span>
         <span class="list-item-name">Endgame: park when time is short</span>
       </div>
       <div class="list-item-sub">
-        {#if parkBranches.length}
-          Parks from: {parkBranches.join(", ")}
-          {#if preview?.guard}<span class="auto-bad"> · used in this preview at {preview.guard.t.toFixed(1)} s</span>{/if}
-        {:else}
-          No park path yet: tick "Park path" on a branch's last path card.
-        {/if}
+        Parks from: {parkBranches.join(", ")}
+        {#if preview?.guard}<span class="auto-bad"> · used in this preview at {preview.guard.t.toFixed(1)} s</span>{/if}
       </div>
     </div>
+    {/if}
   </div>
 </section>
 

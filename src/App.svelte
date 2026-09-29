@@ -170,7 +170,7 @@
     sharedCopyState,
     type SharedCopyView,
   } from "./lib/session/sharedCopy";
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick, untrack } from "svelte";
   import { debounce } from "lodash";
   import { createHistory, type AppState } from "./utils/history";
   import {
@@ -181,7 +181,10 @@
     setAutoRecorder,
     takePinsToAdopt,
     updateAuto,
+    parseSelection,
+    selectedCardId,
   } from "./lib/auto/store";
+  import { findCard } from "./lib/auto/tree";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
@@ -2520,6 +2523,25 @@
   });
 
   let autoActive = $derived($autoMode && $autoSection !== null);
+  // Auto mode: selecting a path card selects its path, so the field shows that
+  // path's control points (and only that path's) and the toolbar edits it.
+  $effect(() => {
+    const { cardId } = parseSelection($selectedCardId);
+    const auto = untrack(() => $autoSection);
+    if (!autoActive || !auto || !cardId) return;
+    const card = findCard(auto.cards, cardId);
+    if (card?.kind === "path") {
+      untrack(() => {
+        if (primarySelectedId !== card.lineId) selectedPathIds = [card.lineId];
+      });
+    }
+  });
+  let autoHandleSegments = $derived.by(() => {
+    const { cardId } = parseSelection($selectedCardId);
+    const card = $autoSection && cardId ? findCard($autoSection.cards, cardId) : null;
+    const path = card?.kind === "path" ? findPathById(lines, card.lineId) : null;
+    return new Set(path ? atomicSegments([path]).map((segment) => segment.id) : []);
+  });
   let showUntakenBranches = $state(true);
   let autoCatalog = $derived(
     autoActive ? buildPathCatalog(startPoint, lines, settings) : null,
@@ -2677,6 +2699,7 @@
               selection: pointSelection,
               registry,
               container: "main",
+              controlPointsFor: autoActive ? autoHandleSegments : undefined,
             }),
             ...buildSelectedPointRing(lines, pointSelection, scales),
           ]),
