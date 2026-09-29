@@ -72,6 +72,7 @@ A complete example that uses every card and row kind is
 | `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
+| `registry.events` | string[], optional | The conditions that are events: once true, true for the rest of the match (`HiveTip1`). The rest are states, which can turn false again (`IntakeFull`). The editor shows which is which; the export does not use it. |
 | `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
 | `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
 | `startAt` | string, optional | The named point the start pose is on. |

@@ -58,6 +58,23 @@
   function unregister(list: "actions" | "conditions", name: string) {
     updateAuto((draft) => {
       draft.registry[list] = draft.registry[list].filter((entry) => entry !== name);
+      if (draft.registry.events) {
+        draft.registry.events = draft.registry.events.filter((entry) => entry !== name);
+        if (!draft.registry.events.length) delete draft.registry.events;
+      }
+    });
+  }
+
+  const isEvent = (name: string) => auto.registry.events?.includes(name) ?? false;
+
+  /** Switches a condition between event (stays true) and state (can change back). */
+  function toggleEvent(name: string) {
+    updateAuto((draft) => {
+      const events = new Set(draft.registry.events ?? []);
+      if (events.has(name)) events.delete(name);
+      else events.add(name);
+      if (events.size) draft.registry.events = draft.registry.conditions.filter((c) => events.has(c));
+      else delete draft.registry.events;
     });
   }
 
@@ -97,6 +114,14 @@
         <div class="flex items-center justify-between gap-2">
           <span class="font-mono text-gray-100">{name}</span>
           <span class="flex items-center gap-2">
+            {#if list === "conditions"}
+              <button type="button" class="rounded border border-gray-600 px-1 text-[10px] hover:border-gray-400"
+                class:text-sky-300={isEvent(name)} class:text-gray-400={!isEvent(name)}
+                title={isEvent(name)
+                  ? "Event: once true, stays true for the rest of the match. Click to make it a state."
+                  : "State: true or false right now, and can change back. Click to make it an event."}
+                onclick={() => toggleEvent(name)}>{isEvent(name) ? "event" : "state"}</button>
+            {/if}
             <span class="text-gray-500">{counts.get(name) ? `used ${counts.get(name)}×` : "unused"}</span>
             <button type="button" class="text-gray-500 hover:text-red-400" aria-label={`Remove ${name}`} title="Remove from the registry" onclick={() => unregister(list, name)}>✕</button>
           </span>

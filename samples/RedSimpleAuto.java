@@ -22,7 +22,7 @@ public final class RedSimpleAuto {
     public static final String[] ACTIONS = {"ShootAll"};
 
     /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] CONDITIONS = {"HiveTipped"};
+    public static final String[] CONDITIONS = {"HiveTip1"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -60,7 +60,7 @@ public final class RedSimpleAuto {
         return kit.sequence(
                 kit.action("ShootAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("HiveTipped").then(
+                        kit.when("HiveTip1").then(
                                 kit.path("UnderHive", underHive),
                                 kit.action("ShootAll")),
                         kit.afterMs(3000).then(

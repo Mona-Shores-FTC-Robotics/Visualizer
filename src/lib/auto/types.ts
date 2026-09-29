@@ -15,6 +15,13 @@ export type Alliance = "RED" | "BLUE";
 export interface AutoRegistry {
   actions: string[];
   conditions: string[];
+  /**
+   * The conditions that are events: once true, true for the rest of the match
+   * ("HiveTip1": the first TIP has happened). The others are states, which can
+   * turn false again ("IntakeFull": holding 4 right now). Only the editor uses
+   * the difference, to say how to read a condition.
+   */
+  events?: string[];
 }
 
 /** `[x, y]` or `[x, y, headingDeg]`, inches in the Pedro field frame. */

@@ -2,6 +2,7 @@ import {
   AUTO_FORMAT_VERSION,
   type Alliance,
   type AutoCard,
+  type AutoRegistry,
   type AutoRow,
   type AutoSection,
   type NamedPoint,
@@ -90,10 +91,18 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
   if (raw.registry !== undefined && !isObject(raw.registry)) {
     problems.push("The registry is not an object; started an empty one.");
   }
-  const registry = {
+  const registry: AutoRegistry = {
     actions: nameList(registryRaw.actions, "registry.actions", problems),
     conditions: nameList(registryRaw.conditions, "registry.conditions", problems),
   };
+  if (registryRaw.events !== undefined) {
+    const events = nameList(registryRaw.events, "registry.events", problems);
+    const known = events.filter((name) => registry.conditions.includes(name));
+    if (known.length < events.length) {
+      problems.push("registry.events names a condition that is not registered; dropped it.");
+    }
+    if (known.length) registry.events = known;
+  }
 
   const points: Record<string, NamedPoint> = {};
   if (raw.points !== undefined && !isObject(raw.points)) {
@@ -476,6 +485,8 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     registry: {
       actions: [...auto.registry.actions],
       conditions: [...auto.registry.conditions],
+      // Written only when there are some, so older files stay as they were.
+      ...(auto.registry.events?.length ? { events: [...auto.registry.events] } : {}),
     },
     points: Object.fromEntries(
       Object.entries(auto.points).map(([name, point]) => [name, [...point]]),
