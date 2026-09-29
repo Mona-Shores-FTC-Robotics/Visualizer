@@ -4,6 +4,7 @@ import { isUnsaved } from "../../stores";
 import { normalizeAuto } from "./normalize";
 import type { Scenario } from "./simulate";
 import type { AutoSection, NamedPoint } from "./types";
+import { foldedBranches } from "./fold";
 
 /**
  * The open project's `auto` section. A store rather than a prop so the many
@@ -74,6 +75,7 @@ export function loadAutoFrom(data: unknown): string[] {
   const { auto, problems } = normalizeAuto(raw);
   autoSection.set(auto);
   selectedCardId.set(null);
+  foldedBranches.set(new Set());
   if (!auto) autoMode.set(false);
   return problems;
 }
