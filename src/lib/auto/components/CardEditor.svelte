@@ -467,6 +467,14 @@
                 (index) => editRow(rowIndex, (r) => { if ("when" in r) r.when.splice(index, 1); }),
                 (name) => editRow(rowIndex, (r) => { if ("when" in r && !r.when.includes(name)) r.when.push(name); }),
               )}
+              {#each (row as { when: string[] }).when as name (name)}
+                <div class="text-[10px] text-gray-500">
+                  <span class="font-mono text-gray-300">{name}</span>
+                  {auto.registry.events?.includes(name)
+                    ? "is an event: true once it has happened, and stays true."
+                    : "is a state: true only while it is true right now."}
+                </div>
+              {/each}
             </div>
           {/if}
           <div class="grid grid-cols-[1fr_auto] items-end gap-2">

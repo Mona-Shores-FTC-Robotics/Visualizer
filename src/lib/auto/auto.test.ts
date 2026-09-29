@@ -187,3 +187,14 @@ test("rows after an otherwise row are flagged as unreachable", () => {
   assertEqual(issues.length, 2);
   assert(issues.every((i) => i.level === "warning" && i.message.includes("never fire")));
 });
+
+test("condition kinds: events round-trip, unknown names are dropped, none writes nothing", () => {
+  const raw = clone(loadSample().data.auto);
+  raw.registry.events = ["HiveTipped", "NotRegistered"];
+  const { auto, problems } = normalizeAuto(raw);
+  assertEqual(auto!.registry.events, ["HiveTipped"]);
+  assert(problems.some((p) => p.includes("registry.events")));
+  assertEqual(serializeAuto(auto!).registry.events, ["HiveTipped"]);
+  const plain = normalizeAuto(loadSample().data.auto).auto!;
+  assert(!("events" in serializeAuto(plain).registry), "no events key for a file without events");
+});

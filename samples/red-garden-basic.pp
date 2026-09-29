@@ -271,9 +271,11 @@
         "ShootAll"
       ],
       "conditions": [
-        "CameraBlind",
-        "HiveTipped",
+        "HiveTip1",
         "IntakeFull"
+      ],
+      "events": [
+        "HiveTip1"
       ]
     },
     "points": {
@@ -336,8 +338,7 @@
         "rows": [
           {
             "when": [
-              "HiveTipped",
-              "CameraBlind"
+              "HiveTip1"
             ],
             "label": "If tipped",
             "cards": [

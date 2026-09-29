@@ -13,6 +13,13 @@ curve over to `Garden` beside the red GARDEN, turning to face the red wall (a pl
 The grey "Back to Start (never driven)" path is only there because the editor chains every path
 from the one before it in the Path List; no card drives it.
 
+## Conditions
+
+Every condition is true or false. **Events** stay true once they have happened: `HiveTip1` is the
+first TIP of our HIVE, `HiveTip2` the second, whoever tipped it; the robot counts them with the
+camera. **States** are true only while they are true: `IntakeFull` is "holding 4 POLLEN right now".
+The only timing is each wait's time row, so a missed TIP or a jammed intake cannot stop the Auto.
+
 ## Rules every Auto here follows
 
 From the BIOBUZZ Competition Manual, TU02 (Section 10 Game Details, Section 11 Game Rules):
@@ -47,7 +54,8 @@ sat, which Pedro absorbs.
 A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
 
 1. Shoot the 4 preloads (the turret aims; the robot only points its intake).
-2. Wait for the first of: our HIVE tipped (or the camera is blind) → **If tipped**; 5 s → **If not tipped**.
+2. Wait for the first of: `HiveTip1` (the first TIP of our HIVE has happened, by us or our partner) →
+   **If tipped**; 5 s → **If not tipped**.
 3. **If tipped:** two collect passes from the start with the intake on (about 20 in straight ahead
    and back, then about 21 in at 27° to the left and back); one path straight through the gap under
    the HIVE (entering at 60.0, 46.8) to `RearShot` at the rear, without stopping at the entrance; shoot; take 4 POLLEN from the RED_LOADING FLOWER; shoot; park in
