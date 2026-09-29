@@ -1,0 +1,85 @@
+# Sample Autos
+
+## Rules every Auto here follows
+
+From the BIOBUZZ Competition Manual, TU02 (Section 10 Game Details, Section 11 Game Rules):
+
+| Rule | What it means for an Auto | How these samples meet it |
+|---|---|---|
+| G304 setup | Start fully on our side (red = FIELD columns A–C, x < 70.75), **touching the perimeter wall**, not touching a FLOWER, **not in the LOADING ZONE**, inside the starting size, touching exactly 4 POLLEN preloads, and motionless once INIT finishes | `Start` (60.0, 9.0, 90): back flush on the audience wall, footprint x 51.0–69.0. No FLOWER near it (the audience-wall FLOWER is at x ≈ 94), and it's nowhere near a LOADING ZONE. INIT only checks names and builds the follower, so nothing moves. |
+| G402 | Don't disrupt the other alliance's Auto. Entering their side is "risky" and may be judged STRATEGIC | The robot body never crosses x = 70.75; the closest it gets is 1.8 in, under the HIVE |
+| G407 | Never CONTROL more than 4 SCORING ELEMENTS | Every pickup comes after the previous load is shot. The intake must stop at 4 (`IntakeFull` means "holding 4") |
+| G417 | Only LAUNCHING may move the HIVE. Touching it, directly or through POLLEN we hold, is likely STRATEGIC; accidentally bumping the frame while picking up POLLEN is not | The paths clear both frame legs (1.6 in at the gap under the HIVE). Nothing on the robot, POLLEN included, may touch a CELL while passing under it; check that on the robot with the LOADING CELL down |
+| G418 | POLLEN comes out of a FLOWER only from the bottom (retrieval opening). Don't shake the FLOWER or ram the wall to knock POLLEN out | The pickups face the FLOWER's opening and arrive decelerating, 8.5 in from the wall |
+| G405 / G406 | Don't eject SCORING ELEMENTS from the field; don't damage the ARENA | Shots are aimed at CELLs from inside our half |
+| G403 | No powered movement between AUTO and TELEOP | The Auto finishes by 30 s with room to spare, and the Driver Station's 30 s AUTO timer (required by G305) stops the OpMode |
+| 10.5.4 LEAVE (3 pts) | At the end of AUTO, not touching the perimeter wall | Every branch ends at `Park`, 4.4–7.0 in off the wall |
+| 10.5.4 PARK (5 pts) | At the end of AUTO, at least partly in our LOADING ZONE | `Park` (16.0, 106.0) puts 4.4–7.0 in of the robot inside the zone (x ≤ 11.4, y 94.6–117.7) |
+| 10.5.5 HIVE TIP (20 pts each) | Every TIP completed before TELEOP counts for AUTO. POLLEN left in a CELL only scores at the end of the match | A tip takes **8 POLLEN** (Event Field Setup Guide §12.3: 7 tossed in must not tip, the 8th must), and in AUTO there is no NECTAR (G401), so one robot's 4 preloads can't tip the HIVE alone. The tipped branch then puts its GARDEN 4 and LOADING FLOWER 4 into the now-UP RED_LOADING CELL: exactly 8, a second tip if every shot goes in |
+
+Our own rules on top: never drive through a wall or a HIVE frame leg; coordinates with at most
+one decimal place; field positions are placeholders until measured.
+
+
+Open a `.pp` here in the editor (☰ → open file), then press **Auto**. Each has its exported Java beside it.
+
+Both start **touching the audience wall** (every Auto must start touching a wall): `Start` =
+(60.0, 9.0, 90), the back of an 18 in robot flush with the wall, intake toward the RED_GARDEN CELL.
+The collect passes return to `CollectHome` (60.0, 10.0), 1 in off the wall, so the robot never
+drives back into the wall; the not-tipped branch leaves from there too, 1 in from where the robot
+sat, which Pedro absorbs.
+
+## `red-garden-basic.pp`
+
+A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
+
+1. Shoot the 4 preloads (the turret aims; the robot only points its intake).
+2. Wait for the first of: our HIVE tipped (or the camera is blind) → **If tipped**; 5 s → **If not tipped**.
+3. **If tipped:** two collect passes from the start with the intake on (12 in straight ahead and
+   back, then 12 in at 20° to the left and back); one tile forward to the gap under the HIVE;
+   under the HIVE to the rear; shoot; take 4 POLLEN from the RED_LOADING FLOWER; shoot; park in
+   the red LOADING ZONE.
+4. **If not tipped:** straight under the HIVE; take 4 POLLEN from the RED_LOADING FLOWER; shoot at
+   the RED_GARDEN CELL to try for the tip; park in the red LOADING ZONE.
+
+It never lets the robot body overlap the center line (x = 70.75) and never drives through a wall or
+a HIVE frame leg. Under the HIVE, an 18 in robot has 1.6 in to the frame leg and 1.8 in to the
+center line.
+
+**Placeholders to measure on the field before running it:** `Start` (60.0, 9.0, 90),
+`LoadingFlower` (47.0, 124.0, 90), `Park` (16.0, 106.0), and the robot's real width (18 in
+assumed). Field positions (frame legs, center line, zones) were measured from the editor's field
+image; check the frame legs with a tape measure, since the under-HIVE gap depends on them.
+
+## `red-garden-no-turret.pp`
+
+The same plan for a robot **without a turret**. The launcher is assumed fixed and to fire the way the
+intake faces, so the robot turns to face each CELL before it shoots. If our launcher fires out the
+back instead, every shot heading flips by 180°.
+
+- **Preloads:** from `Start`, facing 90°. The CELL's centre is 2.3° to the left, so the shot lands
+  about 2.1 in off centre on a 20 in opening. The robot can't start turned toward it, because it
+  has to sit square against the wall.
+- **If tipped:** the same collect passes and the same route under the HIVE. It then moves over to
+  (52.0, 112.0), where an 18 in robot has room to spin (it sweeps a 12.7 in radius), and turns
+  165.7° to face the RED_LOADING CELL and shoot (23.8 in). It picks up from the RED_LOADING FLOWER,
+  turns 162.7° to shoot again (36.8 in), and parks.
+- **If not tipped:** a shot over the HIVE from the rear would be a long, blind lob without a turret,
+  so this branch stays on the audience side instead. It takes 4 POLLEN from the **RED_GARDEN
+  FLOWER** on the red wall, turns 159.3° to face the RED_GARDEN CELL (36.2 in) and shoots, then
+  drives up the red wall to park.
+- The editor chains each path from the one before it in the Path List, so both branches leaving
+  `Start` need one **connector** path (grey, "never driven") to bring the chain back to `Start`. No
+  card drives it.
+
+| | With turret | Without turret |
+|---|---|---|
+| Tipped: preview end (turns added) | 18.6 s | 19.9 s (about 21.7 s with turns) |
+| Not tipped: preview end (turns added) | 17.0 s | 16.1 s (about 17.0 s with turns) |
+| Worst case (every wait times out) | 23.1 s | 24.4 s (about 26.2 s with turns) |
+| Big turns | none | three turns of about 160°, about 0.9 s each at 180°/s |
+| Tightest clearance | 1.6 in to the frame leg under the HIVE | same |
+
+The Auto preview charges only for distance driven, so the "turns added" figures add angle ÷ 180°/s
+for each turn made while barely moving. Both speeds are placeholders until
+[biobuzz#113](https://github.com/Mona-Shores-FTC-Robotics/biobuzz/issues/113) measures the real ones.
