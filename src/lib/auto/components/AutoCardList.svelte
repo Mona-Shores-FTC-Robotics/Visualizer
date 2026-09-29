@@ -4,7 +4,8 @@
   import type { PreviewResult, WorstCase } from "../simulate";
   import { AUTO_LENGTH_S } from "../simulate";
   import type { AutoCard, AutoSection, FirstOfCard } from "../types";
-  import { cardTitle, childLists, describeRow, isPlainWait, rowLabel } from "../tree";
+  import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel } from "../tree";
+  import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
   import { insertNewCard, moveCard, removeCard, canMove, type NewCardKind } from "../edit";
   import {
     parseSelection,
@@ -48,6 +49,32 @@
     walk(auto.cards, "Auto");
     return labels;
   });
+
+  // Selecting a card (in the list, on the field, or by adding one) opens the
+  // folded branches around it, so the selection is always in view.
+  $effect(() => {
+    const id = selection.cardId;
+    if (id) foldedBranches.update((folded) => unfoldAround(folded, auto.cards, id));
+  });
+
+  function toggleFold(key: string) {
+    foldedBranches.update((folded) => toggleFolded(folded, key));
+  }
+
+  function nameOf(card: AutoCard): string {
+    return card.kind === "path" ? pathName(card.lineId) : cardTitle(card);
+  }
+
+  /** The worst issue anywhere in a folded branch, so folding never hides one. */
+  function levelInside(list: AutoCard[]): "error" | "warning" | null {
+    let worst: "error" | "warning" | null = null;
+    for (const card of allCards(list)) {
+      const level = levelOf(card.id);
+      if (level === "error") return "error";
+      worst ??= level;
+    }
+    return worst;
+  }
 
   function levelOf(cardId: string): "error" | "warning" | null {
     const own = issues.filter((issue) => issue.cardId === cardId);
@@ -221,11 +248,26 @@
           {@const rowSelected = selection.cardId === card.id && selection.rowIndex === rowIndex}
           {@const takenHere = preview?.taken.get(card.id) === rowIndex}
           {@const worstEnd = worst?.rows.get(card.id)?.[rowIndex]}
+          {@const key = branchKey(card.id, rowIndex)}
+          {@const folded = row.cards.length > 0 && $foldedBranches.has(key)}
           <div
             class="auto-branch"
             class:auto-branch--off={preview !== null && preview.ran.has(card.id) && !takenHere && card.kind !== "together"}
             style={`--c: ${row.color}`}
           >
+            <div class="auto-branch-row">
+            {#if row.cards.length}
+              <button
+                type="button"
+                class="auto-fold"
+                aria-expanded={!folded}
+                aria-label={folded ? `Open ${row.label}` : `Fold ${row.label}`}
+                title={folded ? "Open this branch" : "Fold this branch"}
+                onclick={() => toggleFold(key)}>{folded ? "▸" : "▾"}</button
+              >
+            {:else}
+              <span class="auto-fold auto-fold--empty" aria-hidden="true"></span>
+            {/if}
             <button
               type="button"
               class="auto-branch-h"
@@ -233,10 +275,7 @@
               onclick={() => selectedCardId.set(rowSelected ? card.id : `${card.id}#${rowIndex}`)}
               title="Select this branch: new cards go at its end"
             >
-              <span class="auto-branch-name">
-                {row.cards.length || rowSelected ? "▾" : "▸"}
-                {row.label}
-              </span>
+              <span class="auto-branch-name">{row.label}</span>
               <span class="auto-branch-meta">
                 {#if takenHere}<span class="auto-run">this preview</span>{/if}
                 {#if row.cards.length && card.kind !== "together"}
@@ -252,7 +291,19 @@
                 {/if}
               </span>
             </button>
-            {#if row.cards.length}
+            </div>
+            {#if folded}
+              {@const level = levelInside(row.cards)}
+              {@const summary = foldSummary(row.cards, nameOf)}
+              <button type="button" class="auto-fold-summary" title={`${summary}\nClick to open this branch`} onclick={() => toggleFold(key)}>
+                <span class="auto-fold-text">{summary}</span>
+                {#if level}
+                  <span class="auto-flag auto-flag--{level}" title={level === "error" ? "A card in here blocks the Java export" : "A card in here has a warning"}
+                    >{level === "error" ? "!" : "⚠"}</span
+                  >
+                {/if}
+              </button>
+            {:else if row.cards.length}
               <div class="auto-branch-cards">
                 {@render cardList(row.cards)}
               </div>
@@ -443,7 +494,52 @@
     opacity: 0.55;
     border-left-style: dashed;
   }
+  .auto-branch-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .auto-fold {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    display: inline-grid;
+    place-items: center;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 0;
+    font-size: 0.7rem;
+    color: var(--c);
+  }
+  button.auto-fold:hover {
+    background: #1c1c1c;
+  }
+  .auto-fold-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: #141414;
+    border: 1px dashed #333333;
+    border-radius: 5px;
+    padding: 3px 6px;
+    text-align: left;
+    font-size: 0.66rem;
+    color: #aaaaaa;
+  }
+  .auto-fold-summary:hover {
+    border-color: var(--c);
+  }
+  .auto-fold-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .auto-branch-h {
+    flex: 1;
+    min-width: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
