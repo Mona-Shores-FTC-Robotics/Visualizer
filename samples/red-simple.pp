@@ -181,10 +181,10 @@
         "ShootAll"
       ],
       "conditions": [
-        "HiveTip1"
+        "Tip1"
       ],
       "events": [
-        "HiveTip1"
+        "Tip1"
       ]
     },
     "points": {
@@ -223,7 +223,7 @@
         "rows": [
           {
             "when": [
-              "HiveTip1"
+              "Tip1"
             ],
             "label": "Tipped: under the HIVE",
             "cards": [

@@ -3,19 +3,15 @@
   import { previewScenario } from "../store";
 
   interface Props {
-    /** The card asking. */
-    cardId: string;
     condition: string;
-    /** Show the condition's name next to the answer. */
-    named?: boolean;
   }
 
-  let { cardId, condition, named = true }: Props = $props();
+  let { condition }: Props = $props();
 
-  let yes = $derived(answerOf($previewScenario, cardId, condition));
+  let yes = $derived(answerOf($previewScenario, "", condition));
 
   function flip() {
-    previewScenario.update((scenario) => ({ ...scenario, [questionKey(cardId, condition)]: !yes }));
+    previewScenario.update((scenario) => ({ ...scenario, [questionKey("", condition)]: !yes }));
   }
 </script>
 
@@ -24,11 +20,13 @@
   class="answer"
   class:answer--no={!yes}
   aria-pressed={yes}
-  title={`Preview: is ${condition} true when this card asks? Click to answer ${yes ? "false" : "true"}.`}
+  title={yes
+    ? `${condition} happens: its rows fire at once. Click: it never happens, so its waits time out.`
+    : `${condition} never happens: its waits time out. Click: it happens.`}
   onclick={flip}
 >
-  {#if named}<span class="answer-name">{condition}</span>{/if}
-  <span class="answer-value">{yes ? "T" : "F"}</span>
+  <span class="answer-value">{yes ? "✓" : "✗"}</span>
+  <span class="answer-name">{condition}</span>
 </button>
 
 <style>
@@ -40,15 +38,19 @@
     border: 1px solid #2f6b4a;
     background: #10261a;
     color: #7ee2a8;
-    border-radius: 5px;
-    padding: 0 4px;
-    font-size: 0.62rem;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
     line-height: 1.4;
+    cursor: pointer;
   }
   .answer--no {
-    border-color: #6b3a3a;
-    background: #261010;
-    color: #ff9a9a;
+    border-color: #444444;
+    background: #1a1a1a;
+    color: #8a8a8a;
+  }
+  .answer--no .answer-name {
+    text-decoration: line-through;
   }
   .answer-name {
     font-family: ui-monospace, monospace;

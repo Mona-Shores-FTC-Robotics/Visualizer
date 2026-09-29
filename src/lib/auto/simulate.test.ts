@@ -52,18 +52,12 @@ test("answered false, the time row fires at its time", () => {
   assert(Math.abs(firedAt(result) - firedAt(happy) - 1.5) < 1e-9, `${firedAt(happy)} → ${firedAt(result)}`);
 });
 
-test("the same condition asked by two cards is two questions", () => {
-  // The HIVE has not tipped at the first decision, and has by the later one.
+test("a condition has one answer, whichever card asks it", () => {
+  // HiveTipped false: the first decision waits to its time row, and the later
+  // one falls through to "otherwise".
   const { result } = run(loadSample().auto, no("did-tip", "HiveTipped", "CameraBlind"));
   assertEqual(result.taken.get("did-tip"), 1);
-  assertEqual(result.taken.get("near-5"), 0);
-  assert(result.ran.has("late-1"), "Tipped late runs");
-  // Answer the later one false too, and that decision falls through to "otherwise".
-  const both = run(loadSample().auto, {
-    ...no("did-tip", "HiveTipped", "CameraBlind"),
-    ...no("near-5", "HiveTipped"),
-  });
-  assertEqual(both.result.taken.get("near-5"), 2);
+  assertEqual(result.taken.get("near-5"), 2);
 });
 
 test("the questions are listed per card, in the order the Auto asks them", () => {

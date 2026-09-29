@@ -73,7 +73,7 @@ A complete example that uses every card and row kind is
 | `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
-| `registry.events` | string[], optional | The conditions that are events: once true, true for the rest of the match (`HiveTip1`). The rest are states, which can turn false again (`IntakeFull`). The editor shows which is which; the export does not use it. |
+| `registry.events` | string[], optional | The conditions that are events: once true, true for the rest of the match (`Tip1`). The rest are states, which can turn false again (`IntakeFull`). The editor shows which is which; the export does not use it. |
 | `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
 | `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
 | `startAt` | string, optional | The named point the start pose is on. |
@@ -240,17 +240,18 @@ compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 
 ## Preview
 
-The preview runs the card tree against **answers**: for each card that asks a
-condition, whether it is true (T) or false (F) when that card asks it. There
-is no timing to set. A row answered T fires the moment its card is reached; a
-row answered F never fires, so the next row that can wins (a time row fires at
-its time). A row asking several conditions (`when: [A, B]`) fires if any is T.
+The preview has one switch per condition the Auto asks, in the Preview
+panel: **✓** it happens, so a row asking it fires the moment its card is
+reached; **✗** it never happens, so the next row that can wins (a time row
+fires at its time). There is no timing to set. A row asking several
+conditions (`when: [A, B]`) fires if any is ✓. Every condition starts ✓ (the
+happy path); the switches are not saved in the file.
 
-The answers belong to the **card**, not the condition name: the Auto has no
-loops, so each card asks at most once per run, and the same condition asked by
-two cards is two questions. So "HIVE not tipped" at the first decision and
-"tipped" at a later one is one run. Every question starts as T (the happy
-path); **All T** / **All F** reset them. Answers are not saved in the file.
+The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
+fastest the Auto can go, ✗ the slowest, and a real run falls between them.
+Events are separate names, so "not tipped at the first decision, tipped at a
+later one" is `Tip1` ✗ and `Tip2` ✓. A state asked by several cards
+(`IntakeFull`) has one answer for all of them.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field

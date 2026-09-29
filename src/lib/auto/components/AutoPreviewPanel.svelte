@@ -3,13 +3,12 @@
   import {
     AUTO_LENGTH_S,
     previewQuestions,
-    questionKey,
     type PreviewResult,
     type WorstCase,
   } from "../simulate";
-  import { previewScenario, selectedCardId } from "../store";
+  import { selectedCardId } from "../store";
   import AnswerChip from "./AnswerChip.svelte";
-  import { CELL_CLASS, LABEL_CLASS, SECTION_CLASS, seconds } from "./ui";
+  import { LABEL_CLASS, SECTION_CLASS, seconds } from "./ui";
 
   interface Props {
     auto: AutoSection;
@@ -21,7 +20,8 @@
 
   let { auto, preview, worst, now }: Props = $props();
 
-  let questions = $derived(previewQuestions(auto));
+  /** Each condition the Auto asks, once, in the order the Auto first asks it. */
+  let conditions = $derived([...new Set(previewQuestions(auto).map((q) => q.condition))]);
   let current = $derived.by(() => {
     let index = -1;
     preview.log.forEach((entry, i) => {
@@ -41,42 +41,15 @@
       }
     }
   });
-
-  function answerAll(yes: boolean) {
-    previewScenario.set(
-      yes ? {} : Object.fromEntries(questions.map((q) => [questionKey(q.cardId, q.condition), false])),
-    );
-  }
 </script>
 
 <div class={SECTION_CLASS}>
-  <div class="flex items-start justify-between gap-3 border-b border-[#333333] pb-2">
-    <div>
-      <div class="font-semibold text-gray-100" title="T: the condition is true when its card asks. F: the wait runs to its time row.">Preview as</div>
-    </div>
-    {#if questions.length}
-      <div class="flex shrink-0 gap-1">
-        <button type="button" class="path-list-action" onclick={() => answerAll(true)}>All T</button>
-        <button type="button" class="path-list-action" onclick={() => answerAll(false)}>All F</button>
-      </div>
-    {/if}
+  <div class="flex flex-wrap items-center gap-1.5">
+    <span class="font-semibold text-gray-100" title="Click a condition to switch it: ✓ it happens, ✗ it never does and its waits time out.">Preview</span>
+    {#each conditions as condition (condition)}
+      <AnswerChip {condition} />
+    {/each}
   </div>
-  {#if questions.length}
-    <div class="space-y-1 text-[11px] text-gray-300">
-      {#each questions as q (questionKey(q.cardId, q.condition))}
-        <div class="flex items-center gap-2 {CELL_CLASS}" class:opacity-50={!preview.ran.has(q.cardId)}>
-          <button
-            type="button"
-            class="min-w-0 flex-1 truncate text-left text-gray-100 hover:underline"
-            title="Select this card"
-            onclick={() => selectedCardId.set(q.cardId)}>{q.card}</button
-          >
-          {#if !preview.ran.has(q.cardId)}<span class="text-gray-500">not reached</span>{/if}
-          <AnswerChip cardId={q.cardId} condition={q.condition} />
-        </div>
-      {/each}
-    </div>
-  {/if}
 
   <div class="flex items-center gap-2 text-[11px]">
     <span class="text-gray-500">Auto period</span>

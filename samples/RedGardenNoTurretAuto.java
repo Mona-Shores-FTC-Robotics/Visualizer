@@ -22,7 +22,7 @@ public final class RedGardenNoTurretAuto {
     public static final String[] ACTIONS = {"IntakeOff", "IntakeOn", "ShootAll"};
 
     /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] CONDITIONS = {"HiveTip1", "IntakeFull"};
+    public static final String[] CONDITIONS = {"IntakeFull", "Tip1"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -86,7 +86,7 @@ public final class RedGardenNoTurretAuto {
         return kit.sequence(
                 kit.action("ShootAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("HiveTip1").then(
+                        kit.when("Tip1").then(
                                 kit.guarded("If tipped", toParkPath, 1.6,
                                         kit.action("IntakeOn"),
                                         kit.path("Pass1Ahead", pass1Ahead),

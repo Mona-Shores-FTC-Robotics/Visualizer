@@ -26,19 +26,20 @@ import {
 export const AUTO_LENGTH_S = 30;
 
 /**
- * The preview's answers: whether a condition is true when a card asks it,
- * keyed by `questionKey(card id, condition)`. The Auto has no loops, so each
- * card asks at most once per run: the same condition asked by two cards is
- * two questions with their own answers (HIVE not tipped at the first
- * decision, tipped at the later one). Unanswered questions are true.
+ * The preview's answers, one per condition: true, the condition is true
+ * whenever a card asks it (a row fires at once); false, it never is (every
+ * wait on it runs to its time row). Events are separate names (Tip1, Tip2),
+ * so "not tipped at the first decision, tipped at the later one" is Tip1
+ * false, Tip2 true. Unanswered conditions are true.
  */
 export type Scenario = Record<string, boolean>;
 
 /** What a question is before anyone answers it: the happy path. */
 export const DEFAULT_ANSWER = true;
 
-export function questionKey(cardId: string, condition: string): string {
-  return `${cardId}:${condition}`;
+/** Where a condition's answer is kept. The asking card does not matter. */
+export function questionKey(_cardId: string, condition: string): string {
+  return condition;
 }
 
 export function answerOf(scenario: Scenario, cardId: string, condition: string): boolean {

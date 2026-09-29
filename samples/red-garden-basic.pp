@@ -271,11 +271,11 @@
         "ShootAll"
       ],
       "conditions": [
-        "HiveTip1",
+        "Tip1",
         "IntakeFull"
       ],
       "events": [
-        "HiveTip1"
+        "Tip1"
       ]
     },
     "points": {
@@ -338,7 +338,7 @@
         "rows": [
           {
             "when": [
-              "HiveTip1"
+              "Tip1"
             ],
             "label": "If tipped",
             "cards": [

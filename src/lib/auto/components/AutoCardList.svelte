@@ -14,7 +14,6 @@
     updateAuto,
   } from "../store";
   import { branchColor, cardColors, seconds, TRUNK_COLOR } from "./ui";
-  import AnswerChip from "./AnswerChip.svelte";
   import { rowKind } from "../types";
 
   interface Props {
@@ -235,12 +234,6 @@
         </div>
       {/if}
     </button>
-    {#if card.kind === "routine" && auto.routines[card.routine]?.endsWhen}
-      <div class="auto-card-answers">
-        <span class="auto-answers-label">ends when</span>
-        <AnswerChip cardId={card.id} condition={auto.routines[card.routine].endsWhen} />
-      </div>
-    {/if}
     {#if selected}
       <div class="auto-card-tools">
         <button type="button" class="path-list-action" title="Move up" aria-label="Move up"
@@ -306,9 +299,6 @@
                 {/if}
               </span>
             </button>
-            {#each row.asks as condition (condition)}
-              <AnswerChip cardId={card.id} {condition} named={!row.label.includes(condition)} />
-            {/each}
             </div>
             {#if folded}
               {@const level = levelInside(row.cards)}
