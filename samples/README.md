@@ -1,5 +1,26 @@
 # Sample Autos
 
+## Rules every Auto here follows
+
+From the BIOBUZZ Competition Manual, TU02 (Section 10 Game Details, Section 11 Game Rules):
+
+| Rule | What it means for an Auto | How these samples meet it |
+|---|---|---|
+| G304 setup | Start fully on our side (red = FIELD columns A–C, x < 70.75), **touching the perimeter wall**, not touching a FLOWER, **not in the LOADING ZONE**, inside the starting size, touching exactly 4 POLLEN preloads, and motionless once INIT finishes | `Start` (60.0, 9.0, 90): back flush on the audience wall, footprint x 51.0–69.0. No FLOWER near it (the audience-wall FLOWER is at x ≈ 94), and it's nowhere near a LOADING ZONE. INIT only checks names and builds the follower, so nothing moves. |
+| G402 | Don't disrupt the other alliance's Auto. Entering their side is "risky" and may be judged STRATEGIC | The robot body never crosses x = 70.75; the closest it gets is 1.8 in, under the HIVE |
+| G407 | Never CONTROL more than 4 SCORING ELEMENTS | Every pickup comes after the previous load is shot. The intake must stop at 4 (`IntakeFull` means "holding 4") |
+| G417 | Only LAUNCHING may move the HIVE. Touching it, directly or through POLLEN we hold, is likely STRATEGIC; accidentally bumping the frame while picking up POLLEN is not | The paths clear both frame legs (1.6 in at the gap under the HIVE). Nothing on the robot, POLLEN included, may touch a CELL while passing under it; check that on the robot with the LOADING CELL down |
+| G418 | POLLEN comes out of a FLOWER only from the bottom (retrieval opening). Don't shake the FLOWER or ram the wall to knock POLLEN out | The pickups face the FLOWER's opening and arrive decelerating, 8.5 in from the wall |
+| G405 / G406 | Don't eject SCORING ELEMENTS from the field; don't damage the ARENA | Shots are aimed at CELLs from inside our half |
+| G403 | No powered movement between AUTO and TELEOP | The Auto finishes by 30 s with room to spare, and the Driver Station's 30 s AUTO timer (required by G305) stops the OpMode |
+| 10.5.4 LEAVE (3 pts) | At the end of AUTO, not touching the perimeter wall | Every branch ends at `Park`, 4.4–7.0 in off the wall |
+| 10.5.4 PARK (5 pts) | At the end of AUTO, at least partly in our LOADING ZONE | `Park` (16.0, 106.0) puts 4.4–7.0 in of the robot inside the zone (x ≤ 11.4, y 94.6–117.7) |
+| 10.5.5 HIVE TIP (20 pts each) | Every TIP completed before TELEOP counts for AUTO. POLLEN left in a CELL only scores at the end of the match | After a tip, the tipped branch shoots into the now-UP RED_LOADING CELL, which can tip the HIVE back for another 20 |
+
+Our own rules on top: never drive through a wall or a HIVE frame leg; coordinates with at most
+one decimal place; field positions are placeholders until measured.
+
+
 Open a `.pp` here in the editor (☰ → open file), then press **Auto**. Each has its exported Java beside it.
 
 Both start **touching the audience wall** (every Auto must start touching a wall): `Start` =
@@ -26,7 +47,7 @@ a HIVE frame leg. Under the HIVE, an 18 in robot has 1.6 in to the frame leg and
 center line.
 
 **Placeholders to measure on the field before running it:** `Start` (60.0, 9.0, 90),
-`LoadingFlower` (47.0, 124.0, 90), `Park` (18.0, 106.0, 90), and the robot's real width (18 in
+`LoadingFlower` (47.0, 124.0, 90), `Park` (16.0, 106.0), and the robot's real width (18 in
 assumed). Field positions (frame legs, center line, zones) were measured from the editor's field
 image; check the frame legs with a tape measure, since the under-HIVE gap depends on them.
 

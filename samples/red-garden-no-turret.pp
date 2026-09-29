@@ -149,7 +149,7 @@
       "name": "GardenToPark",
       "kind": "atomic",
       "endPoint": {
-        "x": 20.0,
+        "x": 16.0,
         "y": 106.0
       },
       "controlPoints": [],
@@ -309,7 +309,7 @@
       "name": "ToPark",
       "kind": "atomic",
       "endPoint": {
-        "x": 20.0,
+        "x": 16.0,
         "y": 106.0
       },
       "controlPoints": [],
@@ -541,7 +541,7 @@
         287.3
       ],
       "Park": [
-        20.0,
+        16.0,
         106.0
       ],
       "GardenSide": [

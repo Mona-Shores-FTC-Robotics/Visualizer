@@ -47,7 +47,7 @@ public final class RedGardenBasicAuto {
         Pose hiveEntrance = p.of(60, 33, 90);
         Pose rearShot = p.of(60, 104, 90);
         Pose loadingFlower = p.of(47, 124, 90);
-        Pose park = p.of(18, 106, 90);
+        Pose park = p.of(16, 106, 90);
         Pose collectHome = p.of(60, 10, 90);
 
         // Keep-out zones (from the .pp `shapes`), corners in order.
@@ -69,7 +69,7 @@ public final class RedGardenBasicAuto {
                 kit.action("ShootAll"),
                 kit.firstOf("Did our HIVE tip?",
                         kit.when("HiveTipped", "CameraBlind").then(
-                                kit.guarded("If tipped", toPark, 1.6,
+                                kit.guarded("If tipped", toPark, 1.7,
                                         kit.action("IntakeOn"),
                                         kit.path("Pass1Ahead", pass1Ahead),
                                         kit.path("Pass1Back", pass1Back),
@@ -87,7 +87,7 @@ public final class RedGardenBasicAuto {
                                         kit.action("ShootAll"),
                                         kit.path("ToPark", toPark))),
                         kit.afterMs(5000).then(
-                                kit.guarded("If not tipped", toPark, 1.6,
+                                kit.guarded("If not tipped", toPark, 1.7,
                                         kit.path("ToHiveEntrance", toHiveEntrance),
                                         kit.path("UnderHive", underHive),
                                         kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),

@@ -50,7 +50,7 @@ public final class RedGardenNoTurretAuto {
         Pose rearShot = p.of(52, 110, 284.3);
         Pose loadingFlower = p.of(47, 124, 90);
         Pose flowerShot = p.of(47, 122, 287.3);
-        Pose park = p.of(20, 106, 0);
+        Pose park = p.of(16, 106, 0);
         Pose gardenSide = p.of(40, 30, 0);
         Pose gardenFlower = p.of(18, 47.5, 180);
         Pose gardenShot = p.of(24, 47.5, 20.7);
@@ -60,8 +60,8 @@ public final class RedGardenNoTurretAuto {
 
         // Other poses the paths need (control points, unnamed endpoints).
         Pose toGardenSide = p.of(40, 30, 90);
-        Pose gardenToPark = p.of(20, 106, 20.7);
-        Pose toPark = p.of(20, 106, 287.3);
+        Pose gardenToPark = p.of(16, 106, 20.7);
+        Pose toPark = p.of(16, 106, 287.3);
 
         // Keep-out zones (from the .pp `shapes`), corners in order.
         kit.keepOut(p.of(46.6, 51.2, 0), p.of(49.4, 51.2, 0), p.of(49.4, 90.3, 0), p.of(46.6, 90.3, 0)); // HIVE frame leg (red side)
