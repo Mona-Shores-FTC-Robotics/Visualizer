@@ -1,9 +1,17 @@
 # Sample Autos
 
-**Open in the Visualizer:** [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
+**Open in the Visualizer:** [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
 
 These sample links open the files in this folder as last deployed, so they never go stale. Each
 opens as a shared copy: change anything, and "Save as new file" keeps your version.
+
+## `red-simple.pp`
+
+The smallest useful Auto, for learning the editor: shoot the preloads, then wait up to 3 s for the
+HIVE to tip. **Tipped:** drive straight under the HIVE to `RearShot` and shoot. **Not tipped:**
+curve over to `Garden` beside the red GARDEN, turning to face the red wall (a placeholder spot).
+The grey "Back to Start (never driven)" path is only there because the editor chains every path
+from the one before it in the Path List; no card drives it.
 
 ## Rules every Auto here follows
 
