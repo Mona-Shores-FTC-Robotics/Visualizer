@@ -481,7 +481,6 @@
   "auto": {
     "version": 1,
     "drawnFor": "RED",
-    "exportName": "red-garden-no-turret",
     "registry": {
       "actions": [
         "IntakeOff",
@@ -558,19 +557,29 @@
         47.5,
         20.7
       ],
-      "GardenCellAim": [
-        57.9,
-        60.3
-      ],
-      "LoadingCellAim": [
-        57.9,
-        86.9
-      ],
       "CollectHome": [
         60.0,
         10.0,
         90
       ]
+    },
+    "pathEnds": {
+      "pass1-out": "CollectAhead",
+      "pass1-back": "CollectHome",
+      "pass2-out": "CollectLeft",
+      "pass2-back": "CollectHome",
+      "to-garden-side": "GardenSide",
+      "to-garden-flower": "GardenFlower",
+      "turn-garden-shot": "GardenShot",
+      "garden-to-park": "Park",
+      "connector": "CollectHome",
+      "to-entrance": "HiveEntrance",
+      "under-hive": "CorridorExit",
+      "clear-to-turn": "ClearToTurn",
+      "turn-rear-shot": "RearShot",
+      "to-flower": "LoadingFlower",
+      "turn-flower-shot": "FlowerShot",
+      "to-park": "Park"
     },
     "cards": [
       {
@@ -803,6 +812,8 @@
           }
         ]
       }
-    ]
+    ],
+    "startAt": "Start",
+    "exportName": "red-garden-no-turret"
   }
 }

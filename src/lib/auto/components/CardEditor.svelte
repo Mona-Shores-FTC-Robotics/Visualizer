@@ -55,6 +55,27 @@
   let actions = $derived(auto.registry.actions);
   let conditions = $derived(auto.registry.conditions);
   let pointNames = $derived(Object.keys(auto.points));
+  let newEndName = $state("");
+
+  /** Puts a path's end on a named point ("" takes it off); the end moves to the point. */
+  function pinEnd(segmentId: string, name: string) {
+    updateAuto((draft) => {
+      if (name && draft.points[name]) draft.pathEnds[segmentId] = name;
+      else delete draft.pathEnds[segmentId];
+    });
+  }
+
+  /** Names a path's end where it is (to 0.1 in) and puts the end on it. */
+  function nameEnd(segmentId: string, end: { x: number; y: number }, headingDeg: number) {
+    const name = newEndName.trim();
+    if (!name || auto.points[name]) return;
+    const round = (value: number) => Math.round(value * 10) / 10;
+    updateAuto((draft) => {
+      draft.points[name] = [round(end.x), round(end.y), Math.round(((headingDeg % 360) + 360) % 360)];
+      draft.pathEnds[segmentId] = name;
+    });
+    newEndName = "";
+  }
 
   const ROW_KINDS: { value: RowKind; label: string }[] = [
     { value: "when", label: "Condition is true" },
@@ -289,6 +310,34 @@
         </span>
       </label>
     </div>
+    {#if info}
+      {@const pinned = auto.pathEnds[info.endSegmentId]}
+      <div class="{CELL_CLASS} text-[11px] text-gray-300">
+        <label class={LABEL_CLASS} for="auto-path-ends-at">Ends at</label>
+        <select
+          id="auto-path-ends-at"
+          class={FIELD_CLASS}
+          value={pinned ?? ""}
+          onchange={(e) => pinEnd(info.endSegmentId, e.currentTarget.value)}
+        >
+          <option value="">A spot of its own ({info.end.x.toFixed(1)}, {info.end.y.toFixed(1)})</option>
+          {#each pointNames as name (name)}
+            <option value={name}>{name} ({auto.points[name][0]}, {auto.points[name][1]})</option>
+          {/each}
+        </select>
+        {#if !pinned}
+          <form class="mt-1.5 flex gap-1.5" onsubmit={(e) => { e.preventDefault(); nameEnd(info.endSegmentId, info.end, info.endHeadingDeg); }}>
+            <input class={FIELD_CLASS} placeholder="Name this spot, e.g. RearShot" bind:value={newEndName} aria-label="Name for this path's end" />
+            <button type="submit" class="{ACTION_CLASS} shrink-0 text-[10px]" disabled={!newEndName.trim() || !!auto.points[newEndName.trim()]}>Name it</button>
+          </form>
+        {/if}
+        <div class="mt-1 text-gray-500">
+          {pinned
+            ? `Dragging this end moves ${pinned}, and every path that ends there moves with it.`
+            : "Name the spots where the robot does something (shoots, picks up, parks) or where paths meet."}
+        </div>
+      </div>
+    {/if}
     <div class={CELL_CLASS}>
       <span class={LABEL_CLASS}>While driving</span>
       {@render chips(

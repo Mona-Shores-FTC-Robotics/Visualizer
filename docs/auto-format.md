@@ -28,7 +28,11 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
   editor** (steps table, a pattern canvas whose points drag, end condition,
   timeout, while and exit actions).
 - **Robot actions & conditions** is the registry, plus the alliance the Auto
-  is drawn for, the export name and the named points.
+  is drawn for, the export name and the named points (each shows what uses
+  it, or "unused").
+- A path card's **Ends at** puts the path's end on a named point, or names the
+  end where it is ("Name it"); "Start is" does the same for the start pose.
+  See [Named points and pins](#named-points-and-pins).
 - **Preview as** sets the scenario; the playback bar, robot and log follow it.
   Untaken branches are dashed on the field and dimmed in the list.
 - **Export .java** (or Export → Export Auto (Java)) downloads the class.
@@ -69,6 +73,8 @@ A complete example that uses every card and row kind is
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
 | `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
+| `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
+| `startAt` | string, optional | The named point the start pose is on. |
 | `cards` | card[] | The Auto, top to bottom (the "trunk"). |
 
 ### Cards
@@ -152,6 +158,27 @@ a path starts where the previous path **in the Path List** ends. So two
 branches that both leave the same spot need the Path List to reach that spot
 before each of them; the discontinuity warning says when a card would start
 somewhere the robot is not.
+
+### Named points and pins
+
+A named point is a place with a name: `RearShot`, `Park`. Name the places
+where the robot does something (shoots, picks up, parks) or where paths meet;
+leave the rest unnamed. The Java uses the names, so they are also what to
+change at an event.
+
+A path end on a named point is **pinned** to it (`pathEnds`, and `startAt` for
+the start). A pinned end has no position of its own; it is wherever its point
+is. Edit the point and every end on it moves; drag a pinned end and the point
+moves with it (to 0.1 in), and so does every other end on that point. Paths
+still carry their end positions, so a stock Visualizer draws the file; the
+editor keeps the two equal (`src/lib/auto/pins.ts`, applied in `App.svelte`
+after every change). Choosing a point in "Ends at" moves the end onto the
+point, never the reverse.
+
+A file from before pins (no `pathEnds` key) is pinned when it opens: every
+end and the start that already sit on a named point (within 0.05 in) are
+pinned to it. A point that no end, start or card uses is drawn hollow on the
+field and gets a warning; it is not exported.
 
 ## Generated Java
 
@@ -279,7 +306,7 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 - `src/utils/history.ts` — `AppState.auto`, so undo/redo cover the Auto; `reset()`
   for opening and closing a shared copy.
 - `src/lib/session/sessionSnapshot.ts` — the recovery snapshot carries `auto`.
-- `src/App.svelte` — load, save, undo/redo, session recovery; opening a share
+- `src/App.svelte` — load, save, undo/redo, session recovery; the pins effect; opening a share
   link as a shared copy (session and settings are not persisted while it is shown,
   and saves go to a new file).
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.

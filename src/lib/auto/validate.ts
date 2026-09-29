@@ -2,6 +2,7 @@ import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { isTimeRow, rowKind, type AutoCard, type AutoSection } from "./types";
 import { describeRow } from "./tree";
+import { isUsed, pointUses } from "./pins";
 
 export type IssueLevel = "error" | "warning";
 
@@ -199,6 +200,12 @@ export function validateAuto(
       error(null, `Point name "${name}" must start with a letter and use letters, digits, spaces, _ or -.`);
     }
     if (!point.every(Number.isFinite)) error(null, `Point "${name}" has a coordinate that is not a number.`);
+  }
+  const uses = pointUses(auto);
+  for (const name of Object.keys(auto.points)) {
+    if (!isUsed(uses.get(name))) {
+      warn(null, `Point "${name}" is not used: no path ends on it and no card names it. Remove it, or pin a path's end to it.`);
+    }
   }
   return issues;
 }

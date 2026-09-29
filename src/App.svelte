@@ -179,7 +179,10 @@
     loadAutoFrom,
     previewScenario,
     setAutoRecorder,
+    takePinsToAdopt,
+    updateAuto,
   } from "./lib/auto/store";
+  import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
   import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
@@ -2474,6 +2477,45 @@
   let canRedo = $derived($canRedoStore);
   // Auto mode: the whole Auto is previewed, so the playback bar and the
   // robot follow the preview's timeline instead of the Path List's.
+  // Pins: path ends and the start that are named points stay on them. After
+  // any edit, a moved point takes its ends along, and a dragged end takes its
+  // point (and the point's other ends) along. `pinnedState` is the
+  // pins as they last held.
+  let pinnedState: PinState | null = null;
+  $effect.pre(() => {
+    const auto = $autoSection;
+    if (!auto) {
+      pinnedState = null;
+      return;
+    }
+    if (takePinsToAdopt()) {
+      updateAuto((draft) => adoptPins(draft, startPoint, lines), false);
+      return;
+    }
+    const segments = atomicPaths(lines);
+    const stale = Object.keys(auto.pathEnds).filter((id) => !segments.has(id));
+    if (stale.length) {
+      updateAuto((draft) => stale.forEach((id) => delete draft.pathEnds[id]), false);
+      return;
+    }
+    const { points, moves } = resolvePins(auto, startPoint, lines, pinnedState);
+    if (moves.length) {
+      for (const move of moves) {
+        const target = move.segmentId === null ? startPoint : segments.get(move.segmentId)?.endPoint;
+        if (target) {
+          target.x = move.x;
+          target.y = move.y;
+        }
+      }
+    }
+    pinnedState = { ...pinState(auto), points: points ?? auto.points };
+    if (points) {
+      updateAuto((draft) => {
+        draft.points = points;
+      }, false);
+    }
+  });
+
   let autoActive = $derived($autoMode && $autoSection !== null);
   let showUntakenBranches = $state(true);
   let autoCatalog = $derived(

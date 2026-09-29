@@ -264,7 +264,6 @@
   "auto": {
     "version": 1,
     "drawnFor": "RED",
-    "exportName": "red-garden-basic",
     "registry": {
       "actions": [
         "IntakeOff",
@@ -293,11 +292,6 @@
         29.1,
         117
       ],
-      "HiveEntrance": [
-        60,
-        46.8,
-        90
-      ],
       "RearShot": [
         60,
         118.8,
@@ -318,6 +312,15 @@
         10.0,
         90
       ]
+    },
+    "pathEnds": {
+      "pass1-out": "CollectAhead",
+      "pass1-back": "CollectHome",
+      "pass2-out": "CollectLeft",
+      "pass2-back": "CollectHome",
+      "to-rear-shot": "RearShot",
+      "to-flower": "LoadingFlower",
+      "to-park": "Park"
     },
     "cards": [
       {
@@ -510,6 +513,8 @@
           }
         ]
       }
-    ]
+    ],
+    "startAt": "Start",
+    "exportName": "red-garden-basic"
   }
 }

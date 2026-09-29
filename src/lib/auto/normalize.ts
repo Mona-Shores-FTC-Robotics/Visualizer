@@ -30,6 +30,7 @@ export function createEmptyAuto(drawnFor: Alliance = "BLUE"): AutoSection {
     drawnFor,
     registry: { actions: [], conditions: [] },
     points: {},
+    pathEnds: {},
     routines: {},
     cards: [],
   };
@@ -112,6 +113,21 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     }
   }
 
+  const pathEnds: Record<string, string> = {};
+  if (raw.pathEnds !== undefined && !isObject(raw.pathEnds)) {
+    problems.push("pathEnds is not an object of path id → point name; ignored it.");
+  } else if (isObject(raw.pathEnds)) {
+    for (const [lineId, name] of Object.entries(raw.pathEnds)) {
+      if (typeof name === "string" && points[name.trim()]) pathEnds[lineId] = name.trim();
+      else problems.push(`pathEnds: path ${lineId} is on "${String(name)}", which is not a named point; unpinned it.`);
+    }
+  }
+  let startAt: string | undefined;
+  if (raw.startAt !== undefined) {
+    if (typeof raw.startAt === "string" && points[raw.startAt.trim()]) startAt = raw.startAt.trim();
+    else problems.push(`startAt: "${String(raw.startAt)}" is not a named point; unpinned the start.`);
+  }
+
   const routines: Record<string, RoutineDef> = {};
   if (raw.routines !== undefined && !isObject(raw.routines)) {
     problems.push("routines is not an object of name → routine; ignored it.");
@@ -130,9 +146,11 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     drawnFor,
     registry,
     points,
+    pathEnds,
     routines,
     cards,
   };
+  if (startAt) auto.startAt = startAt;
   if (typeof raw.exportName === "string" && raw.exportName.trim()) {
     auto.exportName = raw.exportName.trim();
   }
@@ -462,6 +480,9 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     points: Object.fromEntries(
       Object.entries(auto.points).map(([name, point]) => [name, [...point]]),
     ) as Record<string, NamedPoint>,
+    // Always written, even empty: a file without it is one from before pins,
+    // whose ends on named points the editor pins when it opens the file.
+    pathEnds: { ...auto.pathEnds },
     routines: Object.fromEntries(
       Object.entries(auto.routines).map(([name, routine]) => [
         name,
@@ -484,6 +505,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
   if (Object.keys(out.routines).length === 0) {
     delete (out as Partial<AutoSection>).routines;
   }
+  if (auto.startAt) out.startAt = auto.startAt;
   if (auto.exportName) out.exportName = auto.exportName;
   return out;
 }
