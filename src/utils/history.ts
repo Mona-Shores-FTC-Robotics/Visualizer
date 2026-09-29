@@ -61,6 +61,14 @@ export function createHistory(maxSize = 200) {
     updateStores();
   }
 
+  /** Forget every undo and redo step; `state` becomes the only one. */
+  function reset(state: AppState) {
+    undoStack.length = 0;
+    redoStack = [];
+    lastHash = "";
+    record(state);
+  }
+
   function canUndo() {
     return undoStack.length > 1; // keep initial state; require at least one prior state
   }
@@ -95,6 +103,7 @@ export function createHistory(maxSize = 200) {
 
   return {
     record,
+    reset,
     undo,
     redo,
     canUndo,

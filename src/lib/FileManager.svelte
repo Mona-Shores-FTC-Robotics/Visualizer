@@ -10,6 +10,7 @@
     Path,
     Shape,
     SequenceItem,
+    Settings,
     StartPose,
   } from "../types";
   import * as browserFileStore from "../utils/browserFileStore";
@@ -25,7 +26,12 @@
     normalizeStartPose,
     deriveSequence,
   } from "../utils/normalize";
-  import { newerVersionWarning, serializeProject } from "../utils/project";
+  import {
+    buildOtherFileProject,
+    newerVersionWarning,
+    serializeProject,
+    settingsForFile,
+  } from "../utils/project";
   import { downloadJson } from "../utils/download";
   import { stripPpExtension } from "../utils/filename";
   import {
@@ -51,6 +57,8 @@
     secondShapes?: Shape[];
     secondSequence?: SequenceItem[];
     fieldPoints?: FieldPoint[];
+    /** Written into the main file; opening a file applies its own. */
+    settings?: Settings;
   }
 
   let {
@@ -64,7 +72,21 @@
     secondShapes = $bindable([]),
     secondSequence = $bindable([]),
     fieldPoints = $bindable([]),
+    settings = $bindable(),
   }: Props = $props();
+
+  /** The main file's document, the same whichever button saves it. */
+  function mainProject() {
+    return {
+      startPoint,
+      lines,
+      shapes,
+      sequence,
+      fieldPoints,
+      settings,
+      auto: currentAuto(),
+    };
+  }
 
   let files: FileInfo[] = $state([]);
   let selectedFile2: FileInfo | null = $state(null);
@@ -119,14 +141,7 @@
   async function syncActiveProjectToStorage() {
     if (!$currentFilePath) return;
 
-    const content = serializeProject({
-      startPoint,
-      lines,
-      shapes,
-      sequence,
-      fieldPoints,
-      auto: currentAuto(),
-    });
+    const content = serializeProject(mainProject());
     await browserFileStore.writeFile($currentFilePath, content);
     isUnsaved.set(false);
   }
@@ -227,15 +242,22 @@
         (selectedFile?.path ?? $currentFilePath) === renamingFile.path;
       const renamingSecondary = selectedFile2?.path === renamingFile.path;
       let currentContent: string | null = null;
-      if (renamingPrimary || renamingSecondary) {
-        currentContent = serializeProject({
-          startPoint: renamingPrimary ? startPoint : secondStartPoint!,
-          lines: renamingPrimary ? lines : secondLines,
-          shapes: renamingPrimary ? shapes : secondShapes,
-          sequence: renamingPrimary ? sequence : secondSequence,
-          fieldPoints,
-          auto: renamingPrimary ? currentAuto() : null,
-        });
+      if (renamingPrimary) {
+        currentContent = serializeProject(mainProject());
+        await browserFileStore.writeFile(renamingFile.path, currentContent);
+      } else if (renamingSecondary) {
+        // The second file keeps its own Auto and field points.
+        const stored = await browserFileStore
+          .readFile(renamingFile.path)
+          .catch(() => null);
+        currentContent = JSON.stringify(
+          buildOtherFileProject(stored, {
+            startPoint: secondStartPoint,
+            lines: secondLines,
+            shapes: secondShapes,
+            sequence: secondSequence,
+          }),
+        );
         await browserFileStore.writeFile(renamingFile.path, currentContent);
       }
 
@@ -338,6 +360,7 @@
     shapes = doc.shapes;
     sequence = doc.sequence;
     fieldPoints = doc.fieldPoints;
+    if (settings) settings = settingsForFile(settings, doc.raw.settings);
     const autoProblems = loadAutoFrom(doc.raw);
     if (autoProblems.length) {
       showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
@@ -386,14 +409,7 @@
     }
 
     try {
-      const content = serializeProject({
-        startPoint,
-        lines,
-        shapes,
-        sequence,
-        fieldPoints,
-        auto: currentAuto(),
-      });
+      const content = serializeProject(mainProject());
 
       await browserFileStore.writeFile(selectedFile.path, content);
       await refreshDirectory();
@@ -409,10 +425,7 @@
   // Download current project as a .pp file to the user's computer (Save As...)
   function downloadCurrentToDisk() {
     try {
-      const content = serializeProject(
-        { startPoint, lines, shapes, sequence, fieldPoints, auto: currentAuto() },
-        { pretty: true },
-      );
+      const content = serializeProject(mainProject(), { pretty: true });
 
       const defaultName = selectedFile?.name || "path.pp";
       downloadJson(content, defaultName);
@@ -449,10 +462,7 @@
 
       const writable = await handle.createWritable();
 
-      const content = serializeProject(
-        { startPoint, lines, shapes, sequence, fieldPoints, auto: currentAuto() },
-        { pretty: true },
-      );
+      const content = serializeProject(mainProject(), { pretty: true });
 
       await writable.write(content);
       await writable.close();
@@ -509,6 +519,8 @@
         shapes: defaultShapes,
         sequence: defaultSequence,
         fieldPoints: defaultFieldPoints,
+        // A new file starts with the robot settings in use now.
+        settings,
       });
 
       await browserFileStore.writeFile(filePath, content);

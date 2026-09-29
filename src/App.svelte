@@ -40,6 +40,7 @@
   import FieldMapImage from "./lib/components/FieldMapImage.svelte";
   import FieldLoadingOverlay from "./lib/components/FieldLoadingOverlay.svelte";
   import ToastHost from "./lib/components/ui/ToastHost.svelte";
+  import SharedCopyBanner from "./lib/components/SharedCopyBanner.svelte";
   import _ from "lodash";
   import hotkeys from "hotkeys-js";
   import { createAnimationController } from "./utils/animation";
@@ -48,8 +49,11 @@
   import { downloadBlob } from "./utils/download";
   import {
     PROJECT_VERSION,
+    buildOtherFileProject,
     buildProject,
+    settingsForFile,
     newerVersionWarning,
+    type OtherFilePaths,
   } from "./utils/project";
   import { showToast } from "./lib/toast";
   import { basename, pathStem } from "./utils/filename";
@@ -160,6 +164,12 @@
     type SessionSnapshot,
   } from "./lib/session/sessionSnapshot";
   import * as browserFileStore from "./utils/browserFileStore";
+  import { decodeShareHash } from "./utils/shareLink";
+  import {
+    freeSharedFileName,
+    sharedCopyState,
+    type SharedCopyView,
+  } from "./lib/session/sharedCopy";
   import { onDestroy, onMount, tick } from "svelte";
   import { debounce } from "lodash";
   import { createHistory, type AppState } from "./utils/history";
@@ -592,6 +602,20 @@
     );
   }
 
+  /**
+   * The text to save for a file shown beside the main one. Starts from the
+   * file as stored, so its own Auto and field points survive the save.
+   */
+  async function otherFileContent(
+    filePath: string,
+    paths: OtherFilePaths,
+  ): Promise<string> {
+    const existing = await browserFileStore
+      .readFile(filePath)
+      .catch(() => null);
+    return JSON.stringify(buildOtherFileProject(existing, paths));
+  }
+
   function getAppState(): AppState {
     return {
       startPoint,
@@ -715,6 +739,15 @@
     const snapshot = loadSessionSnapshot();
     if (!snapshot) return false;
 
+    const autoProblems = applySessionSnapshot(snapshot);
+    if (autoProblems.length) console.warn("Auto recovery:", autoProblems);
+    isUnsaved.set(true);
+
+    return true;
+  }
+
+  /** Puts a snapshot's project on screen; returns the Auto's load problems. */
+  function applySessionSnapshot(snapshot: SessionSnapshot): string[] {
     startPoint = snapshot.startPoint;
     lines = snapshot.lines;
     sequence = snapshot.sequence;
@@ -730,12 +763,137 @@
     secondShapes = snapshot.secondShapes;
 
     activePaths.set(snapshot.activePaths);
-    const autoProblems = loadAutoFrom(snapshot);
-    if (autoProblems.length) console.warn("Auto recovery:", autoProblems);
-    isUnsaved.set(true);
-
-    return true;
+    return loadAutoFrom(snapshot);
   }
+
+  // A project opened from a share link (#data=…) is shown as a copy. The
+  // viewer's own work waits in `sharedStash` and nothing is persisted while
+  // the copy is on screen, so a link can never save over a file, the
+  // recovered session or the viewer's settings.
+  let sharedCopy = $state<SharedCopyView | null>(null);
+  let shareLinkError = $state<string | null>(null);
+  let sharedStash: {
+    snapshot: SessionSnapshot;
+    fieldPoints: FieldPoint[];
+    unsaved: boolean;
+    dualPathMode: boolean;
+    autoMode: boolean;
+  } | null = null;
+
+  async function openShareLink() {
+    const result = await decodeShareHash(window.location.hash);
+    if (result.kind === "none") return;
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + window.location.search,
+    );
+    if (result.kind === "error") {
+      shareLinkError = result.message;
+      return;
+    }
+    shareLinkError = null;
+
+    const { project, name } = result.shared;
+    // Opening a second link while a copy is shown keeps the first stash:
+    // that is the viewer's own work.
+    sharedStash ??= JSON.parse(
+      JSON.stringify({
+        snapshot: buildSessionSnapshot(),
+        fieldPoints,
+        unsaved: $isUnsaved,
+        dualPathMode: $dualPathMode,
+        autoMode: $autoMode,
+      }),
+    );
+    sharedCopy = {
+      name,
+      madeAt: typeof project.timestamp === "string" ? project.timestamp : null,
+      savedAs: null,
+    };
+
+    const shared = sharedCopyState(project, settings);
+    startPoint = shared.startPoint;
+    lines = shared.lines;
+    sequence = shared.sequence;
+    shapes = shared.shapes;
+    fieldPoints = shared.fieldPoints;
+    settings = shared.settings;
+    // No file is open, so Save cannot write over one; the viewer's other
+    // files are not overlaid on someone else's Auto.
+    currentFilePath.set(null);
+    activePaths.set([]);
+    dualPathMode.set(false);
+
+    const versionWarning = newerVersionWarning(project.version);
+    if (versionWarning) showToast(versionWarning, "warning");
+    const autoProblems = loadAutoFrom(project);
+    if (autoProblems.length) {
+      showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
+    }
+    if ($autoSection) autoMode.set(true);
+    history.reset(getAppState());
+  }
+
+  /** Close the shared copy and put the viewer's own work back. */
+  function closeSharedCopy() {
+    const stash = sharedStash;
+    sharedCopy = null;
+    sharedStash = null;
+    if (!stash) return;
+
+    applySessionSnapshot(stash.snapshot);
+    fieldPoints = stash.fieldPoints;
+    dualPathMode.set(stash.dualPathMode);
+    autoMode.set(stash.autoMode && $autoSection !== null);
+    history.reset(getAppState());
+    isUnsaved.set(stash.unsaved);
+  }
+
+  /** Save the shared copy under a new name; it stays on screen as a copy. */
+  async function saveSharedCopy() {
+    if (!sharedCopy) return;
+    const suggested = await freeSharedFileName(
+      sharedCopy.name,
+      browserFileStore.fileExists,
+    );
+    const answer = window.prompt("Save the shared copy as a new file", suggested);
+    const trimmed = answer?.trim();
+    if (!trimmed) return;
+
+    const fileName = trimmed.endsWith(".pp") ? trimmed : `${trimmed}.pp`;
+    if (!/^[a-zA-Z0-9_\-. ]+\.pp$/.test(fileName)) {
+      alert("Use only letters, numbers, spaces, dots, underscores and dashes.");
+      return;
+    }
+    if (
+      (await browserFileStore.fileExists(fileName)) &&
+      !confirm(`"${fileName}" already exists. Overwrite it with the shared copy?`)
+    ) {
+      return;
+    }
+    try {
+      await browserFileStore.writeFile(
+        fileName,
+        JSON.stringify(buildProjectData(), null, 2),
+      );
+      sharedCopy = { ...sharedCopy, savedAs: fileName };
+      showToast(`Saved the shared copy as ${fileName}`, "success");
+    } catch (error) {
+      console.error("Failed to save the shared copy:", error);
+      alert("Failed to save the shared copy.");
+    }
+  }
+
+  // Opening or saving a file some other way makes that file the work on
+  // screen; the shared copy and the set-aside work are then let go, as with
+  // any file load.
+  $effect(() => {
+    if (sharedCopy && $currentFilePath) {
+      sharedCopy = null;
+      sharedStash = null;
+    }
+  });
 
   let secondRobotXY: BasePoint = $state({ x: 0, y: 0 });
   let secondRobotHeading: number = $state(0);
@@ -764,6 +922,8 @@
     if (restored) {
       console.info("Recovered previous unsaved session.");
     }
+    await openShareLink();
+    window.addEventListener("hashchange", openShareLink);
 
     // robotWidth/robotHeight derive from settings, so loading settings is enough.
     // Apply the saved panel widths, then clamp them to the current viewport.
@@ -824,6 +984,9 @@
   const debouncedSaveSession = debounce(saveSessionSnapshot, 750);
 
   onDestroy(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("hashchange", openShareLink);
+    }
     debouncedSaveSession.cancel();
     debouncedSaveSettings.cancel();
     endPanelResize();
@@ -849,6 +1012,7 @@
   // Save Function
   // Save the current project into the browser-backed store (or download)
   async function saveProject() {
+    if (sharedCopy) return saveSharedCopy();
     try {
       await saveFile();
     } catch (e) {
@@ -863,15 +1027,13 @@
     if (!pathData || !pathData.filePath) return;
 
     try {
-      const fileData = JSON.stringify(
-        buildProjectData({
-          startPoint: pathData.startPoint,
-          lines: pathData.lines,
-          shapes: pathData.shapes,
-          sequence: pathData.sequence,
-          settings: pathData.settings,
-        }),
-      );
+      const fileData = await otherFileContent(pathData.filePath, {
+        startPoint: pathData.startPoint,
+        lines: pathData.lines,
+        shapes: pathData.shapes,
+        sequence: pathData.sequence,
+        settings: pathData.settings,
+      });
 
       await browserFileStore.writeFile(pathData.filePath, fileData);
       console.log(`Auto-saved additional path: ${pathData.filePath}`);
@@ -896,7 +1058,9 @@
   onMount(() => {
     hotkeys("cmd+s, ctrl+s", function (event) {
       event.preventDefault();
-      if ($activePaths.length > 0) {
+      if (sharedCopy) {
+        saveSharedCopy();
+      } else if ($activePaths.length > 0) {
         // Multiple paths mode - save all modified paths
         showDualPathSaveDialog = true;
       } else if ($dualPathMode && secondStartPoint && secondLines.length > 0) {
@@ -1279,6 +1443,7 @@
   }
 
   async function saveFileAs() {
+    if (sharedCopy) return saveSharedCopy();
     const win: any = window as any;
     await saveAllAdditionalPaths();
     const content = JSON.stringify(buildProjectData(), null, 2);
@@ -1832,10 +1997,9 @@
       // Load shapes with defaults
       shapes = data.shapes || [];
       fieldPoints = normalizeFieldPoints(data);
-      // Load settings (including robot size) if present
-      if (data.settings) {
-        settings = { ...settings, ...data.settings };
-      }
+      // The file's own robot size and motion model; the viewer's
+      // preferences (panels, colours, images) stay as they are.
+      settings = settingsForFile(settings, data.settings);
 
       activePaths.set(Array.isArray(data.activePaths) ? data.activePaths : []);
 
@@ -2166,14 +2330,12 @@
           await browserFileStore.writeFile($currentFilePath, fileData);
           isUnsaved.set(false);
         } else if (target === "second" && $secondFilePath) {
-          const fileData = JSON.stringify(
-            buildProjectData({
-              startPoint: secondStartPoint,
-              lines: secondLines,
-              shapes: secondShapes,
-              sequence: secondSequence,
-            }),
-          );
+          const fileData = await otherFileContent($secondFilePath, {
+            startPoint: secondStartPoint,
+            lines: secondLines,
+            shapes: secondShapes,
+            sequence: secondSequence,
+          });
           await browserFileStore.writeFile($secondFilePath, fileData);
         } else if (target === "both") {
           // Save first path
@@ -2183,14 +2345,12 @@
           }
           // Save second path
           if ($secondFilePath) {
-            const fileData2 = JSON.stringify(
-              buildProjectData({
-                startPoint: secondStartPoint,
-                lines: secondLines,
-                shapes: secondShapes,
-                sequence: secondSequence,
-              }),
-            );
+            const fileData2 = await otherFileContent($secondFilePath, {
+              startPoint: secondStartPoint,
+              lines: secondLines,
+              shapes: secondShapes,
+              sequence: secondSequence,
+            });
             await browserFileStore.writeFile($secondFilePath, fileData2);
           }
           isUnsaved.set(false);
@@ -2743,12 +2903,12 @@
   });
   // Watch for settings changes and save
   $effect.pre(() => {
-    if (settings) {
+    if (settings && !sharedCopy) {
       debouncedSaveSettings(settings);
     }
   });
   $effect.pre(() => {
-    if (isLoaded) {
+    if (isLoaded && !sharedCopy) {
       debouncedSaveSession(buildSessionSnapshot());
     }
   });
@@ -3005,6 +3165,14 @@
   />
 
   <ToastHost />
+
+  <SharedCopyBanner
+    view={sharedCopy}
+    error={shareLinkError}
+    onSave={saveSharedCopy}
+    onClose={closeSharedCopy}
+    onDismissError={() => (shareLinkError = null)}
+  />
 
   <!--   {saveFile} -->
   <div class="ui-shell w-screen h-screen pt-[5.1rem] px-3 pb-3">
