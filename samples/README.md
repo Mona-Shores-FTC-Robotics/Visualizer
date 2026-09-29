@@ -15,7 +15,7 @@ From the BIOBUZZ Competition Manual, TU02 (Section 10 Game Details, Section 11 G
 | G403 | No powered movement between AUTO and TELEOP | The Auto finishes by 30 s with room to spare, and the Driver Station's 30 s AUTO timer (required by G305) stops the OpMode |
 | 10.5.4 LEAVE (3 pts) | At the end of AUTO, not touching the perimeter wall | Every branch ends at `Park`, 4.4–7.0 in off the wall |
 | 10.5.4 PARK (5 pts) | At the end of AUTO, at least partly in our LOADING ZONE | `Park` (16.0, 106.0) puts 4.4–7.0 in of the robot inside the zone (x ≤ 11.4, y 94.6–117.7) |
-| 10.5.5 HIVE TIP (20 pts each) | Every TIP completed before TELEOP counts for AUTO. POLLEN left in a CELL only scores at the end of the match | After a tip, the tipped branch shoots into the now-UP RED_LOADING CELL, which can tip the HIVE back for another 20 |
+| 10.5.5 HIVE TIP (20 pts each) | Every TIP completed before TELEOP counts for AUTO. POLLEN left in a CELL only scores at the end of the match | A tip takes **8 POLLEN** (Event Field Setup Guide §12.3: 7 tossed in must not tip, the 8th must), and in AUTO there is no NECTAR (G401), so one robot's 4 preloads can't tip the HIVE alone. The tipped branch then puts its GARDEN 4 and LOADING FLOWER 4 into the now-UP RED_LOADING CELL: exactly 8, a second tip if every shot goes in |
 
 Our own rules on top: never drive through a wall or a HIVE frame leg; coordinates with at most
 one decimal place; field positions are placeholders until measured.
