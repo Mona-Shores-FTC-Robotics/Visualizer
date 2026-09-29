@@ -2,6 +2,12 @@
 
 Open a `.pp` here in the editor (☰ → open file), then press **Auto**. Each has its exported Java beside it.
 
+Both start **touching the audience wall** (every Auto must start touching a wall): `Start` =
+(60.0, 9.0, 90), the back of an 18 in robot flush with the wall, intake toward the RED_GARDEN CELL.
+The collect passes return to `CollectHome` (60.0, 10.0), 1 in off the wall, so the robot never
+drives back into the wall; the not-tipped branch leaves from there too, 1 in from where the robot
+sat, which Pedro absorbs.
+
 ## `red-garden-basic.pp`
 
 A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
@@ -19,7 +25,7 @@ It never lets the robot body overlap the center line (x = 70.75) and never drive
 a HIVE frame leg. Under the HIVE, an 18 in robot has 1.6 in to the frame leg and 1.8 in to the
 center line.
 
-**Placeholders to measure on the field before running it:** `Start` (60.0, 20.0, 90),
+**Placeholders to measure on the field before running it:** `Start` (60.0, 9.0, 90),
 `LoadingFlower` (47.0, 124.0, 90), `Park` (18.0, 106.0, 90), and the robot's real width (18 in
 assumed). Field positions (frame legs, center line, zones) were measured from the editor's field
 image; check the frame legs with a tape measure, since the under-HIVE gap depends on them.
@@ -30,7 +36,9 @@ The same plan for a robot **without a turret**. The launcher is assumed fixed an
 intake faces, so the robot turns to face each CELL before it shoots. If our launcher fires out the
 back instead, every shot heading flips by 180°.
 
-- **Preloads:** `Start` faces 93.0°, straight at the RED_GARDEN CELL (40.3 in away).
+- **Preloads:** from `Start`, facing 90°. The CELL's centre is 2.3° to the left, so the shot lands
+  about 2.1 in off centre on a 20 in opening. The robot can't start turned toward it, because it
+  has to sit square against the wall.
 - **If tipped:** the same collect passes and the same route under the HIVE. It then moves over to
   (52.0, 112.0), where an 18 in robot has room to spin (it sweeps a 12.7 in radius), and turns
   165.7° to face the RED_LOADING CELL and shoot (23.8 in). It picks up from the RED_LOADING FLOWER,
@@ -45,9 +53,9 @@ back instead, every shot heading flips by 180°.
 
 | | With turret | Without turret |
 |---|---|---|
-| Tipped: preview end (turns added) | 18.5 s | 19.9 s (about 21.7 s with turns) |
-| Not tipped: preview end (turns added) | 16.8 s | 15.9 s (about 16.8 s with turns) |
-| Worst case (every wait times out) | 23.0 s | 24.4 s (about 26.2 s with turns) |
+| Tipped: preview end (turns added) | 18.6 s | 19.9 s (about 21.7 s with turns) |
+| Not tipped: preview end (turns added) | 17.0 s | 16.1 s (about 17.0 s with turns) |
+| Worst case (every wait times out) | 23.1 s | 24.4 s (about 26.2 s with turns) |
 | Big turns | none | three turns of about 160°, about 0.9 s each at 180°/s |
 | Tightest clearance | 1.6 in to the frame leg under the HIVE | same |
 

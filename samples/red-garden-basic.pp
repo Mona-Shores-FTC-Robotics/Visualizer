@@ -1,7 +1,7 @@
 {
   "startPoint": {
     "x": 60.0,
-    "y": 20.0,
+    "y": 9.0,
     "headingDeg": 90,
     "name": "Start"
   },
@@ -13,7 +13,7 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 32.0
+        "y": 21.0
       },
       "controlPoints": [],
       "heading": {
@@ -32,7 +32,7 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 20.0
+        "y": 10.0
       },
       "controlPoints": [],
       "heading": {
@@ -51,7 +51,7 @@
       "kind": "atomic",
       "endPoint": {
         "x": 55.9,
-        "y": 31.3
+        "y": 20.3
       },
       "controlPoints": [],
       "heading": {
@@ -71,7 +71,7 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 20.0
+        "y": 10.0
       },
       "controlPoints": [],
       "heading": {
@@ -91,7 +91,7 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 44.0
+        "y": 33.0
       },
       "controlPoints": [],
       "heading": {
@@ -303,22 +303,22 @@
     "points": {
       "Start": [
         60.0,
-        20.0,
+        9.0,
         90
       ],
       "CollectAhead": [
         60.0,
-        32.0,
+        21.0,
         90
       ],
       "CollectLeft": [
         55.9,
-        31.3,
+        20.3,
         110
       ],
       "HiveEntrance": [
         60.0,
-        44.0,
+        33.0,
         90
       ],
       "RearShot": [
@@ -334,6 +334,11 @@
       "Park": [
         18.0,
         106.0,
+        90
+      ],
+      "CollectHome": [
+        60.0,
+        10.0,
         90
       ]
     },

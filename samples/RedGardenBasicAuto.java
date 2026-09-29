@@ -29,7 +29,7 @@ public final class RedGardenBasicAuto {
 
     /** Where the robot starts, for the given alliance. */
     public static Pose startPose(boolean mirrored) {
-        return poses(mirrored).of(60, 20, 90);
+        return poses(mirrored).of(60, 9, 90);
     }
 
     private static PoseFactory poses(boolean mirrored) {
@@ -41,13 +41,14 @@ public final class RedGardenBasicAuto {
         PoseFactory p = poses(mirrored);
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
-        Pose start = p.of(60, 20, 90);
-        Pose collectAhead = p.of(60, 32, 90);
-        Pose collectLeft = p.of(55.9, 31.3, 110);
-        Pose hiveEntrance = p.of(60, 44, 90);
+        Pose start = p.of(60, 9, 90);
+        Pose collectAhead = p.of(60, 21, 90);
+        Pose collectLeft = p.of(55.9, 20.3, 110);
+        Pose hiveEntrance = p.of(60, 33, 90);
         Pose rearShot = p.of(60, 104, 90);
         Pose loadingFlower = p.of(47, 124, 90);
         Pose park = p.of(18, 106, 90);
+        Pose collectHome = p.of(60, 10, 90);
 
         // Keep-out zones (from the .pp `shapes`), corners in order.
         kit.keepOut(p.of(46.6, 51.2, 0), p.of(49.4, 51.2, 0), p.of(49.4, 90.3, 0), p.of(46.6, 90.3, 0)); // HIVE frame leg (red side)
@@ -56,10 +57,10 @@ public final class RedGardenBasicAuto {
 
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
-        Path pass1Back = Paths.line(collectAhead, start).constant(start);
-        Path pass2Left = Paths.line(start, collectLeft).linear(start, collectLeft);
-        Path pass2Back = Paths.line(collectLeft, start).linear(collectLeft, start);
-        Path toHiveEntrance = Paths.line(start, hiveEntrance).constant(hiveEntrance);
+        Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
+        Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
+        Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
+        Path toHiveEntrance = Paths.line(collectHome, hiveEntrance).constant(hiveEntrance);
         Path underHive = Paths.line(hiveEntrance, rearShot).constant(rearShot);
         Path toLoadingFlower = Paths.line(rearShot, loadingFlower).constant(loadingFlower);
         Path toPark = Paths.line(loadingFlower, park).constant(park);

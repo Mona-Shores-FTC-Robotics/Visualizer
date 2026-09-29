@@ -29,7 +29,7 @@ public final class RedGardenNoTurretAuto {
 
     /** Where the robot starts, for the given alliance. */
     public static Pose startPose(boolean mirrored) {
-        return poses(mirrored).of(60, 20, 93);
+        return poses(mirrored).of(60, 9, 90);
     }
 
     private static PoseFactory poses(boolean mirrored) {
@@ -41,10 +41,10 @@ public final class RedGardenNoTurretAuto {
         PoseFactory p = poses(mirrored);
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
-        Pose start = p.of(60, 20, 93);
-        Pose collectAhead = p.of(59.4, 32, 93);
-        Pose collectLeft = p.of(55.3, 31, 113);
-        Pose hiveEntrance = p.of(60, 44, 90);
+        Pose start = p.of(60, 9, 90);
+        Pose collectAhead = p.of(60, 21, 90);
+        Pose collectLeft = p.of(55.9, 20.3, 110);
+        Pose hiveEntrance = p.of(60, 33, 90);
         Pose corridorExit = p.of(60, 104, 90);
         Pose clearToTurn = p.of(52, 112, 90);
         Pose rearShot = p.of(52, 110, 284.3);
@@ -56,9 +56,10 @@ public final class RedGardenNoTurretAuto {
         Pose gardenShot = p.of(24, 47.5, 20.7);
         Pose gardenCellAim = p.of(57.9, 60.3, 0);
         Pose loadingCellAim = p.of(57.9, 86.9, 0);
+        Pose collectHome = p.of(60, 10, 90);
 
         // Other poses the paths need (control points, unnamed endpoints).
-        Pose toGardenSide = p.of(40, 30, 93);
+        Pose toGardenSide = p.of(40, 30, 90);
         Pose gardenToPark = p.of(20, 106, 20.7);
         Pose toPark = p.of(20, 106, 287.3);
 
@@ -69,14 +70,14 @@ public final class RedGardenNoTurretAuto {
 
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
-        Path pass1Back = Paths.line(collectAhead, start).constant(start);
-        Path pass2Left = Paths.line(start, collectLeft).linear(start, collectLeft);
-        Path pass2Back = Paths.line(collectLeft, start).linear(collectLeft, start);
-        Path toGardenSidePath = Paths.line(start, toGardenSide).constant(toGardenSide);
+        Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
+        Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
+        Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
+        Path toGardenSidePath = Paths.line(collectHome, toGardenSide).constant(toGardenSide);
         Path toGardenFlower = Paths.line(toGardenSide, gardenFlower).linear(toGardenSide, gardenFlower);
         Path turnToGardenCell = Paths.line(gardenFlower, gardenShot).linear(gardenFlower, gardenShot);
         Path gardenToParkPath = Paths.line(gardenShot, gardenToPark).constant(gardenToPark);
-        Path toHiveEntrance = Paths.line(start, hiveEntrance).linear(start, hiveEntrance);
+        Path toHiveEntrance = Paths.line(collectHome, hiveEntrance).constant(hiveEntrance);
         Path underHive = Paths.line(hiveEntrance, corridorExit).constant(corridorExit);
         Path clearToTurnPath = Paths.line(corridorExit, clearToTurn).constant(clearToTurn);
         Path turnToLoadingCell = Paths.line(clearToTurn, rearShot).linear(clearToTurn, rearShot);

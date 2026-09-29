@@ -1,8 +1,8 @@
 {
   "startPoint": {
     "x": 60.0,
-    "y": 20.0,
-    "headingDeg": 93.0,
+    "y": 9.0,
+    "headingDeg": 90,
     "name": "Start"
   },
   "lines": [
@@ -12,13 +12,13 @@
       "name": "Pass1Ahead",
       "kind": "atomic",
       "endPoint": {
-        "x": 59.4,
-        "y": 32.0
+        "x": 60.0,
+        "y": 21.0
       },
       "controlPoints": [],
       "heading": {
         "type": "constant",
-        "degrees": 93.0
+        "degrees": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -32,12 +32,12 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 20.0
+        "y": 10.0
       },
       "controlPoints": [],
       "heading": {
         "type": "constant",
-        "degrees": 93.0
+        "degrees": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -50,14 +50,14 @@
       "name": "Pass2Left",
       "kind": "atomic",
       "endPoint": {
-        "x": 55.3,
-        "y": 31.0
+        "x": 55.9,
+        "y": 20.3
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 93.0,
-        "endDeg": 113.0
+        "startDeg": 90,
+        "endDeg": 110
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -71,13 +71,13 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 20.0
+        "y": 10.0
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 113.0,
-        "endDeg": 93.0
+        "startDeg": 110,
+        "endDeg": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -96,7 +96,7 @@
       "controlPoints": [],
       "heading": {
         "type": "constant",
-        "degrees": 93.0
+        "degrees": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -115,7 +115,7 @@
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 93.0,
+        "startDeg": 90,
         "endDeg": 180
       },
       "waitBeforeMs": 0,
@@ -169,17 +169,17 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 20.0
+        "y": 10.0
       },
       "controlPoints": [
         {
-          "x": 20.0,
-          "y": 20.0
+          "x": 12.0,
+          "y": 12.0
         }
       ],
       "heading": {
         "type": "constant",
-        "degrees": 93.0
+        "degrees": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -193,13 +193,12 @@
       "kind": "atomic",
       "endPoint": {
         "x": 60.0,
-        "y": 44.0
+        "y": 33.0
       },
       "controlPoints": [],
       "heading": {
-        "type": "linear",
-        "startDeg": 93.0,
-        "endDeg": 90
+        "type": "constant",
+        "degrees": 90
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -498,22 +497,22 @@
     "points": {
       "Start": [
         60.0,
-        20.0,
-        93.0
+        9.0,
+        90
       ],
       "CollectAhead": [
-        59.4,
-        32.0,
-        93.0
+        60.0,
+        21.0,
+        90
       ],
       "CollectLeft": [
-        55.3,
-        31.0,
-        113.0
+        55.9,
+        20.3,
+        110
       ],
       "HiveEntrance": [
         60.0,
-        44.0,
+        33.0,
         90
       ],
       "CorridorExit": [
@@ -566,6 +565,11 @@
       "LoadingCellAim": [
         57.9,
         86.9
+      ],
+      "CollectHome": [
+        60.0,
+        10.0,
+        90
       ]
     },
     "cards": [
