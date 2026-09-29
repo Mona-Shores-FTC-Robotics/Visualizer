@@ -182,6 +182,22 @@ contract with the robot's `autokit` library:
   park path's drive time by the preview's motion model, rounded **up** to
   0.1 s; the trunk's guard label is `"Auto"`, a branch's is its row label.
 
+### Robot settings belong to the file
+
+The preview's timing and the park guard's `seconds` come from the robot size
+and motion model (`xVelocity`, `yVelocity`, `aVelocity`, `kFriction`,
+`rWidth`, `rHeight`, `safetyMargin`, `maxVelocity`, `maxAcceleration`,
+`maxDeceleration`), so every file carries its own under `settings`:
+
+- opening a file applies its values, and the **defaults** for any it lacks;
+  the viewer's own values are never used for a file, so the same file exports
+  the same Java whoever opens it, in the app or with `export-auto.mjs`
+  (`settingsForFile` in `src/utils/project.ts`; a test checks the two agree);
+- editing them in Settings changes the open file, and every save writes them;
+- a new file starts with the values in use when it is made;
+- display preferences (panels, colours, images, the field image) stay the
+  viewer's and do not change when a file is opened.
+
 From the command line, without opening the app:
 
 ```
@@ -227,7 +243,7 @@ snapshot: git holds the Auto that runs.
 - **What it carries.** The `.pp` document exactly as a save writes it (paths,
   shapes, sequence, field points, `auto`), the file name, and only the
   settings that change what the Auto means: robot size and the motion model
-  (they time the preview and the park guard's seconds) and the field map.
+  (they time the preview and the park guard's seconds).
   Display preferences stay the viewer's. Nothing is converted: coordinates
   stay in Pedro's field frame, as in the file.
 - **Encoding.** The payload `{name, project}` as JSON, zlib-deflated with

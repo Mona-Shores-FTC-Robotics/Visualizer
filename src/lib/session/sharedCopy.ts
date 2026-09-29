@@ -6,7 +6,7 @@ import {
   normalizePaths,
   normalizeStartPose,
 } from "../../utils/normalize";
-import { projectSettings } from "../../utils/shareLink";
+import { settingsForFile } from "../../utils/project";
 
 /**
  * A project opened from a share link. It is shown instead of the person's own
@@ -35,10 +35,7 @@ export function sharedCopyState(
     fieldPoints: normalizeFieldPoints(project),
     // Robot size and motion model come with the Auto; display
     // preferences stay the viewer's own.
-    settings: {
-      ...ownSettings,
-      ...projectSettings(project.settings as object),
-    } as Settings,
+    settings: settingsForFile(ownSettings, project.settings),
   };
 }
 

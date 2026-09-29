@@ -30,6 +30,7 @@
     buildOtherFileProject,
     newerVersionWarning,
     serializeProject,
+    settingsForFile,
   } from "../utils/project";
   import { downloadJson } from "../utils/download";
   import { stripPpExtension } from "../utils/filename";
@@ -56,7 +57,7 @@
     secondShapes?: Shape[];
     secondSequence?: SequenceItem[];
     fieldPoints?: FieldPoint[];
-    /** Written into the main file, as the app's own Save does. */
+    /** Written into the main file; opening a file applies its own. */
     settings?: Settings;
   }
 
@@ -71,7 +72,7 @@
     secondShapes = $bindable([]),
     secondSequence = $bindable([]),
     fieldPoints = $bindable([]),
-    settings,
+    settings = $bindable(),
   }: Props = $props();
 
   /** The main file's document, the same whichever button saves it. */
@@ -359,6 +360,7 @@
     shapes = doc.shapes;
     sequence = doc.sequence;
     fieldPoints = doc.fieldPoints;
+    if (settings) settings = settingsForFile(settings, doc.raw.settings);
     const autoProblems = loadAutoFrom(doc.raw);
     if (autoProblems.length) {
       showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
@@ -517,6 +519,8 @@
         shapes: defaultShapes,
         sequence: defaultSequence,
         fieldPoints: defaultFieldPoints,
+        // A new file starts with the robot settings in use now.
+        settings,
       });
 
       await browserFileStore.writeFile(filePath, content);

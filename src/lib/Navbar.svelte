@@ -28,12 +28,8 @@
   import ExportCodeDialog from "./components/ExportCodeDialog.svelte";
   import MultiplePathsDialog from "./components/MultiplePathsDialog.svelte";
   import ShareLinkDialog from "./components/ShareLinkDialog.svelte";
-  import { buildProject } from "../utils/project";
-  import {
-    encodeShareHash,
-    projectSettings,
-    shareUrl,
-  } from "../utils/shareLink";
+  import { buildProject, fileSettings } from "../utils/project";
+  import { encodeShareHash, shareUrl } from "../utils/shareLink";
   import { atomicSegments, calculatePathTime, formatTime } from "../utils";
   import { basename, pathStem } from "../utils/filename";
   import { downloadBlob } from "../utils/download";
@@ -209,7 +205,7 @@
       shapes,
       sequence,
       fieldPoints,
-      settings: projectSettings(settings) as unknown as Settings,
+      settings: fileSettings(settings) as Settings,
       auto: $autoSection,
     });
     try {
@@ -337,7 +333,7 @@
     bind:secondShapes
     bind:secondSequence
     bind:fieldPoints
-    {settings}
+    bind:settings
   />
 {/if}
 

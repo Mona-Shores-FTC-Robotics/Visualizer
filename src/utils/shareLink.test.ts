@@ -4,10 +4,10 @@ import golden from "../lib/codegen/auto/fixtures/HiveRushAuto.java?raw";
 import frozenV1Link from "./fixtures/hive-rush.v1.link?raw";
 import { generateAutoJavaFromText } from "../lib/codegen/auto/fromFile";
 import { normalizeAuto } from "../lib/auto/normalize";
+import { fileSettings } from "./project";
 import {
   decodeShareHash,
   encodeShareHash,
-  projectSettings,
   shareUrl,
   type ShareLinkResult,
 } from "./shareLink";
@@ -126,29 +126,11 @@ test("a link without a path project is refused", async () => {
   expectError(await decodeShareHash(hash), "does not contain a path project");
 });
 
-test("only the settings that change the project travel with it", () => {
-  const picked = projectSettings({
-    rWidth: 16,
-    maxVelocity: 60,
-    fieldMap: "biobuzz.webp",
-    leftPanelWidth: 400,
-    customFieldImage: "data:image/png;base64,AAAA",
-    onionColor: "#fff",
-  });
-  assertEqual(picked, {
-    rWidth: 16,
-    maxVelocity: 60,
-    fieldMap: "biobuzz.webp",
-  });
-});
-
 test("link length budget: the hive-rush sample stays under 2,200 characters", async () => {
   // Real Autos are longer than the sample; if this grows, the dialog's
   // advice about where a link fits needs checking again.
   const project = sample();
-  project.settings = projectSettings(
-    project.settings as Record<string, unknown>,
-  );
+  project.settings = fileSettings(project.settings as object);
   const url = shareUrl(
     await encodeShareHash({ name: "hive-rush.pp", project }),
     PAGES,

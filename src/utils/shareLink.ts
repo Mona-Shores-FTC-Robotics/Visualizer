@@ -17,37 +17,6 @@ export const SHARE_HASH_PREFIX = "#data=";
 /** Longest message Discord accepts without Nitro; longer links become a .txt. */
 export const DISCORD_MESSAGE_LIMIT = 2000;
 
-/**
- * The settings that change what the project means: robot size and the motion
- * model, which time the preview and the park guard's seconds in the exported
- * Java. Display preferences (panel widths, colours, images) stay with the
- * person who opens the link.
- */
-export const PROJECT_SETTINGS_KEYS = [
-  "xVelocity",
-  "yVelocity",
-  "aVelocity",
-  "kFriction",
-  "rWidth",
-  "rHeight",
-  "safetyMargin",
-  "maxVelocity",
-  "maxAcceleration",
-  "maxDeceleration",
-  "fieldMap",
-] as const;
-
-export function projectSettings(
-  settings: object | null | undefined,
-): Record<string, unknown> {
-  const source = (settings ?? {}) as Record<string, unknown>;
-  const picked: Record<string, unknown> = {};
-  for (const key of PROJECT_SETTINGS_KEYS) {
-    if (source[key] !== undefined) picked[key] = source[key];
-  }
-  return picked;
-}
-
 export interface SharedProject {
   /** File name of the shared project, when it had one. */
   name: string | null;

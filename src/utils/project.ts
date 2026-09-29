@@ -2,6 +2,58 @@ import type { Path, SequenceItem, Settings, Shape, StartPose } from "../types";
 import type { FieldPoint } from "./fieldPoints";
 import type { AutoSection } from "../lib/auto/types";
 import { serializeAuto } from "../lib/auto/normalize";
+import { DEFAULT_SETTINGS } from "../config/defaults";
+
+/**
+ * The settings a file owns: robot size and the motion model. They time the
+ * preview and the park guard's seconds in the exported Java, so an Auto must
+ * carry its own. Everything else in Settings (panels, colours, images, the
+ * field image) is the viewer's preference.
+ */
+export const FILE_SETTINGS_KEYS = [
+  "xVelocity",
+  "yVelocity",
+  "aVelocity",
+  "kFriction",
+  "rWidth",
+  "rHeight",
+  "safetyMargin",
+  "maxVelocity",
+  "maxAcceleration",
+  "maxDeceleration",
+] as const;
+
+/** The file-owned settings present in `settings`. */
+export function fileSettings(
+  settings: object | null | undefined,
+): Partial<Settings> {
+  const source = (settings ?? {}) as Record<string, unknown>;
+  const picked: Record<string, unknown> = {};
+  for (const key of FILE_SETTINGS_KEYS) {
+    if (typeof source[key] === "number" && Number.isFinite(source[key])) {
+      picked[key] = source[key];
+    }
+  }
+  return picked as Partial<Settings>;
+}
+
+/**
+ * The settings in effect while a file is open: its own robot size and motion
+ * model, the defaults for any it lacks (as the command-line export does), and
+ * the viewer's own preferences for everything else. So the app and the
+ * command line time the same file the same way, whoever opens it.
+ */
+export function settingsForFile(
+  current: Settings,
+  fileSettingsSource: unknown,
+): Settings {
+  const defaults = fileSettings(DEFAULT_SETTINGS);
+  return {
+    ...current,
+    ...defaults,
+    ...fileSettings(fileSettingsSource as object | null | undefined),
+  };
+}
 
 export const PROJECT_VERSION = "1.5.0";
 

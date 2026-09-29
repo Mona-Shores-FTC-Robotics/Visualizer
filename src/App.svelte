@@ -51,6 +51,7 @@
     PROJECT_VERSION,
     buildOtherFileProject,
     buildProject,
+    settingsForFile,
     newerVersionWarning,
     type OtherFilePaths,
   } from "./utils/project";
@@ -1996,10 +1997,9 @@
       // Load shapes with defaults
       shapes = data.shapes || [];
       fieldPoints = normalizeFieldPoints(data);
-      // Load settings (including robot size) if present
-      if (data.settings) {
-        settings = { ...settings, ...data.settings };
-      }
+      // The file's own robot size and motion model; the viewer's
+      // preferences (panels, colours, images) stay as they are.
+      settings = settingsForFile(settings, data.settings);
 
       activePaths.set(Array.isArray(data.activePaths) ? data.activePaths : []);
 
