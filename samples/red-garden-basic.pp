@@ -12,8 +12,8 @@
       "name": "Pass1Ahead",
       "kind": "atomic",
       "endPoint": {
-        "x": 60.0,
-        "y": 21.0
+        "x": 60.8,
+        "y": 29.5
       },
       "controlPoints": [],
       "heading": {
@@ -50,14 +50,14 @@
       "name": "Pass2Left",
       "kind": "atomic",
       "endPoint": {
-        "x": 55.9,
-        "y": 20.3
+        "x": 50.1,
+        "y": 29.1
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
-        "endDeg": 110
+        "endDeg": 117
       },
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
@@ -76,7 +76,7 @@
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 110,
+        "startDeg": 117,
         "endDeg": 90
       },
       "waitBeforeMs": 0,
@@ -85,32 +85,13 @@
       "waitAfterName": ""
     },
     {
-      "id": "to-entrance",
+      "id": "to-rear-shot",
       "color": "#3fcf8e",
-      "name": "ToHiveEntrance",
+      "name": "ToRearShot",
       "kind": "atomic",
       "endPoint": {
-        "x": 60.0,
-        "y": 33.0
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "constant",
-        "degrees": 90
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
-    },
-    {
-      "id": "under-hive",
-      "color": "#3fcf8e",
-      "name": "UnderHive",
-      "kind": "atomic",
-      "endPoint": {
-        "x": 60.0,
-        "y": 104.0
+        "x": 60,
+        "y": 118.8
       },
       "controlPoints": [],
       "heading": {
@@ -128,8 +109,8 @@
       "name": "ToLoadingFlower",
       "kind": "atomic",
       "endPoint": {
-        "x": 47.0,
-        "y": 124.0
+        "x": 47,
+        "y": 129.8
       },
       "controlPoints": [],
       "heading": {
@@ -254,11 +235,7 @@
     },
     {
       "kind": "path",
-      "lineId": "to-entrance"
-    },
-    {
-      "kind": "path",
-      "lineId": "under-hive"
+      "lineId": "to-rear-shot"
     },
     {
       "kind": "path",
@@ -307,28 +284,28 @@
         90
       ],
       "CollectAhead": [
-        60.0,
-        21.0,
+        60.8,
+        29.5,
         90
       ],
       "CollectLeft": [
-        55.9,
-        20.3,
-        110
+        50.1,
+        29.1,
+        117
       ],
       "HiveEntrance": [
-        60.0,
-        33.0,
+        60,
+        46.8,
         90
       ],
       "RearShot": [
-        60.0,
-        104.0,
+        60,
+        118.8,
         90
       ],
       "LoadingFlower": [
-        47.0,
-        124.0,
+        47,
+        129.8,
         90
       ],
       "Park": [
@@ -406,15 +383,7 @@
               {
                 "id": "p-7",
                 "kind": "path",
-                "lineId": "to-entrance",
-                "while": [],
-                "events": [],
-                "park": false
-              },
-              {
-                "id": "p-8",
-                "kind": "path",
-                "lineId": "under-hive",
+                "lineId": "to-rear-shot",
                 "while": [],
                 "events": [],
                 "park": false
@@ -483,15 +452,7 @@
               {
                 "id": "p-15",
                 "kind": "path",
-                "lineId": "to-entrance",
-                "while": [],
-                "events": [],
-                "park": false
-              },
-              {
-                "id": "p-16",
-                "kind": "path",
-                "lineId": "under-hive",
+                "lineId": "to-rear-shot",
                 "while": [],
                 "events": [],
                 "park": false

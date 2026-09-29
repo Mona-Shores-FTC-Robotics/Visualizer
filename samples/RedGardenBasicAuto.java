@@ -42,11 +42,11 @@ public final class RedGardenBasicAuto {
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
         Pose start = p.of(60, 9, 90);
-        Pose collectAhead = p.of(60, 21, 90);
-        Pose collectLeft = p.of(55.9, 20.3, 110);
-        Pose hiveEntrance = p.of(60, 33, 90);
-        Pose rearShot = p.of(60, 104, 90);
-        Pose loadingFlower = p.of(47, 124, 90);
+        Pose collectAhead = p.of(60.8, 29.5, 90);
+        Pose collectLeft = p.of(50.1, 29.1, 117);
+        Pose hiveEntrance = p.of(60, 46.8, 90);
+        Pose rearShot = p.of(60, 118.8, 90);
+        Pose loadingFlower = p.of(47, 129.8, 90);
         Pose park = p.of(16, 106, 90);
         Pose collectHome = p.of(60, 10, 90);
 
@@ -60,8 +60,7 @@ public final class RedGardenBasicAuto {
         Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
         Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
         Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
-        Path toHiveEntrance = Paths.line(collectHome, hiveEntrance).constant(hiveEntrance);
-        Path underHive = Paths.line(hiveEntrance, rearShot).constant(rearShot);
+        Path toRearShot = Paths.line(collectHome, rearShot).constant(rearShot);
         Path toLoadingFlower = Paths.line(rearShot, loadingFlower).constant(loadingFlower);
         Path toPark = Paths.line(loadingFlower, park).constant(park);
 
@@ -76,8 +75,7 @@ public final class RedGardenBasicAuto {
                                         kit.path("Pass2Left", pass2Left),
                                         kit.path("Pass2Back", pass2Back),
                                         kit.action("IntakeOff"),
-                                        kit.path("ToHiveEntrance", toHiveEntrance),
-                                        kit.path("UnderHive", underHive),
+                                        kit.path("ToRearShot", toRearShot),
                                         kit.action("ShootAll"),
                                         kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
@@ -88,8 +86,7 @@ public final class RedGardenBasicAuto {
                                         kit.path("ToPark", toPark))),
                         kit.afterMs(5000).then(
                                 kit.guarded("If not tipped", toPark, 1.7,
-                                        kit.path("ToHiveEntrance", toHiveEntrance),
-                                        kit.path("UnderHive", underHive),
+                                        kit.path("ToRearShot", toRearShot),
                                         kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),
