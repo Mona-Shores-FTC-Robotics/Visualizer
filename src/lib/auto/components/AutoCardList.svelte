@@ -13,6 +13,8 @@
     updateAuto,
   } from "../store";
   import { branchColor, cardColors, seconds, TRUNK_COLOR } from "./ui";
+  import AnswerChip from "./AnswerChip.svelte";
+  import { rowKind } from "../types";
 
   interface Props {
     auto: AutoSection;
@@ -119,20 +121,22 @@
   }
 
   /** The branches a card shows in the list: a decision's rows, or its one inner list. */
-  function branchesOf(card: AutoCard): { label: string; detail: string; cards: AutoCard[]; color: string }[] {
+  function branchesOf(card: AutoCard): { label: string; detail: string; cards: AutoCard[]; color: string; asks: string[] }[] {
     if (card.kind === "firstOf") {
       return card.rows.map((row, index) => ({
         label: row.cards.length || row.label ? rowLabel(row) : describeRow(row),
         detail: describeRow(row),
         cards: row.cards,
         color: branchColor(index),
+        // The conditions this row asks; the preview's answers sit next to them.
+        asks: rowKind(row) === "when" ? (row as { when: string[] }).when : [],
       }));
     }
     if (card.kind === "goTo") {
-      return [{ label: `If refused (over ${card.maxDistanceIn} in away)`, detail: "", cards: card.ifRefused, color: "#ff8a3d" }];
+      return [{ label: `If refused (over ${card.maxDistanceIn} in away)`, detail: "", cards: card.ifRefused, color: "#ff8a3d", asks: [] }];
     }
     if (card.kind === "together") {
-      return [{ label: card.ends === "ALL" ? "Together, until all are done" : "Together, until the first is done", detail: "", cards: card.cards, color: "#5fd4e6" }];
+      return [{ label: card.ends === "ALL" ? "Together, until all are done" : "Together, until the first is done", detail: "", cards: card.cards, color: "#5fd4e6", asks: [] }];
     }
     return [];
   }
@@ -226,6 +230,12 @@
         </div>
       {/if}
     </button>
+    {#if card.kind === "routine" && auto.routines[card.routine]?.endsWhen}
+      <div class="auto-card-answers">
+        <span class="auto-answers-label">ends when</span>
+        <AnswerChip cardId={card.id} condition={auto.routines[card.routine].endsWhen} />
+      </div>
+    {/if}
     {#if selected}
       <div class="auto-card-tools">
         <button type="button" class="path-list-action" title="Move up" aria-label="Move up"
@@ -291,6 +301,9 @@
                 {/if}
               </span>
             </button>
+            {#each row.asks as condition (condition)}
+              <AnswerChip cardId={card.id} {condition} named={!row.label.includes(condition)} />
+            {/each}
             </div>
             {#if folded}
               {@const level = levelInside(row.cards)}
@@ -394,6 +407,13 @@
     background: none;
     border: none;
     padding: 0;
+  }
+  .auto-card-answers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.62rem;
+    color: #888888;
   }
   .auto-card-tools {
     display: flex;

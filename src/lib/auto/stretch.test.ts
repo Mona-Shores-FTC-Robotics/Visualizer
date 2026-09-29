@@ -1,7 +1,7 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import { loadSample } from "./fixtures/load";
 import { buildPathCatalog } from "./geometry";
-import { simulateAuto, motionPoseAt, worstCase } from "./simulate";
+import { simulateAuto, motionPoseAt, questionKey, worstCase, type Scenario } from "./simulate";
 import { validateAuto } from "./validate";
 import { placePoint, placeRoutine } from "./motion";
 import { findCard } from "./tree";
@@ -9,6 +9,11 @@ import { generateAutoJava } from "../codegen/auto/javaAuto";
 import type { AutoSection, FirstOfCard, RoutineCard, TogetherCard } from "./types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+/** Answers false for the given conditions when `cardId` asks them. */
+function no(cardId: string, ...conditions: string[]): Scenario {
+  return Object.fromEntries(conditions.map((name) => [questionKey(cardId, name), false]));
+}
 
 function setup(auto: AutoSection) {
   const sample = loadSample();
@@ -28,19 +33,18 @@ test("routine points are placed by facing and mirror", () => {
   assertEqual(segments.map((s) => [s.end.x, s.end.y]), [[128, 120], [128, 104]]);
 });
 
-test("the routine runs until its condition, then exits to its point", () => {
+test("the routine runs its pattern, then exits to its point", () => {
   const auto = loadSample().auto;
   const { sample, catalog } = setup(auto);
-  const result = simulateAuto(auto, catalog, sample.startPoint, {
-    HiveTipped: { enabled: true, seconds: 0.5, from: "card" },
-    IntakeFull: { enabled: true, seconds: 0.4, from: "card" },
-  });
+  const result = simulateAuto(auto, catalog, sample.startPoint, {});
   assert(result.ran.has("tip-2"));
-  const ended = result.log.find((e) => e.cardId === "tip-2" && e.text.includes("IntakeFull after"));
+  const ended = result.log.find((e) => e.cardId === "tip-2" && e.text.includes("IntakeFull true"));
   assert(ended, JSON.stringify(result.log.filter((e) => e.cardId === "tip-2")));
   const motions = result.motions.filter((m) => m.cardId === "tip-2");
   assertEqual(motions.length, 2);
-  assert(Math.abs(motions[0].t1 - motions[0].t0 - 0.4) < 1e-9, "pattern cut at the condition");
+  // Answered true, the condition is met by the pattern's end (or the timeout, if sooner).
+  const pattern = Math.min(motions[0].motion.seconds, auto.routines.CollectFar.timeoutMs / 1000);
+  assert(Math.abs(motions[0].t1 - motions[0].t0 - pattern) < 1e-9, "the whole pattern runs");
   const end = motionPoseAt(result, motions[1].t1)!;
   assert(Math.hypot(end.x - 108, end.y - 84) < 1e-6, `exit reached: ${JSON.stringify(end)}`);
 });
@@ -48,11 +52,8 @@ test("the routine runs until its condition, then exits to its point", () => {
 test("a routine without its condition runs the pattern to the end", () => {
   const auto = loadSample().auto;
   const { sample, catalog } = setup(auto);
-  const result = simulateAuto(auto, catalog, sample.startPoint, {
-    HiveTipped: { enabled: true, seconds: 0.5, from: "card" },
-    IntakeFull: { enabled: false, seconds: 0, from: "card" },
-  });
-  assert(result.log.some((e) => e.cardId === "tip-2" && e.text.includes("pattern done")));
+  const result = simulateAuto(auto, catalog, sample.startPoint, no("tip-2", "IntakeFull"));
+  assert(result.log.some((e) => e.cardId === "tip-2" && e.text.includes("not true")));
 });
 
 test("goTo drives when close enough and falls back when refused", () => {
@@ -62,12 +63,12 @@ test("goTo drives when close enough and falls back when refused", () => {
   late.rows[1].cards[0] = { ...(late.rows[1].cards[0] as object), maxDistanceIn: 6 } as never;
   (late.rows[1] as { timeLeftBelowS: number }).timeLeftBelowS = 29;
   const { sample, catalog } = setup(auto);
-  const off = { enabled: false, seconds: 0, from: "card" as const };
-  const near = simulateAuto(auto, catalog, sample.startPoint, { HiveTipped: off, CameraBlind: off });
+  const answers = { ...no("did-tip", "HiveTipped", "CameraBlind"), ...no("near-5", "HiveTipped") };
+  const near = simulateAuto(auto, catalog, sample.startPoint, answers);
   assert(near.log.some((e) => e.cardId === "late-hold" && e.text.startsWith("Hold at ShootSpot (")), "drives");
   assert(!near.ran.has("late-out"));
   auto.points.ShootSpot = [70, 71];
-  const far = simulateAuto(auto, catalog, sample.startPoint, { HiveTipped: off, CameraBlind: off });
+  const far = simulateAuto(auto, catalog, sample.startPoint, answers);
   assert(far.log.some((e) => e.cardId === "late-hold" && e.text.includes("refused")), "refuses");
   assert(far.ran.has("late-out"));
 });
@@ -75,9 +76,8 @@ test("goTo drives when close enough and falls back when refused", () => {
 test("together waits for all, or stops at the first", () => {
   const auto = clone(loadSample().auto);
   const { sample, catalog } = setup(auto);
-  const off = { enabled: false, seconds: 0, from: "card" as const };
   const back = catalog.byId.get("near-back")!.seconds;
-  const run = () => simulateAuto(auto, catalog, sample.startPoint, { HiveTipped: off, CameraBlind: off });
+  const run = () => simulateAuto(auto, catalog, sample.startPoint, no("did-tip", "HiveTipped", "CameraBlind"));
   const span = (result: ReturnType<typeof run>) => {
     const start = result.log.find((e) => e.cardId === "near-3" && e.kind === "card")!.t;
     const done = result.log.find((e) => e.cardId === "near-3" && e.kind === "row")!.t;

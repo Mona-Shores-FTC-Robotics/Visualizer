@@ -33,7 +33,8 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 - A path card's **Ends at** puts the path's end on a named point, or names the
   end where it is ("Name it"); "Start is" does the same for the start pose.
   See [Named points and pins](#named-points-and-pins).
-- **Preview as** sets the scenario; the playback bar, robot and log follow it.
+- Each condition a card asks has a **T/F** answer next to it, in the card list
+  and under **Preview as**; the playback bar, robot and log follow the answers.
   Untaken branches are dashed on the field and dimmed in the list.
 - **Export .java** (or Export → Export Auto (Java)) downloads the class.
 
@@ -239,9 +240,19 @@ compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 
 ## Preview
 
-The preview runs the card tree against a **scenario**: for each registered
-condition, whether it becomes true and when (N s after the waiting card
-starts, or N s into the Auto). Decisions pick the first row that fires; the
+The preview runs the card tree against **answers**: for each card that asks a
+condition, whether it is true (T) or false (F) when that card asks it. There
+is no timing to set. A row answered T fires the moment its card is reached; a
+row answered F never fires, so the next row that can wins (a time row fires at
+its time). A row asking several conditions (`when: [A, B]`) fires if any is T.
+
+The answers belong to the **card**, not the condition name: the Auto has no
+loops, so each card asks at most once per run, and the same condition asked by
+two cards is two questions. So "HIVE not tipped" at the first decision and
+"tipped" at a later one is one run. Every question starts as T (the happy
+path); **All T** / **All F** reset them. Answers are not saved in the file.
+
+Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field
 highlights the branches taken and dashes the others; a log lists each card,
 row and event with its time against the 30 s budget.
@@ -249,8 +260,10 @@ row and event with its time against the 30 s budget.
 Each branch also shows its **worst case**: the Auto's end time if that branch
 is taken and every later wait runs to its time row. Over 30 s it is flagged.
 
-Routines run their placed pattern until the condition (from the scenario),
-the timeout or the pattern's end, then drive straight to the exit point. A
+Routines run their placed pattern to its end (or their timeout, if sooner),
+then drive straight to the exit point. Their end condition is a question too:
+T says it was met, F logs that it was not; either way the pattern is the
+preview's only source of timing. A
 `goTo` drives straight to its point or runs its fallback. A `together` follows
 the card that drives and counts the others' time; with `FIRST` it stops at
 the first card's end.

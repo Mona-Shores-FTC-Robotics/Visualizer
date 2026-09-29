@@ -23,7 +23,7 @@ export const autoMode = writable(false);
  */
 export const selectedCardId = writable<string | null>(null);
 
-/** The preview's scenario: when each registered condition becomes true. */
+/** The preview's answers: whether each card's condition is true when it asks. Not saved. */
 export const previewScenario = writable<Scenario>({});
 
 let recorder: (() => void) | null = null;
@@ -90,6 +90,7 @@ export function loadAutoFrom(data: unknown): string[] {
   autoSection.set(auto);
   selectedCardId.set(null);
   foldedBranches.set(new Set());
+  previewScenario.set({});
   if (!auto) autoMode.set(false);
   return problems;
 }
