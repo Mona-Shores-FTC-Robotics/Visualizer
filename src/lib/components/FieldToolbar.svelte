@@ -14,6 +14,8 @@
     onRemoveControlPoint: () => void;
     onCreatePathToLastPoint: () => void;
     onTogglePlay: () => void;
+    /** Auto mode: only the tools for drawing a path; the rest are hidden. */
+    compact?: boolean;
   }
 
   let {
@@ -27,6 +29,7 @@
     onRemoveControlPoint,
     onCreatePathToLastPoint,
     onTogglePlay,
+    compact = false,
   }: Props = $props();
 </script>
 
@@ -38,6 +41,7 @@
   <button class="toolbar-btn" onclick={onRemoveControlPoint}
     >- Control Point</button
   >
+  {#if !compact}
   <button
     class="toolbar-btn toolbar-btn--blue"
     onclick={onCreatePathToLastPoint}
@@ -67,7 +71,9 @@
   >
     <PenIcon className="size-5" strokeWidth={2} />
   </button>
+  {/if}
   <div style="flex: 1;"></div>
+  {#if !compact}
   <button
     class="toolbar-btn toolbar-btn--icon"
     title={playing ? "Pause" : "Play"}
@@ -80,4 +86,5 @@
       <PlayIcon className="size-5" strokeWidth={2} />
     {/if}
   </button>
+  {/if}
 </div>

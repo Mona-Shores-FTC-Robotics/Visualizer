@@ -3291,6 +3291,7 @@
           onRemoveControlPoint={removeControlPoint}
           onCreatePathToLastPoint={createPathBetweenSelectedPoints}
           onTogglePlay={() => (playing ? pause() : play())}
+          compact={autoActive}
         />
 
         <div
@@ -3415,9 +3416,11 @@
         <div class="module-box control-panel-header">
           <div class="module-header-row">
             <div>
-              <h3 class="module-title">Controls</h3>
+              <h3 class="module-title">{autoActive ? "Card" : "Controls"}</h3>
               <p class="module-caption">
-                Edit playback, paths, and robot settings.
+                {autoActive
+                  ? "Edit the selected card, then preview the Auto."
+                  : "Edit playback, paths, and robot settings."}
               </p>
             </div>
             <button

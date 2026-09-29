@@ -608,7 +608,8 @@
       </div>
     </button>
 
-    <!-- Multiple Paths Toggle -->
+    <!-- Multiple Paths Toggle (not in Auto mode, which shows one Auto) -->
+    {#if !$autoMode}
     <button
       title="Manage Multiple Paths Visualization"
       onclick={() => (multiplePathsDialogOpen = true)}
@@ -639,6 +640,7 @@
         {/if}
       </div>
     </button>
+    {/if}
 
     <NavDivider />
 

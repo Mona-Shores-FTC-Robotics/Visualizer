@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { AutoSection, NamedPoint } from "../types";
+  import type { StartPose } from "../../../types";
+  import StartingPointSection from "../../components/StartingPointSection.svelte";
   import { usedNames } from "../tree";
   import { commitAuto, updateAuto } from "../store";
   import { isUsed, pointUses } from "../pins";
@@ -12,9 +14,10 @@
     robotAt: { x: number; y: number };
     /** Display name of every path, by id, for "used by". */
     pathNames: Map<string, string>;
+    startPoint: StartPose;
   }
 
-  let { auto, defaultExportName, robotAt, pathNames }: Props = $props();
+  let { auto, defaultExportName, robotAt, pathNames, startPoint = $bindable() }: Props = $props();
   let uses = $derived(pointUses(auto));
 
   function describeUse(name: string): string {
@@ -37,7 +40,7 @@
     });
   }
 
-  let open = $state(true);
+  let open = $state(false);
   let used = $derived(usedNames(auto));
   let newAction = $state("");
   let newCondition = $state("");
@@ -157,16 +160,15 @@
 <div class={SECTION_CLASS}>
   <button type="button" class="flex w-full items-center justify-between gap-2 text-left" onclick={() => (open = !open)} aria-expanded={open}>
     <span>
-      <span class="block font-semibold text-gray-100">Robot actions &amp; conditions</span>
+      <span class="block font-semibold text-gray-100">Setup</span>
       <span class="text-[11px] text-gray-500">
-        The names the robot code registers. The editor cannot read robot code: keep this list in step with it.
+        Start pose, the robot's actions and conditions, named points, alliance and export name.
       </span>
     </span>
     <span class="text-[11px] text-gray-400">{open ? "Hide" : "Show"}</span>
   </button>
 
-  {#if open}
-    {#if unregistered.actions.length || unregistered.conditions.length}
+  {#if unregistered.actions.length || unregistered.conditions.length}
       <div class="border border-red-700 bg-red-950 px-2 py-1.5 text-[11px] text-red-300">
         <div class="font-semibold">Used but not registered (blocks the Java export)</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
@@ -178,7 +180,16 @@
           {/each}
         </div>
       </div>
-    {/if}
+  {/if}
+
+  {#if open}
+    <div class="border border-[#333333] bg-[#222222] p-3">
+      <StartingPointSection bind:startPoint />
+    </div>
+    <div class="text-[11px] text-gray-500">
+      Actions and conditions are the names the robot code registers. The editor cannot read robot
+      code: keep this list in step with it.
+    </div>
     <div class="grid gap-2 text-[11px] text-gray-300 lg:grid-cols-2">
       {@render nameList("actions", "Actions")}
       {@render nameList("conditions", "Conditions")}

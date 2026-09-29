@@ -5,8 +5,6 @@
   import type { AutoIssue } from "../validate";
   import type { PreviewResult, WorstCase } from "../simulate";
   import type { AutoSection } from "../types";
-  import StartingPointSection from "../../components/StartingPointSection.svelte";
-  import RobotPositionDisplay from "../../components/RobotPositionDisplay.svelte";
   import PlaybackControls from "../../components/PlaybackControls.svelte";
   import CardEditor from "./CardEditor.svelte";
   import RegistryPanel from "./RegistryPanel.svelte";
@@ -79,20 +77,11 @@
   <div
     class="min-h-0 flex-1 flex flex-col justify-start items-start w-full bg-[#1a1a1a] border border-[#333333] p-3 overflow-y-auto overflow-x-hidden gap-3"
   >
-    <div class="grid w-full grid-cols-1 gap-2 lg:grid-cols-2">
-      <div class="w-full border border-[#333333] bg-[#222222] p-3">
-        <StartingPointSection bind:startPoint />
-      </div>
-      <div class="w-full border border-[#333333] bg-[#222222] p-3">
-        <RobotPositionDisplay {robotXY} {robotHeading} {x} {y} />
-      </div>
-    </div>
-
     <CardEditor {auto} {catalog} {issues} {preview} {worst} {shapes} />
 
     <AutoPreviewPanel {auto} {preview} {worst} {now} />
 
-    <RegistryPanel {auto} {defaultExportName} robotAt={robotInches} pathNames={catalog.names} />
+    <RegistryPanel {auto} {defaultExportName} robotAt={robotInches} pathNames={catalog.names} bind:startPoint />
 
     <div class={SECTION_CLASS}>
       <div class="flex items-start justify-between gap-3">
