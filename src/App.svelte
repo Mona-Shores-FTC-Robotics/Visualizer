@@ -179,12 +179,14 @@
     loadAutoFrom,
     previewScenario,
     setAutoRecorder,
+    setNewPathHandler,
     takePinsToAdopt,
     updateAuto,
     parseSelection,
     selectedCardId,
   } from "./lib/auto/store";
-  import { findCard } from "./lib/auto/tree";
+  import { allCards, findCard } from "./lib/auto/tree";
+  import { insertPathCard, newPathStart } from "./lib/auto/edit";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
@@ -638,6 +640,7 @@
     history.record(getAppState());
   }
   setAutoRecorder(recordChange);
+  setNewPathHandler((where) => addAutoPath(where));
 
   function undoAction() {
     const prev = history.undo();
@@ -2092,6 +2095,67 @@
     }
   }
 
+  /** Auto mode: clicking a path on the field selects the card that drives it. */
+  function selectCardDriving(segmentId: string) {
+    const auto = $autoSection;
+    if (!auto) return;
+    const top = lines.find((line) => line.id === segmentId || atomicSegments([line]).some((s) => s.id === segmentId));
+    const { cardId } = parseSelection($selectedCardId);
+    const current = cardId ? findCard(auto.cards, cardId) : null;
+    if (current?.kind === "path" && current.lineId === top?.id) return;
+    const driver = allCards(auto.cards).find((card) => card.kind === "path" && card.lineId === top?.id);
+    if (driver) selectedCardId.set(driver.id);
+  }
+
+  /**
+   * Auto mode's "add a path": a new path that starts where the robot is at that
+   * point of the Auto, and a card that drives it. `branchEnd` (the field's
+   * + Add Path) adds at the end of the selected card's branch; `after` (the card
+   * list's + Path) right after the selected card. Paths still chain in Path List
+   * order, so when the robot is not where the last path ends, a grey link path
+   * that no card drives goes first.
+   */
+  function addAutoPath(where: "after" | "branchEnd") {
+    const auto = $autoSection;
+    if (!auto) return;
+    const catalog = buildPathCatalog(startPoint, lines, settings);
+    const selection = parseSelection($selectedCardId);
+    const from = newPathStart(auto, catalog, startPoint, selection, where);
+    const tail = catalog.paths[catalog.paths.length - 1]?.end ?? startPoint;
+    const round = (value: number) => Math.round(value * 10) / 10;
+    const onField = (value: number) => Math.min(FIELD_SIZE - 12, Math.max(12, value));
+    const headingDeg = round(from.headingDeg);
+    const pointName = Object.entries(auto.points).find(
+      ([, point]) => Math.abs(point[0] - from.x) < 0.05 && Math.abs(point[1] - from.y) < 0.05,
+    )?.[0];
+
+    const added: Path[] = [];
+    if (Math.hypot(tail.x - from.x, tail.y - from.y) > 0.05) {
+      const link = createSegment(round(from.x), round(from.y));
+      link.name = `Link to ${pointName ?? `${round(from.x)}, ${round(from.y)}`} (never driven)`;
+      link.color = "#6b7280";
+      link.heading = { type: "constant", degrees: headingDeg };
+      added.push(link);
+    }
+    const rad = (from.headingDeg * Math.PI) / 180;
+    const path = createSegment(
+      round(onField(from.x + 24 * Math.cos(rad))),
+      round(onField(from.y + 24 * Math.sin(rad))),
+    );
+    path.heading = { type: "constant", degrees: headingDeg };
+    added.push(path);
+
+    lines = [...lines, ...added];
+    sequence = [...sequence, ...added.map((line) => ({ kind: "path" as const, lineId: line.id }))];
+    let cardId = "";
+    updateAuto((draft) => {
+      cardId = insertPathCard(draft, path.id, selection, where);
+      if (pointName && added.length === 2) draft.pathEnds[added[0].id] = pointName;
+    }, false);
+    selectedCardId.set(cardId);
+    recordChange();
+  }
+
   function addNewLine() {
     const newLine = createSegment(_.random(36, 108), _.random(36, 108), {
       reverse: true,
@@ -2239,6 +2303,7 @@
     if (!line) return;
 
     selectedPathIds = [line.id];
+    if (autoActive) selectCardDriving(line.id);
     const maxPointIndex = Math.max(0, line.controlPoints.length);
     selectedPointIndex = Math.max(0, Math.min(pointIndex, maxPointIndex));
   }
@@ -3307,7 +3372,7 @@
           {playing}
           {penToolEnabled}
           {coordinateToolEnabled}
-          onAddPath={addNewLine}
+          onAddPath={autoActive ? () => addAutoPath("branchEnd") : addNewLine}
           onTogglePenTool={togglePenTool}
           onToggleCoordinateTool={toggleCoordinateTool}
           onAddControlPoint={addControlPoint}
@@ -3440,11 +3505,11 @@
           <div class="module-header-row">
             <div>
               <h3 class="module-title">{autoActive ? "Card" : "Controls"}</h3>
-              <p class="module-caption">
-                {autoActive
-                  ? "Edit the selected card, then preview the Auto."
-                  : "Edit playback, paths, and robot settings."}
-              </p>
+              {#if !autoActive}
+                <p class="module-caption">
+                  Edit playback, paths, and robot settings.
+                </p>
+              {/if}
             </div>
             <button
               class="panel-toggle-btn"

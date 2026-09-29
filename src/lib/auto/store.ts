@@ -38,6 +38,18 @@ export function takePinsToAdopt(): boolean {
   return pending;
 }
 
+let newPathHandler: ((where: "after" | "branchEnd") => void) | null = null;
+
+/** The app's "add a path here", which needs the Path List (App.svelte). */
+export function setNewPathHandler(handler: (where: "after" | "branchEnd") => void): void {
+  newPathHandler = handler;
+}
+
+/** Adds a new path and the card that drives it, starting where the robot is. */
+export function addNewPath(where: "after" | "branchEnd"): void {
+  newPathHandler?.(where);
+}
+
 /** The app's undo recorder, called after each committed Auto edit. */
 export function setAutoRecorder(record: () => void): void {
   recorder = record;

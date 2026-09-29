@@ -82,9 +82,7 @@
     {/each}
   </div>
   <div class="flex justify-between text-[10px] text-gray-500"><span>start</span><span>50%</span><span>end</span></div>
-  {#if events.length === 0}
-    <div class="text-[11px] text-gray-500">No events. Click the bar to fire an action part-way along the path.</div>
-  {:else}
+  {#if events.length}
     <div class="space-y-1">
       {#each events as event, index (index)}
         <div class="flex items-center gap-2">

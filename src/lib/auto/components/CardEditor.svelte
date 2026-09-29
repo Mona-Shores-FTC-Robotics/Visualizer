@@ -201,30 +201,29 @@
   </div>
 {/snippet}
 
+{#if card}
 <div class={SECTION_CLASS}>
   <div class="flex items-start justify-between gap-3 border-b border-[#333333] pb-2">
     <div>
       <div class="font-semibold text-gray-100">
-        {#if !card}
-          Selected Card
-        {:else if card.kind === "action"}
-          Selected Action
+        {#if card.kind === "action"}
+          Action
         {:else if card.kind === "path"}
-          Selected Path Card
+          Path
         {:else if card.kind === "routine"}
-          Selected Routine
+          Routine
         {:else if card.kind === "goTo"}
-          Selected Go to
+          Go to
         {:else if card.kind === "together"}
-          Selected Together
+          Together
         {:else if isPlainWait(card)}
-          Selected Wait
+          Wait
         {:else}
-          Selected Decision
+          Decision
         {/if}
       </div>
       <div class="text-[11px] text-gray-500">
-        {card ? where : "Pick a card in the Auto list to edit it."}
+        {where}
       </div>
     </div>
     {#if card}
@@ -258,7 +257,7 @@
         {@render nameSelect(card.name, actions, "an action", (name) => edit((c) => { if (c.kind === "action") c.name = name; }))}
       </div>
       <div class={CELL_CLASS}>
-        <label class={LABEL_CLASS} for="auto-action-ms">Takes about (ms)</label>
+        <label class={LABEL_CLASS} for="auto-action-ms" title="Only the preview uses this; on the robot the action takes as long as it takes.">Preview time (ms)</label>
         <input
           id="auto-action-ms"
           class={FIELD_CLASS}
@@ -270,9 +269,6 @@
           onchange={commitAuto}
         />
       </div>
-    </div>
-    <div class="text-[11px] text-gray-500">
-      The time is for the preview only; on the robot the action takes as long as it takes.
     </div>
   {:else if card?.kind === "path"}
     {@const info = catalog.byId.get(card.lineId)}
@@ -304,10 +300,7 @@
           checked={card.park}
           onchange={(e) => edit((c) => { if (c.kind === "path") c.park = e.currentTarget.checked; })}
         />
-        <span>
-          <span class="block font-semibold text-gray-100">Park path</span>
-          <span class="text-gray-500">The endgame guard drives this when time is short.</span>
-        </span>
+        <span class="font-semibold text-gray-100" title="The endgame guard drives this path when time is short.">Park path</span>
       </label>
     </div>
     {#if info}
@@ -327,15 +320,10 @@
         </select>
         {#if !pinned}
           <form class="mt-1.5 flex gap-1.5" onsubmit={(e) => { e.preventDefault(); nameEnd(info.endSegmentId, info.end, info.endHeadingDeg); }}>
-            <input class={FIELD_CLASS} placeholder="Name this spot, e.g. RearShot" bind:value={newEndName} aria-label="Name for this path's end" />
+            <input class={FIELD_CLASS} placeholder="Name this spot" bind:value={newEndName} aria-label="Name for this path's end" />
             <button type="submit" class="{ACTION_CLASS} shrink-0 text-[10px]" disabled={!newEndName.trim() || !!auto.points[newEndName.trim()]}>Name it</button>
           </form>
         {/if}
-        <div class="mt-1 text-gray-500">
-          {pinned
-            ? `Dragging this end moves ${pinned}, and every path that ends there moves with it.`
-            : "Name the spots where the robot does something (shoots, picks up, parks) or where paths meet."}
-        </div>
       </div>
     {/if}
     <div class={CELL_CLASS}>
@@ -368,10 +356,6 @@
         oninput={(e) => edit((c) => { if (c.kind === "firstOf") c.label = e.currentTarget.value; }, false)}
         onchange={commitAuto}
       />
-    </div>
-    <div class="text-[11px] text-gray-500">
-      Waits for the <b class="text-gray-300">first</b> of these rows to become true, then runs that row's cards.
-      Every wait needs a time row so it cannot wait forever.
     </div>
     <div class="space-y-2">
       {#each card.rows as row, rowIndex (rowIndex)}
@@ -459,7 +443,7 @@
           </div>
           {#if kind === "when"}
             <div class="space-y-1">
-              <span class="text-gray-500">Any of these registered conditions</span>
+              <span class="text-gray-500">Any of</span>
               {@render chips(
                 (row as { when: string[] }).when,
                 conditions,
@@ -467,14 +451,6 @@
                 (index) => editRow(rowIndex, (r) => { if ("when" in r) r.when.splice(index, 1); }),
                 (name) => editRow(rowIndex, (r) => { if ("when" in r && !r.when.includes(name)) r.when.push(name); }),
               )}
-              {#each (row as { when: string[] }).when as name (name)}
-                <div class="text-[10px] text-gray-500">
-                  <span class="font-mono text-gray-300">{name}</span>
-                  {auto.registry.events?.includes(name)
-                    ? "is an event: true once it has happened, and stays true."
-                    : "is a state: true only while it is true right now."}
-                </div>
-              {/each}
             </div>
           {/if}
           <div class="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -593,7 +569,7 @@
       </div>
     </div>
     <div class="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-      <span>Farther than that, the robot runs the "if refused" cards instead of driving.</span>
+      <span></span>
       <button type="button" class="{ACTION_CLASS} shrink-0 text-[10px]" onclick={() => selectedCardId.set(`${card!.id}#0`)}>
         {card.ifRefused.length} card{card.ifRefused.length === 1 ? "" : "s"} · add here
       </button>
@@ -615,15 +591,11 @@
       </div>
     </div>
     <div class="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-      <span>The cards start together. Only one of them should drive.</span>
+      <span></span>
       <button type="button" class="{ACTION_CLASS} shrink-0 text-[10px]" onclick={() => selectedCardId.set(`${card!.id}#0`)}>
         {card.cards.length} card{card.cards.length === 1 ? "" : "s"} · add here
       </button>
     </div>
-  {:else}
-    <div class="text-[11px] text-gray-500">
-      Each card runs after the one above it. A decision waits for the first of its rows and runs that row's
-      branch; the cards after the decision continue from there.
-    </div>
   {/if}
 </div>
+{/if}

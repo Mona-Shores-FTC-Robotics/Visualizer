@@ -86,13 +86,13 @@
     <div class={SECTION_CLASS}>
       <div class="flex items-start justify-between gap-3">
         <div>
-          <div class="font-semibold text-gray-100">Export Auto (Java)</div>
+          <div class="font-semibold text-gray-100">Export</div>
           <div class="text-[11px] text-gray-500">
             {errors.length
               ? `${errors.length} problem${errors.length === 1 ? "" : "s"} to fix first`
               : warnings.length
                 ? `Ready, with ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`
-                : "Ready: builds the whole Auto for the robot's autokit"}
+                : "Ready"}
           </div>
         </div>
         <button type="button" class="{ACTION_CLASS} text-[11px]" class:!border-[#1a3f82]={!errors.length} class:!bg-[#0b1b3a]={!errors.length}

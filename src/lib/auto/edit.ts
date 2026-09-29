@@ -41,6 +41,66 @@ function insertionPoint(
   return { list: auto.cards, index: auto.cards.length };
 }
 
+/** Where the robot is before `index` of `list`, and which way it faces. */
+function robotPoseBefore(
+  auto: AutoSection,
+  list: AutoCard[],
+  index: number,
+  catalog: PathCatalog,
+): { x: number; y: number; headingDeg: number } | null {
+  for (let i = index - 1; i >= 0; i--) {
+    const card = list[i];
+    if (card.kind !== "path") continue;
+    const path = catalog.byId.get(card.lineId);
+    return path ? { x: path.end.x, y: path.end.y, headingDeg: path.endHeadingDeg } : null;
+  }
+  const owner = findOwner(auto.cards, list);
+  return owner ? robotPoseBefore(auto, owner.list, owner.index, catalog) : null;
+}
+
+/**
+ * Where a new path card goes. "after": after the selected card, or at the end
+ * of a selected branch (as every other + button). "branchEnd": at the end of
+ * the selected card's branch, or of the selected branch; else of the Auto.
+ */
+function pathInsertionPoint(
+  auto: AutoSection,
+  selection: { cardId: string | null; rowIndex: number | null },
+  where: "after" | "branchEnd",
+): { list: AutoCard[]; index: number } {
+  const at = insertionPoint(auto, selection.cardId, selection.rowIndex);
+  return where === "branchEnd" ? { list: at.list, index: at.list.length } : at;
+}
+
+/** Where the robot will be when a new path card starts (see `pathInsertionPoint`). */
+export function newPathStart(
+  auto: AutoSection,
+  catalog: PathCatalog,
+  startPoint: { x: number; y: number; headingDeg: number },
+  selection: { cardId: string | null; rowIndex: number | null },
+  where: "after" | "branchEnd",
+): { x: number; y: number; headingDeg: number } {
+  const at = pathInsertionPoint(auto, selection, where);
+  return robotPoseBefore(auto, at.list, at.index, catalog) ?? {
+    x: startPoint.x,
+    y: startPoint.y,
+    headingDeg: startPoint.headingDeg,
+  };
+}
+
+/** Adds a card that drives `lineId` where `newPathStart` said; returns its id. */
+export function insertPathCard(
+  auto: AutoSection,
+  lineId: string,
+  selection: { cardId: string | null; rowIndex: number | null },
+  where: "after" | "branchEnd",
+): string {
+  const at = pathInsertionPoint(auto, selection, where);
+  const card: AutoCard = { id: makeCardId(), kind: "path", lineId, while: [], events: [], park: false };
+  at.list.splice(at.index, 0, card);
+  return card.id;
+}
+
 /** Where the robot is before `index` of `list`: the last path it drove there. */
 function robotBefore(
   auto: AutoSection,

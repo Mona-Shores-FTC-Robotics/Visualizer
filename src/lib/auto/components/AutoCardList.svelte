@@ -8,6 +8,7 @@
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
   import { insertNewCard, moveCard, removeCard, canMove, type NewCardKind } from "../edit";
   import {
+    addNewPath,
     parseSelection,
     selectedCardId,
     updateAuto,
@@ -88,6 +89,7 @@
   }
 
   function add(kind: NewCardKind) {
+    if (kind === "path") return addNewPath("after");
     let created: string | null = null;
     updateAuto((draft) => {
       created = insertNewCard(draft, kind, catalog, selection);
@@ -344,7 +346,7 @@
     <button type="button" class="path-list-action" onclick={() => add("action")} title="Add an action after the selected card">+ Action</button>
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
     <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
-    <button type="button" class="path-list-action" onclick={() => add("path")} disabled={catalog.paths.length === 0} title="Drive one of the project's paths">+ Path</button>
+    <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is">+ Path</button>
     <button type="button" class="path-list-action" onclick={() => (showMore = !showMore)} aria-expanded={showMore}
       title="Routines, go-to and cards that run together">{showMore ? "Less ▴" : "More ▾"}</button>
     {#if showMore}
@@ -353,11 +355,7 @@
       <button type="button" class="path-list-action" onclick={() => add("together")} title="Run several cards at the same time">+ Together</button>
     {/if}
   </div>
-  {#if selection.cardId}
-    <div class="module-caption auto-add-hint">
-      {selection.rowIndex !== null ? "New cards go at the end of the selected branch." : "New cards go after the selected card."}
-    </div>
-  {/if}
+
   <div class="module-list" role="list">
     {@render cardList(auto.cards)}
     {#if auto.cards.length === 0}

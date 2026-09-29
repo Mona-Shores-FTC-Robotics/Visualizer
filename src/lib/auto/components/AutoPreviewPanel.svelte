@@ -52,10 +52,7 @@
 <div class={SECTION_CLASS}>
   <div class="flex items-start justify-between gap-3 border-b border-[#333333] pb-2">
     <div>
-      <div class="font-semibold text-gray-100">Preview as</div>
-      <div class="text-[11px] text-gray-500">
-        Is each condition true when its card asks? T fires at once; F lets the time row fire. Play below to watch it.
-      </div>
+      <div class="font-semibold text-gray-100" title="T: the condition is true when its card asks. F: the wait runs to its time row.">Preview as</div>
     </div>
     {#if questions.length}
       <div class="flex shrink-0 gap-1">
@@ -64,9 +61,7 @@
       </div>
     {/if}
   </div>
-  {#if questions.length === 0}
-    <div class="text-[11px] text-gray-500">No card asks a condition: every wait runs to its time row.</div>
-  {:else}
+  {#if questions.length}
     <div class="space-y-1 text-[11px] text-gray-300">
       {#each questions as q (questionKey(q.cardId, q.condition))}
         <div class="flex items-center gap-2 {CELL_CLASS}" class:opacity-50={!preview.ran.has(q.cardId)}>
@@ -96,7 +91,7 @@
   </div>
   {#if worst}
     <div class="text-[11px]" class:text-red-400={worst.total > AUTO_LENGTH_S} class:text-gray-500={worst.total <= AUTO_LENGTH_S}>
-      Worst case (every wait runs to its time row): {seconds(worst.total)}{worst.total > AUTO_LENGTH_S ? " — over 30 s; each branch's worst case is on its header" : ""}.
+      <span title="Every wait runs to its time row">Worst case {seconds(worst.total)}</span>{worst.total > AUTO_LENGTH_S ? " — over 30 s" : ""}
     </div>
   {/if}
 
