@@ -92,7 +92,7 @@
 
     <AutoPreviewPanel {auto} {preview} {worst} {now} />
 
-    <RegistryPanel {auto} {defaultExportName} robotAt={robotInches} />
+    <RegistryPanel {auto} {defaultExportName} robotAt={robotInches} pathNames={catalog.names} />
 
     <div class={SECTION_CLASS}>
       <div class="flex items-start justify-between gap-3">

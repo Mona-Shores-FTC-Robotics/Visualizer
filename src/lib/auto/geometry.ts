@@ -30,6 +30,8 @@ export interface PathInfo {
   segments: FlatSegment[];
   start: BasePoint;
   end: BasePoint;
+  /** The segment whose end is the path's end (the path itself, or a group's last). */
+  endSegmentId: string;
   startHeadingDeg: number;
   endHeadingDeg: number;
   length: number;
@@ -139,6 +141,7 @@ export function buildPathCatalog(
       segments,
       start: first.start,
       end: last.line.endPoint,
+      endSegmentId: last.line.id,
       startHeadingDeg: getLineStartHeading(
         first.line,
         first.start,

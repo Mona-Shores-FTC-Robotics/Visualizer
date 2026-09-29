@@ -8,6 +8,7 @@
   import { placementAt, placeRoutine, segmentSamples } from "../motion";
   import { parseSelection, selectedCardId } from "../store";
   import { cardColors } from "./ui";
+  import { isUsed, pointUses } from "../pins";
 
   interface Props {
     auto: AutoSection;
@@ -43,6 +44,7 @@
       : [],
   );
   let unit = $derived(size / 141.5);
+  let uses = $derived(pointUses(auto));
 
   const polyline = (points: BasePoint[]) =>
     points.map((p) => `${x(p.x).toFixed(1)},${y(p.y).toFixed(1)}`).join(" ");
@@ -161,8 +163,10 @@
     />
   {/each}
 
+  <!-- Named points. A point that nothing uses is drawn hollow and grey. -->
   {#each Object.entries(auto.points) as [name, point] (name)}
-    <circle cx={x(point[0])} cy={y(point[1])} r={unit * 0.8} fill="#ffc516" stroke="#111" stroke-width={unit * 0.25} />
-    <text x={x(point[0])} y={y(point[1]) + unit * 3.4} font-size={unit * 2.2} text-anchor="middle" fill="#ffffff" stroke="#000000" stroke-width={unit * 0.4} paint-order="stroke">{name}</text>
+    {@const used = isUsed(uses.get(name))}
+    <circle cx={x(point[0])} cy={y(point[1])} r={unit * (used ? 0.8 : 0.7)} fill={used ? "#ffc516" : "none"} stroke={used ? "#111" : "#9a9a9a"} stroke-width={unit * 0.25} />
+    <text x={x(point[0])} y={y(point[1]) + unit * 3.4} font-size={unit * 2.2} text-anchor="middle" fill={used ? "#ffffff" : "#9a9a9a"} stroke="#000000" stroke-width={unit * 0.4} paint-order="stroke">{used ? name : `${name} (unused)`}</text>
   {/each}
 </svg>

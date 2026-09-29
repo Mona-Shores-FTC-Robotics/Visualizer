@@ -16,6 +16,7 @@ import {
   usedNames,
 } from "../../auto/tree";
 import { placementAt, placeRoutine } from "../../auto/motion";
+import { isUsed, pointUses } from "../../auto/pins";
 import {
   rowKind,
   type AutoCard,
@@ -255,9 +256,12 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const names = new Names();
 
   // Named points keep their names; everything else is named around them.
+  // A point nothing uses (validation warns about it) is left out.
+  const uses = pointUses(auto);
   const pointVars = new Map<string, string>();
   const pointDecls: { varName: string; point: NamedPoint }[] = [];
   for (const [name, point] of Object.entries(auto.points)) {
+    if (!isUsed(uses.get(name))) continue;
     const varName = names.take(camelCase(sanitizeIdentifier(name, "point")));
     pointVars.set(name, varName);
     pointDecls.push({ varName, point });

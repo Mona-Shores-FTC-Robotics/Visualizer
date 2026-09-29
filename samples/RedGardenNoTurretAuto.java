@@ -54,8 +54,6 @@ public final class RedGardenNoTurretAuto {
         Pose gardenSide = p.of(40, 30, 0);
         Pose gardenFlower = p.of(18, 47.5, 180);
         Pose gardenShot = p.of(24, 47.5, 20.7);
-        Pose gardenCellAim = p.of(57.9, 60.3, 0);
-        Pose loadingCellAim = p.of(57.9, 86.9, 0);
         Pose collectHome = p.of(60, 10, 90);
 
         // Other poses the paths need (control points, unnamed endpoints).

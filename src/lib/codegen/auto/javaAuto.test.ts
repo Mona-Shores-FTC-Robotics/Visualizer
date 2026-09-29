@@ -34,6 +34,21 @@ test("golden: the hive-rush sample exports exactly HiveRushAuto.java", () => {
   assertText(result.source, golden);
 });
 
+test("golden: the same file saved before pins still exports exactly HiveRushAuto.java", () => {
+  const data = JSON.parse(sampleText);
+  delete data.auto.pathEnds;
+  delete data.auto.startAt;
+  const result = generateAutoJavaFromText(JSON.stringify(data), "hive-rush.pp");
+  assert(result.ok, JSON.stringify(result));
+  assertText(result.source, golden);
+});
+
+test("a named point nothing uses is not exported", () => {
+  const auto = clone(loadSample().auto);
+  auto.points.Nowhere = [70, 70];
+  assert(!sourceOf(auto).includes("nowhere"));
+});
+
 test("class names are the export name in PascalCase plus Auto", () => {
   assertEqual(autoClassName("hive-rush.pp"), "HiveRushAuto");
   assertEqual(autoClassName("near_side park"), "NearSideParkAuto");

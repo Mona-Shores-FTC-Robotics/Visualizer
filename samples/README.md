@@ -1,9 +1,17 @@
 # Sample Autos
 
-**Open in the Visualizer:** [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#data=1.eJzNV9tu4zYQ_RVh-tIClEDKlmzppci1CZAbdoNdoIEfaGlks5FFlaLjzQb-94KibcnZWE52GyDIizUcDs_hHM5MnqDgM4QYFKbuhKsUC3fMK5F4ZQkESiX_wURD_ASV5krfSFHUX98gDimBR4gjAlPkqSgmxziBOKJkHfKz2QFLArkosIL47glECjGUvKqYK-caCCQylwpi-C3LkoCFsNl8Y5wOTGQgcC8Ks5FrORMJEMAi3UbiDWssfuQFSxO00ErmtYs5d7SBaDbox9IckMii0rwwIFKcKDQII7oksOBCH2ImFV5WEFNrOMg0qta3dbiyWKHlszYtyRbbMU_u99I9tE572dZcGf2ITP3X5NW_wEzvJxpQj63Tyl5L1miNKyBWrxtJYpHWvxkbvBfx16TYf6cUv8CasUFD-z3SraWrkCu3msqtjPeyJBtiw_tWfkKuPluvVxJnQ2_40eStpZvlcoGqm-yFrAGerl33MO4PLGM_-pCMS67uu_neWI89NFm4UnT4UUiOCFRTXrYbU6b4DN0cJ67CtOF4dv7lxKnXnBwnzu8KU6cSKf4BBB5QaZGsgph0hp5lGjDPNxdpbJHX32mLqNdb29Z7a9uodetp4oe-KSWZyPOjpsCE43DcpKuBP87nuBu_Wd1JIPJ_JBAFOywt8Jt9PwnegHKnPM8a3IcGpzHFTqX5o2M7y3PAg3XzpyskrM-8YIel_rWybjZaYxuyH4Q9HD-HHFIeZNwqB_-dY5FgDWIl_ZLrKdhh53x7zDEHdjrVrWOPl_-aUP7eUFtVu9tvVe26neoCYa9Ea1FMqvrBf8FcJkI_QjwwF998hgEB3nz2PNZnQeSHQS8YRoOoR-D-VIlEC1lAXPd_9VWkegoxGxJQZygmU20_Kp6hfrzkaiIKiBmBGW-dazrJjH87SBLMUXEbMAhq4zE-N2YC8_SSl0aIQo7n3797CxyXZnh9QFXVfsC8wKNAQIsZVprPjLdP_dClkesPb5kfUxpT6lFK_wYCfK6luYxNAEYgVXxRnNZy-nRybMrkt1IqffXyDA4EFE5EpdWjCcTrazHCh_NC83u8zsxrWf0ugMDnqZT6IM-hFnORis2GIz5DxQ9zk0cCZ-IBb0VZ1lXO7j-dm21LAuWqKj-t5vf4LqQkIhEdETiSeY6JtmO5WfCGxMzcW6v1cBff1dObmdwIY4ORPfOk0IrbZxNS0g-9od25GRBqe9397cJ2M43v-gNSd0q7Wree-I6FhNFwC8OZnK0OYdQsmKbDVdqq9dz1_Vbbsopr_nVZX6T5FwgfBC5Mb_EDSpvmKEo3xURUduMqUCZUpa9NWnI-xhxiOBapI-fKqauwFuWfJqtyYaEspliY9GwlpJ2rURPoPDPbrcsPZNhuLht9NPOq26K-u2wRWExFjrZB4wNumnX95uOM5xW2Yvb2xVwNyG8K2u8O6v8M0GBfzLcD5W64NwFZ1s7AYDeIZ4P1m2BEb9Y0bWm6dBntxLUZgF8C9QRcm6I9IOuz2-LbAXnhMtb1fG75PTp95-b64uLkysmUnDl6is7F9cHx-dVfzunF9deTTy89qXZZax7MyBzM18MiCyhtr41aN8k6ysMLGeUu6_3q3XeIvRnFO-Wg1RyX2xwDaji2ikgh9c5CUrqs43X8vDBLl3UL_l2ENfyYwup4oy8Ky6e_KCyf_V_CMn_L5X-pjUfq) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#data=1.eJzNWVtv2zgW_isG92UWoASSlmRLL4M0lyZAmhRpdgpMYCxoibI5kUUtTcfNBP7vC5KyJNuxLLdJp_CLRR4ene_w3PUCcjpjIAKSJc6EyoTlTi4ctZCSKbcoAASFFH-xWIHoBcwVleqz4Ll5-gaiAEHwDKIQgimjCc8nZ2wCohDBNdsv-gRYQZDxnM1B9PACeAIiUND5HDtioQAEsciEBBH4V5rGPg5AdfizJjrRnAEEjzzXB6kSMx4DCFievCIJwSvNMFdSZGZbv3NUiaeJ1XOhmccinyuaawESNpFMSxeiFQRLytUHlgrJPs1BhOzCSaqYbDxbghsrJ2jQrJdWcAPpmMaPB6F-sETdkGL0KyIlXe6UXLNUHQbq-25oLxW5_a5gtZ1RCaC11cocWZ6Y_xi_G_AuV0ze6YpfQY1xA_Z7XLcS64Ax5wnbRD6k_aRGfi8-GsIvlu4AeM-C7_9y9l0DTjOxZLIL5Is15QHQeGhAewPXfytLH76HChYyr259KlSrChYyX6vhlGXZYSUQ7y2UgIcNLRDkDt5eDaUGlHAKKh_blGDh34vPlu6QFQSl3wc_YvvvgzkWec5iJTbMPhgPyBDVcE_XRL3fcvbEZC-R_Inl__6xkGd1QywBWf3TQYDlStI83gh5_TROh6zp_5f8iZ3XlN3g9zvnuZ-Fd5EnTDpT_tQK9z-a6tISdb1o71eDGmeMSu3UOsq1oT3VhPfi3pIdqmJKu8XkV8NrgrnUmLdD-Y41m1B-LYyk3WJ5BftHaphmPiNDz1SBb-_Pu9l815tL7F3TuTcog1VnI38FvUH8zjWcNgGL_3gjOJlQ3sEBKl10doCDljB4J0vYzua7dvBT8_jb4hxBMJ_SotmFp5LOmJOxiSNZo2i5vPrjvGf2ehmb9H6TLOnpGl-n8ScmFY9ZlZa9wLVgfewSrUu9Frre3rXQNHObZ83aqKH4JCYB0b1TyrPstC6ugnEwrm-sFn-cLdh--fXuXgAh2QUQ-ntWGsJX575TeC2UM6VZWsv9Qcupl6LeXNHnnm2ltwUeINc2C6iUBHvY9fesmH_lanXQLjZFJn7QZ-NtkQNE_ZRay2H_WzBdyWghSusvqJoCO9m52pzp6Be2Eple-QAV6cKKHGS11aZ2oiwzQhvtdiPUQrvVLbRQ1jV2u5hVBdpC1ijc2t64UfMcAlwXC-3yddRfM_G0M7SKM3aoFM8ncxNo_2CZiLl6BtFAW3v9GPgQ0Pqx72IP-yEJ_L4_DAdhH4LHC8ljxUUOIuRiCORXnqip7cPlJeOTqbIPc5oy9fyJygnPQYQhmNHGe3UxO6PfTuKYZUxSy9D3zeIZ215MOcuST7TQ3s_FePH33-6SjQs9Hn1icm7oAHZ9V3dUis_YXNGZpiaIBA4KHRLeYxIhFCHkIoT-BBDQhRJaGRUDDEEi6TK_MD58d36m09O3Qkh1s3_SCyCQbMLnSj5rZtSoRkcccJUr-shuUx2myv8653-ZCqFOsgyYKJInvDpwSmdM0g-ZvksIdE9wz4vCpBd7_mKhj60gKMqM-FJOiaOHAMEQhmgEwanIMhYrO_w1GwRv7JgRYvRgZoR6Pggx1rsbXZc51--vz0nJEyHPv_HyVRh55Vajno8efAIxJnbnjlH5RZtnuYygKcpGEGwWhNGDN4CYlPzsYnnObBBokvkIAlNARA84gBgFIwgak7HowUOwj6rFijceQj0TgXhYb5bciWe3dM9f7ZnijM-00AM3hAFqSry1OQzcsNbqpZixtXI0Fl2-UJk0SgbqEL9RAFkfqsf9a7PQnw3YE2dLXaIQH6G6zOKFk7CYz-3BklHK5VzdaiPL6JhlIAJnPOmJheyZZK548bu2UbG0oiynTF_Vpnk1LW9UM7pK9XFLsgMG78dSWXs953VITb4_-0GwnPKM2VKPPbGq7DNRLEppNmcNnv1DPMvB8lFMvXam5HsE9Q_xPF5Q6gQHLyBNmzcw2C_E5mjmKGjD_Vw3BiBHMQ33M90eNRzFF6MWHWz39EddBm5xhz2ujRquXTi4xUGanfZrUr0AqnQ2HsD1u5s-uEfmpYP7bVHknj6yntf7fHt9fX7TS6WY9dSU9e7Oz_57fXtydnXzsXdxffv1_O616NLMV3XsGOmX03X7hX2Emnujpjq9I40bt7jYK636cXfb4mnd7rbd9creuVUmJRdstak_H2n9NWJ1LtTeeF04uMVTdz5IHedVLe76ypefN7Rggr7Tgj-e3J2d37yjAZPD6XHTgEmb_-9-OzrKgEn_Bw2YtCTFnS86XexY_1ar_wM3r3fE)
+**Open in the Visualizer:** [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
 
-These links carry a copy of the `.pp` files as they were when the links were made. If a file
-changes, make a new link with the Share button.
+These sample links open the files in this folder as last deployed, so they never go stale. Each
+opens as a shared copy: change anything, and "Save as new file" keeps your version.
+
+## `red-simple.pp`
+
+The smallest useful Auto, for learning the editor: shoot the preloads, then wait up to 3 s for the
+HIVE to tip. **Tipped:** drive straight under the HIVE to `RearShot` and shoot. **Not tipped:**
+curve over to `Garden` beside the red GARDEN, turning to face the red wall (a placeholder spot).
+The grey "Back to Start (never driven)" path is only there because the editor chains every path
+from the one before it in the Path List; no card drives it.
 
 ## Rules every Auto here follows
 
@@ -42,7 +50,7 @@ A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
 2. Wait for the first of: our HIVE tipped (or the camera is blind) → **If tipped**; 5 s → **If not tipped**.
 3. **If tipped:** two collect passes from the start with the intake on (about 20 in straight ahead
    and back, then about 21 in at 27° to the left and back); one path straight through the gap under
-   the HIVE (`HiveEntrance`) to `RearShot` at the rear, without stopping at the entrance; shoot; take 4 POLLEN from the RED_LOADING FLOWER; shoot; park in
+   the HIVE (entering at 60.0, 46.8) to `RearShot` at the rear, without stopping at the entrance; shoot; take 4 POLLEN from the RED_LOADING FLOWER; shoot; park in
    the red LOADING ZONE.
 4. **If not tipped:** straight under the HIVE; take 4 POLLEN from the RED_LOADING FLOWER; shoot at
    the RED_GARDEN CELL to try for the tip; park in the red LOADING ZONE.
@@ -61,6 +69,8 @@ image; check the frame legs with a tape measure, since the under-HIVE gap depend
 The same plan for a robot **without a turret**. The launcher is assumed fixed and to fire the way the
 intake faces, so the robot turns to face each CELL before it shoots. If our launcher fires out the
 back instead, every shot heading flips by 180°.
+Each shot heading aims at a CELL's centre, measured from the field image: RED_GARDEN (57.9, 60.3)
+and RED_LOADING (57.9, 86.9).
 
 - **Preloads:** from `Start`, facing 90°. The CELL's centre is 2.3° to the left, so the shot lands
   about 2.1 in off centre on a 20 in opening. The robot can't start turned toward it, because it

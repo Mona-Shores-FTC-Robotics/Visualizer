@@ -2,6 +2,7 @@
   import type { AutoSection, NamedPoint } from "../types";
   import { usedNames } from "../tree";
   import { commitAuto, updateAuto } from "../store";
+  import { isUsed, pointUses } from "../pins";
   import { ACTION_CLASS, CELL_CLASS, FIELD_CLASS, LABEL_CLASS, SECTION_CLASS } from "./ui";
 
   interface Props {
@@ -9,9 +10,32 @@
     defaultExportName: string;
     /** Where the robot is now; "Add at robot" puts a new point there. */
     robotAt: { x: number; y: number };
+    /** Display name of every path, by id, for "used by". */
+    pathNames: Map<string, string>;
   }
 
-  let { auto, defaultExportName, robotAt }: Props = $props();
+  let { auto, defaultExportName, robotAt, pathNames }: Props = $props();
+  let uses = $derived(pointUses(auto));
+
+  function describeUse(name: string): string {
+    const use = uses.get(name);
+    if (!isUsed(use)) return "unused";
+    const parts: string[] = [];
+    if (use!.start) parts.push("start");
+    if (use!.ends.length) parts.push(`end of ${use!.ends.map((id) => pathNames.get(id) ?? "a path").join(", ")}`);
+    if (use!.cards) parts.push(`${use!.cards} card${use!.cards === 1 ? "" : "s"}`);
+    return parts.join(" · ");
+  }
+
+  function removePoint(name: string) {
+    updateAuto((draft) => {
+      delete draft.points[name];
+      for (const [id, pinned] of Object.entries(draft.pathEnds)) {
+        if (pinned === name) delete draft.pathEnds[id];
+      }
+      if (draft.startAt === name) delete draft.startAt;
+    });
+  }
 
   let open = $state(true);
   let used = $derived(usedNames(auto));
@@ -156,18 +180,36 @@
       <span class={LABEL_CLASS}>Named points</span>
       <div class="space-y-1">
         {#each Object.entries(auto.points) as [name, point] (name)}
-          <div class="grid grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_auto] items-center gap-1">
-            <span class="truncate font-mono text-gray-100" title={name}>{name}</span>
+          {@const use = describeUse(name)}
+          <div class="flex items-baseline justify-between gap-2 pt-0.5" title={`${name}: ${use}`}>
+            <span class="truncate font-mono text-gray-100">{name}</span>
+            <span class="truncate text-[10px]" class:text-amber-400={use === "unused"} class:text-gray-500={use !== "unused"}>{use}</span>
+          </div>
+          <div class="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-1">
             <input class={FIELD_CLASS} type="number" step="0.5" value={point[0]} aria-label={`${name} x`} oninput={(e) => setPoint(name, 0, e.currentTarget.value)} onchange={commitAuto} />
             <input class={FIELD_CLASS} type="number" step="0.5" value={point[1]} aria-label={`${name} y`} oninput={(e) => setPoint(name, 1, e.currentTarget.value)} onchange={commitAuto} />
             <input class={FIELD_CLASS} type="number" step="5" value={point[2] ?? ""} placeholder="0°" aria-label={`${name} heading`} oninput={(e) => setPoint(name, 2, e.currentTarget.value)} onchange={commitAuto} />
             <button type="button" class="text-gray-500 hover:text-red-400" aria-label={`Remove point ${name}`}
-              onclick={() => updateAuto((draft) => { delete draft.points[name]; })}>✕</button>
+              onclick={() => removePoint(name)}>✕</button>
           </div>
         {/each}
         {#if Object.keys(auto.points).length === 0}
-          <div class="text-gray-500">None yet. A path endpoint on a named point is exported under its name.</div>
+          <div class="text-gray-500">None yet. Name a path's end from its card ("Ends at").</div>
         {/if}
+      </div>
+      <div class="mt-1.5 text-gray-500">
+        Editing a point moves every path end on it. Name only the spots where the robot does
+        something or where paths meet; the Java uses these names.
+      </div>
+      <div class="mt-1.5 flex items-center gap-1.5">
+        <label class="shrink-0 text-gray-400" for="auto-start-at">Start is</label>
+        <select id="auto-start-at" class={FIELD_CLASS} value={auto.startAt ?? ""}
+          onchange={(e) => { const v = e.currentTarget.value; updateAuto((draft) => { if (v && draft.points[v]) draft.startAt = v; else delete draft.startAt; }); }}>
+          <option value="">a spot of its own</option>
+          {#each Object.keys(auto.points) as name (name)}
+            <option value={name}>{name}</option>
+          {/each}
+        </select>
       </div>
       <form class="mt-1.5 flex gap-1.5" onsubmit={(e) => { e.preventDefault(); addPoint(); }}>
         <input class={FIELD_CLASS} placeholder="ShootSpot" bind:value={newPoint} aria-label="New point name" />

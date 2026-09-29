@@ -311,6 +311,13 @@
         28
       ]
     },
+    "pathEnds": {
+      "near-collect": "NearPickup",
+      "near-back": "ShootSpot",
+      "far-to": "FarPickup",
+      "far-up": "UpCellShot",
+      "far-park": "ParkFar"
+    },
     "routines": {
       "CollectFar": {
         "steps": [
@@ -580,7 +587,8 @@
           }
         ]
       }
-    ]
+    ],
+    "startAt": "ShootSpot"
   },
   "version": "1.5.0"
 }

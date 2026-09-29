@@ -164,6 +164,15 @@ export interface AutoSection {
   exportName?: string;
   registry: AutoRegistry;
   points: Record<string, NamedPoint>;
+  /**
+   * Path ends that are named points, by path id. Such an end has no position
+   * of its own: it is wherever the point is, and dragging it moves the point
+   * and every other end on it. The paths still carry the position, so a stock
+   * Visualizer draws them; the editor keeps the two equal (see pins.ts).
+   */
+  pathEnds: Record<string, string>;
+  /** The named point the start pose is on, if any; same rules as `pathEnds`. */
+  startAt?: string;
   /** Routine definitions by name; placed on the field by routine cards. */
   routines: Record<string, RoutineDef>;
   cards: AutoCard[];

@@ -2,6 +2,7 @@ import { get, writable } from "svelte/store";
 import { FIELD_SIZE } from "../../config";
 import { isUnsaved } from "../../stores";
 import { normalizeAuto } from "./normalize";
+import { predatesPins } from "./pins";
 import type { Scenario } from "./simulate";
 import type { AutoSection, NamedPoint } from "./types";
 import { foldedBranches } from "./fold";
@@ -26,6 +27,16 @@ export const selectedCardId = writable<string | null>(null);
 export const previewScenario = writable<Scenario>({});
 
 let recorder: (() => void) | null = null;
+
+/** Set when the file just loaded predates pins; see `takePinsToAdopt`. */
+let pinsToAdopt = false;
+
+/** Whether the loaded file's pins still have to be adopted; clears the flag. */
+export function takePinsToAdopt(): boolean {
+  const pending = pinsToAdopt;
+  pinsToAdopt = false;
+  return pending;
+}
 
 /** The app's undo recorder, called after each committed Auto edit. */
 export function setAutoRecorder(record: () => void): void {
@@ -73,6 +84,9 @@ export function loadAutoFrom(data: unknown): string[] {
       ? (data as { auto?: unknown }).auto
       : undefined;
   const { auto, problems } = normalizeAuto(raw);
+  // A file from before pins: the ends already on named points get pinned once
+  // the app has its paths (see App.svelte and pins.ts).
+  pinsToAdopt = auto !== null && predatesPins(raw);
   autoSection.set(auto);
   selectedCardId.set(null);
   foldedBranches.set(new Set());

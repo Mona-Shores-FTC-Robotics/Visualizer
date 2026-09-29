@@ -44,7 +44,6 @@ public final class RedGardenBasicAuto {
         Pose start = p.of(60, 9, 90);
         Pose collectAhead = p.of(60.8, 29.5, 90);
         Pose collectLeft = p.of(50.1, 29.1, 117);
-        Pose hiveEntrance = p.of(60, 46.8, 90);
         Pose rearShot = p.of(60, 118.8, 90);
         Pose loadingFlower = p.of(47, 129.8, 90);
         Pose park = p.of(16, 106, 90);
