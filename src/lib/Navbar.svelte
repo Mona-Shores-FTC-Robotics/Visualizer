@@ -337,6 +337,7 @@
     bind:secondShapes
     bind:secondSequence
     bind:fieldPoints
+    {settings}
   />
 {/if}
 
