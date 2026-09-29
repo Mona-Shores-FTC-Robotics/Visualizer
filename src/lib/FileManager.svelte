@@ -25,7 +25,11 @@
     normalizeStartPose,
     deriveSequence,
   } from "../utils/normalize";
-  import { newerVersionWarning, serializeProject } from "../utils/project";
+  import {
+    buildOtherFileProject,
+    newerVersionWarning,
+    serializeProject,
+  } from "../utils/project";
   import { downloadJson } from "../utils/download";
   import { stripPpExtension } from "../utils/filename";
   import {
@@ -227,15 +231,29 @@
         (selectedFile?.path ?? $currentFilePath) === renamingFile.path;
       const renamingSecondary = selectedFile2?.path === renamingFile.path;
       let currentContent: string | null = null;
-      if (renamingPrimary || renamingSecondary) {
+      if (renamingPrimary) {
         currentContent = serializeProject({
-          startPoint: renamingPrimary ? startPoint : secondStartPoint!,
-          lines: renamingPrimary ? lines : secondLines,
-          shapes: renamingPrimary ? shapes : secondShapes,
-          sequence: renamingPrimary ? sequence : secondSequence,
+          startPoint,
+          lines,
+          shapes,
+          sequence,
           fieldPoints,
-          auto: renamingPrimary ? currentAuto() : null,
+          auto: currentAuto(),
         });
+        await browserFileStore.writeFile(renamingFile.path, currentContent);
+      } else if (renamingSecondary) {
+        // The second file keeps its own Auto and field points.
+        const stored = await browserFileStore
+          .readFile(renamingFile.path)
+          .catch(() => null);
+        currentContent = JSON.stringify(
+          buildOtherFileProject(stored, {
+            startPoint: secondStartPoint,
+            lines: secondLines,
+            shapes: secondShapes,
+            sequence: secondSequence,
+          }),
+        );
         await browserFileStore.writeFile(renamingFile.path, currentContent);
       }
 

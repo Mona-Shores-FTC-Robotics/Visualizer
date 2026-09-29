@@ -49,8 +49,10 @@
   import { downloadBlob } from "./utils/download";
   import {
     PROJECT_VERSION,
+    buildOtherFileProject,
     buildProject,
     newerVersionWarning,
+    type OtherFilePaths,
   } from "./utils/project";
   import { showToast } from "./lib/toast";
   import { basename, pathStem } from "./utils/filename";
@@ -599,6 +601,20 @@
     );
   }
 
+  /**
+   * The text to save for a file shown beside the main one. Starts from the
+   * file as stored, so its own Auto and field points survive the save.
+   */
+  async function otherFileContent(
+    filePath: string,
+    paths: OtherFilePaths,
+  ): Promise<string> {
+    const existing = await browserFileStore
+      .readFile(filePath)
+      .catch(() => null);
+    return JSON.stringify(buildOtherFileProject(existing, paths));
+  }
+
   function getAppState(): AppState {
     return {
       startPoint,
@@ -1010,15 +1026,13 @@
     if (!pathData || !pathData.filePath) return;
 
     try {
-      const fileData = JSON.stringify(
-        buildProjectData({
-          startPoint: pathData.startPoint,
-          lines: pathData.lines,
-          shapes: pathData.shapes,
-          sequence: pathData.sequence,
-          settings: pathData.settings,
-        }),
-      );
+      const fileData = await otherFileContent(pathData.filePath, {
+        startPoint: pathData.startPoint,
+        lines: pathData.lines,
+        shapes: pathData.shapes,
+        sequence: pathData.sequence,
+        settings: pathData.settings,
+      });
 
       await browserFileStore.writeFile(pathData.filePath, fileData);
       console.log(`Auto-saved additional path: ${pathData.filePath}`);
@@ -2316,14 +2330,12 @@
           await browserFileStore.writeFile($currentFilePath, fileData);
           isUnsaved.set(false);
         } else if (target === "second" && $secondFilePath) {
-          const fileData = JSON.stringify(
-            buildProjectData({
-              startPoint: secondStartPoint,
-              lines: secondLines,
-              shapes: secondShapes,
-              sequence: secondSequence,
-            }),
-          );
+          const fileData = await otherFileContent($secondFilePath, {
+            startPoint: secondStartPoint,
+            lines: secondLines,
+            shapes: secondShapes,
+            sequence: secondSequence,
+          });
           await browserFileStore.writeFile($secondFilePath, fileData);
         } else if (target === "both") {
           // Save first path
@@ -2333,14 +2345,12 @@
           }
           // Save second path
           if ($secondFilePath) {
-            const fileData2 = JSON.stringify(
-              buildProjectData({
-                startPoint: secondStartPoint,
-                lines: secondLines,
-                shapes: secondShapes,
-                sequence: secondSequence,
-              }),
-            );
+            const fileData2 = await otherFileContent($secondFilePath, {
+              startPoint: secondStartPoint,
+              lines: secondLines,
+              shapes: secondShapes,
+              sequence: secondSequence,
+            });
             await browserFileStore.writeFile($secondFilePath, fileData2);
           }
           isUnsaved.set(false);

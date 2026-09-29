@@ -70,3 +70,46 @@ export function serializeProject(
     pretty ? 2 : undefined,
   );
 }
+
+/** What a file shown beside the main one (second or additional path) edits. */
+export interface OtherFilePaths {
+  /** Null keeps the start point the file has. */
+  startPoint: StartPose | null;
+  lines: Path[];
+  shapes: Shape[];
+  sequence: SequenceItem[];
+  settings?: Settings;
+}
+
+/**
+ * The document for saving a file shown beside the main one: the dual-path
+ * second file or an additional path. Only what is edited on screen is
+ * replaced; everything else the file already had (its own Auto, field points,
+ * settings) is kept, and nothing of the main project is written into it.
+ * `existingText` is the file as stored, or null when it cannot be read.
+ */
+export function buildOtherFileProject(
+  existingText: string | null,
+  paths: OtherFilePaths,
+): Record<string, unknown> {
+  let existing: Record<string, unknown> = {};
+  if (existingText) {
+    try {
+      const parsed = JSON.parse(existingText);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        existing = parsed;
+      }
+    } catch {
+      // Unreadable: write the paths alone rather than keep nothing at all.
+    }
+  }
+  const { startPoint, settings, ...edited } = paths;
+  return {
+    ...existing,
+    ...(startPoint ? { startPoint } : {}),
+    ...edited,
+    ...(settings ? { settings } : {}),
+    version: PROJECT_VERSION,
+    timestamp: new Date().toISOString(),
+  };
+}
