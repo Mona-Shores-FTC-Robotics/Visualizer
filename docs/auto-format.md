@@ -297,6 +297,15 @@ Code: `src/utils/shareLink.ts` (encode/decode, no DOM),
 `src/lib/session/sharedCopy.ts`, `ShareLinkDialog.svelte`,
 `SharedCopyBanner.svelte`.
 
+## Sample links
+
+`#sample=<name>` opens `samples/<name>.pp` from the site as a shared copy, the
+same way a share link does (`src/utils/sampleLink.ts`). The build copies
+`samples/*.pp` to `samples/` on the site (a plugin in `vite.config.ts`, which
+also serves them in dev). The link is short, so chat apps do not cut it, and
+it always opens the sample as last deployed:
+<https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic>.
+
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
@@ -323,3 +332,4 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
   overlay draws them by branch), and the Controls panel shows the Auto panel instead
   of `ControlTab`.
 - `package.json` — `test` script.
+- `vite.config.ts` — publishes `samples/*.pp` for sample links.

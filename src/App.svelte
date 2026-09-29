@@ -164,7 +164,7 @@
     type SessionSnapshot,
   } from "./lib/session/sessionSnapshot";
   import * as browserFileStore from "./utils/browserFileStore";
-  import { decodeShareHash } from "./utils/shareLink";
+  import { resolveProjectHash } from "./utils/sampleLink";
   import {
     freeSharedFileName,
     sharedCopyState,
@@ -784,7 +784,10 @@
   } | null = null;
 
   async function openShareLink() {
-    const result = await decodeShareHash(window.location.hash);
+    const result = await resolveProjectHash(window.location.hash, async (fileName) => {
+      const response = await fetch(publicAsset(`/samples/${fileName}`), { cache: "no-cache" });
+      return response.ok ? response.text() : null;
+    });
     if (result.kind === "none") return;
     window.history.replaceState(
       null,
