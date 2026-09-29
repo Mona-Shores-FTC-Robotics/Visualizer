@@ -1,6 +1,6 @@
 import type { BasePoint, StartPose, TimelineEvent } from "../../types";
 import { pointAlong, timeAtFraction, type PathCatalog, type PathInfo } from "./geometry";
-import { cardTitle, describeRow, parkCardOf, rowLabel } from "./tree";
+import { allCards, cardTitle, describeRow, parkCardOf, rowLabel } from "./tree";
 import {
   motionAlong,
   placementAt,
@@ -26,23 +26,53 @@ import {
 export const AUTO_LENGTH_S = 30;
 
 /**
- * When a registered condition becomes true in the preview: `seconds` after
- * the card waiting on it starts ("card"), or `seconds` into the Auto
- * ("start"). A disabled condition never becomes true.
+ * The preview's answers: whether a condition is true when a card asks it,
+ * keyed by `questionKey(card id, condition)`. The Auto has no loops, so each
+ * card asks at most once per run: the same condition asked by two cards is
+ * two questions with their own answers (HIVE not tipped at the first
+ * decision, tipped at the later one). Unanswered questions are true.
  */
-export interface ConditionScenario {
-  enabled: boolean;
-  seconds: number;
-  from: "card" | "start";
+export type Scenario = Record<string, boolean>;
+
+/** What a question is before anyone answers it: the happy path. */
+export const DEFAULT_ANSWER = true;
+
+export function questionKey(cardId: string, condition: string): string {
+  return `${cardId}:${condition}`;
 }
 
-export type Scenario = Record<string, ConditionScenario>;
+export function answerOf(scenario: Scenario, cardId: string, condition: string): boolean {
+  return scenario[questionKey(cardId, condition)] ?? DEFAULT_ANSWER;
+}
 
-export const DEFAULT_CONDITION: ConditionScenario = {
-  enabled: true,
-  seconds: 1,
-  from: "card",
-};
+/** A question the preview asks: a condition in a card's row, or a routine's end condition. */
+export interface PreviewQuestion {
+  cardId: string;
+  condition: string;
+  /** The card asking, as the list names it. */
+  card: string;
+}
+
+/** Every question in the Auto, in the order the Auto reaches the cards. */
+export function previewQuestions(auto: AutoSection): PreviewQuestion[] {
+  const questions: PreviewQuestion[] = [];
+  const add = (card: AutoCard, condition: string) => {
+    if (!questions.some((q) => q.cardId === card.id && q.condition === condition)) {
+      questions.push({ cardId: card.id, condition, card: cardTitle(card) });
+    }
+  };
+  for (const card of allCards(auto.cards)) {
+    if (card.kind === "firstOf") {
+      for (const row of card.rows) {
+        if (rowKind(row) === "when") (row as { when: string[] }).when.forEach((name) => add(card, name));
+      }
+    } else if (card.kind === "routine") {
+      const endsWhen = auto.routines[card.routine]?.endsWhen;
+      if (endsWhen) add(card, endsWhen);
+    }
+  }
+  return questions;
+}
 
 export type LogKind = "card" | "row" | "event" | "guard" | "warn" | "end";
 
@@ -202,22 +232,13 @@ export function simulateAuto(
     heading = end.headingDeg;
   };
 
-  /** When a registered condition turns true, for a card that started at t0. */
-  const conditionTime = (name: string, t0: number): number => {
-    const sc = scenario[name] ?? DEFAULT_CONDITION;
-    if (!sc.enabled) return Infinity;
-    return sc.from === "card" ? t0 + sc.seconds : Math.max(t0, sc.seconds);
-  };
-
-  const fireTime = (row: AutoRow, t0: number): number => {
+  /** A row asking conditions fires the moment it is asked if any is answered true. */
+  const fireTime = (cardId: string, row: AutoRow, t0: number): number => {
     switch (rowKind(row)) {
-      case "when": {
-        let best = Infinity;
-        for (const name of (row as { when: string[] }).when) {
-          best = Math.min(best, conditionTime(name, t0));
-        }
-        return best;
-      }
+      case "when":
+        return (row as { when: string[] }).when.some((name) => answerOf(scenario, cardId, name))
+          ? t0
+          : Infinity;
       case "afterMs":
         return t0 + (row as { afterMs: number }).afterMs / 1000;
       case "timeLeftBelowS":
@@ -243,14 +264,10 @@ export function simulateAuto(
     }
   };
 
-  const whyRow = (row: AutoRow, waited: number): string => {
-    const kind = rowKind(row);
-    if (kind === "when") {
-      const first = (row as { when: string[] }).when.find((name) => {
-        const sc = scenario[name] ?? DEFAULT_CONDITION;
-        return sc.enabled;
-      });
-      return `${first ?? "condition"} after ${waited.toFixed(2)} s`;
+  const whyRow = (cardId: string, row: AutoRow): string => {
+    if (rowKind(row) === "when") {
+      const first = (row as { when: string[] }).when.find((name) => answerOf(scenario, cardId, name));
+      return `${first ?? "condition"} true`;
     }
     return describeRow(row);
   };
@@ -290,7 +307,7 @@ export function simulateAuto(
     let winner = -1;
     let at = Infinity;
     card.rows.forEach((row, index) => {
-      const fire = fireTime(row, t0);
+      const fire = fireTime(card.id, row, t0);
       if (fire < at - 1e-9) {
         at = fire;
         winner = index;
@@ -314,8 +331,8 @@ export function simulateAuto(
     const hasCards = card.rows.some((r) => r.cards.length > 0);
     note(
       hasCards
-        ? `${label} → ${rowLabel(row)} (${whyRow(row, at - t0)})`
-        : `${label}: ${whyRow(row, at - t0)}`,
+        ? `${label} → ${rowLabel(row)} (${whyRow(card.id, row)})`
+        : `${label}: ${whyRow(card.id, row)}`,
       "row",
       card.id,
     );
@@ -390,9 +407,12 @@ export function simulateAuto(
     heading = card.facingDeg;
     const motion = motionAlong(segmentSamples(placeRoutine(routine, placement), origin), settings, card.facingDeg);
     const t0 = t;
-    const condition = routine.endsWhen ? conditionTime(routine.endsWhen, t0) : Infinity;
     const timeout = t0 + routine.timeoutMs / 1000;
     const done = t0 + motion.seconds;
+    // Answered true, the end condition is met by the time the pattern is done;
+    // answered false, the routine ends at its timeout or the pattern's end.
+    const condition =
+      routine.endsWhen && answerOf(scenario, card.id, routine.endsWhen) ? done : Infinity;
     const end = Math.min(condition, timeout, done);
     note(
       `Routine ${title}${routine.while.length ? ` · while ${routine.while.join(", ")}` : ""}`,
@@ -403,7 +423,7 @@ export function simulateAuto(
     if (signal) return signal;
     note(
       end === condition
-        ? `${title}: ${routine.endsWhen} after ${(end - t0).toFixed(2)} s`
+        ? `${title}: ${routine.endsWhen} true, done after ${(end - t0).toFixed(2)} s`
         : end === timeout
           ? `${title}: timed out at ${routine.timeoutMs} ms`
           : `${title}: pattern done (${(end - t0).toFixed(2)} s), ${routine.endsWhen || "no condition"} not true`,

@@ -2,14 +2,14 @@
   import type { AutoSection } from "../types";
   import {
     AUTO_LENGTH_S,
-    DEFAULT_CONDITION,
-    type ConditionScenario,
+    previewQuestions,
+    questionKey,
     type PreviewResult,
     type WorstCase,
   } from "../simulate";
   import { previewScenario, selectedCardId } from "../store";
-  import { usedNames } from "../tree";
-  import { CELL_CLASS, FIELD_CLASS, LABEL_CLASS, SECTION_CLASS, seconds } from "./ui";
+  import AnswerChip from "./AnswerChip.svelte";
+  import { CELL_CLASS, LABEL_CLASS, SECTION_CLASS, seconds } from "./ui";
 
   interface Props {
     auto: AutoSection;
@@ -21,7 +21,7 @@
 
   let { auto, preview, worst, now }: Props = $props();
 
-  let used = $derived(usedNames(auto).conditions);
+  let questions = $derived(previewQuestions(auto));
   let current = $derived.by(() => {
     let index = -1;
     preview.log.forEach((entry, i) => {
@@ -42,15 +42,10 @@
     }
   });
 
-  function scenarioOf(name: string): ConditionScenario {
-    return $previewScenario[name] ?? DEFAULT_CONDITION;
-  }
-
-  function setScenario(name: string, change: Partial<ConditionScenario>) {
-    previewScenario.update((scenario) => ({
-      ...scenario,
-      [name]: { ...(scenario[name] ?? DEFAULT_CONDITION), ...change },
-    }));
+  function answerAll(yes: boolean) {
+    previewScenario.set(
+      yes ? {} : Object.fromEntries(questions.map((q) => [questionKey(q.cardId, q.condition), false])),
+    );
   }
 </script>
 
@@ -58,34 +53,31 @@
   <div class="flex items-start justify-between gap-3 border-b border-[#333333] pb-2">
     <div>
       <div class="font-semibold text-gray-100">Preview as</div>
-      <div class="text-[11px] text-gray-500">When each condition turns true in this run. Play below to watch it.</div>
+      <div class="text-[11px] text-gray-500">
+        Is each condition true when its card asks? T fires at once; F lets the time row fire. Play below to watch it.
+      </div>
     </div>
+    {#if questions.length}
+      <div class="flex shrink-0 gap-1">
+        <button type="button" class="path-list-action" onclick={() => answerAll(true)}>All T</button>
+        <button type="button" class="path-list-action" onclick={() => answerAll(false)}>All F</button>
+      </div>
+    {/if}
   </div>
-  {#if auto.registry.conditions.length === 0}
-    <div class="text-[11px] text-gray-500">No registered conditions: every wait runs to its time row.</div>
+  {#if questions.length === 0}
+    <div class="text-[11px] text-gray-500">No card asks a condition: every wait runs to its time row.</div>
   {:else}
     <div class="space-y-1 text-[11px] text-gray-300">
-      {#each auto.registry.conditions as name (name)}
-        {@const sc = scenarioOf(name)}
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 {CELL_CLASS}" class:opacity-60={!used.has(name)}>
-          <label class="flex min-w-32 flex-1 items-center gap-2 font-mono text-gray-100">
-            <input type="checkbox" checked={sc.enabled} onchange={(e) => setScenario(name, { enabled: e.currentTarget.checked })} />
-            {name}
-            {#if !used.has(name)}<span class="font-sans text-gray-500">(unused)</span>{/if}
-          </label>
-          {#if sc.enabled}
-            <span class="text-gray-500">true after</span>
-            <input class="{FIELD_CLASS} !w-16" type="number" min="0" step="0.1" value={sc.seconds} aria-label={`${name}: seconds`}
-              oninput={(e) => { const v = Number(e.currentTarget.value); if (Number.isFinite(v) && v >= 0) setScenario(name, { seconds: v }); }} />
-            <span class="text-gray-500">s from</span>
-            <select class="{FIELD_CLASS} !w-auto" value={sc.from} aria-label={`${name}: counted from`}
-              onchange={(e) => setScenario(name, { from: e.currentTarget.value === "start" ? "start" : "card" })}>
-              <option value="card">the wait's start</option>
-              <option value="start">the Auto's start</option>
-            </select>
-          {:else}
-            <span class="text-gray-500">never true</span>
-          {/if}
+      {#each questions as q (questionKey(q.cardId, q.condition))}
+        <div class="flex items-center gap-2 {CELL_CLASS}" class:opacity-50={!preview.ran.has(q.cardId)}>
+          <button
+            type="button"
+            class="min-w-0 flex-1 truncate text-left text-gray-100 hover:underline"
+            title="Select this card"
+            onclick={() => selectedCardId.set(q.cardId)}>{q.card}</button
+          >
+          {#if !preview.ran.has(q.cardId)}<span class="text-gray-500">not reached</span>{/if}
+          <AnswerChip cardId={q.cardId} condition={q.condition} />
         </div>
       {/each}
     </div>

@@ -1,7 +1,14 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import { loadSample } from "./fixtures/load";
 import { buildPathCatalog } from "./geometry";
-import { AUTO_LENGTH_S, simulateAuto, worstCase, type Scenario } from "./simulate";
+import {
+  AUTO_LENGTH_S,
+  previewQuestions,
+  questionKey,
+  simulateAuto,
+  worstCase,
+  type Scenario,
+} from "./simulate";
 import { findCard } from "./tree";
 import type { AutoSection, FirstOfCard } from "./types";
 
@@ -13,24 +20,71 @@ function run(auto: AutoSection, scenario: Scenario = {}) {
   return { result: simulateAuto(auto, catalog, sample.startPoint, scenario), catalog };
 }
 
-const never = { enabled: false, seconds: 0, from: "card" as const };
+/** Answers false for the given conditions when `cardId` asks them. */
+function no(cardId: string, ...conditions: string[]): Scenario {
+  return Object.fromEntries(conditions.map((name) => [questionKey(cardId, name), false]));
+}
 
-test("a condition that turns true in time picks its row", () => {
-  const { result } = run(loadSample().auto, {
-    HiveTipped: { enabled: true, seconds: 0.9, from: "card" },
-  });
+/** Every question in the Auto answered false. */
+function allNo(auto: AutoSection): Scenario {
+  return Object.fromEntries(previewQuestions(auto).map((q) => [questionKey(q.cardId, q.condition), false]));
+}
+
+test("unanswered questions are true: the happy path, at the moment they are asked", () => {
+  const { result } = run(loadSample().auto);
   assertEqual(result.taken.get("did-tip"), 0);
   assert(result.ran.has("tip-1") && !result.ran.has("near-1"));
   const row = result.log.find((entry) => entry.cardId === "did-tip")!;
-  assert(row.text.includes("If tipped") && row.text.includes("0.90 s"), row.text);
+  assert(row.text.includes("If tipped") && row.text.includes("HiveTipped true"), row.text);
+  // "Wait for LauncherReady" passes at once: no timing to set.
+  const wait = result.log.find((entry) => entry.cardId === "wait-ready")!;
+  const shot = result.log.find((entry) => entry.cardId === "shoot-preload")!;
+  assert(Math.abs(shot.t - wait.t) < 1e-9, `${wait.t} → ${shot.t}`);
 });
 
-test("with the conditions off, the time row fires", () => {
-  const { result } = run(loadSample().auto, { HiveTipped: never, CameraBlind: never });
+test("answered false, the time row fires at its time", () => {
+  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped", "CameraBlind"));
   assertEqual(result.taken.get("did-tip"), 1);
   assert(result.ran.has("near-1") && !result.ran.has("tip-1"));
-  // The nested decision falls through to "otherwise".
-  assertEqual(result.taken.get("near-5"), 2);
+  // Answered true, the row fires the moment it is asked; false, 1500 ms later.
+  const firedAt = (r: typeof result) => r.log.find((e) => e.cardId === "did-tip" && e.kind === "row")!.t;
+  const happy = run(loadSample().auto).result;
+  assert(Math.abs(firedAt(result) - firedAt(happy) - 1.5) < 1e-9, `${firedAt(happy)} → ${firedAt(result)}`);
+});
+
+test("the same condition asked by two cards is two questions", () => {
+  // The HIVE has not tipped at the first decision, and has by the later one.
+  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped", "CameraBlind"));
+  assertEqual(result.taken.get("did-tip"), 1);
+  assertEqual(result.taken.get("near-5"), 0);
+  assert(result.ran.has("late-1"), "Tipped late runs");
+  // Answer the later one false too, and that decision falls through to "otherwise".
+  const both = run(loadSample().auto, {
+    ...no("did-tip", "HiveTipped", "CameraBlind"),
+    ...no("near-5", "HiveTipped"),
+  });
+  assertEqual(both.result.taken.get("near-5"), 2);
+});
+
+test("the questions are listed per card, in the order the Auto asks them", () => {
+  const questions = previewQuestions(loadSample().auto).map((q) => `${q.cardId}:${q.condition}`);
+  assertEqual(questions, [
+    "wait-ready:LauncherReady",
+    "did-tip:HiveTipped",
+    "did-tip:CameraBlind",
+    "tip-2:IntakeFull",
+    "near-2:IntakeFull",
+    "near-5:HiveTipped",
+  ]);
+});
+
+test("a routine's end condition changes what the log says, not when it ends", () => {
+  const yes = run(loadSample().auto).result;
+  const notYet = run(loadSample().auto, no("tip-2", "IntakeFull")).result;
+  const say = (r: typeof yes) => r.log.filter((e) => e.cardId === "tip-2").map((e) => e.text).join(" | ");
+  assert(say(yes).includes("IntakeFull true"), say(yes));
+  assert(say(notYet).includes("IntakeFull not true"), say(notYet));
+  assertEqual(yes.endTime, notYet.endTime);
 });
 
 test("path timing comes from the app's motion model and events land inside the drive", () => {
@@ -61,7 +115,7 @@ test("the endgame guard parks when the time left is down to the park path", () =
   const branch = (findCard(auto.cards, "did-tip") as FirstOfCard).rows[0].cards;
   // A slow shot before the far pickups leaves too little time for them.
   branch.unshift({ id: "slow", kind: "action", name: "ShootAll", previewMs: 22000 });
-  const { result, catalog } = run(auto, { HiveTipped: { enabled: true, seconds: 0.5, from: "card" } });
+  const { result, catalog } = run(auto);
   assert(result.guard, "guard expected");
   const park = catalog.byId.get("far-park")!;
   assert(Math.abs(result.guard.t - (AUTO_LENGTH_S - park.seconds)) < 1e-6, `guard at ${result.guard.t}`);
@@ -79,7 +133,7 @@ test("a wait no row can end stalls the preview and says so", () => {
   const auto = clone(loadSample().auto);
   const wait = findCard(auto.cards, "wait-ready") as FirstOfCard;
   wait.rows = [{ when: ["LauncherReady"], cards: [] }];
-  const { result } = run(auto, { LauncherReady: never });
+  const { result } = run(auto, no("wait-ready", "LauncherReady"));
   assert(result.stalled);
   assert(!result.ran.has("shoot-preload"));
 });
@@ -94,6 +148,6 @@ test("worst case: every wait runs to its time row", () => {
   // "time left < 6 s" cannot win against "otherwise" this early.
   assertEqual(worst.rows.get("near-5")![1], null);
   // The worst case is at least as long as any preview.
-  const { result } = run(auto, { HiveTipped: never, CameraBlind: never, IntakeFull: never, LauncherReady: never });
+  const { result } = run(auto, allNo(auto));
   assert(result.endTime <= worst.total + 1e-9, `${result.endTime} > ${worst.total}`);
 });
