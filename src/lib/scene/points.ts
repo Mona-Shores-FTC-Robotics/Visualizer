@@ -36,6 +36,11 @@ export interface PointMarkerOptions {
    * shows them for the selected path only); end points are always shown.
    */
   controlPointsFor?: Set<string>;
+  /**
+   * Segments whose points are neither drawn nor hit: Auto mode's link paths, whose ends sit on
+   * the spots a branch starts from and would otherwise be grabbed instead of the spot.
+   */
+  hidden?: Set<string>;
 }
 
 function circle(
@@ -100,6 +105,7 @@ export function buildPathPointMarkers(
     container = "main",
     scope = idPrefix,
     controlPointsFor,
+    hidden,
   } = options;
 
   const radius = POINT_RADIUS * radiusScale;
@@ -138,7 +144,7 @@ export function buildPathPointMarkers(
 
   // Markers are drawn per drivable curve, so groups are walked through.
   atomicSegments(lines).forEach((line, idx) => {
-    if (!line || !line.endPoint) return;
+    if (!line || !line.endPoint || hidden?.has(line.id)) return;
     const isSelectedLine = selection?.lineId === line.id;
 
     const handles = !controlPointsFor || controlPointsFor.has(line.id);

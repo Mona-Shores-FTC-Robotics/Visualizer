@@ -192,7 +192,7 @@
   import AutoPreviewSwitches from "./lib/auto/components/AutoPreviewSwitches.svelte";
   import AutoTimeline from "./lib/auto/components/AutoTimeline.svelte";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
-  import { relink } from "./lib/auto/links";
+  import { linkSegmentIds, relink } from "./lib/auto/links";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
   import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
@@ -2824,6 +2824,7 @@
               registry,
               container: "main",
               controlPointsFor: autoActive ? autoHandleSegments : undefined,
+              hidden: autoActive && $autoSection ? linkSegmentIds($autoSection, lines) : undefined,
             }),
             ...buildSelectedPointRing(lines, pointSelection, scales),
           ]),
