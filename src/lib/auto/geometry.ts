@@ -57,6 +57,9 @@ export interface PathCatalog {
   names: Map<string, string>;
   /** The robot settings the times were computed with. */
   settings: Settings;
+  /** What the catalog was built from, for timing several paths as one drive. */
+  startPoint: StartPose;
+  lines: Path[];
 }
 
 /** Names as the Path List shows them: "Path N" counts segments, "Group N" groups. */
@@ -176,7 +179,62 @@ export function buildPathCatalog(
     nestedIds,
     names,
     settings,
+    startPoint,
+    lines,
   };
+}
+
+/** Several paths driven as one: the robot does not stop at the ends between them. */
+export interface ChainInfo {
+  /** Seconds for the whole drive, from rest to rest (with a turn on the spot first, if needed). */
+  seconds: number;
+  /** Travel events, starting at time 0, for every segment of every path. */
+  travel: TimelineEvent[];
+  /** When the robot reaches each path's start and end, relative to the chain's start. */
+  times: Map<string, { t0: number; t1: number }>;
+}
+
+/**
+ * Times `ids` (consecutive top-level paths, in order) as one continuous drive, the way Pedro
+ * follows one compound path: it slows only at the very end. Paths that are not next to each other
+ * in the list cannot be one drive; they are timed one after another instead.
+ */
+export function chainInfo(catalog: PathCatalog, ids: string[]): ChainInfo {
+  const infos = ids.map((id) => catalog.byId.get(id)).filter((info): info is PathInfo => !!info);
+  const consecutive = infos.every((info, i) => i === 0 || info.index === infos[i - 1].index + 1);
+  const times = new Map<string, { t0: number; t1: number }>();
+  if (!consecutive || infos.length < 2) {
+    let t = 0;
+    const travel: TimelineEvent[] = [];
+    for (const info of infos) {
+      travel.push(...info.travel.map((e) => ({ ...e, startTime: e.startTime + t, endTime: e.endTime + t })));
+      times.set(info.id, { t0: t, t1: t + info.seconds });
+      t += info.seconds;
+    }
+    return { seconds: t, travel, times };
+  }
+  const first = infos[0].index;
+  const chainLines = infos.map((info) => catalog.lines[info.index]);
+  const merged: Path = {
+    id: `chain:${ids.join("+")}`,
+    color: chainLines[0].color,
+    kind: "compound",
+    segments: chainLines,
+  } as Path;
+  const lines = [...catalog.lines.slice(0, first), merged, ...catalog.lines.slice(first + infos.length)];
+  const prediction = calculatePathTime(
+    catalog.startPoint,
+    lines,
+    catalog.settings,
+    atomicSegments(chainLines).map((line) => ({ kind: "path" as const, lineId: line.id })),
+  );
+  const travel = prediction.timeline.filter((event) => event.type === "travel");
+  for (const info of infos) {
+    const own = new Set(info.segments.map((segment) => segment.line.id));
+    const mine = travel.filter((event) => event.lineId && own.has(event.lineId));
+    if (mine.length) times.set(info.id, { t0: mine[0].startTime, t1: mine[mine.length - 1].endTime });
+  }
+  return { seconds: prediction.totalTime, travel, times };
 }
 
 /** The point `fraction` (0..1) of the way along the path by distance. */

@@ -12,7 +12,7 @@
     type RowKind,
   } from "../types";
   import type { Shape } from "../../../types";
-  import { findCard, isPlainWait, rowLabel } from "../tree";
+  import { allCards, findCard, isPlainWait, rowLabel } from "../tree";
   import { canMove, duplicateCard, moveCard, removeCard, rowOfKind } from "../edit";
   import { commitAuto, parseSelection, selectedCardId, updateAuto } from "../store";
   import {
@@ -274,6 +274,14 @@
         />
         <span class="font-semibold text-gray-100" title="The endgame guard drives this path when time is short.">Park path</span>
       </label>
+      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-gray-300">
+        <input
+          type="checkbox"
+          checked={!!card.through}
+          onchange={(e) => edit((c) => { if (c.kind === "path") { if (e.currentTarget.checked) c.through = true; else delete c.through; } })}
+        />
+        <span class="font-semibold text-gray-100" title="The robot passes this spot without stopping: this path and the next are one drive.">Drive through (don't stop here)</span>
+      </label>
     <button type="button" class="self-start text-[11px] text-gray-500 hover:text-gray-200" onclick={() => (showMore = !showMore)}>{showMore ? "less ▴" : "more ▾"}</button>
     {#if showMore}
     <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
@@ -300,6 +308,30 @@
       </div>
     </div>
     {/if}
+  {:else if card?.kind === "rejoin"}
+    {@const stops = allCards(auto.cards).filter((c) => c.kind === "path" && !c.through && c.id !== card.id)}
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+      <div class="{CELL_CLASS} col-span-2">
+        <span class={LABEL_CLASS}>Rejoin at the stop</span>
+        <select class={FIELD_CLASS} value={card.target}
+          onchange={(e) => edit((c) => { if (c.kind === "rejoin") c.target = e.currentTarget.value; })}>
+          {#if !stops.some((s) => s.id === card.target)}<option value={card.target}>(choose a stop)</option>{/if}
+          {#each stops as stop (stop.id)}
+            {#if stop.kind === "path"}<option value={stop.id}>{catalog.byId.get(stop.lineId)?.name ?? stop.lineId}</option>{/if}
+          {/each}
+        </select>
+      </div>
+      <div class="{CELL_CLASS} col-span-2">
+        <span class={LABEL_CLASS}>Driving there on</span>
+        <select class={FIELD_CLASS} value={card.lineId}
+          onchange={(e) => edit((c) => { if (c.kind === "rejoin") c.lineId = e.currentTarget.value; })}>
+          {#each catalog.paths.filter((p) => !auto.linkPaths?.includes(p.id)) as path (path.id)}
+            <option value={path.id}>{path.name}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
+    <div class="text-[11px] text-gray-500">After it, this route runs the steps after that stop, shared with the route it joins.</div>
   {:else if card?.kind === "firstOf"}
     <div class={CELL_CLASS}>
       <label class={LABEL_CLASS} for="auto-firstof-label">{isPlainWait(card) ? "Wait name" : "Question"}</label>

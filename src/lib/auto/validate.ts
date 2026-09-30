@@ -1,6 +1,7 @@
 import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { rowKind, type AutoCard, type AutoSection } from "./types";
+import { allCards, rejoinTail } from "./tree";
 import { isUsed, pointUses } from "./pins";
 
 export type IssueLevel = "error" | "warning";
@@ -61,7 +62,7 @@ export function validateAuto(
       warn(park.id, `The park path is not the last card of ${branch.toLowerCase()}; cards after it still run.`);
     }
 
-    for (const card of list) {
+    for (const [index, card] of list.entries()) {
       switch (card.kind) {
         case "action":
           checkAction(card.id, "This action card", card.name);
@@ -85,7 +86,48 @@ export function validateAuto(
               `${path.name} starts ${gap.toFixed(1)} in from where the robot can be (${from.x.toFixed(1)}, ${from.y.toFixed(1)}). Add a path that joins them.`,
             );
           }
+          if (card.through) {
+            const next = list[index + 1];
+            if (next?.kind !== "path") {
+              error(card.id, `${path.name} is a drive-through, so a path must come straight after it in the same route.`);
+            }
+            if (card.park) error(card.id, "The park path cannot be a drive-through: the Auto ends there.");
+          }
           at = [path.end];
+          break;
+        }
+        case "rejoin": {
+          const path = catalog.byId.get(card.lineId);
+          const tail = rejoinTail(auto.cards, card.target);
+          if (!path) error(card.id, "The path this rejoin drives no longer exists.");
+          if (!tail) {
+            error(card.id, "This rejoin's target stop no longer exists; pick the stop to join at.");
+          } else {
+            if (allCards(tail.list.slice(tail.index)).includes(card) || allCards([tail.target]).includes(card)) {
+              error(card.id, "This rejoin joins a stop before itself, so the Auto would loop.");
+            }
+            if (tail.target.through) {
+              error(card.id, "This rejoin joins a drive-through; join at a stop, where the robot stops.");
+            }
+            const targetPath = catalog.byId.get(tail.target.lineId);
+            if (path && targetPath) {
+              const gap = Math.hypot(path.end.x - targetPath.end.x, path.end.y - targetPath.end.y);
+              if (gap > DISCONTINUITY_LIMIT_IN) {
+                warn(card.id, `${path.name} ends ${gap.toFixed(1)} in from the stop it rejoins; end it on the same spot.`);
+              }
+            }
+          }
+          if (index !== list.length - 1) {
+            error(card.id, "A rejoin must be the last step of its route: after it the other route's steps run.");
+          }
+          if (path) {
+            const from = farthest(at, path.start);
+            const gap = Math.hypot(path.start.x - from.x, path.start.y - from.y);
+            if (gap > DISCONTINUITY_LIMIT_IN) {
+              warn(card.id, `${path.name} starts ${gap.toFixed(1)} in from where the robot can be (${from.x.toFixed(1)}, ${from.y.toFixed(1)}).`);
+            }
+            at = [path.end];
+          }
           break;
         }
         case "firstOf": {

@@ -49,24 +49,24 @@ public final class HiveRushAuto {
         Pose parkFar = p.of(124, 28, 0);
 
         // Other poses the paths need (control points, unnamed endpoints).
-        Pose collectNearControl1 = p.of(18, 88, 0);
-        Pose backToShootControl1 = p.of(34, 100, 0);
         Pose toFarPickupsControl1 = p.of(34, 128, 0);
         Pose toFarPickupsControl2 = p.of(98, 134, 0);
-        Pose point4 = p.of(128, 120, 0);
-        Pose point5 = p.of(128, 104, 0);
-        Pose point5Control1 = p.of(134, 112, 0);
+        Pose point2 = p.of(128, 120, 0);
+        Pose point3 = p.of(128, 104, 0);
+        Pose point3Control1 = p.of(134, 112, 0);
         Pose toUpCellShotSegment1Heading = p.of(108, 84, 0);
         Pose toUpCellShotSegment2Start = p.of(108, 84, 0);
         Pose parkFarPathControl1 = p.of(112, 56, 0);
+        Pose collectNearControl1 = p.of(18, 88, 0);
+        Pose backToShootControl1 = p.of(34, 100, 0);
 
         // Paths, written as the stock Visualizer export writes them.
+        Path toFarPickups = Paths.curve(shootSpot, toFarPickupsControl1, toFarPickupsControl2, farPickup).tangent();
+        Path collectFar = Paths.path(Paths.line(farPickup, point2).constant(point2), Paths.curve(point2, point3Control1, point3).constant(point3));
+        Path toUpCellShot = Paths.line(point3, upCellShot).heading(Interpolator.piecewise().until(0.5, Interpolator.constant(toUpCellShotSegment1Heading)).until(1, Interpolator.linear(toUpCellShotSegment2Start, upCellShot)));
+        Path parkFarPath = Paths.curve(upCellShot, parkFarPathControl1, parkFar).tangent();
         Path collectNear = Paths.curve(shootSpot, collectNearControl1, nearPickup).tangent();
         Path backToShoot = Paths.curve(nearPickup, backToShootControl1, shootSpot).constant(shootSpot);
-        Path toFarPickups = Paths.curve(shootSpot, toFarPickupsControl1, toFarPickupsControl2, farPickup).tangent();
-        Path collectFar = Paths.path(Paths.line(farPickup, point4).constant(point4), Paths.curve(point4, point5Control1, point5).constant(point5));
-        Path toUpCellShot = Paths.line(point5, upCellShot).heading(Interpolator.piecewise().until(0.5, Interpolator.constant(toUpCellShotSegment1Heading)).until(1, Interpolator.linear(toUpCellShotSegment2Start, upCellShot)));
-        Path parkFarPath = Paths.curve(upCellShot, parkFarPathControl1, parkFar).tangent();
 
         return kit.sequence(
                 kit.command("SpinUp"),

@@ -1,6 +1,6 @@
 import type { BasePoint } from "../../types";
 import type { PathCatalog } from "./geometry";
-import { childLists, cloneCard, locateCard, makeCardId } from "./tree";
+import { allCards, childLists, cloneCard, locateCard, makeCardId } from "./tree";
 import { createEmptyAuto } from "./normalize";
 import {
   type AutoCard,
@@ -19,7 +19,8 @@ export type NewCardKind =
   | "action"
   | "wait"
   | "decision"
-  | "path";
+  | "path"
+  | "rejoin";
 
 /** Where a new card goes: after the selected card, into a selected branch, or at the end. */
 function insertionPoint(
@@ -172,6 +173,11 @@ export function newCard(
         lineId: (fits ?? catalog.paths[0])?.id ?? "",
         park: false,
       };
+    }
+    case "rejoin": {
+      // Joins the first stop of the main plan until one is picked; the path is picked too.
+      const firstStop = allCards(auto.cards).find((card) => card.kind === "path" && !card.through);
+      return { id: makeCardId(), kind: "rejoin", lineId: catalog.paths[0]?.id ?? "", target: firstStop?.id ?? "" };
     }
   }
 }

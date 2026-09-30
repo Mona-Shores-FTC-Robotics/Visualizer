@@ -231,7 +231,15 @@ function normalizeCard(
         kind: "path",
         lineId,
         park: raw.park === true,
+        ...(raw.through === true ? { through: true } : {}),
       };
+    }
+    case "rejoin": {
+      const lineId = typeof raw.lineId === "string" ? raw.lineId : "";
+      const target = typeof raw.target === "string" ? raw.target : "";
+      if (!lineId) problems.push(`${where} is a rejoin with no lineId.`);
+      if (!target) problems.push(`${where} is a rejoin with no target.`);
+      return { id: cardId(raw, seenIds), kind: "rejoin", lineId, target };
     }
     case "firstOf": {
       const rows: AutoRow[] = [];
@@ -260,7 +268,7 @@ function normalizeCard(
       return null;
     default:
       problems.push(
-        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path and firstOf).`,
+        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path, firstOf and rejoin).`,
       );
       return null;
   }
@@ -332,7 +340,10 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           kind: "path",
           lineId: c.lineId,
           park: c.park,
+          ...(c.through ? { through: true } : {}),
         };
+      case "rejoin":
+        return { id: c.id, kind: "rejoin", lineId: c.lineId, target: c.target };
       case "firstOf":
         return {
           id: c.id,

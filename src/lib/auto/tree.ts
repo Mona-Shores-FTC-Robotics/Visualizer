@@ -122,6 +122,8 @@ export function cardTitle(card: AutoCard, pathName?: string): string {
       return pathName ?? "(missing path)";
     case "firstOf":
       return card.label || "Wait";
+    case "rejoin":
+      return `Rejoin${pathName ? ` via ${pathName}` : ""}`;
   }
 }
 
@@ -135,4 +137,16 @@ export function listLabel(parent: { card: AutoCard; rowIndex: number } | null): 
 /** True when no row has cards: shown as a "Wait for" card, not a decision. */
 export function isPlainWait(card: FirstOfCard): boolean {
   return card.rows.every((row) => row.cards.length === 0);
+}
+
+/**
+ * Where a rejoin continues: the list holding its target stop and the index after it. Null when the
+ * target is missing or not a path card.
+ */
+export function rejoinTail(cards: AutoCard[], targetId: string): { list: AutoCard[]; index: number; target: PathCard } | null {
+  const location = locateCard(cards, targetId);
+  if (!location) return null;
+  const target = location.list[location.index];
+  if (target.kind !== "path") return null;
+  return { list: location.list, index: location.index + 1, target };
 }

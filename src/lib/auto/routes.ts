@@ -1,7 +1,7 @@
 import type { StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { AUTO_LENGTH_S, simulateAuto, switchKey, type Scenario } from "./simulate";
-import { isPlainWait, rowLabel } from "./tree";
+import { isPlainWait, rejoinTail, rowLabel } from "./tree";
 import type { AutoCard, AutoSection, FirstOfCard } from "./types";
 
 /**
@@ -31,17 +31,23 @@ export interface Route {
 
 /** Every route through the Auto, in the order the list shows them (✓ before ✗ at each wait). */
 export function enumerateRoutes(auto: AutoSection): Route[] {
-  const suffixes = (list: AutoCard[], from: number): RouteChoice[][] => {
+  const suffixes = (list: AutoCard[], from: number, depth = 0): RouteChoice[][] => {
     for (let i = from; i < list.length; i++) {
       const card = list[i];
+      if (card.kind === "rejoin") {
+        // The rest is the target route's, from after the stop it joins at.
+        const tail = rejoinTail(auto.cards, card.target);
+        if (!tail || depth > 20) return [[]];
+        return suffixes(tail.list, tail.index, depth + 1);
+      }
       if (card.kind !== "firstOf" || isPlainWait(card)) continue;
       const out: RouteChoice[][] = [];
       const order = rowOrder(card);
       for (const rowIndex of order) {
         const row = card.rows[rowIndex];
         const choice: RouteChoice = { cardId: card.id, rowIndex, fired: "when" in row, label: rowLabel(row) };
-        for (const inside of suffixes(row.cards, 0)) {
-          for (const after of suffixes(list, i + 1)) out.push([choice, ...inside, ...after]);
+        for (const inside of suffixes(row.cards, 0, depth)) {
+          for (const after of suffixes(list, i + 1, depth)) out.push([choice, ...inside, ...after]);
         }
       }
       return out;

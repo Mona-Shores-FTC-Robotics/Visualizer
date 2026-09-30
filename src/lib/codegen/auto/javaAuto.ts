@@ -7,9 +7,13 @@ import { camelCase, isReservedWord, sanitizeIdentifier } from "../identifiers";
 import type { HeadingCall, InterpolatorRef, PathExpr, PoseDecl } from "../types";
 import { buildPathCatalog, type PathCatalog } from "../../auto/geometry";
 import { validateAuto } from "../../auto/validate";
+import { relink } from "../../auto/links";
 import {
   allCards,
   isPlainWait,
+  listLabel,
+  locateCard,
+  rejoinTail,
   parkCardOf,
   rowLabel,
   usedNames,
@@ -240,7 +244,9 @@ const sameAngle = (a: number, b: number) =>
 // --- the generator ------------------------------------------------------------
 
 export function generateAutoJava(input: AutoExportInput): AutoExportResult {
-  const { auto, startPoint, lines, settings } = input;
+  const { auto, startPoint, settings } = input;
+  // Lay the paths out as the editor does, so a file straight from disk exports the same.
+  const lines = relink(startPoint, input.lines, auto, settings).lines;
   const catalog: PathCatalog = buildPathCatalog(startPoint, lines, settings);
   const issues = validateAuto(auto, catalog, startPoint);
   const errors = issues.filter((issue) => issue.level === "error").map((issue) => issue.message);
@@ -259,7 +265,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const pointDecls: { varName: string; point: NamedPoint }[] = [];
   for (const [name, point] of Object.entries(auto.points)) {
     if (!isUsed(uses.get(name))) continue;
-    const varName = names.take(camelCase(sanitizeIdentifier(name, "point")));
+    const varName = names.take(camelCase(sanitizeIdentifier(lowerShouting(name), "point")));
     pointVars.set(name, varName);
     pointDecls.push({ varName, point });
   }
@@ -268,7 +274,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const cards = allCards(auto.cards);
   const referenced = new Set<number>();
   for (const card of cards) {
-    if (card.kind !== "path") continue;
+    if (card.kind !== "path" && card.kind !== "rejoin") continue;
     const info = catalog.byId.get(card.lineId);
     if (info) referenced.add(info.index);
   }
@@ -279,6 +285,19 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   usedIndices.forEach((index) =>
     collectVars(model.paths[index].expression, usedVars, headingVars),
   );
+
+  // Poses named after a path (its control points) follow the path's Java name.
+  const prefixes = catalog.paths
+    .map((info) => ({
+      raw: camelCase(sanitizeIdentifier(info.name, "path")),
+      nice: camelCase(sanitizeIdentifier(lowerShouting(info.name), "path")),
+    }))
+    .filter((p) => p.raw !== p.nice)
+    .sort((a, b) => b.raw.length - a.raw.length);
+  const niceName = (name: string) => {
+    const hit = prefixes.find((p) => name.startsWith(p.raw));
+    return hit ? hit.nice + name.slice(hit.raw.length) : name;
+  };
 
   // A pose that sits on a named point becomes that point, unless the heading
   // it carries matters and differs from the point's.
@@ -296,7 +315,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       poseRename.set(pose.varName, named.varName);
       continue;
     }
-    const varName = names.take(pose.varName);
+    const varName = names.take(niceName(pose.varName));
     poseRename.set(pose.varName, varName);
     poseDecls.push({ ...pose, varName });
   }
@@ -310,7 +329,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   let usesInterpolator = false;
   for (const index of usedIndices) {
     const info = catalog.paths.find((path) => path.index === index)!;
-    const base = camelCase(sanitizeIdentifier(info.name, "path"));
+    const base = camelCase(sanitizeIdentifier(lowerShouting(info.name), "path"));
     const varName = names.take(names.has(base) ? `${base}Path` : base);
     pathVars.set(index, varName);
     const decl = model.paths[index];
@@ -345,11 +364,60 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
             : [javaString(firstOfLabel(card))],
           children: card.rows.map(rowNode),
         };
+      case "rejoin": {
+        const { info, varName } = pathOf(card.lineId);
+        return `kit.path(${javaString(info.name)}, ${varName})`;
+      }
     }
   };
 
+  // Rejoined tails: the steps after a stop that a rejoin joins at are one Supplier both routes
+  // call, not a copy. Declared shortest first, since a longer tail may call a shorter one.
+  const tailVars = new Map<string, string>();
+  const tailDecls: { varName: string; targetId: string; size: number }[] = [];
+  for (const card of cards) {
+    if (card.kind !== "rejoin" || tailVars.has(card.target)) continue;
+    const tail = rejoinTail(auto.cards, card.target);
+    if (!tail) continue;
+    const spot = auto.pathEnds[catalog.byId.get(tail.target.lineId)?.endSegmentId ?? ""];
+    const base = `after${pascal(spot ?? catalog.byId.get(tail.target.lineId)?.name ?? "Stop")}`;
+    const varName = names.take(base);
+    tailVars.set(card.target, varName);
+    tailDecls.push({ varName, targetId: card.target, size: allCards(tail.list.slice(tail.index)).length });
+  }
+  tailDecls.sort((a, b) => a.size - b.size);
+
   const listNodes = (list: AutoCard[], label: string): JNode[] => {
-    const nodes = list.map(cardNode);
+    const nodes: JNode[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const card = list[i];
+      if (card.kind === "path" && card.through) {
+        // A drive-through chain: one Pedro path, so the robot does not stop between them.
+        const chain = [card];
+        while (chain[chain.length - 1].through && list[i + chain.length]?.kind === "path") {
+          chain.push(list[i + chain.length] as typeof card);
+        }
+        if (chain.length > 1) {
+          const parts = chain.map((c) => pathOf(c.lineId));
+          nodes.push(
+            `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}))`,
+          );
+          i += chain.length - 1;
+          const last = chain[chain.length - 1];
+          if (tailVars.has(last.id)) {
+            nodes.push(`${tailVars.get(last.id)}.get()`);
+            break;
+          }
+          continue;
+        }
+      }
+      nodes.push(cardNode(card));
+      if (card.kind === "rejoin" && tailVars.has(card.target)) nodes.push(`${tailVars.get(card.target)}.get()`);
+      if (tailVars.has(card.id)) {
+        nodes.push(`${tailVars.get(card.id)}.get()`);
+        break;
+      }
+    }
     const park = parkCardOf(list);
     if (!park) return nodes;
     const { info, varName } = pathOf(park.lineId);
@@ -386,6 +454,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "import com.pedropathing.paths.Path;",
   );
   if (usesInterpolator) out.push("import com.pedropathing.paths.interpolator.Interpolator;");
+  if (tailDecls.length > 0) out.push("", "import java.util.function.Supplier;");
   out.push("", "import org.firstinspires.ftc.teamcode.autokit.AutoKit;", "");
   out.push(
     "/**",
@@ -437,6 +506,19 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     out.push("", "        // Paths, written as the stock Visualizer export writes them.");
     out.push(...pathDecls);
   }
+  if (tailDecls.length > 0) {
+    out.push("", "        // Steps two routes share: a rejoin runs them from the stop it joins at.");
+    for (const decl of tailDecls) {
+      const tail = rejoinTail(auto.cards, decl.targetId)!;
+      const location = locateCard(auto.cards, decl.targetId)!;
+      const body: JNode = {
+        head: "kit.sequence",
+        args: [],
+        children: listNodes(tail.list.slice(tail.index), listLabel(location.parent)),
+      };
+      out.push(`        Supplier<Command> ${decl.varName} = () -> ${printNode(body, 8)};`);
+    }
+  }
   const top: JNode = {
     head: "kit.sequence",
     args: [],
@@ -454,6 +536,32 @@ export function firstOfLabel(card: FirstOfCard): string {
     return when ? `Wait for ${when.when.join(" or ")}` : "Wait";
   }
   return "Decision";
+}
+
+/**
+ * `LEFT_FLOWER` → `Left Flower`, `to LEFT_FLOWER` → `to Left Flower`: all-capital words become
+ * capitalised, so a spot named the field's way reads as a Java name (`leftFlower`, not
+ * `lEFTFLOWER`). Other names are left as they are.
+ */
+function lowerShouting(text: string): string {
+  return text
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((word, i) =>
+      /^[A-Z0-9]{2,}$/.test(word) && /[A-Z]/.test(word)
+        ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        : i === 0
+          ? word
+          : word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join("");
+}
+
+/** `LEFT_FLOWER` or `to left flower` → `LeftFlower`. */
+function pascal(text: string): string {
+  const words = text.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const name = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+  return /^[A-Za-z]/.test(name) ? name : `Stop${name}`;
 }
 
 // Java reads \u escapes even inside comments, so keep backslashes out of them.

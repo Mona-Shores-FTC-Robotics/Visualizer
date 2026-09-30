@@ -97,6 +97,11 @@ export function relink(
         if (!line || oldLinks.has(line.id)) continue;
         if (!placed.has(line.id)) place(line, here.at, here.headingDeg);
         here = { at: { ...endOf(line) }, headingDeg: endHeading.get(line.id) ?? here.headingDeg };
+      } else if (card.kind === "rejoin") {
+        const line = byId.get(card.lineId);
+        if (!line || oldLinks.has(line.id)) continue;
+        if (!placed.has(line.id)) place(line, here.at, here.headingDeg);
+        here = { at: { ...endOf(line) }, headingDeg: endHeading.get(line.id) ?? here.headingDeg };
       } else if (card.kind === "firstOf") {
         const ends = card.rows.map((row) => visit(row.cards, here));
         // With no cards on any row the robot has not moved; otherwise the rest of the list runs

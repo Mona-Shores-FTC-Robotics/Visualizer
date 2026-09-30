@@ -1,6 +1,6 @@
 import type { BasePoint, StartPose, TimelineEvent } from "../../types";
-import { pointAlong, type PathCatalog, type PathInfo } from "./geometry";
-import { allCards, cardTitle, describeRow, isPlainWait, parkCardOf, rowLabel } from "./tree";
+import { chainInfo, pointAlong, type PathCatalog, type PathInfo } from "./geometry";
+import { allCards, cardTitle, describeRow, isPlainWait, parkCardOf, rejoinTail, rowLabel } from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import {
   DEFAULT_TIMEOUT_S,
@@ -146,6 +146,9 @@ interface Guard {
 }
 
 type Signal = { abortTo: Guard } | null;
+
+/** How many rejoins one preview follows before calling it a loop. */
+const MAX_REJOINS = 20;
 
 /** Seconds the endgame guard reserves for a park path. */
 export function guardSeconds(path: PathInfo): number {
@@ -342,7 +345,81 @@ export function simulateAuto(
       }
       case "firstOf":
         return runFirstOf(card, guards);
+      case "rejoin": {
+        const own: PathCard = { id: card.id, kind: "path", lineId: card.lineId, park: false };
+        const signal = runCard(own, guards);
+        if (signal) return signal;
+        const tail = rejoinTail(auto.cards, card.target);
+        if (!tail) {
+          note("Rejoin: its target stop is missing", "warn", card.id);
+          return null;
+        }
+        if (++rejoins > MAX_REJOINS) {
+          note("Rejoin: the routes loop; stopped", "warn", card.id);
+          stalled = true;
+          return null;
+        }
+        note(`Rejoin at ${pathName(tail.target.lineId)}`, "row", card.id);
+        return runList(tail.list.slice(tail.index), guards, `Rejoined at ${pathName(tail.target.lineId)}`);
+      }
     }
+  };
+
+  const pathName = (lineId: string) => catalog.byId.get(lineId)?.name ?? lineId;
+  let rejoins = 0;
+
+  /** Drive a chain of paths as one: the robot passes the ends between them without stopping. */
+  const runChain = (cards: PathCard[], guards: Guard[]): Signal => {
+    if (cards.some((card) => !catalog.byId.get(card.lineId))) {
+      for (const card of cards) {
+        const signal = runCard(card, guards);
+        if (signal) return signal;
+      }
+      return null;
+    }
+    cards.forEach((card) => ran.add(card.id));
+    const chain = chainInfo(catalog, cards.map((card) => card.lineId));
+    const t0 = t;
+    const deadline = pendingDeadline(guards);
+    const cut = !!deadline && deadline.deadline < t0 + chain.seconds - 1e-9;
+    const stop = cut && deadline ? Math.max(0, deadline.deadline - t0) : chain.seconds;
+    for (const event of chain.travel) {
+      if (event.startTime >= stop - 1e-9) break;
+      const end = Math.min(event.endTime, stop);
+      timeline.push({ ...event, startTime: event.startTime + t0, endTime: end + t0, duration: end - event.startTime });
+    }
+    for (const [i, card] of cards.entries()) {
+      const path = catalog.byId.get(card.lineId)!;
+      const at = chain.times.get(path.id) ?? { t0: 0, t1: 0 };
+      if (at.t0 >= stop - 1e-9) break;
+      note(`Drive ${path.name}${i < cards.length - 1 ? " · through" : ""}${card.park ? " · park" : ""}`, "card", card.id, t0 + at.t0);
+      drives.push({ cardId: card.id, pathId: path.id, t0: t0 + at.t0, t1: t0 + Math.min(at.t1, stop) });
+      if (at.t1 > stop + 1e-9) {
+        const fraction = at.t1 > at.t0 ? (stop - at.t0) / (at.t1 - at.t0) : 1;
+        pos = pointAlong(path, fraction);
+      } else {
+        pos = { ...path.end };
+        heading = path.endHeadingDeg;
+      }
+    }
+    t = t0 + stop;
+    if (cut && deadline) {
+      note("Drive-through: stopped by the endgame guard", "warn", cards[0].id);
+      return { abortTo: deadline };
+    }
+    return null;
+  };
+
+  /** The drive-through chain starting at `list[index]`: that path and the ones it drives on into. */
+  const chainFrom = (list: AutoCard[], index: number): PathCard[] => {
+    const chain: PathCard[] = [];
+    for (let i = index; i < list.length; i++) {
+      const card = list[i];
+      if (card.kind !== "path") break;
+      chain.push(card);
+      if (!card.through) break;
+    }
+    return chain;
   };
 
   const runList = (list: AutoCard[], outer: Guard[], label: string): Signal => {
@@ -360,7 +437,8 @@ export function simulateAuto(
         : null;
     const guards = own ? [...outer, own] : outer;
 
-    for (const card of list) {
+    for (let i = 0; i < list.length; i++) {
+      const card = list[i];
       if (stalled) return null;
       if (card === parkCard && own) {
         own.parked = true;
@@ -376,7 +454,10 @@ export function simulateAuto(
         }
         return { abortTo: due };
       }
-      const signal = runCard(card, guards);
+      const chain = card.kind === "path" && card.through ? chainFrom(list, i) : [];
+      if (chain.length > 1) i += chain.length - 1;
+      if (chain.length > 1 && own && chain.includes(parkCard!)) own.parked = true;
+      const signal = chain.length > 1 ? runChain(chain, own?.parked ? outer : guards) : runCard(card, guards);
       if (signal) {
         if (signal.abortTo === own && own) {
           park(own);
@@ -445,13 +526,28 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
     rows.set(id, list);
   };
 
+  let depth = 0;
   const endOf = (list: AutoCard[], start: number, index: number, rest: (t: number) => number): number => {
     let t = start;
     for (let i = index; i < list.length; i++) {
       const card = list[i];
       if (card.kind === "action") t += commandSeconds(auto, card);
-      else if (card.kind === "path") t += catalog.byId.get(card.lineId)?.seconds ?? 0;
-      else {
+      else if (card.kind === "path") {
+        // A drive-through chain is one drive.
+        const ids = [card.lineId];
+        let j = i;
+        while (list[j]?.kind === "path" && (list[j] as { through?: boolean }).through && list[j + 1]?.kind === "path") {
+          j++;
+          ids.push((list[j] as { lineId: string }).lineId);
+        }
+        t += ids.length > 1 ? chainInfo(catalog, ids).seconds : catalog.byId.get(card.lineId)?.seconds ?? 0;
+        i = j;
+      } else if (card.kind === "rejoin") {
+        t += catalog.byId.get(card.lineId)?.seconds ?? 0;
+        const tail = rejoinTail(auto.cards, card.target);
+        if (!tail || ++depth > MAX_REJOINS) return rest(t);
+        return endOf(tail.list, t, tail.index, (x) => x);
+      } else {
         const limit = waitLimit(card, t);
         if (!Number.isFinite(limit)) return Infinity;
         const after = (end: number) => endOf(list, end, i + 1, rest);

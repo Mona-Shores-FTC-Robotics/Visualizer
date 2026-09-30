@@ -1,9 +1,18 @@
 # Sample Autos
 
-**Open in the Visualizer:** [spot map](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-spot-map) · [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
+**Open in the Visualizer:** [RightStartTip](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=right-start-tip) · [spot map](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-spot-map) · [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
 
 These sample links open the files in this folder as last deployed, so they never go stale. Each
 opens as a shared copy: change anything, and "Save as new file" keeps your version.
+
+## `right-start-tip.pp`
+
+The design's sample Auto (the route view's mockups use it), on the v1 spots. From RIGHT_START:
+**LaunchAll · wait for Tip ≤4 s**. ✓: drive through both HIVE entrances to LEFT_FLOWER in one
+drive, collect, shoot at LEFT_SHOT and wait for the tip back (✓ park in the LEFT LOADING ZONE, ✗
+the other FLOWER first). Timed out: collect in the GARDEN, shoot from RIGHT_SHOT and check again:
+✓ **rejoins the main plan at LEFT_FLOWER** (the steps after it are shared, not copied), ✗ parks
+in the RIGHT LOADING ZONE. LEFT_SHOT, RIGHT_SHOT and YOUR_WALL_SHOT are placeholder spots.
 
 ## `red-spot-map.pp`
 

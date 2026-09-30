@@ -4,7 +4,7 @@
   import type { PreviewResult, WorstCase } from "../simulate";
   import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
   import type { AutoCard, AutoSection, FirstOfCard } from "../types";
-  import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel } from "../tree";
+  import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel, rejoinTail } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
   import { insertNewCard, moveCard, removeCard, canMove, type NewCardKind } from "../edit";
   import {
@@ -192,6 +192,7 @@
           <span class="auto-icon auto-icon--path" aria-hidden="true">↝</span>
           <span class="list-item-name">{pathName(card.lineId)}</span>
           {#if card.park}<span class="auto-tag">park</span>{/if}
+          {#if card.through}<span class="auto-tag">through</span>{/if}
         {:else if card.kind === "firstOf"}
           <span
             class="auto-icon"
@@ -200,6 +201,10 @@
             aria-hidden="true">{isPlainWait(card) ? "⏳" : "◆"}</span
           >
           <span class="list-item-name">{card.label || (isPlainWait(card) ? "Wait for" : "Decision")}</span>
+        {:else}
+          {@const tail = rejoinTail(auto.cards, card.target)}
+          <span class="auto-icon auto-icon--path" aria-hidden="true">↻</span>
+          <span class="list-item-name">Rejoin at {tail ? pathName(tail.target.lineId) : "?"}</span>
         {/if}
         {#if level}
           <span class="auto-flag auto-flag--{level}" title={level === "error" ? "Blocks the Java export" : "Warning"}
@@ -218,6 +223,8 @@
           {:else}
             <span class="auto-bad">path not found</span>
           {/if}
+        {:else if card.kind === "rejoin"}
+          via {pathName(card.lineId)} · then the steps after that stop
         {:else if card.kind === "firstOf"}
           {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}
         {/if}
@@ -337,6 +344,7 @@
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
     <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
     <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is">+ Path</button>
+    <button type="button" class="path-list-action" onclick={() => add("rejoin")} title="End this route by joining another at one of its stops">+ Rejoin</button>
   </div>
 
   <div class="module-list" role="list">

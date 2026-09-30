@@ -76,8 +76,10 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 | `kind` | Fields | Meaning |
 |---|---|---|
 | `action` | `name`, `timeoutS?`, `previewMs?` | Runs a registered **command** (the editor calls it that; the file keeps the key `action`). On the robot it runs until it finishes or `timeoutS` (default 5 s), exported as `kit.command(name[, timeoutS])`. The preview uses the command's typical time from `registry.typicalS`, else `previewMs` (older files), else instant, never past the timeout. |
-| `path` | `lineId`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `park`: this is the branch's park path for the endgame guard. Nothing runs while it drives. |
+| `path` | `lineId`, `park`, `through`? | Drives an existing path. `through`: the robot drives through this path's end without stopping, so it and the paths after it (up to the first without `through`) are one drive, exported as one Pedro path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `park`: this is the branch's park path for the endgame guard. Nothing runs while it drives. |
 | `firstOf` | `label`, `rows`, `alongside`? | **Wait for a trigger, at most a time**: exactly one `when` row and one `afterMs` row. With no cards on either row it is a plain **Wait for**; with cards each row holds the rest of its route (a **decision**). `alongside` names a command run *while* it waits ("LaunchAll · wait for Tip"): it starts with the wait and is stopped when a row fires, if still running. |
+
+| `rejoin` | `lineId`, `target` | Ends a route by joining another at one of its stops: drives `lineId` (from where the robot is to the spot the target stop ends on), then runs the steps after the target path card in its list. Those steps are shared by both routes. Must be the last step of its route; the target must be a stop (a path card that is not a drive-through) and not lead back to the rejoin. |
 
 Older files may hold `routine`, `goTo` and `together` cards, commands while driving (`while`,
 `events`) and other row kinds (`timeLeftBelowS`, `otherwise`, `nearPoint`, `inArea`,
@@ -174,6 +176,12 @@ contract with the robot's `autokit` library:
 - the cards become one `kit.sequence(...)`; a `firstOf` becomes
   `kit.firstOf(label, rows...)`, or `kit.firstOf(label, kit.command(name), rows...)` with
   `alongside`; a row with cards is `kit.when(...).then(...)` or `kit.afterMs(...).then(...)`;
+- a drive-through chain is one `kit.path("A → B → C", Paths.path(a, b, c))`;
+- the steps after a stop that a rejoin joins at are one local
+  `Supplier<Command> after<Spot> = () -> kit.sequence(...)`, declared before the Auto and called
+  (`after<Spot>.get()`) by the route that stops there and by the rejoin, so they are written once;
+- the export lays the paths out as the editor does (link paths included) before writing, so a
+  file straight from disk exports the same;
 - a list that directly contains a park card is wrapped
   `kit.guarded(label, parkPath, seconds, cards...)`, where `seconds` is the
   park path's drive time by the preview's motion model, rounded **up** to

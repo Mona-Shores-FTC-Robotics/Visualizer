@@ -53,6 +53,24 @@ export interface PathCard {
   lineId: string;
   /** The branch's park path, used by the endgame guard. */
   park: boolean;
+  /**
+   * Drive through this path's end without stopping: it and the paths after it, up to the first
+   * that is not a drive-through, are one continuous drive (one Pedro path).
+   */
+  through?: boolean;
+}
+
+/**
+ * Ends a route by joining another: drives `lineId` (from wherever the robot is to the spot the
+ * target stop ends on), then runs everything after the target stop in its list. The target is a
+ * path card; the steps after it are shared by both routes, not copied.
+ */
+export interface RejoinCard {
+  id: string;
+  kind: "rejoin";
+  lineId: string;
+  /** The path card (stop) whose spot this route joins at. */
+  target: string;
 }
 
 /**
@@ -73,7 +91,7 @@ export interface FirstOfCard {
   alongside?: string;
 }
 
-export type AutoCard = ActionCard | PathCard | FirstOfCard;
+export type AutoCard = ActionCard | PathCard | FirstOfCard | RejoinCard;
 export type AutoCardKind = AutoCard["kind"];
 
 interface RowCommon {
