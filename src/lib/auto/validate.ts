@@ -36,9 +36,9 @@ export function validateAuto(
     issues.push({ level: "warning", cardId, message, rowIndex });
 
   const checkAction = (cardId: string, what: string, name: string) => {
-    if (!name) error(cardId, `${what} has no action chosen.`);
+    if (!name) error(cardId, `${what} has no command chosen.`);
     else if (!actions.has(name))
-      error(cardId, `${what} uses "${name}", which is not a registered action.`);
+      error(cardId, `${what} uses "${name}", which is not in the robot's list of commands.`);
   };
 
   // The robot may reach a card from several places (one per branch of an
@@ -118,10 +118,10 @@ export function validateAuto(
             if (kind === "when") {
               const names = (row as { when: string[] }).when;
               if (names.length === 0)
-                error(card.id, `Row ${rowIndex + 1} has no condition chosen.`, rowIndex);
+                error(card.id, `Row ${rowIndex + 1} has no trigger chosen.`, rowIndex);
               names.forEach((condition) => {
                 if (!conditions.has(condition))
-                  error(card.id, `Row ${rowIndex + 1} uses "${condition}", which is not a registered condition.`, rowIndex);
+                  error(card.id, `Row ${rowIndex + 1} uses "${condition}", which is not in the robot's list of triggers.`, rowIndex);
               });
             }
             if (kind === "nearPoint") {
@@ -147,9 +147,9 @@ export function validateAuto(
             error(card.id, card.routine ? `Routine "${card.routine}" is not defined.` : "No routine chosen.");
           } else {
             if (routine.steps.length === 0) error(card.id, `Routine "${card.routine}" has no steps.`);
-            if (!routine.endsWhen) error(card.id, `Routine "${card.routine}" needs a condition that ends it.`);
+            if (!routine.endsWhen) error(card.id, `Routine "${card.routine}" needs a trigger that ends it.`);
             else if (!conditions.has(routine.endsWhen))
-              error(card.id, `Routine "${card.routine}" ends on "${routine.endsWhen}", which is not a registered condition.`);
+              error(card.id, `Routine "${card.routine}" ends on "${routine.endsWhen}", which is not in the robot's list of triggers.`);
             routine.while.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (while)`, name));
             routine.exit.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (on exit)`, name));
           }

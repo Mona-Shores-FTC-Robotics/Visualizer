@@ -18,11 +18,11 @@ public final class RedGardenNoTurretAuto {
     /** The .pp file this was generated from. */
     public static final String SOURCE = "red-garden-no-turret.pp";
 
-    /** Registered robot actions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] ACTIONS = {"IntakeOff", "IntakeOn", "ShootAll"};
+    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
+    public static final String[] COMMANDS = {"IntakeOff", "IntakeOn", "LaunchAll"};
 
-    /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] CONDITIONS = {"IntakeFull", "Tip1"};
+    /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
+    public static final String[] TRIGGERS = {"HiveLeftGarden", "IntakeFull"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -84,28 +84,28 @@ public final class RedGardenNoTurretAuto {
         Path toParkPath = Paths.line(flowerShot, toPark).constant(toPark);
 
         return kit.sequence(
-                kit.action("ShootAll"),
+                kit.command("LaunchAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("Tip1").then(
+                        kit.when("HiveLeftGarden").then(
                                 kit.guarded("If tipped", toParkPath, 1.6,
-                                        kit.action("IntakeOn"),
+                                        kit.command("IntakeOn"),
                                         kit.path("Pass1Ahead", pass1Ahead),
                                         kit.path("Pass1Back", pass1Back),
                                         kit.path("Pass2Left", pass2Left),
                                         kit.path("Pass2Back", pass2Back),
-                                        kit.action("IntakeOff"),
+                                        kit.command("IntakeOff"),
                                         kit.path("ToHiveEntrance", toHiveEntrance),
                                         kit.path("UnderHive", underHive),
                                         kit.path("ClearToTurn", clearToTurnPath),
                                         kit.path("TurnToLoadingCell", turnToLoadingCell),
-                                        kit.action("ShootAll"),
+                                        kit.command("LaunchAll"),
                                         kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),
                                         kit.firstOf("Take 4 POLLEN from the RED_LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
-                                        kit.action("IntakeOff"),
+                                        kit.command("IntakeOff"),
                                         kit.path("TurnToLoadingCellAgain", turnToLoadingCellAgain),
-                                        kit.action("ShootAll"),
+                                        kit.command("LaunchAll"),
                                         kit.path("ToPark", toParkPath))),
                         kit.afterMs(5000).then(
                                 kit.guarded("If not tipped", gardenToParkPath, 2.1,
@@ -114,9 +114,9 @@ public final class RedGardenNoTurretAuto {
                                         kit.firstOf("Take 4 POLLEN from the RED_GARDEN FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
-                                        kit.action("IntakeOff"),
+                                        kit.command("IntakeOff"),
                                         kit.path("TurnToGardenCell", turnToGardenCell),
-                                        kit.action("ShootAll"),
+                                        kit.command("LaunchAll"),
                                         kit.path("GardenToPark", gardenToParkPath)))));
     }
 }

@@ -4,6 +4,7 @@
   import type { PreviewResult, WorstCase } from "../simulate";
   import { AUTO_LENGTH_S } from "../simulate";
   import {
+    DEFAULT_TIMEOUT_S,
     rowKind,
     type AutoCard,
     type AutoRow,
@@ -225,21 +226,27 @@
   {#if card?.kind === "action"}
     <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
       <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Action</span>
-        {@render nameSelect(card.name, actions, "an action", (name) => edit((c) => { if (c.kind === "action") c.name = name; }))}
+        <span class={LABEL_CLASS}>Command</span>
+        {@render nameSelect(card.name, actions, "a command", (name) => edit((c) => { if (c.kind === "action") c.name = name; }))}
       </div>
       <div class={CELL_CLASS}>
-        <label class={LABEL_CLASS} for="auto-action-ms" title="Only the preview uses this; on the robot the action takes as long as it takes.">Preview time (ms)</label>
+        <label class={LABEL_CLASS} for="auto-command-timeout"
+          title="The robot cuts the command off after this long if it has not finished.">Timeout (s)</label>
         <input
-          id="auto-action-ms"
+          id="auto-command-timeout"
           class={FIELD_CLASS}
           type="number"
-          min="0"
-          step="100"
-          value={card.previewMs ?? 0}
-          oninput={(e) => edit((c) => { if (c.kind === "action") { const ms = numberOr(e.currentTarget.value, 0); if (ms > 0) c.previewMs = ms; else delete c.previewMs; } }, false)}
+          min="0.1"
+          step="0.5"
+          value={card.timeoutS ?? DEFAULT_TIMEOUT_S}
+          oninput={(e) => edit((c) => { if (c.kind === "action") { const s = numberOr(e.currentTarget.value, DEFAULT_TIMEOUT_S); if (s > 0 && s !== DEFAULT_TIMEOUT_S) c.timeoutS = s; else delete c.timeoutS; } }, false)}
           onchange={commitAuto}
         />
+        <span class="text-[10px] text-gray-500">
+          {auto.registry.typicalS?.[card.name] !== undefined
+            ? `typically ${auto.registry.typicalS[card.name]} s`
+            : "typical time not in the robot's list"}
+        </span>
       </div>
     </div>
   {:else if card?.kind === "path"}

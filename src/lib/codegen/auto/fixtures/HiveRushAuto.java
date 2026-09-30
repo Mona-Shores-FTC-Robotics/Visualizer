@@ -19,11 +19,11 @@ public final class HiveRushAuto {
     /** The .pp file this was generated from. */
     public static final String SOURCE = "hive-rush.pp";
 
-    /** Registered robot actions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] ACTIONS = {"IntakeOff", "IntakeOn", "ShootAll", "SpinDown", "SpinUp"};
+    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
+    public static final String[] COMMANDS = {"IntakeOff", "IntakeOn", "ShootAll", "SpinDown", "SpinUp"};
 
-    /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] CONDITIONS = {"CameraBlind", "HiveTipped", "IntakeFull", "LauncherReady"};
+    /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
+    public static final String[] TRIGGERS = {"CameraBlind", "HiveTipped", "IntakeFull", "LauncherReady"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "BLUE";
@@ -78,17 +78,17 @@ public final class HiveRushAuto {
         Path collectFarPattern = Paths.path(Paths.line(farPickup, collectFarPatternP1).constant(farPickup), Paths.curve(collectFarPatternP1, collectFarPatternC2, collectFarPatternP2).constant(farPickup));
 
         return kit.sequence(
-                kit.action("SpinUp"),
+                kit.command("SpinUp"),
                 kit.firstOf("Wait for LauncherReady",
                         kit.when("LauncherReady"),
                         kit.afterMs(800)),
-                kit.action("ShootAll"),
+                kit.command("ShootAll"),
                 kit.firstOf("Did the HIVE tip?",
                         kit.when("HiveTipped", "CameraBlind").then(
                                 kit.guarded("If tipped", parkFarPath, 2.1,
                                         kit.path("ToFarPickups", toFarPickups, new String[] {"SpinDown"}, AutoKit.at(0.6, "IntakeOn")),
                                         kit.routine("CollectFar at FarPickup", collectFarPattern, "IntakeFull", 2500, new String[] {"IntakeOn"}, new String[] {"IntakeOff", "SpinUp"}, upCellShot),
-                                        kit.action("ShootAll"),
+                                        kit.command("ShootAll"),
                                         kit.path("ParkFarPath", parkFarPath))),
                         kit.afterMs(1500).then(
                                 kit.path("CollectNear", collectNear, new String[] {}, AutoKit.at(0.35, "IntakeOn")),
@@ -97,20 +97,20 @@ public final class HiveRushAuto {
                                         kit.afterMs(1800)),
                                 kit.together("Back and spin up", AutoKit.Ends.ALL,
                                         kit.path("BackToShoot", backToShoot, new String[] {"IntakeOff"}),
-                                        kit.action("SpinUp")),
-                                kit.action("ShootAll"),
+                                        kit.command("SpinUp")),
+                                kit.command("ShootAll"),
                                 kit.firstOf("Did it tip this time?",
                                         kit.when("HiveTipped").then(
                                                 kit.guarded("Tipped late", parkFarPath, 2.1,
                                                         kit.path("ToFarPickups", toFarPickups, new String[] {"SpinDown"}, AutoKit.at(0.6, "IntakeOn")),
                                                         kit.path("CollectFar", collectFar, new String[] {"IntakeOn"}),
-                                                        kit.action("IntakeOff"),
+                                                        kit.command("IntakeOff"),
                                                         kit.path("ToUpCellShot", toUpCellShot, new String[] {"SpinUp"}),
-                                                        kit.action("ShootAll"),
+                                                        kit.command("ShootAll"),
                                                         kit.path("ParkFarPath", parkFarPath))),
                                         kit.timeLeftBelow(6).then(
                                                 kit.goTo("Hold at ShootSpot", shootSpot, 6,
-                                                        kit.action("SpinDown"))),
+                                                        kit.command("SpinDown"))),
                                         kit.otherwise()))));
     }
 }

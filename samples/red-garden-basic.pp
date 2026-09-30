@@ -268,15 +268,17 @@
       "actions": [
         "IntakeOff",
         "IntakeOn",
-        "ShootAll"
+        "LaunchAll"
       ],
       "conditions": [
-        "Tip1",
+        "HiveLeftGarden",
         "IntakeFull"
       ],
-      "events": [
-        "Tip1"
-      ]
+      "typicalS": {
+        "IntakeOff": 0.2,
+        "IntakeOn": 0.2,
+        "LaunchAll": 3.0
+      }
     },
     "points": {
       "Start": [
@@ -328,8 +330,7 @@
       {
         "id": "a-22",
         "kind": "action",
-        "name": "ShootAll",
-        "previewMs": 2500
+        "name": "LaunchAll"
       },
       {
         "id": "tip-decision",
@@ -338,7 +339,7 @@
         "rows": [
           {
             "when": [
-              "Tip1"
+              "HiveLeftGarden"
             ],
             "label": "If tipped",
             "cards": [
@@ -395,8 +396,7 @@
               {
                 "id": "a-9",
                 "kind": "action",
-                "name": "ShootAll",
-                "previewMs": 2000
+                "name": "LaunchAll"
               },
               {
                 "id": "p-10",
@@ -436,8 +436,7 @@
               {
                 "id": "a-13",
                 "kind": "action",
-                "name": "ShootAll",
-                "previewMs": 2000
+                "name": "LaunchAll"
               },
               {
                 "id": "p-14",
@@ -499,8 +498,7 @@
               {
                 "id": "a-20",
                 "kind": "action",
-                "name": "ShootAll",
-                "previewMs": 2000
+                "name": "LaunchAll"
               },
               {
                 "id": "p-21",

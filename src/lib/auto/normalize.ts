@@ -103,6 +103,13 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     }
     if (known.length) registry.events = known;
   }
+  if (isObject(registryRaw.typicalS)) {
+    const typicalS: Record<string, number> = {};
+    for (const [name, seconds] of Object.entries(registryRaw.typicalS)) {
+      if (finite(seconds) && seconds >= 0) typicalS[name] = seconds;
+    }
+    if (Object.keys(typicalS).length) registry.typicalS = typicalS;
+  }
 
   const points: Record<string, NamedPoint> = {};
   if (raw.points !== undefined && !isObject(raw.points)) {
@@ -212,6 +219,7 @@ function normalizeCard(
         name: typeof raw.name === "string" ? raw.name.trim() : "",
       };
       if (!card.name) problems.push(`${where} is an action with no name.`);
+      if (finite(raw.timeoutS) && raw.timeoutS > 0) card.timeoutS = raw.timeoutS;
       if (finite(raw.previewMs) && raw.previewMs > 0) {
         card.previewMs = raw.previewMs;
       }
@@ -424,9 +432,13 @@ export function serializeAuto(auto: AutoSection): AutoSection {
   const card = (c: AutoCard): AutoCard => {
     switch (c.kind) {
       case "action":
-        return c.previewMs
-          ? { id: c.id, kind: "action", name: c.name, previewMs: c.previewMs }
-          : { id: c.id, kind: "action", name: c.name };
+        return {
+          id: c.id,
+          kind: "action",
+          name: c.name,
+          ...(c.timeoutS ? { timeoutS: c.timeoutS } : {}),
+          ...(c.previewMs ? { previewMs: c.previewMs } : {}),
+        };
       case "path":
         return {
           id: c.id,
@@ -487,6 +499,9 @@ export function serializeAuto(auto: AutoSection): AutoSection {
       conditions: [...auto.registry.conditions],
       // Written only when there are some, so older files stay as they were.
       ...(auto.registry.events?.length ? { events: [...auto.registry.events] } : {}),
+      ...(auto.registry.typicalS && Object.keys(auto.registry.typicalS).length
+        ? { typicalS: { ...auto.registry.typicalS } }
+        : {}),
     },
     points: Object.fromEntries(
       Object.entries(auto.points).map(([name, point]) => [name, [...point]]),

@@ -132,7 +132,7 @@ test("unregistered names are errors", () => {
   auto.registry.actions = auto.registry.actions.filter((name) => name !== "IntakeOn");
   auto.registry.conditions = auto.registry.conditions.filter((name) => name !== "CameraBlind");
   const errors = issuesOf(auto).filter((issue) => issue.level === "error");
-  assert(errors.some((e) => e.message.includes('"IntakeOn"') && e.message.includes("registered action")));
+  assert(errors.some((e) => e.message.includes('"IntakeOn"') && e.message.includes("list of commands")));
   assert(errors.some((e) => e.cardId === "did-tip" && e.message.includes('"CameraBlind"')));
 });
 

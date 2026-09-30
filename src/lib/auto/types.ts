@@ -22,6 +22,8 @@ export interface AutoRegistry {
    * the difference, to say how to read a condition.
    */
   events?: string[];
+  /** Each command's typical time in seconds, from the robot's list: what the preview uses. */
+  typicalS?: Record<string, number>;
 }
 
 /** `[x, y]` or `[x, y, headingDeg]`, inches in the Pedro field frame. */
@@ -33,13 +35,22 @@ export interface PathEvent {
   action: string;
 }
 
+/**
+ * Runs a registered command (the file calls it an action). On the robot it runs until it finishes
+ * or `timeoutS` (5 s when unset) has passed, whichever is first.
+ */
 export interface ActionCard {
   id: string;
   kind: "action";
   name: string;
-  /** Preview only: how long the action keeps the robot busy. Not exported. */
+  /** Seconds before the robot cuts the command off; unset means `DEFAULT_TIMEOUT_S`. */
+  timeoutS?: number;
+  /** Preview only, from older files: how long it keeps the robot busy. The robot's typical time wins. */
   previewMs?: number;
 }
+
+/** A command step's timeout when it sets none, as `AutoKit.DEFAULT_TIMEOUT_S`. */
+export const DEFAULT_TIMEOUT_S = 5;
 
 export interface PathCard {
   id: string;

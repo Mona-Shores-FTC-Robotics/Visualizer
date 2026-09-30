@@ -105,7 +105,7 @@ test("routine problems are reported", () => {
   (findCard(auto.cards, "tip-2") as RoutineCard).exit = "Nowhere";
   const { issues } = setup(auto);
   const messages = issues.filter((i) => i.cardId === "tip-2").map((i) => i.message).join("\n");
-  assert(messages.includes("needs a condition"), messages);
+  assert(messages.includes("needs a trigger"), messages);
   assert(messages.includes('"Nowhere"'), messages);
 });
 

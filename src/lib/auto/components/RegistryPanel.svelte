@@ -5,6 +5,7 @@
   import { usedNames } from "../tree";
   import { commitAuto, updateAuto } from "../store";
   import { isUsed, pointUses } from "../pins";
+  import { applyRobotList, parseRobotList } from "../robotList";
   import { ACTION_CLASS, CELL_CLASS, FIELD_CLASS, LABEL_CLASS, SECTION_CLASS } from "./ui";
 
   interface Props {
@@ -70,6 +71,20 @@
         if (!draft.registry.events.length) delete draft.registry.events;
       }
     });
+  }
+
+  let listProblem = $state("");
+
+  /** Reads TeamCode/auto-registry.json and makes the registry exactly the robot's list. */
+  async function loadRobotList(file: File | undefined) {
+    if (!file) return;
+    const list = parseRobotList(await file.text());
+    if ("error" in list) {
+      listProblem = list.error;
+      return;
+    }
+    listProblem = "";
+    updateAuto((draft) => applyRobotList(draft, list));
   }
 
   const isEvent = (name: string) => auto.registry.events?.includes(name) ?? false;
@@ -169,13 +184,13 @@
 
   {#if unregistered.actions.length || unregistered.conditions.length}
       <div class="border border-red-700 bg-red-950 px-2 py-1.5 text-[11px] text-red-300">
-        <div class="font-semibold">Used but not registered (blocks the Java export)</div>
+        <div class="font-semibold">Not in the robot's list (blocks the Java export)</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           {#each unregistered.actions as name (name)}
-            <button type="button" class="{ACTION_CLASS} text-[10px]" onclick={() => register("actions", name)}>Register action {name}</button>
+            <button type="button" class="{ACTION_CLASS} text-[10px]" onclick={() => register("actions", name)}>Add command {name}</button>
           {/each}
           {#each unregistered.conditions as name (name)}
-            <button type="button" class="{ACTION_CLASS} text-[10px]" onclick={() => register("conditions", name)}>Register condition {name}</button>
+            <button type="button" class="{ACTION_CLASS} text-[10px]" onclick={() => register("conditions", name)}>Add trigger {name}</button>
           {/each}
         </div>
       </div>
@@ -185,9 +200,16 @@
     <div class="border border-[#333333] bg-[#222222] p-3">
       <StartingPointSection bind:startPoint />
     </div>
+    <label class="{ACTION_CLASS} w-fit cursor-pointer text-[11px]"
+      title="TeamCode/auto-registry.json, written by the robot code's AutoRegistrationTest">
+      Load the robot's commands and triggers…
+      <input type="file" accept=".json,application/json" class="hidden"
+        onchange={(e) => { loadRobotList(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }} />
+    </label>
+    {#if listProblem}<div class="text-[11px] text-red-400">{listProblem}</div>{/if}
     <div class="grid gap-2 text-[11px] text-gray-300 lg:grid-cols-2">
-      {@render nameList("actions", "Actions")}
-      {@render nameList("conditions", "Conditions")}
+      {@render nameList("actions", "Commands")}
+      {@render nameList("conditions", "Triggers")}
     </div>
 
     <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">

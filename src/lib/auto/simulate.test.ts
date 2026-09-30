@@ -108,7 +108,7 @@ test("the endgame guard parks when the time left is down to the park path", () =
   const auto = clone(loadSample().auto);
   const branch = (findCard(auto.cards, "did-tip") as FirstOfCard).rows[0].cards;
   // A slow shot before the far pickups leaves too little time for them.
-  branch.unshift({ id: "slow", kind: "action", name: "ShootAll", previewMs: 22000 });
+  branch.unshift({ id: "slow", kind: "action", name: "ShootAll", previewMs: 22000, timeoutS: 25 });
   const { result, catalog } = run(auto);
   assert(result.guard, "guard expected");
   const park = catalog.byId.get("far-park")!;

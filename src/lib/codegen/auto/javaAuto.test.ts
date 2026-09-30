@@ -84,7 +84,7 @@ test("an empty Auto still exports a compilable skeleton", () => {
   auto.cards = [];
   auto.points = {};
   const source = sourceOf(auto);
-  assert(source.includes("public static final String[] ACTIONS = {};"));
+  assert(source.includes("public static final String[] COMMANDS = {};"));
   assert(source.includes("return kit.sequence();"));
   assert(!source.includes("Interpolator"), "no Interpolator import without a piecewise path");
   assert(!source.includes("Path "), "no path locals when no card drives one");
@@ -127,8 +127,8 @@ test("near-point and in-area rows use the named point poses", () => {
   assert(source.includes("kit.nearPoint(shootSpot, 4.5),"), source);
   assert(source.includes("kit.inArea(nearPickup, farPickup).then("), source);
   assert(source.includes("kit.afterMs(250))"), source);
-  assert(source.includes('public static final String[] ACTIONS = {"IntakeOn"};'), source);
-  assert(source.includes("public static final String[] CONDITIONS = {};"), source);
+  assert(source.includes('public static final String[] COMMANDS = {"IntakeOn"};'), source);
+  assert(source.includes("public static final String[] TRIGGERS = {};"), source);
 });
 
 test("errors block the export and say why", () => {

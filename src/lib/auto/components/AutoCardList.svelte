@@ -2,7 +2,7 @@
   import type { PathCatalog } from "../geometry";
   import type { AutoIssue } from "../validate";
   import type { PreviewResult, WorstCase } from "../simulate";
-  import { AUTO_LENGTH_S } from "../simulate";
+  import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
   import type { AutoCard, AutoSection, FirstOfCard } from "../types";
   import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
@@ -14,7 +14,7 @@
     updateAuto,
   } from "../store";
   import { branchColor, cardColors, seconds, TRUNK_COLOR } from "./ui";
-  import { rowKind } from "../types";
+  import { DEFAULT_TIMEOUT_S, rowKind } from "../types";
   import type { Shape, StartPose } from "../../../types";
   import CardEditor from "./CardEditor.svelte";
   import RegistryPanel from "./RegistryPanel.svelte";
@@ -195,7 +195,7 @@
       <div class="list-item-top">
         {#if card.kind === "action"}
           <span class="auto-icon auto-icon--action" aria-hidden="true">▶</span>
-          <span class="list-item-name">{card.name || "(choose an action)"}</span>
+          <span class="list-item-name">{card.name || "(choose a command)"}</span>
         {:else if card.kind === "path"}
           <span class="auto-icon auto-icon--path" aria-hidden="true">↝</span>
           <span class="list-item-name">{pathName(card.lineId)}</span>
@@ -226,7 +226,7 @@
       </div>
       <div class="list-item-sub">
         {#if card.kind === "action"}
-          action{card.previewMs ? ` · ~${(card.previewMs / 1000).toFixed(1)} s` : " · instant"}
+          command · ≈{seconds(commandSeconds(auto, card))} · max {seconds(card.timeoutS ?? DEFAULT_TIMEOUT_S)}
           {#if card.name && !registeredActions.has(card.name)}<span class="auto-bad"> · not registered</span>{/if}
         {:else if card.kind === "path"}
           {@const info = catalog.byId.get(card.lineId)}
@@ -377,7 +377,7 @@
     </div>
   {/if}
   <div class="auto-add-row">
-    <button type="button" class="path-list-action" onclick={() => add("action")} title="Add an action after the selected card">+ Action</button>
+    <button type="button" class="path-list-action" onclick={() => add("action")} title="A robot command, after the selected card">+ Command</button>
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
     <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
     <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is">+ Path</button>

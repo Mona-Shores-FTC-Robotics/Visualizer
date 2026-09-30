@@ -11,7 +11,9 @@ import {
   type Motion,
 } from "./motion";
 import {
+  DEFAULT_TIMEOUT_S,
   rowKind,
+  type ActionCard,
   type AutoCard,
   type AutoRow,
   type AutoSection,
@@ -21,6 +23,15 @@ import {
   type RoutineCard,
   type TogetherCard,
 } from "./types";
+
+/**
+ * How long a command step keeps the robot busy in the preview: the command's typical time from
+ * the robot's list, else an older file's preview time, else instant; never past its timeout.
+ */
+export function commandSeconds(auto: AutoSection, card: ActionCard): number {
+  const typical = auto.registry.typicalS?.[card.name] ?? (card.previewMs ?? 0) / 1000;
+  return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
+}
 
 /** Length of the Autonomous period, as `AutoKit.AUTO_LENGTH_S`. */
 export const AUTO_LENGTH_S = 30;
@@ -346,7 +357,7 @@ export function simulateAuto(
       case "action": {
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
-        const busy = (card.previewMs ?? 0) / 1000;
+        const busy = commandSeconds(auto, card);
         if (deadline && deadline.deadline < t + busy) {
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
@@ -667,7 +678,7 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
     let t = start;
     for (let i = index; i < list.length; i++) {
       const card = list[i];
-      if (card.kind === "action") t += (card.previewMs ?? 0) / 1000;
+      if (card.kind === "action") t += commandSeconds(auto, card);
       else if (card.kind === "path") t += catalog.byId.get(card.lineId)?.seconds ?? 0;
       else if (card.kind === "routine") t += routineSeconds(card);
       else if (card.kind === "together") {

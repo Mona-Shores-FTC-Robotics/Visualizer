@@ -65,6 +65,7 @@ A complete example that uses every card and row kind is
 | `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
+| `registry.typicalS` | `{ name: seconds }`, optional | Each command's typical time, from the robot's list (`TeamCode/auto-registry.json`, loaded in Setup). |
 | `registry.events` | string[], optional | The conditions that are events: once true, true for the rest of the match (`Tip1`). The rest are states, which can turn false again (`IntakeFull`). The editor shows which is which; the export does not use it. |
 | `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
 | `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
@@ -77,7 +78,7 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 
 | `kind` | Fields | Meaning |
 |---|---|---|
-| `action` | `name`, `previewMs?` | Runs a registered action. `previewMs` is only used by the preview (how long the action keeps the robot busy); it is not exported. |
+| `action` | `name`, `timeoutS?`, `previewMs?` | Runs a registered **command** (the editor calls it that; the file keeps the key `action`). On the robot it runs until it finishes or `timeoutS` (default 5 s), exported as `kit.command(name[, timeoutS])`. The preview uses the command's typical time from `registry.typicalS`, else `previewMs` (older files), else instant, never past the timeout. |
 | `path` | `lineId`, `while`, `events`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `while`: actions started with the path. `events`: `{at, action}` with `at` in 0..1 of the path's length. `park`: this is the branch's park path for the endgame guard. |
 | `firstOf` | `label`, `rows` | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. |
 | `routine` | `routine`, `at`, `facingDeg`, `mirror`, `exit` | Runs the named routine (see below) placed at the named point `at`, facing `facingDeg`, optionally mirrored left↔right; then drives straight to the named point `exit`. |
@@ -180,7 +181,7 @@ field and gets a warning; it is not exported.
 `org.firstinspires.ftc.teamcode.opmodes.auto.generated`, following the
 contract with the robot's `autokit` library:
 
-- `SOURCE`, `ACTIONS`, `CONDITIONS` (every registered name used, sorted, no
+- `SOURCE`, `COMMANDS`, `TRIGGERS` (every registered name used, sorted, no
   duplicates), `DRAWN_FOR`, `startPose(boolean mirrored)`, a private
   `poses(boolean mirrored)` factory and `build(AutoKit kit, boolean mirrored)`;
 - every pose is a `Pose` local built with `p.of(...)` so mirroring applies to
@@ -241,9 +242,9 @@ happy path); the switches are not saved in the file.
 
 The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
 fastest the Auto can go, ✗ the slowest, and a real run falls between them.
-Events are separate names, so "not tipped at the first decision, tipped at a
-later one" is `Tip1` ✗ and `Tip2` ✓. A state asked by several cards
-(`IntakeFull`) has one answer for all of them.
+A trigger asked by several cards (`IntakeFull`) has one answer for all of
+them; triggers that describe what the robot sees now (`HiveLeftGarden`,
+`HiveLeftLoading`) are separate names for separate questions.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field

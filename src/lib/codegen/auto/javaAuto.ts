@@ -374,7 +374,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const cardNode = (card: AutoCard): JNode => {
     switch (card.kind) {
       case "action":
-        return `kit.action(${javaString(card.name)})`;
+        return card.timeoutS
+          ? `kit.command(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
+          : `kit.command(${javaString(card.name)})`;
       case "path": {
         const { info, varName } = pathOf(card.lineId);
         const args = [javaString(info.name), varName];
@@ -496,11 +498,11 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "    /** The .pp file this was generated from. */",
     `    public static final String SOURCE = ${javaString(sourceFileName)};`,
     "",
-    "    /** Registered robot actions this Auto uses; checked when the OpMode initialises. */",
-    `    public static final String[] ACTIONS = ${sortedList(used.actions.keys())};`,
+    "    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */",
+    `    public static final String[] COMMANDS = ${sortedList(used.actions.keys())};`,
     "",
-    "    /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */",
-    `    public static final String[] CONDITIONS = ${sortedList(used.conditions.keys())};`,
+    "    /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */",
+    `    public static final String[] TRIGGERS = ${sortedList(used.conditions.keys())};`,
     "",
     '    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */',
     `    public static final String DRAWN_FOR = ${javaString(auto.drawnFor)};`,

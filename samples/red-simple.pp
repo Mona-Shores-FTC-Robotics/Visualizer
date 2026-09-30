@@ -178,14 +178,14 @@
     "drawnFor": "RED",
     "registry": {
       "actions": [
-        "ShootAll"
+        "LaunchAll"
       ],
       "conditions": [
-        "Tip1"
+        "HiveLeftGarden"
       ],
-      "events": [
-        "Tip1"
-      ]
+      "typicalS": {
+        "LaunchAll": 3.0
+      }
     },
     "points": {
       "Start": [
@@ -213,8 +213,7 @@
       {
         "id": "shoot-preloads",
         "kind": "action",
-        "name": "ShootAll",
-        "previewMs": 2500
+        "name": "LaunchAll"
       },
       {
         "id": "tip-decision",
@@ -223,7 +222,7 @@
         "rows": [
           {
             "when": [
-              "Tip1"
+              "HiveLeftGarden"
             ],
             "label": "Tipped: under the HIVE",
             "cards": [
@@ -238,8 +237,7 @@
               {
                 "id": "shoot-rear",
                 "kind": "action",
-                "name": "ShootAll",
-                "previewMs": 2000
+                "name": "LaunchAll"
               }
             ]
           },

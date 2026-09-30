@@ -18,11 +18,11 @@ public final class RedSimpleAuto {
     /** The .pp file this was generated from. */
     public static final String SOURCE = "red-simple.pp";
 
-    /** Registered robot actions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] ACTIONS = {"ShootAll"};
+    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
+    public static final String[] COMMANDS = {"LaunchAll"};
 
-    /** Registered robot conditions this Auto uses; checked when the OpMode initialises. */
-    public static final String[] CONDITIONS = {"Tip1"};
+    /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
+    public static final String[] TRIGGERS = {"HiveLeftGarden"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -58,11 +58,11 @@ public final class RedSimpleAuto {
         Path toGarden = Paths.curve(start, toGardenControl1, garden).linear(start, garden);
 
         return kit.sequence(
-                kit.action("ShootAll"),
+                kit.command("LaunchAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("Tip1").then(
+                        kit.when("HiveLeftGarden").then(
                                 kit.path("UnderHive", underHive),
-                                kit.action("ShootAll")),
+                                kit.command("LaunchAll")),
                         kit.afterMs(3000).then(
                                 kit.path("ToGarden", toGarden))));
     }
