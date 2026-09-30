@@ -28,8 +28,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx vite build
-      # The service worker serves the app cache-first; a new cache name per build makes
-      # browsers pick up each deploy instead of the previous one.
+      # The service worker names its cache after VERSION; a new name per build drops
+      # the previous deploy's saved copy (see public/sw.js).
       - name: Stamp the service worker with this commit
         run: |
           sed -i "s/const VERSION = \"dev\";/const VERSION = \"${GITHUB_SHA::12}\";/" dist/sw.js
