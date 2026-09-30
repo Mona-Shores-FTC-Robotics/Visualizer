@@ -3406,6 +3406,7 @@
               <input type="checkbox" bind:checked={showUntakenBranches} />
               Other branches
             </label>
+            <span class="module-caption whitespace-nowrap" title="Hold Shift while dragging a path point to keep it level or plumb with the previous point, so the path runs exactly along x or y">Shift-drag: straight x/y</span>
           {:else}
             <span class="module-caption" title="Hold Shift while dragging a path point to keep it level or plumb with the previous point, so the path runs exactly along x or y">Click a line or point to select it · Shift-drag: straight along x or y</span>
           {/if}
