@@ -53,11 +53,13 @@ Where the design is heading (canvas "Auto builder · BIOBUZZ", latest: Concept B
   wait times out, the safe side (CameraBlind says why).
 
 Robot-side notes:
-- Ivy 1.1.1 has no default commands, and a command that requires a subsystem interrupts its
-  `periodic()`, so "LaunchAll takes the intake over" is not how this robot does it. The intake's
-  own `update()` owns the policy: run in COLLECT unless full or `robot.launcher.isLaunching()`
-  (read-only accessor). Same behaviour, nothing to require, and it holds in TeleOp too. A stall
-  check (current high, no piece arriving → back off) belongs there as well.
+- Ivy 1.1.1 has no default-command API, but priority plus `InterruptedBehavior.SUSPEND` gives the
+  same thing (checked against Ivy 1.1.1): Collect runs forever at priority 0 with SUSPEND;
+  LaunchAll (priority 1) and IntakeHold take the roller over, and Collect resumes by itself when
+  they end. Both must require a **roller token** (`robot.intake.roller()`), never the intake
+  subsystem itself: requiring the subsystem interrupts its `periodic()`, which ends for good.
+  Adopting this changes CLAUDE.md's "No default commands" line in the same PR. A stall check
+  (current high, no piece arriving → back off) belongs in Collect.
 - The race is Ivy's `Groups.race` / `deadline` / `until`; autokit's `firstOf` gains an
   "alongside" command and a "that finished" row.
 - `Tip` needs the wait to remember where the HIVE was when it started (an event, not a plain
