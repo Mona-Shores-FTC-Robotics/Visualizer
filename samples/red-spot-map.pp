@@ -1,210 +1,210 @@
 {
   "startPoint": {
-    "x": 60.0,
-    "y": 9.0,
-    "headingDeg": 90,
-    "name": "RIGHT_START"
+    "x": 59,
+    "y": 9.5,
+    "name": "RIGHT_START",
+    "headingDeg": 90
   },
   "lines": [
     {
       "id": "to-right-hive-entrance",
       "color": "#3fcf8e",
       "name": "to RIGHT_HIVE_ENTRANCE",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 60.0,
-        "y": 42.0
+        "x": 59,
+        "y": 47
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
         "endDeg": 90
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     },
     {
       "id": "to-left-hive-entrance",
       "color": "#3fcf8e",
       "name": "to LEFT_HIVE_ENTRANCE",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 60.0,
-        "y": 100.0
+        "x": 59,
+        "y": 94.7
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
         "endDeg": 90
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     },
     {
       "id": "to-left-dump",
       "color": "#3fcf8e",
       "name": "to LEFT_DUMP",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 38.0,
-        "y": 112.0
+        "x": 59,
+        "y": 117.8
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
         "endDeg": 308
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     },
     {
       "id": "to-left-flower",
       "color": "#3fcf8e",
       "name": "to LEFT_FLOWER",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 47.0,
-        "y": 125.5
+        "x": 47.5,
+        "y": 129
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 308,
         "endDeg": 90
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     },
     {
       "id": "to-left-start",
       "color": "#3fcf8e",
       "name": "to LEFT_START",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 60.0,
-        "y": 132.5
+        "x": 59,
+        "y": 132
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
         "endDeg": 270
-      },
+      }
+    },
+    {
+      "id": "to-left-loading-zone",
+      "color": "#3fcf8e",
+      "name": "to LEFT_LOADING_ZONE",
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
       "waitBeforeName": "",
-      "waitAfterName": ""
-    },
-    {
-      "id": "to-loading-zone",
-      "color": "#3fcf8e",
-      "name": "to LOADING_ZONE",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 16.0,
-        "y": 106.0
+        "x": 16,
+        "y": 115.7
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 270,
         "endDeg": 90
-      },
+      }
+    },
+    {
+      "id": "to-right-loading-zone",
+      "color": "#3fcf8e",
+      "name": "to RIGHT_LOADING_ZONE",
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
       "waitBeforeName": "",
-      "waitAfterName": ""
-    },
-    {
-      "id": "to-wall-dump",
-      "color": "#3fcf8e",
-      "name": "to WALL_DUMP",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 30.0,
-        "y": 80.0
+        "x": 16,
+        "y": 96.6
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90,
-        "endDeg": 14
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+        "endDeg": 90
+      }
     },
     {
       "id": "to-your-wall-flower",
       "color": "#3fcf8e",
       "name": "to YOUR_WALL_FLOWER",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 16.5,
-        "y": 47.5
+        "x": 15.2,
+        "y": 47.8
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 14,
+        "startDeg": 90,
         "endDeg": 180
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     },
     {
       "id": "to-right-dump",
       "color": "#3fcf8e",
       "name": "to RIGHT_DUMP",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 36.0,
-        "y": 30.0
+        "x": 59,
+        "y": 23.7
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 180,
-        "endDeg": 54
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+        "endDeg": 52
+      }
     },
     {
       "id": "to-garden",
       "color": "#3fcf8e",
       "name": "to GARDEN",
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 20.0,
-        "y": 10.0
+        "x": 10.5,
+        "y": 11.8
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
-        "startDeg": 54,
+        "startDeg": 52,
         "endDeg": 180
-      },
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": ""
+      }
     }
   ],
   "shapes": [
@@ -241,11 +241,11 @@
           "y": 51.2
         },
         {
-          "x": 95.0,
+          "x": 95,
           "y": 51.2
         },
         {
-          "x": 95.0,
+          "x": 95,
           "y": 90.3
         },
         {
@@ -262,11 +262,11 @@
       "vertices": [
         {
           "x": 70.8,
-          "y": 0.0
+          "y": 0
         },
         {
           "x": 141.5,
-          "y": 0.0
+          "y": 0
         },
         {
           "x": 141.5,
@@ -304,11 +304,11 @@
     },
     {
       "kind": "path",
-      "lineId": "to-loading-zone"
+      "lineId": "to-left-loading-zone"
     },
     {
       "kind": "path",
-      "lineId": "to-wall-dump"
+      "lineId": "to-right-loading-zone"
     },
     {
       "kind": "path",
@@ -323,6 +323,7 @@
       "lineId": "to-garden"
     }
   ],
+  "fieldPoints": [],
   "settings": {
     "xVelocity": 75,
     "yVelocity": 65,
@@ -334,10 +335,30 @@
     "maxVelocity": 60,
     "maxAcceleration": 55,
     "maxDeceleration": 55,
-    "fieldMap": "biobuzz.webp"
+    "fieldMap": "biobuzz.webp",
+    "robotImage": "/robot.png",
+    "showGhostPaths": false,
+    "showOnionLayers": false,
+    "onionLayerSpacing": 3,
+    "onionColor": "#dc2626",
+    "onionNextPointOnly": false,
+    "showHeadingArrow": false,
+    "showCurrentTValue": false,
+    "leftPanelWidth": 262,
+    "rightPanelWidth": 714,
+    "headingArrowLength": 50,
+    "headingArrowColor": "#ffffff",
+    "headingArrowThickness": 2,
+    "pathOpacity": 1,
+    "leftPanelMinWidth": 0,
+    "rightPanelMinWidth": 0,
+    "penToolMaxPaths": 8,
+    "curveThroughMaxPoints": 4,
+    "experimentalFeatures": {
+      "optimize": false,
+      "curveThrough": false
+    }
   },
-  "version": "1.5.0",
-  "timestamp": "2026-09-30T12:00:00.000Z",
   "auto": {
     "version": 1,
     "drawnFor": "RED",
@@ -347,58 +368,58 @@
     },
     "points": {
       "RIGHT_START": [
-        60.0,
-        9.0,
+        59,
+        9.5,
         90
       ],
       "RIGHT_HIVE_ENTRANCE": [
-        60.0,
-        42.0,
+        59,
+        47,
         90
       ],
       "LEFT_HIVE_ENTRANCE": [
-        60.0,
-        100.0,
+        59,
+        94.7,
         90
       ],
       "LEFT_DUMP": [
-        38.0,
-        112.0,
+        59,
+        117.8,
         308
       ],
       "LEFT_FLOWER": [
-        47.0,
-        125.5,
+        47.5,
+        129,
         90
       ],
       "LEFT_START": [
-        60.0,
-        132.5,
+        59,
+        132,
         270
       ],
-      "LOADING_ZONE": [
-        16.0,
-        106.0,
+      "LEFT_LOADING_ZONE": [
+        16,
+        115.7,
         90
       ],
-      "WALL_DUMP": [
-        30.0,
-        80.0,
-        14
+      "RIGHT_LOADING_ZONE": [
+        16,
+        96.6,
+        90
       ],
       "YOUR_WALL_FLOWER": [
-        16.5,
-        47.5,
+        15.2,
+        47.8,
         180
       ],
       "RIGHT_DUMP": [
-        36.0,
-        30.0,
-        54
+        59,
+        23.7,
+        52
       ],
       "GARDEN": [
-        20.0,
-        10.0,
+        10.5,
+        11.8,
         180
       ]
     },
@@ -408,13 +429,12 @@
       "to-left-dump": "LEFT_DUMP",
       "to-left-flower": "LEFT_FLOWER",
       "to-left-start": "LEFT_START",
-      "to-loading-zone": "LOADING_ZONE",
-      "to-wall-dump": "WALL_DUMP",
+      "to-left-loading-zone": "LEFT_LOADING_ZONE",
+      "to-right-loading-zone": "RIGHT_LOADING_ZONE",
       "to-your-wall-flower": "YOUR_WALL_FLOWER",
       "to-right-dump": "RIGHT_DUMP",
       "to-garden": "GARDEN"
     },
-    "routines": {},
     "cards": [
       {
         "id": "visit-1",
@@ -459,7 +479,7 @@
       {
         "id": "visit-6",
         "kind": "path",
-        "lineId": "to-loading-zone",
+        "lineId": "to-left-loading-zone",
         "while": [],
         "events": [],
         "park": false
@@ -467,7 +487,7 @@
       {
         "id": "visit-7",
         "kind": "path",
-        "lineId": "to-wall-dump",
+        "lineId": "to-right-loading-zone",
         "while": [],
         "events": [],
         "park": false
@@ -499,5 +519,7 @@
     ],
     "startAt": "RIGHT_START",
     "exportName": "red-spot-map"
-  }
+  },
+  "version": "1.5.0",
+  "timestamp": "2026-09-30T01:43:49.669Z"
 }
