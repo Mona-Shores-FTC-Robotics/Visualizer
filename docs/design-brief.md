@@ -26,28 +26,49 @@ What is wrong with it, concretely:
 - The branch's steps are not here at all; they are further down the list. Editing the decision
   and editing what happens after it are two different places.
 
-**What people actually want to say.** Almost every decision in an FTC Auto is one of these:
+**What people actually want to say.** The mentor interview (below) settled it: **there is one
+branching block.** Every branch in this year's Autos is
 
-1. **If X happens within N s, do A; otherwise do B.** ("If Tip1 within 3 s, go under the HIVE,
-   else go to the GARDEN.") This is by far the most common.
-2. **Wait until X, at most N s**, then carry on. ("Wait for IntakeFull, at most 1.5 s.") A
-   decision with one branch that does nothing.
-3. **If X or Y**, occasionally ("Tip1 or CameraBlind").
-4. **If time is running out, park** (the endgame guard, once per Auto, mostly automatic).
+> **Wait for a trigger, at most N s.** Triggered → one route. Timed out → another route.
 
-The other row types (several time rows, "time left below", "near a point", "in an area") exist in
-the engine and are rare. They can be hard to reach; they must not shape the common case.
+A plain wait ("wait for IntakeFull, at most 1.5 s, then carry on") is the same block with both
+exits carrying on the same way. Routes may **rejoin** afterwards or run to the end of the Auto.
+The one other kind of branch, "not enough time left: go park", is **automatic**: the tool works out
+when the rest of the plan and the park path no longer fit, and the team only marks which path is
+the park path. Anything else the engine can do (several triggers racing, "near a point", "in an
+area") is rare; it can be hard to reach and must not shape the screen.
 
 **What already works, and should drive the design:** the preview switches. Each condition the
-robot offers is a chip at the top (✓ Tip1 · ✗ IntakeFull). Clicking one is like answering the
+robot offers is a chip at the top (✓ Tipped · ✗ IntakeFull). Clicking one is like answering the
 robot's question for it, and the Auto instantly follows the other branch on the field. People
 understood that at once. Building a decision should feel as direct as answering one: pick the
 question (a chip), say how long to wait, and draw or pick what happens in each case.
 
-**What we would like from design here:** a way to create and edit a decision that reads like
-sentence 1 above, shows its branches and their steps together, and can be done largely on the
-field (the robot is at the spot where it waits; each branch is a route leaving that spot).
-Adding a branch, or steps to one, should be one gesture, not a form.
+**What we would like from design here:** a way to create and edit that one block that reads like
+the sentence above, shows both routes and their steps together, and can be done largely on the
+field (the robot is at the spot where it waits; each route leaves that spot). Adding a route, or
+steps to one, or rejoining two routes, should be one gesture, not a form.
+
+## How this year's Autos go (BIOBUZZ)
+
+The tool is for this season's game first; generality can come later. From the interview, the
+Autos we expect all look like this:
+
+1. **Start on the GARDEN side and launch all preloads** (always first).
+2. **Did the HIVE tip?** Wait for the HIVE to **leave its start position** (it is GARDEN_UP at the
+   start; tipping passes through TRANSITION to LOADING_UP, and either counts), at most N s.
+   - **Tipped:** go on to the next part, typically the LOADING side.
+   - **Timed out:** collect the GARDEN pollen, launch again to force the tip, and **check again**:
+     tipped → **rejoin** the main plan; still not → usually **park** (decided per Auto).
+3. **Collect until full.** At a FLOWER (often the LOADING-side one): take pollen until
+   **IntakeFull**, at most N s, then drive to the next shooting spot and launch.
+4. **Did it tip back?** After launching at the LOADING CELL, wait for the HIVE to leave
+   LOADING_UP, at most N s, and branch the same way.
+5. **Bail out to park** whenever the rest will not fit in 30 s (automatic, see above).
+
+Early in the season the robot stops to aim, launches, then moves again: no shooting on the move and
+no reacting mid-path. The intake stops itself at 4 pieces (its own state machine), so the Auto only
+waits for IntakeFull; it does not manage the intake.
 
 ## What it is for
 
@@ -66,24 +87,24 @@ back", "skip the second pickup", "does this still fit in 30 s?"
 
 ## What an Auto is (the model to design for)
 
-An Auto is a list of steps run top to bottom. Five kinds matter; the rest are rare.
+An Auto is a sequence of three kinds of step, and they must **look different** at a glance: the
+interview's main complaint about the current list is that a command, a path and a branch point all
+look alike.
 
-| Step | Example | Notes |
+| Step | Example | What it shows |
 |---|---|---|
-| **Action** | ShootAll, IntakeOn | A name the robot code offers. |
-| **Path** | Drive to RearShot | A curve on the field from wherever the robot is. Ends on a named spot or a spot of its own. |
-| **Wait** | Wait for IntakeFull, at most 1.5 s | Always has a time limit, so the robot never freezes. |
-| **Decision** | Did the HIVE tip? Tip1 → A, else after 3 s → B | Waits for the first of its conditions; each has its own branch of steps. The steps after the decision continue from wherever the branch left the robot. |
-| **Park** | The branch's last path, marked | If time runs short, the robot abandons what it is doing and drives it. |
+| **Command** | LaunchAll, IntakeOn | A name the robot code registers (a command in the robot's command framework). It ends on its own (LaunchAll: when the pieces are gone) or at its **timeout**, which is worth showing. |
+| **Path** | Drive to RearShot | A curve on the field from wherever the robot is, ending on a named spot or a spot of its own. |
+| **Wait for trigger** | HIVE left start, at most 3 s | The one branching block: triggered → one route, timed out → another. Routes can rejoin. |
 
-**Conditions are true/false names** the robot code offers, of two kinds:
-- **Events** stay true once they happen: `Tip1` (the HIVE's first tip), `Tip2`.
-- **States** can change back: `IntakeFull` (holding 4 pieces right now).
+Plus one marker: a route's **park path**, which the automatic bailout drives when time runs short.
 
-The only number a condition needs is the wait's time limit. The preview does not simulate *when*
-something happens: each condition is either **✓ happens** (fires the moment it is asked) or
-**✗ never happens** (the wait runs out). ✓ everywhere is the fastest the Auto can go, ✗ everywhere
-the slowest; a real match falls between.
+**Triggers are short true/false names** the robot code registers (`Tipped`, `IntakeFull`). The
+preview does not simulate *when* a trigger fires: each is a switch, **✓ happens** (fires the moment
+it is waited for) or **✗ never happens** (the wait times out). ✓ everywhere is the fastest the Auto
+can go, ✗ everywhere the slowest; a real match falls between. The HIVE trigger is naturally
+"the HIVE left the position it was in when the wait began", which reads the same for the first
+tip and the tip back.
 
 **Named spots** (RearShot, Park, Garden) are places the robot does something. Path ends pinned to
 a spot move with it: change RearShot and every path that ends there follows. They are also what a
@@ -91,8 +112,28 @@ team changes at an event, and the names the Java uses.
 
 **The field** is 141.5 in square. The Auto is drawn for one alliance (red) and mirrored for the
 other. The robot must start touching a wall, must not cross the center line during Auto, and ends
-the Auto parked in its LOADING ZONE for points. Coordinates are in inches with at most one
-decimal.
+the Auto parked in its LOADING ZONE for points.
+
+**Positions are typed as often as dragged.** Coordinates are inches with **one decimal** at most
+(23.1, never 23.5353). Later in a season teams type points in rather than drag them, for
+consistency, so exact entry of x / y / heading must be easy wherever a point is, and dragging must
+snap to tenths.
+
+## Decisions from the mentor interview
+
+- **Words:** *command* (not action), *path*, *trigger*, *wait for trigger … at most N s*.
+- **One branching block** plus the automatic park bailout (above). Routes may rejoin.
+- **Visual language:** commands, paths and triggers must be distinguishable by shape and color,
+  not only by an icon; a command shows its timeout.
+- **Built for BIOBUZZ this season.** Name things in the game's terms (HIVE, CELL, FLOWER,
+  GARDEN, LOADING); do not generalize at the cost of clarity.
+- **Exact positions** matter more as the season goes on: one decimal, typed entry, snapping.
+- **The original Pedro Visualizer** is linked for pure path tuning (same file), but this tool is
+  not bound to its layout or tools.
+- **Top-bar tools:** the ruler and protractor are light and fine; the inches, magnet/snap and
+  other unlabeled tools are unclear and should earn their place or go.
+- **Deferred:** reacting mid-path and shooting on the move (later in the season, if at all); what
+  a failed retry does beyond parking (needs testing).
 
 ## The canonical example
 
@@ -100,9 +141,9 @@ Use this to test every concept (it is `samples/red-simple.pp`, live at
 <https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple>):
 
 1. Start touching the audience wall at (60, 9), facing the HIVE.
-2. ShootAll.
+2. LaunchAll.
 3. Decision "Did our HIVE tip?", waiting up to 3 s:
-   - **Tip1** → drive straight under the HIVE to RearShot (60, 110), ShootAll.
+   - **Tipped** → drive straight under the HIVE to RearShot (60, 110), LaunchAll.
    - **else** → curve over to Garden (24, 14), turning to face the red wall.
 
 A bigger one with collection passes, a FLOWER pickup and parking is `samples/red-garden-basic.pp`.
@@ -117,7 +158,7 @@ A bigger one with collection passes, a FLOWER pickup and parking is `samples/red
   screen needs explaining, the screen is wrong. Tooltips at most.
 - **Show less by default.** A path step needs "ends at" and "park" nearly every time; which path,
   actions while driving and events along the path are rare and belong behind "more".
-- **The preview is a few switches**, one per condition (✓ Tip1 · ✗ IntakeFull), not a form of
+- **The preview is a few switches**, one per trigger (✓ Tipped · ✗ IntakeFull), not a form of
   timings or a question per step.
 - **Adding a path means "from here".** Select RearShot, add a path, and it starts at RearShot, at
   the end of that branch. Anything else surprised people.
@@ -167,7 +208,10 @@ Not requirements; directions we have not tried.
 1. Two or three **distinct concepts** for the whole screen, not variations of the current one.
 2. For the strongest concept, the key flows as screens:
    - build the canonical example from an empty field;
-   - turn a plain "shoot, drive" Auto into "if Tip1 within 3 s … otherwise …";
+   - turn a plain "launch, drive" Auto into "wait for Tipped, at most 3 s: … / timed out: …";
+   - the retry: timed out → collect GARDEN pollen, launch, wait for Tipped again → rejoin the
+     main plan, or park;
+   - "collect at the LOADING FLOWER until IntakeFull, at most 2 s", then drive and launch;
    - add the "else" branch to an existing decision;
    - add a wait ("IntakeFull, at most 1.5 s") inside a branch;
    - preview tipped vs not tipped and see the time of each;
