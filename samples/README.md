@@ -23,12 +23,17 @@ from the one before it in the Path List; no card drives it.
 
 ## Commands and triggers
 
-**Commands** are what the robot does (`LaunchAll`, `IntakeOn`). Each step runs until the command
-finishes or its timeout (5 s unless the step sets another), and the preview uses the command's
-typical time from the robot's list (`LaunchAll` ≈ 3 s). **Triggers** are true/false:
-`RightCellDown` is true from the moment our RIGHT CELL starts down (a started TIP always finishes), so a TIP
-that happened during the launch counts; `IntakeFull` is "holding 4 POLLEN right now". The only
-other timing is each wait's time limit, so a missed TIP or a jammed intake cannot stop the Auto.
+**Commands** are what the robot does (`LaunchAll`). Each step runs until the command finishes or
+its timeout (5 s unless the step sets another), and the preview uses the command's typical time
+from the robot's list (`LaunchAll` ≈ 3 s). **Triggers** are true/false: `Tip` is "our HIVE has
+started to TIP since this wait began"; `IntakeFull` is "holding 4 POLLEN right now". The first
+wait runs **while LaunchAll**: the launch and the watching overlap, and the launch stops as soon as
+the TIP is seen. The only other timing is each wait's time limit, so a missed TIP or a jammed
+intake cannot stop the Auto.
+
+**The intake is not in these Autos.** Collecting whenever the robot is not full and not launching
+is how the robot works (a low-priority command the launch pauses), so the only intake step left is
+**wait for IntakeFull** at a FLOWER.
 
 ## Rules every Auto here follows
 
@@ -63,14 +68,13 @@ sat, which Pedro absorbs.
 
 A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
 
-1. Launch the 4 preloads (`LaunchAll`; the turret aims, the robot only points its intake).
-2. Wait for `RightCellDown` (our HIVE has left its start position, whoever tipped it) →
-   **If tipped**; 5 s → **If not tipped**.
-3. **If tipped:** two collect passes from the start with the intake on (about 20 in straight ahead
+1. Launch the 4 preloads and watch the HIVE at the same time: wait for `Tip` while `LaunchAll`
+   (the turret aims, the robot only points its intake) → **If tipped**; 8 s → **If not tipped**.
+2. **If tipped:** two collect passes from the start with the intake on (about 20 in straight ahead
    and back, then about 21 in at 27° to the left and back); one path straight through the gap under
    the HIVE (entering at 60.0, 46.8) to `RearShot` at the rear, without stopping at the entrance; shoot; take 4 POLLEN from the RED_LOADING FLOWER; shoot; park in
    the red LOADING ZONE.
-4. **If not tipped:** straight under the HIVE; take 4 POLLEN from the RED_LOADING FLOWER; shoot at
+3. **If not tipped:** straight under the HIVE; take 4 POLLEN from the RED_LOADING FLOWER; shoot at
    the RED_GARDEN CELL to try for the tip; park in the red LOADING ZONE.
 
 It never lets the robot body overlap the center line (x = 70.75) and never drives through a wall or

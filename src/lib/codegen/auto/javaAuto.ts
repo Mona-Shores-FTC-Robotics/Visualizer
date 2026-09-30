@@ -393,7 +393,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       case "firstOf":
         return {
           head: "kit.firstOf",
-          args: [javaString(firstOfLabel(card))],
+          args: card.alongside
+            ? [javaString(firstOfLabel(card)), `kit.command(${javaString(card.alongside)})`]
+            : [javaString(firstOfLabel(card))],
           children: card.rows.map(rowNode),
         };
       case "routine": {
@@ -455,6 +457,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         break;
       case "otherwise":
         condition = "kit.otherwise()";
+        break;
+      case "finished":
+        condition = "kit.finished()";
         break;
       case "nearPoint": {
         const near = row as { nearPoint: string; radiusIn: number };

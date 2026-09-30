@@ -97,6 +97,9 @@ export function validateAuto(
         }
         case "firstOf": {
           const name = card.label || "This card";
+          if (card.alongside) checkAction(card.id, "The command run while waiting", card.alongside);
+          if (!card.alongside && card.rows.some((row) => rowKind(row) === "finished"))
+            error(card.id, `${name} has a "when it finishes" row but runs no command while waiting.`);
           if (card.rows.length === 0) {
             error(card.id, `${name} has no rows, so it would wait forever.`);
             break;

@@ -78,6 +78,7 @@
     { value: "otherwise", label: "Otherwise (at once)" },
     { value: "nearPoint", label: "Near a point" },
     { value: "inArea", label: "Inside an area" },
+    { value: "finished", label: "The command alongside finishes" },
   ];
 
   /** Edit the selected card in place (on the draft). */
@@ -338,6 +339,27 @@
         oninput={(e) => edit((c) => { if (c.kind === "firstOf") c.label = e.currentTarget.value; }, false)}
         onchange={commitAuto}
       />
+    </div>
+    <div class={CELL_CLASS}>
+      <label class={LABEL_CLASS} for="auto-firstof-alongside">While waiting, run</label>
+      <select
+        id="auto-firstof-alongside"
+        class={FIELD_CLASS}
+        value={card.alongside ?? ""}
+        title="A command that runs during the wait, like LaunchAll while waiting for Tip. It stops when a row fires."
+        onchange={(e) => {
+          const value = e.currentTarget.value;
+          edit((c) => {
+            if (c.kind !== "firstOf") return;
+            if (value) c.alongside = value;
+            else delete c.alongside;
+          });
+        }}
+      >
+        <option value="">nothing</option>
+        {#if card.alongside && !actions.includes(card.alongside)}<option value={card.alongside}>{card.alongside} (not in the robot's list)</option>{/if}
+        {#each actions as name (name)}<option value={name}>{name}</option>{/each}
+      </select>
     </div>
     <div class="space-y-2">
       {#each card.rows as row, rowIndex (rowIndex)}

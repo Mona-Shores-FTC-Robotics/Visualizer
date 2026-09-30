@@ -80,7 +80,7 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 |---|---|---|
 | `action` | `name`, `timeoutS?`, `previewMs?` | Runs a registered **command** (the editor calls it that; the file keeps the key `action`). On the robot it runs until it finishes or `timeoutS` (default 5 s), exported as `kit.command(name[, timeoutS])`. The preview uses the command's typical time from `registry.typicalS`, else `previewMs` (older files), else instant, never past the timeout. |
 | `path` | `lineId`, `while`, `events`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `while`: actions started with the path. `events`: `{at, action}` with `at` in 0..1 of the path's length. `park`: this is the branch's park path for the endgame guard. |
-| `firstOf` | `label`, `rows` | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. |
+| `firstOf` | `label`, `rows`, `alongside`? | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. `alongside` names a command run *while* it waits ("wait for Tip while LaunchAll"): it starts with the wait and is stopped when a row fires, if still running. |
 | `routine` | `routine`, `at`, `facingDeg`, `mirror`, `exit` | Runs the named routine (see below) placed at the named point `at`, facing `facingDeg`, optionally mirrored left↔right; then drives straight to the named point `exit`. |
 | `goTo` | `label`, `point`, `maxDistanceIn`, `ifRefused` | Drives straight to the named point if it is at most `maxDistanceIn` away; otherwise runs the `ifRefused` cards. |
 | `together` | `label`, `ends`, `cards` | Starts its cards at once; done when `"ALL"` of them are, or the `"FIRST"` one is. Only one of them should drive. |
@@ -118,14 +118,15 @@ optional `label` (the branch's name; defaults to one made from the condition).
 | `{"when": ["A", "B"]}` | when any of the registered conditions is true (OR) |
 | `{"afterMs": 800}` | 800 ms after the card started |
 | `{"timeLeftBelowS": 5}` | when less than 5 s of the 30 s Auto remain |
+| `{"finished": true}` | when the card's `alongside` command finishes by itself (an error without one); counts as a time row, since the command always ends |
 | `{"otherwise": true}` | at once (= `afterMs: 0`): the "else" of an if |
 | `{"nearPoint": "ShootSpot", "radiusIn": 6}` | when the robot is within 6 in of the named point |
 | `{"inArea": ["CornerA", "CornerB"]}` | when the robot is inside the axis-aligned box with those named corners |
 
 Rules the editor enforces (errors block the Java export):
 
-- every `firstOf` has at least one **time row** (`afterMs`, `timeLeftBelowS`
-  or `otherwise`), so nothing can wait forever;
+- every `firstOf` has at least one **time row** (`afterMs`, `timeLeftBelowS`,
+  `otherwise`, or `finished` with a command alongside), so nothing can wait forever;
 - every action and condition name used anywhere is in the registry;
 - a path card names a top-level path that exists;
 - a list of cards has at most one park card, and a `together` holds none;
@@ -191,7 +192,9 @@ contract with the robot's `autokit` library:
   (`Paths.line/curve/through/path` plus a heading suffix); `Interpolator` is
   imported only when a piecewise heading is used;
 - the cards become one `kit.sequence(...)`; a `firstOf` becomes
-  `kit.firstOf(label, rows...)`; a row with cards is `kit.when(...).then(...)`;
+  `kit.firstOf(label, rows...)`, or `kit.firstOf(label, kit.command(name), rows...)` with
+  `alongside`; a row with cards is `kit.when(...).then(...)`, and a `finished` row is
+  `kit.finished()`;
 - a routine card becomes `kit.routine(label, pattern, endsWhen, timeoutMs,
   while[], exit[], exitPose)`, where `pattern` is a `Path` local placed on the
   field (`Paths.line/curve(...).constant(start)`, joined with `Paths.path`),
@@ -242,9 +245,10 @@ happy path); the switches are not saved in the file.
 
 The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
 fastest the Auto can go, ✗ the slowest, and a real run falls between them.
-A trigger asked by several cards (`IntakeFull`) has one answer for all of
-them; triggers that describe what the robot sees now (`RightCellDown`,
-`LeftCellDown`) are separate names for separate questions.
+A trigger asked by several cards (`IntakeFull`, `Tip`) has one answer for all of
+them. While a command runs alongside, ✓ fires when the command would finish (its
+typical time), not at once: the launch is what tips the HIVE, so ✓ is never
+faster than the launch.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field

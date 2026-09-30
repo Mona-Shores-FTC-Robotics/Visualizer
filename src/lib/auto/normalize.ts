@@ -271,6 +271,9 @@ function normalizeCard(
         kind: "firstOf",
         label: typeof raw.label === "string" ? raw.label : "",
         rows,
+        ...(typeof raw.alongside === "string" && raw.alongside.trim()
+          ? { alongside: raw.alongside.trim() }
+          : {}),
       };
     }
     case "routine":
@@ -354,6 +357,7 @@ const ROW_KEYS = [
   "otherwise",
   "nearPoint",
   "inArea",
+  "finished",
 ] as const;
 
 function normalizeRow(
@@ -370,7 +374,7 @@ function normalizeRow(
   if (keys.length !== 1) {
     problems.push(
       keys.length === 0
-        ? `${where} has no condition (when, afterMs, timeLeftBelowS, otherwise, nearPoint or inArea); dropped it.`
+        ? `${where} has no condition (when, afterMs, timeLeftBelowS, otherwise, nearPoint, inArea or finished); dropped it.`
         : `${where} has more than one condition (${keys.join(", ")}); dropped it.`,
     );
     return null;
@@ -400,6 +404,8 @@ function normalizeRow(
     }
     case "otherwise":
       return { ...common, otherwise: true };
+    case "finished":
+      return { ...common, finished: true };
     case "nearPoint": {
       const radius = nonNegative(raw.radiusIn ?? 6, "radiusIn");
       if (typeof raw.nearPoint !== "string" || radius === null) {
@@ -454,6 +460,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           kind: "firstOf",
           label: c.label,
           rows: c.rows.map(row),
+          ...(c.alongside ? { alongside: c.alongside } : {}),
         };
       case "routine":
         return {

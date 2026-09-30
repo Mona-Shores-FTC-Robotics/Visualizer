@@ -304,6 +304,8 @@ export function rowOfKind(kind: RowKind, old: AutoRow | null, auto: AutoSection)
       return { ...common, nearPoint: points[0] ?? "", radiusIn: 6 };
     case "inArea":
       return { ...common, inArea: [points[0] ?? "", points[1] ?? points[0] ?? ""] };
+    case "finished":
+      return { ...common, finished: true };
   }
 }
 

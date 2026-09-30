@@ -19,10 +19,10 @@ public final class RedGardenBasicAuto {
     public static final String SOURCE = "red-garden-basic.pp";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
-    public static final String[] COMMANDS = {"IntakeOff", "IntakeOn", "LaunchAll"};
+    public static final String[] COMMANDS = {"LaunchAll"};
 
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
-    public static final String[] TRIGGERS = {"IntakeFull", "RightCellDown"};
+    public static final String[] TRIGGERS = {"IntakeFull", "Tip"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */
     public static final String DRAWN_FOR = "RED";
@@ -64,33 +64,28 @@ public final class RedGardenBasicAuto {
         Path toPark = Paths.line(loadingFlower, park).constant(park);
 
         return kit.sequence(
-                kit.command("LaunchAll"),
-                kit.firstOf("Did our HIVE tip?",
-                        kit.when("RightCellDown").then(
+                kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
+                        kit.when("Tip").then(
                                 kit.guarded("If tipped", toPark, 1.7,
-                                        kit.command("IntakeOn"),
                                         kit.path("Pass1Ahead", pass1Ahead),
                                         kit.path("Pass1Back", pass1Back),
                                         kit.path("Pass2Left", pass2Left),
                                         kit.path("Pass2Back", pass2Back),
-                                        kit.command("IntakeOff"),
                                         kit.path("ToRearShot", toRearShot),
                                         kit.command("LaunchAll"),
-                                        kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),
+                                        kit.path("ToLoadingFlower", toLoadingFlower),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
-                                        kit.command("IntakeOff"),
                                         kit.command("LaunchAll"),
                                         kit.path("ToPark", toPark))),
-                        kit.afterMs(5000).then(
+                        kit.afterMs(8000).then(
                                 kit.guarded("If not tipped", toPark, 1.7,
                                         kit.path("ToRearShot", toRearShot),
-                                        kit.path("ToLoadingFlower", toLoadingFlower, new String[] {}, AutoKit.at(0.7, "IntakeOn")),
+                                        kit.path("ToLoadingFlower", toLoadingFlower),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
-                                        kit.command("IntakeOff"),
                                         kit.command("LaunchAll"),
                                         kit.path("ToPark", toPark)))));
     }

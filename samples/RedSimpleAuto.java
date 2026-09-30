@@ -22,7 +22,7 @@ public final class RedSimpleAuto {
     public static final String[] COMMANDS = {"LaunchAll"};
 
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
-    public static final String[] TRIGGERS = {"RightCellDown"};
+    public static final String[] TRIGGERS = {"Tip"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */
     public static final String DRAWN_FOR = "RED";
@@ -58,12 +58,11 @@ public final class RedSimpleAuto {
         Path toGarden = Paths.curve(start, toGardenControl1, garden).linear(start, garden);
 
         return kit.sequence(
-                kit.command("LaunchAll"),
-                kit.firstOf("Did our HIVE tip?",
-                        kit.when("RightCellDown").then(
+                kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
+                        kit.when("Tip").then(
                                 kit.path("UnderHive", underHive),
                                 kit.command("LaunchAll")),
-                        kit.afterMs(3000).then(
+                        kit.afterMs(6000).then(
                                 kit.path("ToGarden", toGarden))));
     }
 }

@@ -181,7 +181,7 @@
         "LaunchAll"
       ],
       "conditions": [
-        "RightCellDown"
+        "Tip"
       ],
       "typicalS": {
         "LaunchAll": 3.0
@@ -211,18 +211,13 @@
     },
     "cards": [
       {
-        "id": "shoot-preloads",
-        "kind": "action",
-        "name": "LaunchAll"
-      },
-      {
         "id": "tip-decision",
         "kind": "firstOf",
         "label": "Did our HIVE tip?",
         "rows": [
           {
             "when": [
-              "RightCellDown"
+              "Tip"
             ],
             "label": "Tipped: under the HIVE",
             "cards": [
@@ -242,7 +237,7 @@
             ]
           },
           {
-            "afterMs": 3000,
+            "afterMs": 6000,
             "label": "Not tipped: to the GARDEN",
             "cards": [
               {
@@ -255,7 +250,8 @@
               }
             ]
           }
-        ]
+        ],
+        "alongside": "LaunchAll"
       }
     ],
     "startAt": "Start",

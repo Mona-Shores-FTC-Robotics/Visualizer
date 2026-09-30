@@ -483,17 +483,13 @@
     "drawnFor": "RED",
     "registry": {
       "actions": [
-        "IntakeOff",
-        "IntakeOn",
         "LaunchAll"
       ],
       "conditions": [
-        "RightCellDown",
+        "Tip",
         "IntakeFull"
       ],
       "typicalS": {
-        "IntakeOff": 0.2,
-        "IntakeOn": 0.2,
         "LaunchAll": 3.0
       }
     },
@@ -587,26 +583,16 @@
     },
     "cards": [
       {
-        "id": "a-25",
-        "kind": "action",
-        "name": "LaunchAll"
-      },
-      {
         "id": "tip-decision",
         "kind": "firstOf",
         "label": "Did our HIVE tip?",
         "rows": [
           {
             "when": [
-              "RightCellDown"
+              "Tip"
             ],
             "label": "If tipped",
             "cards": [
-              {
-                "id": "a-1",
-                "kind": "action",
-                "name": "IntakeOn"
-              },
               {
                 "id": "p-2",
                 "kind": "path",
@@ -638,11 +624,6 @@
                 "while": [],
                 "events": [],
                 "park": false
-              },
-              {
-                "id": "a-6",
-                "kind": "action",
-                "name": "IntakeOff"
               },
               {
                 "id": "p-7",
@@ -686,12 +667,7 @@
                 "kind": "path",
                 "lineId": "to-flower",
                 "while": [],
-                "events": [
-                  {
-                    "at": 0.7,
-                    "action": "IntakeOn"
-                  }
-                ],
+                "events": [],
                 "park": false
               },
               {
@@ -710,11 +686,6 @@
                     "cards": []
                   }
                 ]
-              },
-              {
-                "id": "a-14",
-                "kind": "action",
-                "name": "IntakeOff"
               },
               {
                 "id": "p-15",
@@ -740,7 +711,7 @@
             ]
           },
           {
-            "afterMs": 5000,
+            "afterMs": 8000,
             "label": "If not tipped",
             "cards": [
               {
@@ -756,12 +727,7 @@
                 "kind": "path",
                 "lineId": "to-garden-flower",
                 "while": [],
-                "events": [
-                  {
-                    "at": 0.7,
-                    "action": "IntakeOn"
-                  }
-                ],
+                "events": [],
                 "park": false
               },
               {
@@ -780,11 +746,6 @@
                     "cards": []
                   }
                 ]
-              },
-              {
-                "id": "a-21",
-                "kind": "action",
-                "name": "IntakeOff"
               },
               {
                 "id": "p-22",
@@ -809,7 +770,8 @@
               }
             ]
           }
-        ]
+        ],
+        "alongside": "LaunchAll"
       }
     ],
     "startAt": "Start",

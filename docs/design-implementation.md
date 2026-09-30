@@ -62,9 +62,10 @@ Robot-side notes:
   (current high, no piece arriving → back off) belongs in Collect.
 - The race is Ivy's `Groups.race` / `deadline` / `until`; autokit's `firstOf` gains an
   "alongside" command and a "that finished" row.
-- `Tip` needs the wait to remember where the HIVE was when it started (an event, not a plain
-  true/false). Today the robot offers `RightCellDown` / `LeftCellDown`, which are the same thing
-  when the Auto knows which CELL is up.
+- `Tip` is built: `registry.triggerSince("Tip", ...)`, watched afresh by each wait (a TIP under
+  way as the wait starts counts). "While a command" is built too: the wait card's `alongside`,
+  exported as `kit.firstOf(label, kit.command(name), rows...)` with a `kit.finished()` row.
+  "While driving to a spot" is not yet.
 
 ## The one big change: a stop-based model
 

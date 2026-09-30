@@ -74,6 +74,11 @@ export interface FirstOfCard {
   kind: "firstOf";
   label: string;
   rows: AutoRow[];
+  /**
+   * A command run while the card waits ("wait for Tip while LaunchAll"). It starts with the wait;
+   * when a row fires it is stopped if still running. A `finished` row fires when it ends by itself.
+   */
+  alongside?: string;
 }
 
 /**
@@ -135,6 +140,8 @@ export type TimeLeftRow = RowCommon & { timeLeftBelowS: number };
 export type OtherwiseRow = RowCommon & { otherwise: true };
 export type NearPointRow = RowCommon & { nearPoint: string; radiusIn: number };
 export type InAreaRow = RowCommon & { inArea: [string, string] };
+/** Fires when the card's `alongside` command finishes by itself. */
+export type FinishedRow = RowCommon & { finished: true };
 
 export type AutoRow =
   | WhenRow
@@ -142,7 +149,8 @@ export type AutoRow =
   | TimeLeftRow
   | OtherwiseRow
   | NearPointRow
-  | InAreaRow;
+  | InAreaRow
+  | FinishedRow;
 
 export type RowKind =
   | "when"
@@ -150,7 +158,8 @@ export type RowKind =
   | "timeLeftBelowS"
   | "otherwise"
   | "nearPoint"
-  | "inArea";
+  | "inArea"
+  | "finished";
 
 /**
  * One step of a routine's pattern, in inches relative to where the routine
@@ -202,11 +211,15 @@ export function rowKind(row: AutoRow): RowKind {
   if ("timeLeftBelowS" in row) return "timeLeftBelowS";
   if ("nearPoint" in row) return "nearPoint";
   if ("inArea" in row) return "inArea";
+  if ("finished" in row) return "finished";
   return "otherwise";
 }
 
-/** A row that becomes true on the clock alone, so a wait with one cannot hang. */
+/**
+ * A row that becomes true on the clock alone, so a wait with one cannot hang. A `finished` row
+ * counts: the command alongside always ends, by itself or at its timeout.
+ */
 export function isTimeRow(row: AutoRow): boolean {
   const kind = rowKind(row);
-  return kind === "afterMs" || kind === "timeLeftBelowS" || kind === "otherwise";
+  return kind === "afterMs" || kind === "timeLeftBelowS" || kind === "otherwise" || kind === "finished";
 }

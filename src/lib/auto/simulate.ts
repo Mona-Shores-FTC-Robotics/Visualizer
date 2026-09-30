@@ -33,6 +33,15 @@ export function commandSeconds(auto: AutoSection, card: ActionCard): number {
   return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
 }
 
+/**
+ * How long a wait's `alongside` command runs in the preview: its typical time, capped at the
+ * default timeout (the robot runs it with `kit.command(name)`). 0 with none.
+ */
+export function alongsideSeconds(auto: AutoSection, card: FirstOfCard): number {
+  if (!card.alongside) return 0;
+  return Math.min(auto.registry.typicalS?.[card.alongside] ?? 0, DEFAULT_TIMEOUT_S);
+}
+
 /** Length of the Autonomous period, as `AutoKit.AUTO_LENGTH_S`. */
 export const AUTO_LENGTH_S = 30;
 
@@ -244,12 +253,20 @@ export function simulateAuto(
     heading = end.headingDeg;
   };
 
-  /** A row asking conditions fires the moment it is asked if any is answered true. */
-  const fireTime = (cardId: string, row: AutoRow, t0: number): number => {
+  /**
+   * A row asking conditions fires the moment it is asked if any is answered true; while a command
+   * runs alongside, answered true means "by the time it finishes" (the launch is what tips the
+   * HIVE), so ✓ never looks faster than the command it waits on.
+   */
+  const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
+    const cardId = card.id;
+    const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card) : Infinity;
     switch (rowKind(row)) {
+      case "finished":
+        return alongEnd;
       case "when":
         return (row as { when: string[] }).when.some((name) => answerOf(scenario, cardId, name))
-          ? t0
+          ? (card.alongside ? alongEnd : t0)
           : Infinity;
       case "afterMs":
         return t0 + (row as { afterMs: number }).afterMs / 1000;
@@ -319,7 +336,7 @@ export function simulateAuto(
     let winner = -1;
     let at = Infinity;
     card.rows.forEach((row, index) => {
-      const fire = fireTime(card.id, row, t0);
+      const fire = fireTime(card, row, t0);
       if (fire < at - 1e-9) {
         at = fire;
         winner = index;
@@ -336,6 +353,11 @@ export function simulateAuto(
       note(`${label}: no row can ever fire; the robot would wait here forever`, "warn", card.id);
       stalled = true;
       return null;
+    }
+    if (card.alongside) {
+      const along = alongsideSeconds(auto, card);
+      note(`${label}: ${card.alongside} alongside`, "card", card.id);
+      if (at < t0 + along - 1e-9) note(`${card.alongside} stopped after ${(at - t0).toFixed(2)} s`, "event", card.id);
     }
     stay(at - t0);
     const row = card.rows[winner];
@@ -626,10 +648,13 @@ export interface WorstCase {
   rows: Map<string, (number | null)[]>;
 }
 
-function waitLimit(card: FirstOfCard, t0: number): number {
+function waitLimit(card: FirstOfCard, t0: number, alongS = 0): number {
   let limit = Infinity;
   for (const row of card.rows) {
     switch (rowKind(row)) {
+      case "finished":
+        if (card.alongside) limit = Math.min(limit, t0 + alongS);
+        break;
       case "afterMs":
         limit = Math.min(limit, t0 + (row as { afterMs: number }).afterMs / 1000);
         break;
@@ -691,14 +716,15 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
         record(card.id, 0, 1, refused);
         return Math.max(drove, refused);
       } else {
-        const limit = waitLimit(card, t);
+        const alongS = alongsideSeconds(auto, card);
+        const limit = waitLimit(card, t, alongS);
         if (!Number.isFinite(limit)) return Infinity;
         const after = (end: number) => endOf(list, end, i + 1, rest);
         let worst = -Infinity;
         card.rows.forEach((row, rowIndex) => {
           const kind = rowKind(row);
-          const time = kind === "afterMs" || kind === "timeLeftBelowS" || kind === "otherwise"
-            ? waitLimit({ ...card, rows: [row] }, t)
+          const time = kind === "afterMs" || kind === "timeLeftBelowS" || kind === "otherwise" || kind === "finished"
+            ? waitLimit({ ...card, rows: [row] }, t, alongS)
             : limit;
           // A time row later than the earliest one never wins.
           if (time > limit + 1e-9) {

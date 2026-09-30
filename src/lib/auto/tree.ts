@@ -100,6 +100,7 @@ export function usedNames(auto: AutoSection): {
       card.events.forEach((event) => bump(actions, event.action));
     }
     if (card.kind === "firstOf") {
+      if (card.alongside) bump(actions, card.alongside);
       for (const row of card.rows) {
         if ("when" in row) row.when.forEach((name) => bump(conditions, name));
       }
@@ -144,6 +145,8 @@ export function describeRow(row: AutoRow): string {
     }
     case "otherwise":
       return "otherwise";
+    case "finished":
+      return "it finished";
   }
 }
 
@@ -155,6 +158,8 @@ export function rowLabel(row: AutoRow): string {
       return `If ${describeRow(row)}`;
     case "otherwise":
       return "Otherwise";
+    case "finished":
+      return "When it finishes";
     default:
       return `After ${describeRow(row)}`;
   }
