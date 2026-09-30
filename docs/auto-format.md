@@ -208,18 +208,20 @@ compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 
 ## Preview
 
-The preview has one switch per condition the Auto asks, in the Preview
-panel: **✓** it happens, so a row asking it fires the moment its card is
-reached; **✗** it never happens, so the time row fires at its time. There is
-no timing to set. Every condition starts ✓ (the
-happy path); the switches are not saved in the file.
+Each wait that branches has its **own switch**: **✓** its trigger fires, **✗** its
+time limit passes. So "the HIVE did not tip at the first wait, but did at the retry" is two
+switches. A **plain wait** (no cards on either row, like IntakeFull at a FLOWER) is not a switch:
+one answer per trigger holds for every plain wait on it. The trigger chips above the field set
+every wait on that trigger at once (± when they differ). Everything starts ✓ (the happy path);
+the switches are not saved in the file.
 
-The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
-fastest the Auto can go, ✗ the slowest, and a real run falls between them.
-A trigger asked by several cards (`IntakeFull`, `Tip`) has one answer for all of
-them. While a command runs alongside, ✓ fires when the command would finish (its
-typical time), not at once: the launch is what tips the HIVE, so ✓ is never
-faster than the launch.
+✓ fires the moment the wait starts, or, with a command alongside, when the command would finish
+(its typical time), since the launch is what tips the HIVE. ✗ runs to the limit. The in-between
+is not previewed: a real run falls between them.
+
+**Routes** (`src/lib/auto/routes.ts`): every way through the Auto, one choice at each branching
+wait it reaches, ✓ before ✗. Each is timed twice, with every plain wait ✓ and with every plain
+wait ✗, and flagged when it runs past 30 s or the endgame guard parks it.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field

@@ -4,12 +4,13 @@ import { buildPathCatalog } from "./geometry";
 import {
   AUTO_LENGTH_S,
   previewQuestions,
-  questionKey,
+  setTrigger,
   simulateAuto,
+  switchKey,
   worstCase,
   type Scenario,
 } from "./simulate";
-import { findCard } from "./tree";
+import { findCard, isPlainWait } from "./tree";
 import type { AutoSection, FirstOfCard } from "./types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -20,14 +21,19 @@ function run(auto: AutoSection, scenario: Scenario = {}) {
   return { result: simulateAuto(auto, catalog, sample.startPoint, scenario), catalog };
 }
 
-/** Answers false for the given conditions when `cardId` asks them. */
+/** `cardId` times out: its own switch for a branching wait, its triggers for a plain one. */
 function no(cardId: string, ...conditions: string[]): Scenario {
-  return Object.fromEntries(conditions.map((name) => [questionKey(cardId, name), false]));
+  const card = findCard(loadSample().auto.cards, cardId) as FirstOfCard;
+  return isPlainWait(card)
+    ? Object.fromEntries(conditions.map((name) => [name, false]))
+    : { [switchKey(cardId)]: false };
 }
 
 /** Every question in the Auto answered false. */
 function allNo(auto: AutoSection): Scenario {
-  return Object.fromEntries(previewQuestions(auto).map((q) => [questionKey(q.cardId, q.condition), false]));
+  return Object.fromEntries(
+    previewQuestions(auto).map((q) => [q.branching ? switchKey(q.cardId) : q.condition, false]),
+  );
 }
 
 test("unanswered questions are true: the happy path, at the moment they are asked", () => {
@@ -52,13 +58,16 @@ test("answered false, the time row fires at its time", () => {
   assert(Math.abs(firedAt(result) - firedAt(happy) - 1.5) < 1e-9, `${firedAt(happy)} → ${firedAt(result)}`);
 });
 
-test("a condition has one answer, whichever card asks it", () => {
-  // HiveTipped false: both waits on it run to their time limits.
-  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped"));
-  assertEqual(result.taken.get("did-tip"), 1);
-  assertEqual(result.taken.get("near-5"), 1);
+test("each branching wait has its own switch; a trigger's answer sets every wait on it", () => {
+  // Only the first wait times out: the retry's wait on the same trigger still fires.
+  const own = run(loadSample().auto, no("did-tip", "HiveTipped")).result;
+  assertEqual(own.taken.get("did-tip"), 1);
+  assertEqual(own.taken.get("near-5"), 0);
+  // The trigger's answer: both waits time out.
+  const all = run(loadSample().auto, setTrigger({}, loadSample().auto, "HiveTipped", false)).result;
+  assertEqual(all.taken.get("did-tip"), 1);
+  assertEqual(all.taken.get("near-5"), 1);
 });
-
 test("the questions are listed per card, in the order the Auto asks them", () => {
   const questions = previewQuestions(loadSample().auto).map((q) => `${q.cardId}:${q.condition}`);
   assertEqual(questions, [

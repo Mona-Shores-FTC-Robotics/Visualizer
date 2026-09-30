@@ -1,6 +1,6 @@
 import type { BasePoint, StartPose, TimelineEvent } from "../../types";
 import { pointAlong, type PathCatalog, type PathInfo } from "./geometry";
-import { allCards, cardTitle, describeRow, parkCardOf, rowLabel } from "./tree";
+import { allCards, cardTitle, describeRow, isPlainWait, parkCardOf, rowLabel } from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import {
   DEFAULT_TIMEOUT_S,
@@ -35,50 +35,61 @@ export function alongsideSeconds(auto: AutoSection, card: FirstOfCard): number {
 export const AUTO_LENGTH_S = 30;
 
 /**
- * The preview's answers, one per condition: true, the condition is true
- * whenever a card asks it (a row fires at once); false, it never is (every
- * wait on it runs to its time row). Events are separate names (Tip1, Tip2),
- * so "not tipped at the first decision, tipped at the later one" is Tip1
- * false, Tip2 true. Unanswered conditions are true.
+ * The preview's answers. Each wait that branches has its own switch, keyed by `switchKey(card)`:
+ * true, its trigger fires (✓); false, its time limit passes. A plain wait (no cards on either row)
+ * is not a switch: its trigger's answer, keyed by the trigger's name, holds for every plain wait on
+ * it (IntakeFull ✓ or ✗). A branching wait with no switch of its own falls back to its trigger's
+ * answer, so setting a trigger sets every wait on it. Unanswered questions are true.
  */
 export type Scenario = Record<string, boolean>;
 
 /** What a question is before anyone answers it: the happy path. */
 export const DEFAULT_ANSWER = true;
 
-/** Where a condition's answer is kept. The asking card does not matter. */
-export function questionKey(_cardId: string, condition: string): string {
-  return condition;
+/** Where a branching wait's own answer is kept. */
+export function switchKey(cardId: string): string {
+  return `wait:${cardId}`;
 }
 
-export function answerOf(scenario: Scenario, cardId: string, condition: string): boolean {
-  return scenario[questionKey(cardId, condition)] ?? DEFAULT_ANSWER;
+/** Whether `card`'s trigger fires in `scenario`. */
+export function answerFor(scenario: Scenario, card: FirstOfCard, condition: string): boolean {
+  const own = isPlainWait(card) ? undefined : scenario[switchKey(card.id)];
+  return own ?? scenario[condition] ?? DEFAULT_ANSWER;
 }
 
-/** A question the preview asks: a condition in a card's row, or a routine's end condition. */
+/** A question the preview asks: a wait's trigger. */
 export interface PreviewQuestion {
   cardId: string;
   condition: string;
   /** The card asking, as the list names it. */
   card: string;
+  /** True when the wait branches, so it has a switch of its own. */
+  branching: boolean;
 }
 
 /** Every question in the Auto, in the order the Auto reaches the cards. */
 export function previewQuestions(auto: AutoSection): PreviewQuestion[] {
   const questions: PreviewQuestion[] = [];
-  const add = (card: AutoCard, condition: string) => {
-    if (!questions.some((q) => q.cardId === card.id && q.condition === condition)) {
-      questions.push({ cardId: card.id, condition, card: cardTitle(card) });
-    }
-  };
   for (const card of allCards(auto.cards)) {
-    if (card.kind === "firstOf") {
-      for (const row of card.rows) {
-        if ("when" in row) row.when.forEach((name) => add(card, name));
+    if (card.kind !== "firstOf") continue;
+    for (const row of card.rows) {
+      if (!("when" in row)) continue;
+      for (const condition of row.when) {
+        if (questions.some((q) => q.cardId === card.id && q.condition === condition)) continue;
+        questions.push({ cardId: card.id, condition, card: cardTitle(card), branching: !isPlainWait(card) });
       }
     }
   }
   return questions;
+}
+
+/** A scenario where every wait on `condition` answers `yes`: its own switches cleared. */
+export function setTrigger(scenario: Scenario, auto: AutoSection, condition: string, yes: boolean): Scenario {
+  const next: Scenario = { ...scenario, [condition]: yes };
+  for (const q of previewQuestions(auto)) {
+    if (q.condition === condition) delete next[switchKey(q.cardId)];
+  }
+  return next;
 }
 
 export type LogKind = "card" | "row" | "event" | "guard" | "warn" | "end";
@@ -210,19 +221,18 @@ export function simulateAuto(
    * HIVE), so ✓ never looks faster than the command it waits on.
    */
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
-    const cardId = card.id;
     const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card) : Infinity;
     if ("when" in row) {
-      return row.when.some((name) => answerOf(scenario, cardId, name))
+      return row.when.some((name) => answerFor(scenario, card, name))
         ? (card.alongside ? alongEnd : t0)
         : Infinity;
     }
     return t0 + row.afterMs / 1000;
   };
 
-  const whyRow = (cardId: string, row: AutoRow): string => {
+  const whyRow = (card: FirstOfCard, row: AutoRow): string => {
     if (rowKind(row) === "when") {
-      const first = (row as { when: string[] }).when.find((name) => answerOf(scenario, cardId, name));
+      const first = (row as { when: string[] }).when.find((name) => answerFor(scenario, card, name));
       return `${first ?? "condition"} true`;
     }
     return describeRow(row);
@@ -292,8 +302,8 @@ export function simulateAuto(
     const hasCards = card.rows.some((r) => r.cards.length > 0);
     note(
       hasCards
-        ? `${label} → ${rowLabel(row)} (${whyRow(card.id, row)})`
-        : `${label}: ${whyRow(card.id, row)}`,
+        ? `${label} → ${rowLabel(row)} (${whyRow(card, row)})`
+        : `${label}: ${whyRow(card, row)}`,
       "row",
       card.id,
     );

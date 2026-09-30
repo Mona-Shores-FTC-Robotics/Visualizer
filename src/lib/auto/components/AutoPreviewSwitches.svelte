@@ -15,9 +15,9 @@
 
 {#if conditions.length}
   <div class="flex flex-wrap items-center gap-1.5"
-    title="Click a condition: ✓ it happens, ✗ it never does and its waits time out.">
+    title="Set every wait on a trigger at once. Each branching wait also has its own switch in the list.">
     {#each conditions as condition (condition)}
-      <AnswerChip {condition} />
+      <AnswerChip {auto} {condition} />
     {/each}
   </div>
 {/if}

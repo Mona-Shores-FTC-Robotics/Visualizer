@@ -17,6 +17,7 @@
   import { DEFAULT_TIMEOUT_S, rowKind } from "../types";
   import type { Shape, StartPose } from "../../../types";
   import CardEditor from "./CardEditor.svelte";
+  import WaitSwitch from "./WaitSwitch.svelte";
   import RegistryPanel from "./RegistryPanel.svelte";
 
   interface Props {
@@ -222,6 +223,9 @@
         {/if}
       </div>
     </button>
+    {#if card.kind === "firstOf" && !isPlainWait(card)}
+      <WaitSwitch {card} />
+    {/if}
     {#if selected}
       <CardEditor {auto} {catalog} {issues} preview={preview ?? null} {worst} {shapes} />
     {/if}

@@ -3,7 +3,7 @@ import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { loadSample } from "./fixtures/load";
 import { buildPathCatalog } from "./geometry";
 import { normalizeAuto, serializeAuto } from "./normalize";
-import { questionKey, simulateAuto, type Scenario } from "./simulate";
+import { simulateAuto, switchKey, type Scenario } from "./simulate";
 import { findCard } from "./tree";
 import type { AutoSection, FirstOfCard } from "./types";
 
@@ -26,8 +26,8 @@ function run(auto: AutoSection, scenario: Scenario = {}) {
 const firedAt = (auto: AutoSection, scenario: Scenario = {}) =>
   run(auto, scenario).result.log.find((e) => e.cardId === "did-tip" && e.kind === "row")!.t;
 
-const not = (...names: string[]): Scenario =>
-  Object.fromEntries(names.map((name) => [questionKey("did-tip", name), false]));
+// "Did the HIVE tip?" times out (its own switch).
+const not = (..._names: string[]): Scenario => ({ [switchKey("did-tip")]: false });
 
 test("while a command runs, ✓ fires when the command would have finished, not at once", () => {
   const plain = firedAt(sampleWith(() => {}));
