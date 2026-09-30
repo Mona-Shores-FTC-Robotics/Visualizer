@@ -236,7 +236,7 @@
             <span class="auto-bad">path not found</span>
           {/if}
         {:else if card.kind === "firstOf"}
-          {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside} · while {card.alongside}{/if}
+          {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}
         {:else if card.kind === "routine"}
           {@const routine = auto.routines[card.routine]}
           routine · {routine?.endsWhen ? `until ${routine.endsWhen}` : "no end condition"} · exit → {card.exit || "?"}
