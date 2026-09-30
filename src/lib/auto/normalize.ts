@@ -158,6 +158,10 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     cards,
   };
   if (startAt) auto.startAt = startAt;
+  if (raw.linkPaths !== undefined) {
+    const links = nameList(raw.linkPaths, "linkPaths", problems);
+    if (links.length) auto.linkPaths = links;
+  }
   if (typeof raw.exportName === "string" && raw.exportName.trim()) {
     auto.exportName = raw.exportName.trim();
   }
@@ -367,6 +371,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     cards: auto.cards.map(card),
   };
   if (auto.startAt) out.startAt = auto.startAt;
+  if (auto.linkPaths?.length) out.linkPaths = [...auto.linkPaths];
   if (auto.exportName) out.exportName = auto.exportName;
   return out;
 }

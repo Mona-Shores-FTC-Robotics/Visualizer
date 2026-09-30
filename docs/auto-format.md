@@ -122,6 +122,19 @@ branches that both leave the same spot need the Path List to reach that spot
 before each of them; the discontinuity warning says when a card would start
 somewhere the robot is not.
 
+### Where a path starts: link paths
+
+In a `.pp` file each path starts where the one above it in the Path List ends. In an Auto, a
+path starts **where the robot is**: the start pose, or the end of the path before it in the
+Auto. So the editor lays the Path List out in the order the Auto drives it (each wait's ✓ route,
+then its timed-out route), and wherever a path must start somewhere else it puts a straight
+**link path** in front of it, named "Link (never driven)". No card drives a link; `linkPaths`
+lists their ids; the editor rebuilds them after every edit and hides them. A path the Auto drives
+twice can start in only one place (its first use); paths no card drives keep their start and come
+last. Hand-made links from older files (paths named "… never driven …" that no card drives) are
+dropped. The file stays readable by the stock Visualizer, which draws every path where it
+really starts.
+
 ### Named points and pins
 
 A named point is a place with a name: `RearShot`, `Park`. Name the places

@@ -6,6 +6,12 @@ import { normalizeAuto } from "../normalize";
 
 /** The hive-rush sample project, read the way the app reads a file. */
 export function loadSample() {
+  return loadProject(sampleText);
+}
+
+/** A project file's text, read the way the app reads a file. */
+export function loadProject(text: string) {
+  const sampleText = text;
   const data = JSON.parse(sampleText);
   const { auto, problems } = normalizeAuto(data.auto);
   if (!auto) throw new Error("sample has no auto section");

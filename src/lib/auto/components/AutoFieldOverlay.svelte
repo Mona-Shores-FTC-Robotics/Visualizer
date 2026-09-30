@@ -61,7 +61,7 @@
   aria-hidden="true"
 >
   <!-- Paths no card drives: faint, so the whole drawing stays visible. -->
-  {#each catalog.paths.filter((path) => !usedLineIds.has(path.id)) as path (path.id)}
+  {#each catalog.paths.filter((path) => !usedLineIds.has(path.id) && !auto.linkPaths?.includes(path.id)) as path (path.id)}
     <polyline points={polyline(path.samples)} fill="none" stroke="#9a9a9a" stroke-width={unit * 0.35} stroke-dasharray={`${unit} ${unit}`} opacity="0.45" />
   {/each}
 

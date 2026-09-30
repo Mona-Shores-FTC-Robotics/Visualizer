@@ -192,6 +192,7 @@
   import AutoPreviewSwitches from "./lib/auto/components/AutoPreviewSwitches.svelte";
   import AutoTimeline from "./lib/auto/components/AutoTimeline.svelte";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
+  import { relink } from "./lib/auto/links";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
   import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
@@ -2613,6 +2614,24 @@
         draft.points = points;
       }, false);
     }
+  });
+
+  // Link paths: the paths are laid out in the order the Auto drives them, and
+  // wherever one must start somewhere else a hidden link path moves the chain
+  // there (see lib/auto/links.ts). Runs after the pins, after every edit.
+  $effect.pre(() => {
+    const auto = $autoSection;
+    if (!auto) return;
+    const result = relink(startPoint, lines, auto, settings);
+    if (!result.changed) return;
+    untrack(() => {
+      lines = result.lines;
+      sequence = atomicSegments(result.lines).map((line) => ({ kind: "path" as const, lineId: line.id }));
+      updateAuto((draft) => {
+        if (result.linkIds.length) draft.linkPaths = result.linkIds;
+        else delete draft.linkPaths;
+      }, false);
+    });
   });
 
   let autoActive = $derived($autoMode && $autoSection !== null);

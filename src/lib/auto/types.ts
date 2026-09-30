@@ -108,6 +108,11 @@ export interface AutoSection {
   pathEnds: Record<string, string>;
   /** The named point the start pose is on, if any; same rules as `pathEnds`. */
   startAt?: string;
+  /**
+   * Ids of the link paths: straight paths no card drives, which the editor puts in the Path List
+   * so each driven path starts where the robot is (see links.ts). Rebuilt after every edit.
+   */
+  linkPaths?: string[];
   cards: AutoCard[];
 }
 
