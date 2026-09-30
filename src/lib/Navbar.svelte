@@ -39,15 +39,6 @@
   import { exportElementAsPng } from "../utils/exportImage";
   import { exportAutoJava } from "./auto/exportAction";
   import { autoMode, autoSection, loadAutoFrom } from "./auto/store";
-  import { createEmptyAuto } from "./auto/normalize";
-
-  function toggleAutoMode() {
-    if (!$autoMode && !$autoSection) {
-      autoSection.set(createEmptyAuto());
-      recordChange();
-    }
-    autoMode.set(!$autoMode);
-  }
 
   interface Props {
     loadFile: (evt: any) => any;
@@ -578,35 +569,6 @@
     </div>
     <NavDivider />
 
-    <!-- Auto mode: the Path List becomes the whole Autonomous -->
-    <button
-      title={$autoMode
-        ? "Back to the Path List"
-        : "Auto mode: build the whole Autonomous from cards"}
-      onclick={toggleAutoMode}
-      class="console-trigger relative text-sm"
-      class:console-trigger--active={$autoMode}
-      class:console-trigger--muted={!$autoMode}
-      aria-pressed={$autoMode}
-    >
-      <div class="flex items-center gap-1.5">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="2"
-          stroke="currentColor"
-          class="size-5"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4 5h7M4 12h4m-4 7h7M15 5l5 7-5 7M11 12h9"
-          />
-        </svg>
-        <span>Auto</span>
-      </div>
-    </button>
 
     <!-- Multiple Paths Toggle (not in Auto mode, which shows one Auto) -->
     {#if !$autoMode}

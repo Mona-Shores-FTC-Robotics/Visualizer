@@ -1,6 +1,7 @@
 import type { BasePoint } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { childLists, cloneCard, locateCard, makeCardId } from "./tree";
+import { createEmptyAuto } from "./normalize";
 import {
   type AutoCard,
   type AutoRow,
@@ -304,4 +305,22 @@ export function rowOfKind(kind: RowKind, old: AutoRow | null, auto: AutoSection)
     case "inArea":
       return { ...common, inArea: [points[0] ?? "", points[1] ?? points[0] ?? ""] };
   }
+}
+
+/**
+ * An Auto for a project that has none: drive each top-level path once, in
+ * Path List order. So a file from the stock Visualizer opens as an Auto that
+ * does what its Path List did.
+ */
+export function autoFromPaths(lineIds: string[]): AutoSection {
+  const auto = createEmptyAuto();
+  auto.cards = lineIds.map((lineId) => ({
+    id: makeCardId(),
+    kind: "path",
+    lineId,
+    while: [],
+    events: [],
+    park: false,
+  }));
+  return auto;
 }

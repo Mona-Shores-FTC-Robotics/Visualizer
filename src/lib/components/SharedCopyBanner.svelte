@@ -26,38 +26,29 @@
   {/if}
 
   {#if view}
-    <div class="shared-banner" role="status">
+    <div class="shared-banner" role="status"
+      title={`${sharedCopyTitle(view)}. A copy, not the version in git, and not saved. Your own work is set aside until you close it.`}>
       <span class="shared-banner__text">
-        <strong>{sharedCopyTitle(view)}.</strong>
-        A copy, not the version in git, and not saved.
-        {#if view.savedAs}
-          Saved as {view.savedAs}; open it from the file manager to keep working
-          on it.
-        {/if}
-        Your own work is set aside until you close this.
+        <strong>Shared copy</strong>{#if view.savedAs} · saved as {view.savedAs}{/if}
       </span>
-      <div class="flex gap-2 shrink-0">
-        <button class="console-action" onclick={onSave}>Save as new file</button
-        >
-        <button class="console-action console-action--accent" onclick={onClose}>
-          Close and return to my work
-        </button>
-      </div>
+      <button class="console-action" onclick={onSave}>Save as new file</button>
+      <button class="console-action" onclick={onClose}>Close</button>
     </div>
   {/if}
 </div>
 
 <style>
-  /* Floats just under the top bar, over the field's top edge. */
+  /* A small bar in the bottom-left corner, clear of the field and its play bar. */
   .shared-stack {
     position: fixed;
-    top: 5.4rem;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 1.25rem;
+    left: 1.5rem;
     z-index: 40;
-    width: min(60rem, calc(100vw - 2rem));
+    width: max-content;
+    max-width: calc(100vw - 2rem);
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 0.5rem;
     pointer-events: none;
   }
@@ -68,8 +59,8 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.9rem;
+    font-size: 0.75rem;
     color: #e8e8e8;
     background: #2a2414;
     border: 1px solid #6b5a1e;

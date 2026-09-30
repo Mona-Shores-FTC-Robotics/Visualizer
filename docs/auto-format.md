@@ -12,31 +12,23 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 - the stock Visualizer opens our files (it ignores `auto`), and
 - a project without an Auto is written exactly as before (no `auto` key).
 
-## Using Auto mode
+## Using the editor
 
-- **Auto** in the top bar swaps the Path List for the Auto's card list and the
-  Controls panel for the Auto panel (the first time, it adds an empty `auto`
-  section). Paths are still drawn and edited on the field as usual.
-- **+ Action / + Wait for / + Decision / + Path / + Routine / + Go to /
-  + Together** add a card after the selected
-  card; select a decision's branch header to add at the end of that branch.
-  The selected card has ↑ ↓ ✕ in the list and Duplicate / Delete in the panel.
-- The panel edits the selected card: the action; a path card's path,
-  while-driving chips, events bar (click to add, drag to move, arrow keys to
-  nudge) and park checkbox; a wait's or decision's rows; a routine's placement,
-  with a fit check against the walls and keep-out zones, and the **routine
-  editor** (steps table, a pattern canvas whose points drag, end condition,
-  timeout, while and exit actions).
-- **Robot actions & conditions** is the registry, plus the alliance the Auto
-  is drawn for, the export name and the named points (each shows what uses
-  it, or "unused").
-- A path card's **Ends at** puts the path's end on a named point, or names the
-  end where it is ("Name it"); "Start is" does the same for the start pose.
-  See [Named points and pins](#named-points-and-pins).
-- Each condition a card asks has a **T/F** answer next to it, in the card list
-  and under **Preview as**; the playback bar, robot and log follow the answers.
-  Untaken branches are dashed on the field and dimmed in the list.
-- **Export .java** (or Export → Export Auto (Java)) downloads the class.
+The fork is one screen: the **Auto** on the left, the **field** on the right.
+A file without an Auto opens with one path card per path, in Path List order.
+
+- **+ Action / + Wait for / + Decision / + Path** add a card after the
+  selected card (or at the end of a selected branch); **More** has Routine,
+  Go to and Together. **+ Path** and the field's **+ Add Path** make a new
+  path that starts where the robot is at that point of the Auto.
+- Click a card to edit it in place, under the card. A path card shows
+  **Ends at** and **Park path**; **more** has the path, while-driving actions
+  and events. Clicking a path on the field selects its card.
+- Above the field: one switch per condition (**✓** happens, **✗** never
+  does). Below it: the play bar, the time against 30 s and the worst case.
+  While it plays, the running card is outlined.
+- **Setup** (start pose, registry, named points, alliance, export name) and
+  **Export** are in the Auto header.
 
 ## Shape
 

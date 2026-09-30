@@ -43,19 +43,12 @@
   let selection = $derived(parseSelection($selectedCardId));
   let card: AutoCard | null = $derived(findCard(auto.cards, selection.cardId));
   let cardIssues = $derived(card ? issues.filter((issue) => issue.cardId === card!.id) : []);
-  let where = $derived.by(() => {
-    if (!card) return "";
-    const location = locateCard(auto.cards, card.id);
-    if (!location?.parent) return "Main sequence";
-    const parent = location.parent;
-    return parent.card.kind === "firstOf"
-      ? `${listLabel(parent)} · in ${parent.card.label || "a decision"}`
-      : `In ${listLabel(parent)}`;
-  });
   let actions = $derived(auto.registry.actions);
   let conditions = $derived(auto.registry.conditions);
   let pointNames = $derived(Object.keys(auto.points));
   let newEndName = $state("");
+  /** Whether a path card shows its rarely used settings (which path, while, events). */
+  let showMore = $state(false);
 
   /** Puts a path's end on a named point ("" takes it off); the end moves to the point. */
   function pinEnd(segmentId: string, name: string) {
@@ -203,29 +196,8 @@
 
 {#if card}
 <div class={SECTION_CLASS}>
-  <div class="flex items-start justify-between gap-3 border-b border-[#333333] pb-2">
-    <div>
-      <div class="font-semibold text-gray-100">
-        {#if card.kind === "action"}
-          Action
-        {:else if card.kind === "path"}
-          Path
-        {:else if card.kind === "routine"}
-          Routine
-        {:else if card.kind === "goTo"}
-          Go to
-        {:else if card.kind === "together"}
-          Together
-        {:else if isPlainWait(card)}
-          Wait
-        {:else}
-          Decision
-        {/if}
-      </div>
-      <div class="text-[11px] text-gray-500">
-        {where}
-      </div>
-    </div>
+  <!-- Shown inside the card list, under its card: the card itself is the title. -->
+  <div class="flex items-center justify-end gap-3">
     {#if card}
       <div class="flex flex-wrap items-center justify-end gap-1.5 text-[10px]">
         <button type="button" class={ACTION_CLASS} disabled={!canMove(auto, card.id, -1)} onclick={() => move(-1)} title="Move up">↑</button>
@@ -272,37 +244,6 @@
     </div>
   {:else if card?.kind === "path"}
     {@const info = catalog.byId.get(card.lineId)}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
-      <div class="{CELL_CLASS} col-span-2">
-        <span class={LABEL_CLASS}>Path</span>
-        <select
-          class={FIELD_CLASS}
-          class:!border-red-600={!info}
-          value={card.lineId}
-          onchange={(e) => edit((c) => { if (c.kind === "path") c.lineId = e.currentTarget.value; })}
-          aria-label="Path to drive"
-        >
-          {#if !info}
-            <option value={card.lineId}>(missing path)</option>
-          {/if}
-          {#each catalog.paths as path (path.id)}
-            <option value={path.id}>{path.name} — to {path.end.x.toFixed(1)}, {path.end.y.toFixed(1)}</option>
-          {/each}
-        </select>
-      </div>
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Length · time</span>
-        <span class="font-mono text-gray-100">{info ? `${info.length.toFixed(0)} in · ${seconds(info.seconds)}` : "—"}</span>
-      </div>
-      <label class="{CELL_CLASS} flex cursor-pointer items-center gap-2">
-        <input
-          type="checkbox"
-          checked={card.park}
-          onchange={(e) => edit((c) => { if (c.kind === "path") c.park = e.currentTarget.checked; })}
-        />
-        <span class="font-semibold text-gray-100" title="The endgame guard drives this path when time is short.">Park path</span>
-      </label>
-    </div>
     {#if info}
       {@const pinned = auto.pathEnds[info.endSegmentId]}
       <div class="{CELL_CLASS} text-[11px] text-gray-300">
@@ -326,6 +267,39 @@
         {/if}
       </div>
     {/if}
+      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-gray-300">
+        <input
+          type="checkbox"
+          checked={card.park}
+          onchange={(e) => edit((c) => { if (c.kind === "path") c.park = e.currentTarget.checked; })}
+        />
+        <span class="font-semibold text-gray-100" title="The endgame guard drives this path when time is short.">Park path</span>
+      </label>
+    <button type="button" class="self-start text-[11px] text-gray-500 hover:text-gray-200" onclick={() => (showMore = !showMore)}>{showMore ? "less ▴" : "more ▾"}</button>
+    {#if showMore}
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+      <div class="{CELL_CLASS} col-span-2">
+        <span class={LABEL_CLASS}>Path</span>
+        <select
+          class={FIELD_CLASS}
+          class:!border-red-600={!info}
+          value={card.lineId}
+          onchange={(e) => edit((c) => { if (c.kind === "path") c.lineId = e.currentTarget.value; })}
+          aria-label="Path to drive"
+        >
+          {#if !info}
+            <option value={card.lineId}>(missing path)</option>
+          {/if}
+          {#each catalog.paths as path (path.id)}
+            <option value={path.id}>{path.name} — to {path.end.x.toFixed(1)}, {path.end.y.toFixed(1)}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="{CELL_CLASS} col-span-2">
+        <span class={LABEL_CLASS}>Length · time</span>
+        <span class="font-mono text-gray-100">{info ? `${info.length.toFixed(0)} in · ${seconds(info.seconds)}` : "—"}</span>
+      </div>
+    </div>
     <div class={CELL_CLASS}>
       <span class={LABEL_CLASS}>While driving</span>
       {@render chips(
@@ -345,6 +319,7 @@
           edit((c) => { if (c.kind === "path") c.events = events; }, done)}
       />
     </div>
+    {/if}
   {:else if card?.kind === "firstOf"}
     <div class={CELL_CLASS}>
       <label class={LABEL_CLASS} for="auto-firstof-label">{isPlainWait(card) ? "Wait name" : "Question"}</label>

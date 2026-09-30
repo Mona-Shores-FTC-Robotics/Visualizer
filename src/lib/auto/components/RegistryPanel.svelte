@@ -15,9 +15,12 @@
     /** Display name of every path, by id, for "used by". */
     pathNames: Map<string, string>;
     startPoint: StartPose;
+    /** Shown as a dialog: always open, with a Close button instead of Hide. */
+    alwaysOpen?: boolean;
+    onClose?: () => void;
   }
 
-  let { auto, defaultExportName, robotAt, pathNames, startPoint = $bindable() }: Props = $props();
+  let { auto, defaultExportName, robotAt, pathNames, startPoint = $bindable(), alwaysOpen = false, onClose }: Props = $props();
   let uses = $derived(pointUses(auto));
 
   function describeUse(name: string): string {
@@ -40,7 +43,8 @@
     });
   }
 
-  let open = $state(false);
+  let expanded = $state(false);
+  let open = $derived(alwaysOpen || expanded);
   let used = $derived(usedNames(auto));
   let newAction = $state("");
   let newCondition = $state("");
@@ -158,9 +162,9 @@
 {/snippet}
 
 <div class={SECTION_CLASS}>
-  <button type="button" class="flex w-full items-center justify-between gap-2 text-left" onclick={() => (open = !open)} aria-expanded={open}>
+  <button type="button" class="flex w-full items-center justify-between gap-2 text-left" onclick={() => (alwaysOpen ? onClose?.() : (expanded = !expanded))} aria-expanded={open}>
     <span class="font-semibold text-gray-100" title="Start pose, actions and conditions, named points, alliance, export name">Setup</span>
-    <span class="text-[11px] text-gray-400">{open ? "Hide" : "Show"}</span>
+    <span class="text-[11px] text-gray-400">{alwaysOpen ? "Close" : open ? "Hide" : "Show"}</span>
   </button>
 
   {#if unregistered.actions.length || unregistered.conditions.length}

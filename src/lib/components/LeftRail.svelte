@@ -180,6 +180,8 @@
   class="panel-box side-rail side-rail-left"
   class:side-rail--collapsed={hidden}
 >
+  <!-- The Auto (listOverride) shows the file name in the top bar instead. -->
+  {#if !listOverride}
   <section class="module-box">
     <div class="module-header-row">
       <h3 class="module-title">File</h3>
@@ -199,6 +201,7 @@
     <p class="module-caption">Export name</p>
     <div class="module-mono">{fileName}</div>
   </section>
+  {/if}
 
   {#if listOverride}
     {@render listOverride()}

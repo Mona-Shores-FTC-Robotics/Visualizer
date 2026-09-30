@@ -186,14 +186,15 @@
     selectedCardId,
   } from "./lib/auto/store";
   import { allCards, findCard } from "./lib/auto/tree";
-  import { insertPathCard, newPathStart } from "./lib/auto/edit";
+  import { autoFromPaths, insertPathCard, newPathStart } from "./lib/auto/edit";
+  import AutoPreviewSwitches from "./lib/auto/components/AutoPreviewSwitches.svelte";
+  import AutoTimeline from "./lib/auto/components/AutoTimeline.svelte";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
   import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
-  import AutoControlPanel from "./lib/auto/components/AutoControlPanel.svelte";
   import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
@@ -2588,6 +2589,17 @@
   });
 
   let autoActive = $derived($autoMode && $autoSection !== null);
+  // This fork is one screen, the Auto: a project without one gets an Auto that
+  // drives its paths in Path List order, and Auto mode is always on. The right
+  // panel is not used; the Auto list and the field hold everything.
+  $effect(() => {
+    if (!isLoaded) return;
+    if (!$autoSection) {
+      untrack(() => autoSection.set(autoFromPaths(lines.map((line) => line.id))));
+    }
+    if (!$autoMode) autoMode.set(true);
+    if (!rightPanelHidden) rightPanelHidden = true;
+  });
   // Auto mode: selecting a path card selects its path, so the field shows that
   // path's control points (and only that path's) and the toolbar edits it.
   $effect(() => {
@@ -3345,6 +3357,19 @@
             issues={autoIssues}
             preview={autoPreview}
             worst={autoWorst}
+            {shapes}
+            now={autoPreview ? (percent / 100) * autoPreview.endTime : 0}
+            bind:startPoint
+            defaultExportName={pathStem($currentFilePath) || "untitled"}
+            robotAt={{ x: x.invert(robotXY.x), y: y.invert(robotXY.y) }}
+            onExport={() =>
+              exportAutoJava({
+                startPoint,
+                lines,
+                shapes,
+                settings,
+                sourceFileName: basename($currentFilePath) || "untitled.pp",
+              })}
           />
         {/if}
       {/snippet}
@@ -3359,10 +3384,11 @@
       <main class="panel-box center-stage">
         <div class="module-header-row mb-2">
           <h3 class="module-title">Field</h3>
-          {#if autoActive}
-            <label class="module-caption flex items-center gap-2">
+          {#if autoActive && $autoSection}
+            <AutoPreviewSwitches auto={$autoSection} />
+            <label class="module-caption flex items-center gap-2" title="Draw the branches this preview does not take, dashed">
               <input type="checkbox" bind:checked={showUntakenBranches} />
-              Show untaken branches (dashed)
+              Other branches
             </label>
           {:else}
             <span class="module-caption">Click a line or point to select it</span>
@@ -3485,11 +3511,25 @@
             {/if}
           </div>
         </div>
-        <div class="module-footer">
-          Field · {FIELD_SIZE}&quot; x {FIELD_SIZE}&quot;
-        </div>
+        {#if autoActive && autoPreview}
+          <AutoTimeline
+            preview={autoPreview}
+            worst={autoWorst}
+            {playing}
+            {play}
+            {pause}
+            bind:percent
+            {handleSeek}
+            bind:loopAnimation
+          />
+        {:else}
+          <div class="module-footer">
+            Field · {FIELD_SIZE}&quot; x {FIELD_SIZE}&quot;
+          </div>
+        {/if}
       </main>
 
+      {#if !autoActive}
       <PanelDivider
         side="right"
         hidden={rightPanelHidden}
@@ -3524,37 +3564,7 @@
             </button>
           </div>
         </div>
-        {#if autoActive && $autoSection && autoCatalog && autoPreview}
-          <AutoControlPanel
-            auto={$autoSection}
-            catalog={autoCatalog}
-            issues={autoIssues}
-            preview={autoPreview}
-            worst={autoWorst}
-            bind:startPoint
-            {robotXY}
-            {robotHeading}
-            {x}
-            {y}
-            {playing}
-            {play}
-            {pause}
-            bind:percent
-            {handleSeek}
-            bind:loopAnimation
-            defaultExportName={pathStem($currentFilePath) || "untitled"}
-            {shapes}
-            onExport={() =>
-              exportAutoJava({
-                startPoint,
-                lines,
-                shapes,
-                settings,
-                sourceFileName: basename($currentFilePath) || "untitled.pp",
-              })}
-          />
-        {:else}
-        <ControlTab
+                <ControlTab
           bind:playing
           {play}
           {pause}
@@ -3577,8 +3587,8 @@
           bind:loopAnimation
           {recordChange}
         />
-        {/if}
       </aside>
+      {/if}
     </div>
   </div>
 {/if}

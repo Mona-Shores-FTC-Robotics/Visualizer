@@ -15,6 +15,9 @@
   } from "../store";
   import { branchColor, cardColors, seconds, TRUNK_COLOR } from "./ui";
   import { rowKind } from "../types";
+  import type { Shape, StartPose } from "../../../types";
+  import CardEditor from "./CardEditor.svelte";
+  import RegistryPanel from "./RegistryPanel.svelte";
 
   interface Props {
     auto: AutoSection;
@@ -22,9 +25,41 @@
     issues: AutoIssue[];
     preview: PreviewResult | null;
     worst: WorstCase | null;
+    shapes: Shape[];
+    /** Seconds into the preview the playback is at. */
+    now: number;
+    startPoint: StartPose;
+    defaultExportName: string;
+    /** Where the robot is now, in inches: Setup's "Add at robot" puts a point there. */
+    robotAt: { x: number; y: number };
+    onExport: () => void;
   }
 
-  let { auto, catalog, issues, preview, worst }: Props = $props();
+  let {
+    auto,
+    catalog,
+    issues,
+    preview,
+    worst,
+    shapes,
+    now,
+    startPoint = $bindable(),
+    defaultExportName,
+    robotAt,
+    onExport,
+  }: Props = $props();
+
+  let setupOpen = $state(false);
+  let errorCount = $derived(issues.filter((issue) => issue.level === "error").length);
+  /** The card the preview is running at `now`: the last one the log reached. */
+  let runningId = $derived.by(() => {
+    let id: string | null = null;
+    for (const entry of preview?.log ?? []) {
+      if (entry.t > now + 1e-6) break;
+      if (entry.cardId) id = entry.cardId;
+    }
+    return id;
+  });
 
   let selection = $derived(parseSelection($selectedCardId));
   let colors = $derived(cardColors(auto.cards));
@@ -153,6 +188,7 @@
     class="list-item-box compact auto-card"
     class:list-item-box--selected={selected}
     class:auto-card--off={isOff(card.id)}
+    class:auto-card--running={runningId === card.id}
     style={`border-left: 3px solid ${colors.get(card.id) ?? TRUNK_COLOR}`}
   >
     <button type="button" class="auto-card-main" onclick={() => select(card.id)}>
@@ -235,14 +271,7 @@
       {/if}
     </button>
     {#if selected}
-      <div class="auto-card-tools">
-        <button type="button" class="path-list-action" title="Move up" aria-label="Move up"
-          disabled={!canMove(auto, card.id, -1)} onclick={() => move(card.id, -1)}>↑</button>
-        <button type="button" class="path-list-action" title="Move down" aria-label="Move down"
-          disabled={!canMove(auto, card.id, 1)} onclick={() => move(card.id, 1)}>↓</button>
-        <button type="button" class="path-list-action" title="Delete card" aria-label="Delete card"
-          onclick={() => remove(card.id)}>✕</button>
-      </div>
+      <CardEditor {auto} {catalog} {issues} preview={preview ?? null} {worst} {shapes} />
     {/if}
   </div>
 {/snippet}
@@ -330,8 +359,23 @@
 <section class="module-box module-fill auto-list-box">
   <div class="module-header-row">
     <h3 class="module-title">Auto</h3>
-    <span class="module-caption">{cardCount} card{cardCount === 1 ? "" : "s"} · drawn for {auto.drawnFor}</span>
+    <span class="module-caption">{cardCount} card{cardCount === 1 ? "" : "s"} · {auto.drawnFor}</span>
+    <span class="auto-head-actions">
+      <button type="button" class="path-list-action" onclick={() => (setupOpen = true)}
+        title="Start pose, actions and conditions, named points, alliance, export name">Setup</button>
+      <button type="button" class="path-list-action" onclick={onExport}
+        title={errorCount ? `${errorCount} problem${errorCount === 1 ? "" : "s"} to fix first (marked ! on the cards)` : "Download the Java for the robot"}
+        >{errorCount ? `Export · ${errorCount} !` : "Export"}</button>
+    </span>
   </div>
+  {#if setupOpen}
+    <div class="auto-modal" role="presentation" onclick={(e) => { if (e.target === e.currentTarget) setupOpen = false; }}>
+      <div class="auto-modal-body" role="dialog" aria-label="Setup">
+        <RegistryPanel {auto} {defaultExportName} {robotAt} pathNames={catalog.names} bind:startPoint
+          alwaysOpen onClose={() => (setupOpen = false)} />
+      </div>
+    </div>
+  {/if}
   <div class="auto-add-row">
     <button type="button" class="path-list-action" onclick={() => add("action")} title="Add an action after the selected card">+ Action</button>
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
@@ -389,6 +433,29 @@
   }
   .auto-card--off {
     opacity: 0.5;
+  }
+  .auto-card--running {
+    box-shadow: 0 0 0 2px #3fcf8e;
+  }
+  .auto-head-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+  .auto-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6rem 1rem 1rem;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .auto-modal-body {
+    width: min(560px, 100%);
+    max-height: calc(100vh - 8rem);
+    overflow: auto;
   }
   .auto-card-main {
     display: block;
