@@ -168,6 +168,24 @@ A bigger one with collection passes, a FLOWER pickup and parking is `samples/red
 
 ## What still hurts
 
+- **Step types are not recognisable.** A path step is marked only by a small "↝" glyph; the mentor
+  could not tell it was a path. Commands, paths and waits need distinct shapes and colors.
+
+  ![A path step today](design-brief/path-card-today.png)
+
+- **Setup is a grab bag.** One dialog mixes the start pose (which is also the named point
+  "Start", shown twice), the robot's registered commands and triggers, the alliance, the export
+  name and the named points, with placeholder text (ShootAll, LauncherReady, ShootSpot) that reads
+  like data, bookkeeping ("used 2×"), a lock icon, and "Start is" / "Add at robot" controls that
+  need explaining. The start pose has no heading field while the named points do.
+
+  ![Setup today](design-brief/setup-today.png)
+
+  What it has to hold: the start pose (a named spot like any other, touching a wall); the list of
+  commands and triggers the robot code registers (ideally read from the robot code, not typed);
+  the alliance the Auto is drawn for; the export name; and the named spots. Most of it is set once
+  per season; the named spots are edited all the time and probably belong on the field.
+
 - Building decisions (above).
 - The step list and the field are two separate pictures of the same Auto. Your eye goes back and
   forth to connect "UnderHive" in the list with the green line on the field.
