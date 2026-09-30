@@ -103,3 +103,14 @@ export function snapPointToGrid(
     ),
   };
 }
+
+/**
+ * Shift-drag: keep the point level with `anchor` (same y) or plumb with it
+ * (same x), whichever the point is already closer to, so a path runs exactly
+ * along the field's x or y axis.
+ */
+export function lockToAxis(point: BasePoint, anchor: BasePoint): BasePoint {
+  return Math.abs(point.x - anchor.x) >= Math.abs(point.y - anchor.y)
+    ? { x: point.x, y: anchor.y }
+    : { x: anchor.x, y: point.y };
+}

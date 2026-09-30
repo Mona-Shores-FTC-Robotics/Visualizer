@@ -67,6 +67,7 @@
     PointRegistry,
     pointKey,
     snapPointToGrid,
+    lockToAxis,
   } from "./lib/canvas/pointRefs";
   import {
     PANEL_DIVIDER_WIDTH,
@@ -1582,6 +1583,9 @@
     let currentElem: string | null = null;
     let isDown = false;
     let dragOffset = { x: 0, y: 0 }; // Store offset to prevent snapping to center
+    // What Shift-drag keeps the point in line with: a path point's segment
+    // start (the previous point, or the start pose), otherwise where the drag began.
+    let dragAnchor: BasePoint | null = null;
     const isLockedPathElem = (id: string | null): boolean => {
       const ref = pointRegistry.resolve(id);
       // A path's start point is not lockable through this guard.
@@ -1656,11 +1660,13 @@
         const yPos = evt.clientY - rect.top;
 
         // Apply drag offset (in inches) to the raw mouse position
-        const { x: inchX, y: inchY } = snapPointToGrid(
+        const snapped = snapPointToGrid(
           x.invert(xPos) + dragOffset.x,
           y.invert(yPos) + dragOffset.y,
           gridSnapOptions(),
         );
+        const { x: inchX, y: inchY } =
+          evt.shiftKey && dragAnchor ? lockToAxis(snapped, dragAnchor) : snapped;
 
         const ref = pointRegistry.resolve(currentElem);
         if (!ref || ref.locked) return;
@@ -1798,6 +1804,15 @@
           x: (ref?.point.x ?? 0) - mouseX,
           y: (ref?.point.y ?? 0) - mouseY,
         };
+        const segmentStart =
+          ref?.container === "main"
+            ? segmentStartById(startPoint, lines, ref.lineId)
+            : null;
+        dragAnchor = segmentStart
+          ? { x: segmentStart.x, y: segmentStart.y }
+          : ref
+            ? { x: ref.point.x, y: ref.point.y }
+            : null;
       }
     });
 
@@ -1814,6 +1829,7 @@
 
       isDown = false;
       dragOffset = { x: 0, y: 0 };
+      dragAnchor = null;
       recordChange();
     });
 
@@ -3391,7 +3407,7 @@
               Other branches
             </label>
           {:else}
-            <span class="module-caption">Click a line or point to select it</span>
+            <span class="module-caption" title="Hold Shift while dragging a path point to keep it level or plumb with the previous point, so the path runs exactly along x or y">Click a line or point to select it · Shift-drag: straight along x or y</span>
           {/if}
         </div>
         <FieldToolbar
