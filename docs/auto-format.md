@@ -243,8 +243,8 @@ happy path); the switches are not saved in the file.
 The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
 fastest the Auto can go, ✗ the slowest, and a real run falls between them.
 A trigger asked by several cards (`IntakeFull`) has one answer for all of
-them; triggers that describe what the robot sees now (`HiveLeftGarden`,
-`HiveLeftLoading`) are separate names for separate questions.
+them; triggers that describe what the robot sees now (`RightCellDown`,
+`LeftCellDown`) are separate names for separate questions.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field

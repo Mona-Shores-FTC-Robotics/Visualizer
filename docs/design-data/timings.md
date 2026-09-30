@@ -9,20 +9,20 @@ matches fall between.
 
 ## Every outcome
 
-HiveLeftGarden is asked twice (first wait, retry wait). A single ✓/✗ switch answers both, so the
+RightCellDown is asked twice (first wait, retry wait). A single ✓/✗ switch answers both, so the
 "✗ at the first wait, ✓ at the retry" rows were run with the retry wait's trigger answered
 separately.
 
-| HiveLeftGarden | HiveLeftLoading | IntakeFull | Route | Ends at (s) | Bailout? |
+| RightCellDown | LeftCellDown | IntakeFull | Route | Ends at (s) | Bailout? |
 |---|---|---|---|---:|---|
 | ✓ | ✓ | ✓ | main plan → park | 13.89 | no |
 | ✓ | ✓ | ✗ | main plan → park | 15.89 | no |
 | ✓ | ✗ | ✓ | main plan → second FLOWER → park | 25.55 | no |
 | ✓ | ✗ | ✗ | main plan → second FLOWER → park | 29.55 | no |
-| ✗ | ✓ | ✓ | retry, then park (HiveLeftLoading never asked) | 19.83 | no |
-| ✗ | ✓ | ✗ | retry, then park (HiveLeftLoading never asked) | 21.83 | no |
-| ✗ | ✗ | ✓ | retry, then park (HiveLeftLoading never asked) | 19.83 | no |
-| ✗ | ✗ | ✗ | retry, then park (HiveLeftLoading never asked) | 21.83 | no |
+| ✗ | ✓ | ✓ | retry, then park (LeftCellDown never asked) | 19.83 | no |
+| ✗ | ✓ | ✗ | retry, then park (LeftCellDown never asked) | 21.83 | no |
+| ✗ | ✗ | ✓ | retry, then park (LeftCellDown never asked) | 19.83 | no |
+| ✗ | ✗ | ✗ | retry, then park (LeftCellDown never asked) | 21.83 | no |
 | ✗ first wait, ✓ retry | ✓ | ✓ | retry, rejoin main plan → park | 23.80 | no |
 | ✗ first wait, ✓ retry | ✓ | ✗ | retry, rejoin main plan → park | 27.80 | no |
 | ✗ first wait, ✓ retry | ✗ | ✓ | retry, rejoin main plan → second FLOWER → park | 30.00 | **yes** |
@@ -48,13 +48,13 @@ Durations of waits are the time actually waited; "at most" is the wait's limit.
 | Step | Kind | Start (s) | Duration (s) | Timeout / end spot · distance |
 |---|---|---:|---:|---|
 | LaunchAll | command | 0.00 | 3.00 | timeout 5 s |
-| Did the HIVE tip? | wait | 3.00 | 0.00 | at most 3 s → Tipped: to the LOADING side (HiveLeftGarden true) |
+| Did the HIVE tip? | wait | 3.00 | 0.00 | at most 3 s → Tipped: to the LOADING side (RightCellDown true) |
 | StartToFlower | path | 3.00 | 4.43 | → LoadingFlower · 123.8 in |
 | IntakeOn | command | 7.43 | 0.20 | timeout 1 s |
 | Collect at the LOADING FLOWER | wait | 7.63 | 0.00 | at most 2 s → IntakeFull true |
 | FlowerToLoadingShot | path | 7.63 | 1.51 | → LoadingShot · 17 in |
 | LaunchAll | command | 9.14 | 3.00 | timeout 5 s |
-| Did the HIVE tip back? | wait | 12.14 | 0.00 | at most 3 s → Tipped back: park (HiveLeftLoading true) |
+| Did the HIVE tip back? | wait | 12.14 | 0.00 | at most 3 s → Tipped back: park (LeftCellDown true) |
 | ShotToPark (park) | path | 12.14 | 1.75 | → Park · 23.1 in |
 | **End** | | **13.89** | | |
 
@@ -63,7 +63,7 @@ Durations of waits are the time actually waited; "at most" is the wait's limit.
 | Step | Kind | Start (s) | Duration (s) | Timeout / end spot · distance |
 |---|---|---:|---:|---|
 | LaunchAll | command | 0.00 | 3.00 | timeout 5 s |
-| Did the HIVE tip? | wait | 3.00 | 0.00 | at most 3 s → Tipped: to the LOADING side (HiveLeftGarden true) |
+| Did the HIVE tip? | wait | 3.00 | 0.00 | at most 3 s → Tipped: to the LOADING side (RightCellDown true) |
 | StartToFlower | path | 3.00 | 4.43 | → LoadingFlower · 123.8 in |
 | IntakeOn | command | 7.43 | 0.20 | timeout 1 s |
 | Collect at the LOADING FLOWER | wait | 7.63 | 0.00 | at most 2 s → IntakeFull true |
@@ -104,7 +104,7 @@ Durations of waits are the time actually waited; "at most" is the wait's limit.
 | Collect the GARDEN POLLEN | wait | 8.68 | 2.00 | at most 2 s → 2000 ms passed |
 | GardenToShot | path | 10.68 | 1.85 | → GardenShot · 25.6 in |
 | LaunchAll | command | 12.53 | 3.00 | timeout 5 s |
-| Did it tip this time? | wait | 15.53 | 0.00 | at most 3 s → Tipped on the retry: rejoin (HiveLeftGarden@retry true) |
+| Did it tip this time? | wait | 15.53 | 0.00 | at most 3 s → Tipped on the retry: rejoin (RightCellDown@retry true) |
 | GardenShotToFlower | path | 15.53 | 3.81 | → LoadingFlower · 99.1 in |
 | IntakeOn | command | 19.34 | 0.20 | timeout 1 s |
 | Collect at the LOADING FLOWER | wait | 19.54 | 2.00 | at most 2 s → 2000 ms passed |

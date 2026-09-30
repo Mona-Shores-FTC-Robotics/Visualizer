@@ -22,7 +22,7 @@ public final class RedSimpleAuto {
     public static final String[] COMMANDS = {"LaunchAll"};
 
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
-    public static final String[] TRIGGERS = {"HiveLeftGarden"};
+    public static final String[] TRIGGERS = {"RightCellDown"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -60,7 +60,7 @@ public final class RedSimpleAuto {
         return kit.sequence(
                 kit.command("LaunchAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("HiveLeftGarden").then(
+                        kit.when("RightCellDown").then(
                                 kit.path("UnderHive", underHive),
                                 kit.command("LaunchAll")),
                         kit.afterMs(3000).then(

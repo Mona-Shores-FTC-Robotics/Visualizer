@@ -26,7 +26,7 @@ from the one before it in the Path List; no card drives it.
 **Commands** are what the robot does (`LaunchAll`, `IntakeOn`). Each step runs until the command
 finishes or its timeout (5 s unless the step sets another), and the preview uses the command's
 typical time from the robot's list (`LaunchAll` ≈ 3 s). **Triggers** are true/false:
-`HiveLeftGarden` is true while the camera sees our HIVE mid-tip or settled LOADING_UP, so a TIP
+`RightCellDown` is true from the moment our RIGHT CELL starts down (a started TIP always finishes), so a TIP
 that happened during the launch counts; `IntakeFull` is "holding 4 POLLEN right now". The only
 other timing is each wait's time limit, so a missed TIP or a jammed intake cannot stop the Auto.
 
@@ -64,7 +64,7 @@ sat, which Pedro absorbs.
 A basic BIOBUZZ Auto, drawn for RED (the robot mirrors it for BLUE):
 
 1. Launch the 4 preloads (`LaunchAll`; the turret aims, the robot only points its intake).
-2. Wait for `HiveLeftGarden` (our HIVE has left its start position, whoever tipped it) →
+2. Wait for `RightCellDown` (our HIVE has left its start position, whoever tipped it) →
    **If tipped**; 5 s → **If not tipped**.
 3. **If tipped:** two collect passes from the start with the intake on (about 20 in straight ahead
    and back, then about 21 in at 27° to the left and back); one path straight through the gap under

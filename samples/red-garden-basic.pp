@@ -271,7 +271,7 @@
         "LaunchAll"
       ],
       "conditions": [
-        "HiveLeftGarden",
+        "RightCellDown",
         "IntakeFull"
       ],
       "typicalS": {
@@ -339,7 +339,7 @@
         "rows": [
           {
             "when": [
-              "HiveLeftGarden"
+              "RightCellDown"
             ],
             "label": "If tipped",
             "cards": [

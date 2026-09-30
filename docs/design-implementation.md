@@ -18,7 +18,7 @@ Where the design is heading (canvas "Auto builder · BIOBUZZ", latest: Concept B
 - **Branching:** a wait on a trigger splits the list: the ✓ side just continues; the timed-out side
   is a named route, collapsed to "timed out · retry · 3 stops". A route can **rejoin the main plan
   at a stop** or end at a **park** stop (P).
-- **Preview:** trigger chips in the top bar (✓ HiveLeftGarden …) choose the route shown; an
+- **Preview:** trigger chips in the top bar (✓ RightCellDown …) choose the route shown; an
   **Outcomes** table lists every route's time with the 30 s line, with and without the
   non-branching waits timing out.
 - From Concept A, worth keeping: the add bar (Command / Path / Wait + the robot's names), the wait
@@ -81,7 +81,7 @@ the preview engine's timing and the Java generator's pieces. The editor keeps re
    31.0 s in one outcome. Recommend: park is a **spot**, and the robot drives there from wherever
    it is (the path is generated at run time), checked during waits as well as between steps;
    show it on the timeline as a dashed "bail out here" marker.
-5. **Repeated triggers in the preview:** HiveLeftGarden is asked twice. One chip for both plus a
+5. **Repeated triggers in the preview:** RightCellDown is asked twice. One chip for both plus a
    "this wait only" override (Concept A)? Recommend: yes.
 6. **Planned names:** commands and triggers the robot does not register yet ("planned"). Allow
    them in the editor but block export? Recommend: yes, with the export check listing them.

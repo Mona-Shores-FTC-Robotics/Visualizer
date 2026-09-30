@@ -586,8 +586,8 @@
         "IntakeOn"
       ],
       "conditions": [
-        "HiveLeftGarden",
-        "HiveLeftLoading",
+        "RightCellDown",
+        "LeftCellDown",
         "IntakeFull"
       ],
       "typicalS": {
@@ -666,7 +666,7 @@
         "rows": [
           {
             "when": [
-              "HiveLeftGarden"
+              "RightCellDown"
             ],
             "label": "Tipped: to the LOADING side",
             "cards": [
@@ -721,7 +721,7 @@
                 "rows": [
                   {
                     "when": [
-                      "HiveLeftLoading"
+                      "LeftCellDown"
                     ],
                     "label": "Tipped back: park",
                     "cards": [
@@ -852,7 +852,7 @@
                 "rows": [
                   {
                     "when": [
-                      "HiveLeftGarden"
+                      "RightCellDown"
                     ],
                     "label": "Tipped on the retry: rejoin",
                     "cards": [
@@ -907,7 +907,7 @@
                         "rows": [
                           {
                             "when": [
-                              "HiveLeftLoading"
+                              "LeftCellDown"
                             ],
                             "label": "Tipped back: park",
                             "cards": [

@@ -6,15 +6,15 @@ What is real, what is estimated, and what is easy to get wrong about BIOBUZZ. "R
 ## Commands and triggers
 
 - **Registered in the robot code today** (`AutoRegistration.java`, and `TeamCode/auto-registry.json`
-  which the editor loads): triggers **`HiveLeftGarden`**, **`HiveLeftLoading`**, **`CameraBlind`**.
+  which the editor loads): triggers **`RightCellDown`**, **`LeftCellDown`**, **`CameraBlind`**.
   **No commands yet**: the robot code says "there is no intake, launcher or turret here, because
   none is designed yet".
 - **Used in this Auto but not registered yet** (the names we plan to use): commands **`LaunchAll`**
   (will likely be SpinUp + Launch inside) and **`IntakeOn`**; trigger **`IntakeFull`** (holding 4
   POLLEN; the intake is expected to stop itself at 4, so there is no IntakeOff step). The editor
   will flag them until the robot registers them.
-- `HiveLeftGarden` is true while the camera sees our HIVE mid-tip or settled LOADING_UP;
-  `HiveLeftLoading` is the tip back. Both read what the camera sees *now*, so a TIP during the
+- `RightCellDown` is true from the moment our RIGHT CELL starts down (a started TIP always finishes);
+  `LeftCellDown` is the tip back. Both read what the camera sees *now*, so a TIP during the
   launch already counts when the wait starts.
 
 ## Durations

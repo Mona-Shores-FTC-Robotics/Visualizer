@@ -22,7 +22,7 @@ public final class RedGardenBasicAuto {
     public static final String[] COMMANDS = {"IntakeOff", "IntakeOn", "LaunchAll"};
 
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
-    public static final String[] TRIGGERS = {"HiveLeftGarden", "IntakeFull"};
+    public static final String[] TRIGGERS = {"IntakeFull", "RightCellDown"};
 
     /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
     public static final String DRAWN_FOR = "RED";
@@ -66,7 +66,7 @@ public final class RedGardenBasicAuto {
         return kit.sequence(
                 kit.command("LaunchAll"),
                 kit.firstOf("Did our HIVE tip?",
-                        kit.when("HiveLeftGarden").then(
+                        kit.when("RightCellDown").then(
                                 kit.guarded("If tipped", toPark, 1.7,
                                         kit.command("IntakeOn"),
                                         kit.path("Pass1Ahead", pass1Ahead),

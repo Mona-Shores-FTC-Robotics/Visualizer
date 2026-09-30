@@ -27,8 +27,8 @@ out.paths = catalog.paths.map((p) => ({ id: p.id, name: p.name, length: +p.lengt
 // The retry wait gets its own name so "✗ at the first wait, ✓ at the retry" can be previewed.
 const retryAuto = JSON.parse(JSON.stringify(auto));
 for (const c of allCards(retryAuto.cards)) if (c.kind === "firstOf" && c.label === "Did it tip this time?")
-  c.rows.forEach((r) => { if (r.when) r.when = r.when.map((n) => n === "HiveLeftGarden" ? "HiveLeftGarden@retry" : n); });
-retryAuto.registry.conditions.push("HiveLeftGarden@retry");
+  c.rows.forEach((r) => { if (r.when) r.when = r.when.map((n) => n === "RightCellDown" ? "RightCellDown@retry" : n); });
+retryAuto.registry.conditions.push("RightCellDown@retry");
 const id = (x) => (x ? (x) : null);
 const W = settings.rWidth / 2, H = settings.rHeight / 2;
 const legs = [[46.6, 49.4, 51.2, 90.3], [92.6, 95.0, 51.2, 90.3]];
@@ -58,11 +58,11 @@ function run(a, scenario) {
 const B = [true, false];
 out.runs = [];
 for (const g of B) for (const l of B) for (const f of B) {
-  const r = run(auto, { HiveLeftGarden: g, HiveLeftLoading: l, IntakeFull: f });
+  const r = run(auto, { RightCellDown: g, LeftCellDown: l, IntakeFull: f });
   out.runs.push({ name: `HLG ${g ? "✓" : "✗"} · HLL ${l ? "✓" : "✗"} · IF ${f ? "✓" : "✗"}`, end: r.end, guard: r.guard, clearance: clearance(r.res), log: r.log });
 }
 for (const l of B) for (const f of B) {
-  const r = run(retryAuto, { HiveLeftGarden: false, "HiveLeftGarden@retry": true, HiveLeftLoading: l, IntakeFull: f });
+  const r = run(retryAuto, { RightCellDown: false, "RightCellDown@retry": true, LeftCellDown: l, IntakeFull: f });
   out.runs.push({ name: `HLG ✗ then ✓ at retry · HLL ${l ? "✓" : "✗"} · IF ${f ? "✓" : "✗"}`, end: r.end, guard: r.guard, clearance: clearance(r.res), log: r.log });
 }
 out.worst = worstCase(auto, catalog).total;

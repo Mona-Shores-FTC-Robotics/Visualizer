@@ -181,7 +181,7 @@
         "LaunchAll"
       ],
       "conditions": [
-        "HiveLeftGarden"
+        "RightCellDown"
       ],
       "typicalS": {
         "LaunchAll": 3.0
@@ -222,7 +222,7 @@
         "rows": [
           {
             "when": [
-              "HiveLeftGarden"
+              "RightCellDown"
             ],
             "label": "Tipped: under the HIVE",
             "cards": [

@@ -55,15 +55,15 @@ The tool is for this season's game first; generality can come later. From the in
 Autos we expect all look like this:
 
 1. **Start on the GARDEN side and launch all preloads** (always first).
-2. **Did the HIVE tip?** Wait for the HIVE to **leave its start position** (it is GARDEN_UP at the
-   start; tipping passes through TRANSITION to LOADING_UP, and either counts), at most N s.
+2. **Did the HIVE tip?** Wait for the HIVE to **leave its start position** (the RIGHT CELL starts up;
+   `RightCellDown` is true from the moment it starts down, since a started TIP always finishes), at most N s.
    - **Tipped:** go on to the next part, typically the LOADING side.
    - **Timed out:** collect the GARDEN pollen, launch again to force the tip, and **check again**:
      tipped → **rejoin** the main plan; still not → usually **park** (decided per Auto).
 3. **Collect until full.** At a FLOWER (often the LOADING-side one): take pollen until
    **IntakeFull**, at most N s, then drive to the next shooting spot and launch.
-4. **Did it tip back?** After launching at the LOADING CELL, wait for the HIVE to leave
-   LOADING_UP, at most N s, and branch the same way.
+4. **Did it tip back?** After launching at the LOADING CELL, wait for `LeftCellDown`, at
+   most N s, and branch the same way.
 5. **Bail out to park** whenever the rest will not fit in 30 s (automatic, see above).
 
 Early in the season the robot stops to aim, launches, then moves again: no shooting on the move and
@@ -103,8 +103,9 @@ Plus one marker: a route's **park path**, which the automatic bailout drives whe
 preview does not simulate *when* a trigger fires: each is a switch, **✓ happens** (fires the moment
 it is waited for) or **✗ never happens** (the wait times out). ✓ everywhere is the fastest the Auto
 can go, ✗ everywhere the slowest; a real match falls between. The HIVE triggers describe what the camera sees now,
-so it does not matter when they are asked: `HiveLeftGarden` (the HIVE is mid-tip or settled
-LOADING_UP; used after launching at the GARDEN CELL) and `HiveLeftLoading` (the tip back). A tip
+so it does not matter when they are asked: `RightCellDown` (the RIGHT CELL has started down;
+used after launching at it), `LeftCellDown` (the tip back), and `LeftCellUp` / `RightCellUp` (settled,
+or assumed once a TIP's measured duration has passed). A tip
 that happens during the launch is already true when the wait begins.
 
 **Named spots** (RearShot, Park, Garden) are places the robot does something. Path ends pinned to
