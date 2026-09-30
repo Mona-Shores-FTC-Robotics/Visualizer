@@ -1,9 +1,17 @@
 # Sample Autos
 
-**Open in the Visualizer:** [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
+**Open in the Visualizer:** [spot map](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-spot-map) · [simple](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-simple) · [basic (turret)](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic) · [no turret](https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-no-turret)
 
 These sample links open the files in this folder as last deployed, so they never go stale. Each
 opens as a shared copy: change anything, and "Save as new file" keeps your version.
+
+## `red-spot-map.pp`
+
+Not an Auto: a tour of every named spot, so their names show on the field and they can be moved
+to where they make sense. Spots are named as seen from your alliance area (where the drivers and
+human player stand): LEFT_ is the wall on your left, RIGHT_ the wall on your right, YOUR_WALL the
+wall you stand behind. For red, left is the back wall. Paired LEFT_/RIGHT_ spots mirror across y = 70.75, and both robots get a LOADING ZONE spot. Drag a spot's end on the field, or type it
+in Setup → Named points; every path ending there moves with it.
 
 ## `red-simple.pp`
 
