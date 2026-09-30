@@ -26,6 +26,44 @@ Where the design is heading (canvas "Auto builder · BIOBUZZ", latest: Concept B
   override, event-day nudges with before/after times, exact path editing (split, piecewise
   heading), export with checks and RED/BLUE files, the Robot and field drawer.
 
+## Decided since (design chat, B6)
+
+- **The intake is not in the Auto.** "Collect whenever not full and not launching" is how the robot
+  works, in Auto and TeleOp alike, so no IntakeOn step, no "runs alongside" bar. The only intake
+  item left is **wait for IntakeFull** at a FLOWER, and its time assumes the intake is already
+  running. Where the robot must *not* pick up (driving through a zone), the Auto sets a **mode**
+  (`IntakeHold` … `IntakeCollect`), never a start or end time: a mode survives branching, a time
+  does not. Position-dependent actions (path events at a fraction of a path) stay for things that
+  truly depend on position, like an arm.
+- **One branching block, general form:**
+  **Wait for [trigger] while [nothing · driving to a spot · running a command], at most [N s · until
+  that finishes]**, with two exits (✓ seen / not seen). Examples:
+  - start: wait for **Tip** while **LaunchAll**, at most 3 s → ✓ LOADING side / ✗ retry. The launch
+    stops cleanly when the tip is seen (the remaining shots would miss the CELL anyway);
+  - at a FLOWER: wait for IntakeFull, at most 2 s (while nothing);
+  - wait for IntakeFull while driving to LEFT_FLOWER → ✓ skip the FLOWER (for example, go from
+    LEFT_HIVE_ENTRANCE to LEFT_DUMP or LEFT_START and shoot instead of collecting more).
+
+  In the exported Java it is a race: the command or path runs alongside the wait, and the wait ends
+  on the trigger, on the command or path finishing, or on the time limit. Lanes and parallel bars go
+  away.
+- **Command timeouts are not shown** on the cards; they stay in the file and on the robot.
+- **Tip** is the trigger both waits use ("the CELL we were looking at started to move"; the robot
+  sees the tags vanish while it holds still). A camera that never saw the CELL is not a tip: the
+  wait times out, the safe side (CameraBlind says why).
+
+Robot-side notes:
+- Ivy 1.1.1 has no default commands, and a command that requires a subsystem interrupts its
+  `periodic()`, so "LaunchAll takes the intake over" is not how this robot does it. The intake's
+  own `update()` owns the policy: run in COLLECT unless full or `robot.launcher.isLaunching()`
+  (read-only accessor). Same behaviour, nothing to require, and it holds in TeleOp too. A stall
+  check (current high, no piece arriving → back off) belongs there as well.
+- The race is Ivy's `Groups.race` / `deadline` / `until`; autokit's `firstOf` gains an
+  "alongside" command and a "that finished" row.
+- `Tip` needs the wait to remember where the HIVE was when it started (an event, not a plain
+  true/false). Today the robot offers `RightCellDown` / `LeftCellDown`, which are the same thing
+  when the Auto knows which CELL is up.
+
 ## The one big change: a stop-based model
 
 Today's file is a card tree plus a Path List, and a path starts where the previous one *in the
