@@ -19,6 +19,8 @@ export interface SharedCopyView {
   madeAt: string | null;
   /** File this copy was last saved to, from the banner. */
   savedAs: string | null;
+  /** Where it was read from when that is git ("biobuzz master"), else null. */
+  from?: string | null;
 }
 
 /** The on-screen state for a shared project, read the way a file is read. */

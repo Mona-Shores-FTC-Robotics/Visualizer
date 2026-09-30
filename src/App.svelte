@@ -166,6 +166,7 @@
   } from "./lib/session/sessionSnapshot";
   import * as browserFileStore from "./utils/browserFileStore";
   import { resolveProjectHash } from "./utils/sampleLink";
+  import { resolveGitHash } from "./utils/gitLink";
   import {
     freeSharedFileName,
     sharedCopyState,
@@ -792,10 +793,19 @@
   } | null = null;
 
   async function openShareLink() {
-    const result = await resolveProjectHash(window.location.hash, async (fileName) => {
-      const response = await fetch(publicAsset(`/samples/${fileName}`), { cache: "no-cache" });
-      return response.ok ? response.text() : null;
+    const gitResult = await resolveGitHash(window.location.hash, async (url) => {
+      const response = await fetch(url, { cache: "no-cache" });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
+      return response.text();
     });
+    const result =
+      gitResult.kind !== "none"
+        ? gitResult
+        : await resolveProjectHash(window.location.hash, async (fileName) => {
+            const response = await fetch(publicAsset(`/samples/${fileName}`), { cache: "no-cache" });
+            return response.ok ? response.text() : null;
+          });
     if (result.kind === "none") return;
     window.history.replaceState(
       null,
@@ -824,6 +834,7 @@
       name,
       madeAt: typeof project.timestamp === "string" ? project.timestamp : null,
       savedAs: null,
+      from: result.shared.from ?? null,
     };
 
     const shared = sharedCopyState(project, settings);
