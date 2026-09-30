@@ -1,5 +1,4 @@
 import type { AtomicPath, BasePoint, Path, StartPose } from "../../types";
-import { allCards } from "./tree";
 import type { AutoSection, NamedPoint } from "./types";
 
 /**
@@ -77,25 +76,8 @@ export interface PointUse {
 export function pointUses(auto: AutoSection): Map<string, PointUse> {
   const uses = new Map<string, PointUse>();
   for (const name of Object.keys(auto.points)) uses.set(name, { ends: [], start: false, cards: 0 });
-  const bump = (name: string) => {
-    const use = uses.get(name);
-    if (use) use.cards += 1;
-  };
   for (const [id, name] of Object.entries(auto.pathEnds)) uses.get(name)?.ends.push(id);
   if (auto.startAt && uses.has(auto.startAt)) uses.get(auto.startAt)!.start = true;
-  for (const card of allCards(auto.cards)) {
-    if (card.kind === "goTo") bump(card.point);
-    if (card.kind === "routine") {
-      bump(card.at);
-      bump(card.exit);
-    }
-    if (card.kind === "firstOf") {
-      for (const row of card.rows) {
-        if ("nearPoint" in row) bump(row.nearPoint);
-        if ("inArea" in row) row.inArea.forEach(bump);
-      }
-    }
-  }
   return uses;
 }
 

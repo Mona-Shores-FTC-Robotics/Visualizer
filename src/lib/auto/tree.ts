@@ -11,25 +11,13 @@ import { rowKind } from "./types";
 export interface CardLocation {
   list: AutoCard[];
   index: number;
-  /**
-   * The card that owns the list and which of its lists it is (a decision's
-   * row, a goTo's "if refused", a together's cards); null for the top level.
-   */
+  /** The wait that owns the list and which of its rows it is; null for the top level. */
   parent: { card: AutoCard; rowIndex: number } | null;
 }
 
-/** The card lists a card holds: a decision's rows, a goTo's fallback, a together's cards. */
+/** The card lists a card holds: a wait's rows. */
 export function childLists(card: AutoCard): AutoCard[][] {
-  switch (card.kind) {
-    case "firstOf":
-      return card.rows.map((row) => row.cards);
-    case "goTo":
-      return [card.ifRefused];
-    case "together":
-      return [card.cards];
-    default:
-      return [];
-  }
+  return card.kind === "firstOf" ? card.rows.map((row) => row.cards) : [];
 }
 
 export function makeCardId(): string {
@@ -95,22 +83,10 @@ export function usedNames(auto: AutoSection): {
 
   for (const card of allCards(auto.cards)) {
     if (card.kind === "action") bump(actions, card.name);
-    if (card.kind === "path") {
-      card.while.forEach((name) => bump(actions, name));
-      card.events.forEach((event) => bump(actions, event.action));
-    }
     if (card.kind === "firstOf") {
       if (card.alongside) bump(actions, card.alongside);
       for (const row of card.rows) {
         if ("when" in row) row.when.forEach((name) => bump(conditions, name));
-      }
-    }
-    if (card.kind === "routine") {
-      const routine = auto.routines[card.routine];
-      if (routine) {
-        if (routine.endsWhen) bump(conditions, routine.endsWhen);
-        routine.while.forEach((name) => bump(actions, name));
-        routine.exit.forEach((name) => bump(actions, name));
       }
     }
   }
@@ -128,41 +104,13 @@ export function parkCardOf(list: AutoCard[]): PathCard | null {
 
 /** A short human description of a row's condition. */
 export function describeRow(row: AutoRow): string {
-  switch (rowKind(row)) {
-    case "when":
-      return (row as { when: string[] }).when.join(" or ") || "(no condition)";
-    case "afterMs":
-      return `${(row as { afterMs: number }).afterMs} ms passed`;
-    case "timeLeftBelowS":
-      return `time left < ${(row as { timeLeftBelowS: number }).timeLeftBelowS} s`;
-    case "nearPoint": {
-      const near = row as { nearPoint: string; radiusIn: number };
-      return `within ${near.radiusIn} in of ${near.nearPoint}`;
-    }
-    case "inArea": {
-      const area = row as { inArea: [string, string] };
-      return `inside ${area.inArea[0]}–${area.inArea[1]}`;
-    }
-    case "otherwise":
-      return "otherwise";
-    case "finished":
-      return "it finished";
-  }
+  return "when" in row ? row.when[0] || "(no trigger)" : `${row.afterMs} ms passed`;
 }
 
 /** The branch's name: its own label, or one made from its condition. */
 export function rowLabel(row: AutoRow): string {
   if (row.label && row.label.trim()) return row.label.trim();
-  switch (rowKind(row)) {
-    case "when":
-      return `If ${describeRow(row)}`;
-    case "otherwise":
-      return "Otherwise";
-    case "finished":
-      return "When it finishes";
-    default:
-      return `After ${describeRow(row)}`;
-  }
+  return rowKind(row) === "when" ? `If ${describeRow(row)}` : "Timed out";
 }
 
 /** A card's display name; path cards need the path's name from the caller. */
@@ -173,13 +121,7 @@ export function cardTitle(card: AutoCard, pathName?: string): string {
     case "path":
       return pathName ?? "(missing path)";
     case "firstOf":
-      return card.label || "First of";
-    case "routine":
-      return `${card.routine} at ${card.at}`;
-    case "goTo":
-      return card.label || `Go to ${card.point}`;
-    case "together":
-      return card.label || "Together";
+      return card.label || "Wait";
   }
 }
 
@@ -187,9 +129,7 @@ export function cardTitle(card: AutoCard, pathName?: string): string {
 export function listLabel(parent: { card: AutoCard; rowIndex: number } | null): string {
   if (!parent) return "Auto";
   const { card, rowIndex } = parent;
-  if (card.kind === "firstOf") return rowLabel(card.rows[rowIndex]);
-  if (card.kind === "goTo") return `${cardTitle(card)}: if refused`;
-  return cardTitle(card);
+  return card.kind === "firstOf" ? rowLabel(card.rows[rowIndex]) : cardTitle(card);
 }
 
 /** True when no row has cards: shown as a "Wait for" card, not a decision. */

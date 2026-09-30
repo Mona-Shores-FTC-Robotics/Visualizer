@@ -9,16 +9,12 @@
     type AutoCard,
     type AutoRow,
     type AutoSection,
-    type PathEvent,
     type RowKind,
   } from "../types";
   import type { Shape } from "../../../types";
-  import { cardTitle, findCard, isPlainWait, listLabel, locateCard, rowLabel } from "../tree";
-  import { checkFit, placementAt, placeRoutine, segmentSamples } from "../motion";
-  import RoutineEditor from "./RoutineEditor.svelte";
+  import { findCard, isPlainWait, rowLabel } from "../tree";
   import { canMove, duplicateCard, moveCard, removeCard, rowOfKind } from "../edit";
   import { commitAuto, parseSelection, selectedCardId, updateAuto } from "../store";
-  import EventsBar from "./EventsBar.svelte";
   import {
     ACTION_CLASS,
     CELL_CLASS,
@@ -72,13 +68,8 @@
   }
 
   const ROW_KINDS: { value: RowKind; label: string }[] = [
-    { value: "when", label: "Condition is true" },
-    { value: "afterMs", label: "Time passed (ms)" },
-    { value: "timeLeftBelowS", label: "Time left below (s)" },
-    { value: "otherwise", label: "Otherwise (at once)" },
-    { value: "nearPoint", label: "Near a point" },
-    { value: "inArea", label: "Inside an area" },
-    { value: "finished", label: "The command alongside finishes" },
+    { value: "when", label: "Trigger fires" },
+    { value: "afterMs", label: "Time limit (ms)" },
   ];
 
   /** Edit the selected card in place (on the draft). */
@@ -308,25 +299,6 @@
         <span class="font-mono text-gray-100">{info ? `${info.length.toFixed(0)} in · ${seconds(info.seconds)}` : "—"}</span>
       </div>
     </div>
-    <div class={CELL_CLASS}>
-      <span class={LABEL_CLASS}>While driving</span>
-      {@render chips(
-        card.while,
-        actions,
-        "action",
-        (index) => edit((c) => { if (c.kind === "path") c.while.splice(index, 1); }),
-        (name) => edit((c) => { if (c.kind === "path" && !c.while.includes(name)) c.while.push(name); }),
-      )}
-    </div>
-    <div class={CELL_CLASS}>
-      <span class={LABEL_CLASS}>Events along this path</span>
-      <EventsBar
-        events={card.events}
-        {actions}
-        onChange={(events: PathEvent[], done: boolean) =>
-          edit((c) => { if (c.kind === "path") c.events = events; }, done)}
-      />
-    </div>
     {/if}
   {:else if card?.kind === "firstOf"}
     <div class={CELL_CLASS}>
@@ -404,56 +376,17 @@
                   oninput={(e) => editRow(rowIndex, (r) => { if ("afterMs" in r) r.afterMs = numberOr(e.currentTarget.value, r.afterMs); }, false)}
                   onchange={commitAuto} />
               </label>
-            {:else if kind === "timeLeftBelowS"}
-              <label class="space-y-1">
-                <span class="text-gray-500">Seconds left</span>
-                <input class={FIELD_CLASS} type="number" min="0" max={AUTO_LENGTH_S} step="0.5" value={(row as { timeLeftBelowS: number }).timeLeftBelowS}
-                  oninput={(e) => editRow(rowIndex, (r) => { if ("timeLeftBelowS" in r) r.timeLeftBelowS = numberOr(e.currentTarget.value, r.timeLeftBelowS); }, false)}
-                  onchange={commitAuto} />
-              </label>
-            {:else if kind === "nearPoint"}
-              {@const near = row as { nearPoint: string; radiusIn: number }}
-              <div class="grid grid-cols-2 gap-1">
-                <label class="space-y-1">
-                  <span class="text-gray-500">Point</span>
-                  <select class={FIELD_CLASS} value={near.nearPoint} onchange={(e) => editRow(rowIndex, (r) => { if ("nearPoint" in r) r.nearPoint = e.currentTarget.value; })}>
-                    {#if !pointNames.includes(near.nearPoint)}<option value={near.nearPoint}>{near.nearPoint || "(none)"}</option>{/if}
-                    {#each pointNames as name (name)}<option value={name}>{name}</option>{/each}
-                  </select>
-                </label>
-                <label class="space-y-1">
-                  <span class="text-gray-500">Within (in)</span>
-                  <input class={FIELD_CLASS} type="number" min="0" step="0.5" value={near.radiusIn}
-                    oninput={(e) => editRow(rowIndex, (r) => { if ("radiusIn" in r) r.radiusIn = numberOr(e.currentTarget.value, r.radiusIn); }, false)}
-                    onchange={commitAuto} />
-                </label>
-              </div>
-            {:else if kind === "inArea"}
-              {@const area = (row as { inArea: [string, string] }).inArea}
-              <div class="grid grid-cols-2 gap-1">
-                {#each [0, 1] as corner (corner)}
-                  <label class="space-y-1">
-                    <span class="text-gray-500">Corner {corner + 1}</span>
-                    <select class={FIELD_CLASS} value={area[corner]} onchange={(e) => editRow(rowIndex, (r) => { if ("inArea" in r) r.inArea[corner] = e.currentTarget.value; })}>
-                      {#if !pointNames.includes(area[corner])}<option value={area[corner]}>{area[corner] || "(none)"}</option>{/if}
-                      {#each pointNames as name (name)}<option value={name}>{name}</option>{/each}
-                    </select>
-                  </label>
-                {/each}
-              </div>
-            {:else if kind === "otherwise"}
-              <div class="self-end pb-1 text-gray-500">True at once: the "else" of an if.</div>
             {/if}
           </div>
           {#if kind === "when"}
             <div class="space-y-1">
-              <span class="text-gray-500">Any of</span>
+              <span class="text-gray-500">Trigger</span>
               {@render chips(
                 (row as { when: string[] }).when,
                 conditions,
                 "condition",
                 (index) => editRow(rowIndex, (r) => { if ("when" in r) r.when.splice(index, 1); }),
-                (name) => editRow(rowIndex, (r) => { if ("when" in r && !r.when.includes(name)) r.when.push(name); }),
+                (name) => editRow(rowIndex, (r) => { if ("when" in r) r.when = [name]; }),
               )}
             </div>
           {/if}
@@ -485,120 +418,7 @@
       <div class="flex flex-wrap gap-1.5 text-[10px]">
         <button type="button" class={ACTION_CLASS} onclick={() => edit((c) => { if (c.kind === "firstOf") c.rows.push(rowOfKind(conditions.length ? "when" : "afterMs", null, auto)); })}>+ Condition row</button>
         <button type="button" class={ACTION_CLASS} onclick={() => edit((c) => { if (c.kind === "firstOf") c.rows.push(rowOfKind("afterMs", null, auto)); })}>+ Time row</button>
-        <button type="button" class={ACTION_CLASS} onclick={() => edit((c) => { if (c.kind === "firstOf") c.rows.push(rowOfKind("otherwise", null, auto)); })}>+ Otherwise</button>
       </div>
-    </div>
-  {:else if card?.kind === "routine"}
-    {@const placement = placementAt(auto.points, card.at, card.facingDeg, card.mirror)}
-    {@const routine = auto.routines[card.routine]}
-    {@const fit = placement && routine
-      ? checkFit(segmentSamples(placeRoutine(routine, placement), { x: placement.x, y: placement.y }), shapes, Math.max(catalog.settings.rWidth, catalog.settings.rHeight))
-      : null}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Routine</span>
-        <select class={FIELD_CLASS} value={card.routine} class:!border-red-600={!routine}
-          onchange={(e) => {
-            const value = e.currentTarget.value;
-            if (value === "__new") {
-              let name = "NewRoutine";
-              for (let i = 2; auto.routines[name]; i++) name = `NewRoutine${i}`;
-              updateAuto((draft) => {
-                draft.routines[name] = { steps: [{ forward: 12, left: 0 }], endsWhen: draft.registry.conditions[0] ?? "", timeoutMs: 2000, while: [], exit: [] };
-                const target = findCard(draft.cards, card!.id);
-                if (target?.kind === "routine") target.routine = name;
-              });
-            } else edit((c) => { if (c.kind === "routine") c.routine = value; });
-          }}>
-          {#if !routine}<option value={card.routine}>{card.routine || "(choose)"}</option>{/if}
-          {#each Object.keys(auto.routines) as name (name)}<option value={name}>{name}</option>{/each}
-          <option value="__new">+ New routine…</option>
-        </select>
-      </div>
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Starts at</span>
-        <select class={FIELD_CLASS} value={card.at} class:!border-red-600={!auto.points[card.at]}
-          onchange={(e) => edit((c) => { if (c.kind === "routine") c.at = e.currentTarget.value; })}>
-          {#if !auto.points[card.at]}<option value={card.at}>{card.at || "(choose a point)"}</option>{/if}
-          {#each pointNames as name (name)}<option value={name}>{name}</option>{/each}
-        </select>
-      </div>
-      <div class={CELL_CLASS}>
-        <label class={LABEL_CLASS} for="auto-routine-facing">Facing (°)</label>
-        <input id="auto-routine-facing" class={FIELD_CLASS} type="number" step="15" value={card.facingDeg}
-          oninput={(e) => edit((c) => { if (c.kind === "routine") { const v = Number(e.currentTarget.value); if (Number.isFinite(v)) c.facingDeg = v; } }, false)}
-          onchange={commitAuto} />
-      </div>
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Exits to</span>
-        <select class={FIELD_CLASS} value={card.exit} class:!border-red-600={!auto.points[card.exit]}
-          onchange={(e) => edit((c) => { if (c.kind === "routine") c.exit = e.currentTarget.value; })}>
-          {#if !auto.points[card.exit]}<option value={card.exit}>{card.exit || "(choose a point)"}</option>{/if}
-          {#each pointNames as name (name)}<option value={name}>{name}</option>{/each}
-        </select>
-      </div>
-    </div>
-    <label class="flex items-center gap-2 text-[11px] text-gray-300">
-      <input type="checkbox" checked={card.mirror} onchange={(e) => edit((c) => { if (c.kind === "routine") c.mirror = e.currentTarget.checked; })} />
-      Mirror the pattern left ↔ right
-    </label>
-    {#if fit}
-      <div class="text-[11px]" class:text-green-400={fit.ok} class:text-red-400={!fit.ok}>
-        {fit.ok
-          ? `✓ Fits here: ${fit.wallMargin.toFixed(1)} in to the nearest wall, clear of the keep-out zones.`
-          : `✕ Doesn't fit here: it ${fit.problems.join(", and ")}.`}
-      </div>
-    {/if}
-    <RoutineEditor {auto} name={card.routine} settings={catalog.settings} />
-  {:else if card?.kind === "goTo"}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
-      <div class="{CELL_CLASS} col-span-2">
-        <label class={LABEL_CLASS} for="auto-goto-label">Name</label>
-        <input id="auto-goto-label" class={FIELD_CLASS} value={card.label} placeholder={cardTitle({ ...card, label: "" })}
-          oninput={(e) => edit((c) => { if (c.kind === "goTo") c.label = e.currentTarget.value; }, false)} onchange={commitAuto} />
-      </div>
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Point</span>
-        <select class={FIELD_CLASS} value={card.point} class:!border-red-600={!auto.points[card.point]}
-          onchange={(e) => edit((c) => { if (c.kind === "goTo") c.point = e.currentTarget.value; })}>
-          {#if !auto.points[card.point]}<option value={card.point}>{card.point || "(choose a point)"}</option>{/if}
-          {#each pointNames as name (name)}<option value={name}>{name}</option>{/each}
-        </select>
-      </div>
-      <div class={CELL_CLASS}>
-        <label class={LABEL_CLASS} for="auto-goto-max">Only if within (in)</label>
-        <input id="auto-goto-max" class={FIELD_CLASS} type="number" min="1" step="1" value={card.maxDistanceIn}
-          oninput={(e) => edit((c) => { if (c.kind === "goTo") { const v = Number(e.currentTarget.value); if (v > 0) c.maxDistanceIn = v; } }, false)}
-          onchange={commitAuto} />
-      </div>
-    </div>
-    <div class="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-      <span></span>
-      <button type="button" class="{ACTION_CLASS} shrink-0 text-[10px]" onclick={() => selectedCardId.set(`${card!.id}#0`)}>
-        {card.ifRefused.length} card{card.ifRefused.length === 1 ? "" : "s"} · add here
-      </button>
-    </div>
-  {:else if card?.kind === "together"}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
-      <div class={CELL_CLASS}>
-        <label class={LABEL_CLASS} for="auto-together-label">Name</label>
-        <input id="auto-together-label" class={FIELD_CLASS} value={card.label} placeholder="Together"
-          oninput={(e) => edit((c) => { if (c.kind === "together") c.label = e.currentTarget.value; }, false)} onchange={commitAuto} />
-      </div>
-      <div class={CELL_CLASS}>
-        <span class={LABEL_CLASS}>Done when</span>
-        <select class={FIELD_CLASS} value={card.ends}
-          onchange={(e) => edit((c) => { if (c.kind === "together") c.ends = e.currentTarget.value === "FIRST" ? "FIRST" : "ALL"; })}>
-          <option value="ALL">all of them are done</option>
-          <option value="FIRST">the first one is done</option>
-        </select>
-      </div>
-    </div>
-    <div class="flex items-center justify-between gap-2 text-[11px] text-gray-500">
-      <span></span>
-      <button type="button" class="{ACTION_CLASS} shrink-0 text-[10px]" onclick={() => selectedCardId.set(`${card!.id}#0`)}>
-        {card.cards.length} card{card.cards.length === 1 ? "" : "s"} · add here
-      </button>
     </div>
   {/if}
 </div>

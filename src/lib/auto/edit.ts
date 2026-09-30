@@ -19,10 +19,7 @@ export type NewCardKind =
   | "action"
   | "wait"
   | "decision"
-  | "path"
-  | "routine"
-  | "goTo"
-  | "together";
+  | "path";
 
 /** Where a new card goes: after the selected card, into a selected branch, or at the end. */
 function insertionPoint(
@@ -97,7 +94,7 @@ export function insertPathCard(
   where: "after" | "branchEnd",
 ): string {
   const at = pathInsertionPoint(auto, selection, where);
-  const card: AutoCard = { id: makeCardId(), kind: "path", lineId, while: [], events: [], park: false };
+  const card: AutoCard = { id: makeCardId(), kind: "path", lineId, park: false };
   at.list.splice(at.index, 0, card);
   return card.id;
 }
@@ -132,19 +129,7 @@ function findOwner(
   return null;
 }
 
-function nearestPoint(auto: AutoSection, from: BasePoint | null): string | null {
-  if (!from) return null;
-  let best: string | null = null;
-  let bestDistance = Infinity;
-  for (const [name, point] of Object.entries(auto.points)) {
-    const distance = Math.hypot(point[0] - from.x, point[1] - from.y);
-    if (distance < bestDistance) {
-      best = name;
-      bestDistance = distance;
-    }
-  }
-  return best;
-}
+
 
 export function newCard(
   kind: NewCardKind,
@@ -172,50 +157,10 @@ export function newCard(
         kind: "firstOf",
         label: firstCondition ? `${firstCondition}?` : "Decision",
         rows: [
-          ...(firstCondition
-            ? [{ when: [firstCondition], label: `If ${firstCondition}`, cards: [] }]
-            : [{ afterMs: 500, cards: [] }]),
-          { otherwise: true, cards: [] },
+          { when: firstCondition ? [firstCondition] : [], ...(firstCondition ? { label: `If ${firstCondition}` } : {}), cards: [] },
+          { afterMs: 3000, label: "Timed out", cards: [] },
         ],
       };
-    case "routine": {
-      const from = robotBefore(auto, at.list, at.index, catalog);
-      const point = nearestPoint(auto, from) ?? Object.keys(auto.points)[0] ?? "";
-      let routine = Object.keys(auto.routines)[0];
-      if (!routine) {
-        routine = "NewRoutine";
-        auto.routines[routine] = {
-          steps: [
-            { forward: 12, left: 0 },
-            { forward: 12, left: -12 },
-          ],
-          endsWhen: auto.registry.conditions[0] ?? "",
-          timeoutMs: 2000,
-          while: [],
-          exit: [],
-        };
-      }
-      return {
-        id: makeCardId(),
-        kind: "routine",
-        routine,
-        at: point,
-        facingDeg: auto.points[point]?.[2] ?? 0,
-        mirror: false,
-        exit: point,
-      };
-    }
-    case "goTo":
-      return {
-        id: makeCardId(),
-        kind: "goTo",
-        label: "",
-        point: Object.keys(auto.points)[0] ?? "",
-        maxDistanceIn: 24,
-        ifRefused: [],
-      };
-    case "together":
-      return { id: makeCardId(), kind: "together", label: "", ends: "ALL", cards: [] };
     case "path": {
       const from = robotBefore(auto, at.list, at.index, catalog);
       const fits = from
@@ -225,8 +170,6 @@ export function newCard(
         id: makeCardId(),
         kind: "path",
         lineId: (fits ?? catalog.paths[0])?.id ?? "",
-        while: [],
-        events: [],
         park: false,
       };
     }
@@ -290,23 +233,9 @@ export function findFirstOf(auto: AutoSection, id: string): FirstOfCard | null {
 export function rowOfKind(kind: RowKind, old: AutoRow | null, auto: AutoSection): AutoRow {
   const common: { cards: AutoCard[]; label?: string } = { cards: old?.cards ?? [] };
   if (old?.label) common.label = old.label;
-  const points = Object.keys(auto.points);
-  switch (kind) {
-    case "when":
-      return { ...common, when: auto.registry.conditions.slice(0, 1) };
-    case "afterMs":
-      return { ...common, afterMs: 1000 };
-    case "timeLeftBelowS":
-      return { ...common, timeLeftBelowS: 5 };
-    case "otherwise":
-      return { ...common, otherwise: true };
-    case "nearPoint":
-      return { ...common, nearPoint: points[0] ?? "", radiusIn: 6 };
-    case "inArea":
-      return { ...common, inArea: [points[0] ?? "", points[1] ?? points[0] ?? ""] };
-    case "finished":
-      return { ...common, finished: true };
-  }
+  return kind === "when"
+    ? { ...common, when: auto.registry.conditions.slice(0, 1) }
+    : { ...common, afterMs: 1000 };
 }
 
 /**
@@ -320,8 +249,6 @@ export function autoFromPaths(lineIds: string[]): AutoSection {
     id: makeCardId(),
     kind: "path",
     lineId,
-    while: [],
-    events: [],
     park: false,
   }));
   return auto;

@@ -74,8 +74,6 @@
     walk(auto.cards);
     return count;
   });
-  /** Whether the less common card kinds (routine, go to, together) are offered. */
-  let showMore = $state(false);
 
   let parkBranches = $derived.by(() => {
     const labels: string[] = [];
@@ -83,7 +81,6 @@
       if (list.some((card) => card.kind === "path" && card.park)) labels.push(label);
       list.forEach((card) => {
         if (card.kind === "firstOf") card.rows.forEach((row) => walk(row.cards, rowLabel(row)));
-        if (card.kind === "goTo") walk(card.ifRefused, `${cardTitle(card)}: if refused`);
       });
     };
     walk(auto.cards, "Auto");
@@ -171,12 +168,6 @@
         asks: rowKind(row) === "when" ? (row as { when: string[] }).when : [],
       }));
     }
-    if (card.kind === "goTo") {
-      return [{ label: `If refused (over ${card.maxDistanceIn} in away)`, detail: "", cards: card.ifRefused, color: "#ff8a3d", asks: [] }];
-    }
-    if (card.kind === "together") {
-      return [{ label: card.ends === "ALL" ? "Together, until all are done" : "Together, until the first is done", detail: "", cards: card.cards, color: "#5fd4e6", asks: [] }];
-    }
     return [];
   }
 </script>
@@ -208,15 +199,6 @@
             aria-hidden="true">{isPlainWait(card) ? "⏳" : "◆"}</span
           >
           <span class="list-item-name">{card.label || (isPlainWait(card) ? "Wait for" : "Decision")}</span>
-        {:else if card.kind === "routine"}
-          <span class="auto-icon auto-icon--routine" aria-hidden="true">◇</span>
-          <span class="list-item-name">{cardTitle(card)}</span>
-        {:else if card.kind === "goTo"}
-          <span class="auto-icon auto-icon--routine" aria-hidden="true">⇢</span>
-          <span class="list-item-name">{cardTitle(card)}</span>
-        {:else}
-          <span class="auto-icon auto-icon--wait" aria-hidden="true">⇉</span>
-          <span class="list-item-name">{cardTitle(card)}</span>
         {/if}
         {#if level}
           <span class="auto-flag auto-flag--{level}" title={level === "error" ? "Blocks the Java export" : "Warning"}
@@ -237,38 +219,8 @@
           {/if}
         {:else if card.kind === "firstOf"}
           {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}
-        {:else if card.kind === "routine"}
-          {@const routine = auto.routines[card.routine]}
-          routine · {routine?.endsWhen ? `until ${routine.endsWhen}` : "no end condition"} · exit → {card.exit || "?"}
-        {:else if card.kind === "goTo"}
-          straight to {card.point || "?"} if within {card.maxDistanceIn} in
-        {:else}
-          {card.cards.length} card{card.cards.length === 1 ? "" : "s"} at once
         {/if}
       </div>
-      {#if card.kind === "routine" && auto.routines[card.routine]}
-        {@const routine = auto.routines[card.routine]}
-        <div class="auto-minis">
-          {#each routine.while as name (name)}
-            <span class="auto-mini" class:auto-mini--bad={!registeredActions.has(name)}>while {name}</span>
-          {/each}
-          {#each routine.exit as name (name)}
-            <span class="auto-mini" class:auto-mini--bad={!registeredActions.has(name)}>exit: {name}</span>
-          {/each}
-        </div>
-      {/if}
-      {#if card.kind === "path" && (card.while.length || card.events.length)}
-        <div class="auto-minis">
-          {#each card.while as name (name)}
-            <span class="auto-mini" class:auto-mini--bad={!registeredActions.has(name)}>while {name}</span>
-          {/each}
-          {#each card.events as event, i (i)}
-            <span class="auto-mini auto-mini--event" class:auto-mini--bad={!registeredActions.has(event.action)}
-              >⚡ {event.action} {Math.round(event.at * 100)}%</span
-            >
-          {/each}
-        </div>
-      {/if}
     </button>
     {#if selected}
       <CardEditor {auto} {catalog} {issues} preview={preview ?? null} {worst} {shapes} />
@@ -289,7 +241,7 @@
           {@const folded = row.cards.length > 0 && $foldedBranches.has(key)}
           <div
             class="auto-branch"
-            class:auto-branch--off={preview !== null && preview.ran.has(card.id) && !takenHere && card.kind !== "together"}
+            class:auto-branch--off={preview !== null && preview.ran.has(card.id) && !takenHere && true}
             style={`--c: ${row.color}`}
           >
             <div class="auto-branch-row">
@@ -315,7 +267,7 @@
               <span class="auto-branch-name">{row.label}</span>
               <span class="auto-branch-meta">
                 {#if takenHere}<span class="auto-run">this preview</span>{/if}
-                {#if row.cards.length && card.kind !== "together"}
+                {#if row.cards.length && true}
                   {#if worstEnd === null || worstEnd === undefined}
                     <span class="auto-worst" title="Can never fire when every wait runs to its time row">—</span>
                   {:else}
@@ -381,13 +333,6 @@
     <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
     <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
     <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is">+ Path</button>
-    <button type="button" class="path-list-action" onclick={() => (showMore = !showMore)} aria-expanded={showMore}
-      title="Routines, go-to and cards that run together">{showMore ? "Less ▴" : "More ▾"}</button>
-    {#if showMore}
-      <button type="button" class="path-list-action" onclick={() => add("routine")} title="Run a routine placed at a named point">+ Routine</button>
-      <button type="button" class="path-list-action" onclick={() => add("goTo")} title="Drive straight to a named point, if it is close enough">+ Go to</button>
-      <button type="button" class="path-list-action" onclick={() => add("together")} title="Run several cards at the same time">+ Together</button>
-    {/if}
   </div>
 
   <div class="module-list" role="list">

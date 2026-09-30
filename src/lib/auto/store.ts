@@ -1,10 +1,9 @@
 import { get, writable } from "svelte/store";
-import { FIELD_SIZE } from "../../config";
 import { isUnsaved } from "../../stores";
 import { normalizeAuto } from "./normalize";
 import { predatesPins } from "./pins";
 import type { Scenario } from "./simulate";
-import type { AutoSection, NamedPoint } from "./types";
+import type { AutoSection } from "./types";
 import { foldedBranches } from "./fold";
 
 /**
@@ -112,22 +111,3 @@ export function currentAuto(): AutoSection | null {
   return get(autoSection);
 }
 
-/**
- * The Auto of the other alliance's copy of the project: drawn for the other
- * alliance, its named points turned half a turn about the field centre with the
- * paths (BIOBUZZ is rotationally symmetric, not mirrored). Cards refer to paths
- * by id and so follow the turned paths on their own.
- */
-export function rotateAutoData(auto: unknown): unknown {
-  const { auto: normalized } = normalizeAuto(auto);
-  if (!normalized) return auto;
-  normalized.drawnFor = normalized.drawnFor === "RED" ? "BLUE" : "RED";
-  for (const [name, point] of Object.entries(normalized.points)) {
-    const turned: NamedPoint =
-      point.length === 3
-        ? [FIELD_SIZE - point[0], FIELD_SIZE - point[1], (((point[2] + 180) % 360) + 360) % 360]
-        : [FIELD_SIZE - point[0], FIELD_SIZE - point[1]];
-    normalized.points[name] = turned;
-  }
-  return normalized;
-}

@@ -9,16 +9,13 @@ import { buildPathCatalog, type PathCatalog } from "../../auto/geometry";
 import { validateAuto } from "../../auto/validate";
 import {
   allCards,
-  cardTitle,
   isPlainWait,
   parkCardOf,
   rowLabel,
   usedNames,
 } from "../../auto/tree";
-import { placementAt, placeRoutine } from "../../auto/motion";
 import { isUsed, pointUses } from "../../auto/pins";
 import {
-  rowKind,
   type AutoCard,
   type AutoRow,
   type AutoSection,
@@ -243,7 +240,7 @@ const sameAngle = (a: number, b: number) =>
 // --- the generator ------------------------------------------------------------
 
 export function generateAutoJava(input: AutoExportInput): AutoExportResult {
-  const { auto, startPoint, lines, shapes, settings } = input;
+  const { auto, startPoint, lines, settings } = input;
   const catalog: PathCatalog = buildPathCatalog(startPoint, lines, settings);
   const issues = validateAuto(auto, catalog, startPoint);
   const errors = issues.filter((issue) => issue.level === "error").map((issue) => issue.message);
@@ -325,51 +322,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     );
   }
 
-  // Routine patterns, placed where their cards start them. Every pose is a
-  // p.of() local like the rest, so the alliance rotation applies to them too.
-  const routineDecls: string[] = [];
-  const routineVars = new Map<string, string>();
-  for (const card of cards) {
-    if (card.kind !== "routine") continue;
-    const routine = auto.routines[card.routine];
-    const placement = placementAt(auto.points, card.at, card.facingDeg, card.mirror);
-    if (!routine || !placement) continue;
-    const base = `${camelCase(sanitizeIdentifier(card.routine, "routine"))}Pattern`;
-    const patternVar = names.take(base);
-    routineVars.set(card.id, patternVar);
-    const at = auto.points[card.at];
-    let startVar = pointVars.get(card.at)!;
-    if (!sameAngle(at[2] ?? 0, card.facingDeg)) {
-      startVar = names.take(`${patternVar}Start`);
-      routineDecls.push(`        Pose ${startVar} = ${pose(placement.x, placement.y, card.facingDeg)};`);
-    }
-    let previous = startVar;
-    const segments = placeRoutine(routine, placement).map((segment, index) => {
-      const endVar = names.take(`${patternVar}P${index + 1}`);
-      routineDecls.push(`        Pose ${endVar} = ${pose(segment.end.x, segment.end.y, card.facingDeg)};`);
-      let expression: string;
-      if (segment.control) {
-        const controlVar = names.take(`${patternVar}C${index + 1}`);
-        routineDecls.push(`        Pose ${controlVar} = ${pose(segment.control.x, segment.control.y, 0)};`);
-        expression = `Paths.curve(${previous}, ${controlVar}, ${endVar})`;
-      } else {
-        expression = `Paths.line(${previous}, ${endVar})`;
-      }
-      previous = endVar;
-      return `${expression}.constant(${startVar})`;
-    });
-    routineDecls.push(
-      `        Path ${patternVar} = ${segments.length === 1 ? segments[0] : `Paths.path(${segments.join(", ")})`};`,
-    );
-  }
-
   const pathOf = (lineId: string) => {
     const info = catalog.byId.get(lineId)!;
     return { info, varName: pathVars.get(info.index)! };
   };
-
-  const stringArray = (values: string[]) =>
-    `new String[] {${values.map(javaString).join(", ")}}`;
 
   const cardNode = (card: AutoCard): JNode => {
     switch (card.kind) {
@@ -379,16 +335,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           : `kit.command(${javaString(card.name)})`;
       case "path": {
         const { info, varName } = pathOf(card.lineId);
-        const args = [javaString(info.name), varName];
-        if (card.while.length > 0 || card.events.length > 0) {
-          args.push(stringArray(card.while));
-          [...card.events]
-            .sort((a, b) => a.at - b.at)
-            .forEach((event) =>
-              args.push(`AutoKit.at(${javaNumber(event.at)}, ${javaString(event.action)})`),
-            );
-        }
-        return `kit.path(${args.join(", ")})`;
+        return `kit.path(${javaString(info.name)}, ${varName})`;
       }
       case "firstOf":
         return {
@@ -397,34 +344,6 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
             ? [javaString(firstOfLabel(card)), `kit.command(${javaString(card.alongside)})`]
             : [javaString(firstOfLabel(card))],
           children: card.rows.map(rowNode),
-        };
-      case "routine": {
-        const routine = auto.routines[card.routine];
-        return `kit.routine(${[
-          javaString(cardTitle(card)),
-          routineVars.get(card.id)!,
-          javaString(routine.endsWhen),
-          javaNumber(routine.timeoutMs),
-          stringArray(routine.while),
-          stringArray(routine.exit),
-          pointVars.get(card.exit)!,
-        ].join(", ")})`;
-      }
-      case "goTo": {
-        const nodes = listNodes(card.ifRefused, `${cardTitle(card)}: if refused`);
-        const refused: JNode =
-          nodes.length === 1 ? nodes[0] : { head: "kit.sequence", args: [], children: nodes };
-        return {
-          head: "kit.goTo",
-          args: [javaString(cardTitle(card)), pointVars.get(card.point)!, javaNumber(card.maxDistanceIn)],
-          children: [refused],
-        };
-      }
-      case "together":
-        return {
-          head: "kit.together",
-          args: [javaString(cardTitle(card)), `AutoKit.Ends.${card.ends}`],
-          children: card.cards.map(cardNode),
         };
     }
   };
@@ -444,34 +363,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   };
 
   const rowNode = (row: AutoRow): JNode => {
-    let condition: string;
-    switch (rowKind(row)) {
-      case "when":
-        condition = `kit.when(${(row as { when: string[] }).when.map(javaString).join(", ")})`;
-        break;
-      case "afterMs":
-        condition = `kit.afterMs(${javaNumber((row as { afterMs: number }).afterMs)})`;
-        break;
-      case "timeLeftBelowS":
-        condition = `kit.timeLeftBelow(${javaNumber((row as { timeLeftBelowS: number }).timeLeftBelowS)})`;
-        break;
-      case "otherwise":
-        condition = "kit.otherwise()";
-        break;
-      case "finished":
-        condition = "kit.finished()";
-        break;
-      case "nearPoint": {
-        const near = row as { nearPoint: string; radiusIn: number };
-        condition = `kit.nearPoint(${pointVars.get(near.nearPoint)}, ${javaNumber(near.radiusIn)})`;
-        break;
-      }
-      case "inArea": {
-        const [a, b] = (row as { inArea: [string, string] }).inArea;
-        condition = `kit.inArea(${pointVars.get(a)}, ${pointVars.get(b)})`;
-        break;
-      }
-    }
+    const condition =
+      "when" in row
+        ? `kit.when(${row.when.map(javaString).join(", ")})`
+        : `kit.afterMs(${javaNumber(row.afterMs)})`;
     if (row.cards.length === 0) return condition;
     return { head: `${condition}.then`, args: [], children: listNodes(row.cards, rowLabel(row)) };
   };
@@ -538,24 +433,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       out.push(`        Pose ${decl.varName} = ${pose(decl.x, decl.y, decl.headingDeg)};`),
     );
   }
-  const zones = shapes.filter((shape) => (shape.vertices?.length ?? 0) >= 3);
-  if (zones.length > 0) {
-    out.push("", "        // Keep-out zones (from the .pp `shapes`), corners in order.");
-    zones.forEach((shape) =>
-      out.push(
-        `        kit.keepOut(${shape.vertices.map((v) => pose(v.x, v.y, 0)).join(", ")});${shape.name ? ` // ${commentSafe(shape.name)}` : ""}`,
-      ),
-    );
-  }
   if (pathDecls.length > 0) {
     out.push("", "        // Paths, written as the stock Visualizer export writes them.");
     out.push(...pathDecls);
   }
-  if (routineDecls.length > 0) {
-    out.push("", "        // Routine patterns, placed where their cards start them; heading held at the start.");
-    out.push(...routineDecls);
-  }
-
   const top: JNode = {
     head: "kit.sequence",
     args: [],

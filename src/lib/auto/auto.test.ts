@@ -73,7 +73,7 @@ test("the loader repairs what it can and says what it dropped", () => {
         id: "p",
         kind: "path",
         lineId: "l1",
-        events: [{ at: 1.5, action: "A" }, { at: 0.2, action: "B" }, { at: "no" }],
+        events: [{ at: 0.2, action: "B" }],
       },
       {
         id: "f",
@@ -82,25 +82,24 @@ test("the loader repairs what it can and says what it dropped", () => {
           { when: ["C"], afterMs: 5, cards: [] },
           { afterMs: -1, cards: [] },
           { otherwise: true },
+          { when: ["C", "D"], cards: [] },
         ],
       },
+      { id: "r", kind: "routine", routine: "Sweep" },
     ],
+    routines: { Sweep: {} },
   });
   assert(auto, "section expected");
-  assertEqual(auto.drawnFor, "BLUE");
+  assertEqual(auto.drawnFor, "RED");
   assertEqual(auto.registry, { actions: ["A", "B"], conditions: [] });
   assertEqual(Object.keys(auto.points), ["Good"]);
   assertEqual(auto.cards.map((card) => card.kind), ["action", "action", "path", "firstOf"]);
   assert(auto.cards[0].id !== auto.cards[1].id, "duplicate ids must be re-issued");
   const path = auto.cards[2] as PathCard;
-  assertEqual(path.events, [
-    { at: 0.2, action: "B" },
-    { at: 1, action: "A" },
-  ]);
-  assertEqual(path.park, false);
-  assertEqual((auto.cards[3] as FirstOfCard).rows, [{ cards: [], otherwise: true }]);
+  assertEqual(path, { id: "p", kind: "path", lineId: "l1", park: false });
+  assertEqual((auto.cards[3] as FirstOfCard).rows, [{ cards: [], when: ["C"] }]);
   const text = problems.join("\n");
-  for (const expected of ["newer Auto builder", "drawnFor", "registry.conditions", 'Point "Bad"', '"teleport"', "more than one condition", "afterMs must be"]) {
+  for (const expected of ["newer Auto builder", "drawnFor", "registry.conditions", 'Point "Bad"', '"teleport"', "more than one condition", "afterMs must be", "while driving", '"otherwise" row', "waits for any of C, D", "routine card", "routines"]) {
     assert(text.includes(expected), `expected a problem mentioning ${expected}; got:\n${text}`);
   }
 });
@@ -120,31 +119,36 @@ test("the sample validates clean", () => {
   assertEqual(issuesOf(sample.auto), []);
 });
 
-test("used names are counted across cards, chips, events and rows", () => {
+test("used names are counted across cards and rows", () => {
   const sample = loadSample();
   const used = usedNames(sample.auto);
-  assertEqual([...used.conditions.keys()].sort(), ["CameraBlind", "HiveTipped", "IntakeFull", "LauncherReady"]);
-  assertEqual(used.actions.get("IntakeOn"), 5);
+  assertEqual([...used.conditions.keys()].sort(), ["HiveTipped", "IntakeFull", "LauncherReady"]);
+  assertEqual(used.actions.get("ShootAll"), 4);
 });
 
 test("unregistered names are errors", () => {
   const auto = clone(loadSample().auto);
-  auto.registry.actions = auto.registry.actions.filter((name) => name !== "IntakeOn");
-  auto.registry.conditions = auto.registry.conditions.filter((name) => name !== "CameraBlind");
+  auto.registry.actions = auto.registry.actions.filter((name) => name !== "IntakeOff");
+  auto.registry.conditions = auto.registry.conditions.filter((name) => name !== "HiveTipped");
   const errors = issuesOf(auto).filter((issue) => issue.level === "error");
-  assert(errors.some((e) => e.message.includes('"IntakeOn"') && e.message.includes("list of commands")));
-  assert(errors.some((e) => e.cardId === "did-tip" && e.message.includes('"CameraBlind"')));
+  assert(errors.some((e) => e.message.includes('"IntakeOff"') && e.message.includes("list of commands")));
+  assert(errors.some((e) => e.cardId === "did-tip" && e.message.includes('"HiveTipped"')));
 });
 
-test("a wait with no time row is an error", () => {
-  const auto = clone(loadSample().auto);
-  const wait = findCard(auto.cards, "wait-ready") as FirstOfCard;
-  wait.rows = wait.rows.filter((row) => "when" in row);
-  const issues = issuesOf(auto);
-  assert(
-    issues.some((i) => i.level === "error" && i.cardId === "wait-ready" && i.message.includes("time row")),
-    JSON.stringify(issues),
-  );
+test("a wait needs exactly one trigger and one time limit", () => {
+  for (const rows of [
+    [{ when: ["LauncherReady"], cards: [] }],
+    [{ afterMs: 500, cards: [] }],
+    [{ when: ["LauncherReady"], cards: [] }, { afterMs: 500, cards: [] }, { afterMs: 900, cards: [] }],
+  ]) {
+    const auto = clone(loadSample().auto);
+    (findCard(auto.cards, "wait-ready") as FirstOfCard).rows = rows;
+    const issues = issuesOf(auto);
+    assert(
+      issues.some((i) => i.level === "error" && i.cardId === "wait-ready" && i.message.includes("exactly one trigger")),
+      JSON.stringify(issues),
+    );
+  }
 });
 
 test("a path that starts away from the robot is a discontinuity warning", () => {
@@ -154,8 +158,6 @@ test("a path that starts away from the robot is a discontinuity warning", () => 
     id: "jump",
     kind: "path",
     lineId: "far-collect",
-    while: [],
-    events: [],
     park: false,
   });
   const issues = issuesOf(auto);
@@ -166,10 +168,10 @@ test("a path that starts away from the robot is a discontinuity warning", () => 
 test("paths inside a group, missing paths and double parks are errors", () => {
   const auto = clone(loadSample().auto);
   auto.cards.push(
-    { id: "nested", kind: "path", lineId: "far-collect-a", while: [], events: [], park: false },
-    { id: "gone", kind: "path", lineId: "no-such-line", while: [], events: [], park: false },
-    { id: "park1", kind: "path", lineId: "far-park", while: [], events: [], park: true },
-    { id: "park2", kind: "path", lineId: "far-park", while: [], events: [], park: true },
+    { id: "nested", kind: "path", lineId: "far-collect-a", park: false },
+    { id: "gone", kind: "path", lineId: "no-such-line", park: false },
+    { id: "park1", kind: "path", lineId: "far-park", park: true },
+    { id: "park2", kind: "path", lineId: "far-park", park: true },
   );
   const issues = issuesOf(auto);
   const errorFor = (id: string) => issues.find((i) => i.cardId === id && i.level === "error");
@@ -177,15 +179,6 @@ test("paths inside a group, missing paths and double parks are errors", () => {
   assert(errorFor("gone")?.message.includes("no longer exists"));
   assert(errorFor("park2")?.message.includes("more than one park"));
   assert(!errorFor("park1"));
-});
-
-test("rows after an otherwise row are flagged as unreachable", () => {
-  const auto = clone(loadSample().auto);
-  const wait = findCard(auto.cards, "wait-ready") as FirstOfCard;
-  wait.rows.unshift({ otherwise: true, cards: [] });
-  const issues = issuesOf(auto).filter((i) => i.cardId === "wait-ready");
-  assertEqual(issues.length, 2);
-  assert(issues.every((i) => i.level === "warning" && i.message.includes("never fire")));
 });
 
 test("condition kinds: events round-trip, unknown names are dropped, none writes nothing", () => {

@@ -13,13 +13,9 @@ test("the branches around a card, outermost first", () => {
   const { auto } = loadSample();
   assertEqual(branchesAround(auto.cards, "spin-up"), []);
   assertEqual(branchesAround(auto.cards, "tip-2"), ["did-tip#0"]);
-  // Did the HIVE tip? → If not tipped → Did it tip this time? → Out of time → Hold's fallback.
-  assertEqual(branchesAround(auto.cards, "late-out"), [
-    "did-tip#1",
-    "near-5#1",
-    "late-hold#0",
-  ]);
-  assertEqual(branchesAround(auto.cards, "near-3b"), ["did-tip#1", "near-3#0"]);
+  // Did the HIVE tip? → If not tipped → Did it tip this time? → Out of time.
+  assertEqual(branchesAround(auto.cards, "late-out"), ["did-tip#1", "near-5#1"]);
+  assertEqual(branchesAround(auto.cards, "near-3b"), ["did-tip#1"]);
   assertEqual(branchesAround(auto.cards, "no-such-card"), []);
 });
 
@@ -48,12 +44,12 @@ test("a folded branch reads as its card count and first cards", () => {
   if (tipped.kind !== "firstOf") throw new Error("sample changed");
   assertEqual(
     foldSummary(tipped.rows[0].cards, name),
-    "4 cards · far-to → CollectFar at FarPickup → ShootAll → far-park",
+    "5 cards · far-to → far-collect → far-up → ShootAll → …",
   );
   // Nested cards count; only the branch's own first cards are named.
   assertEqual(
     foldSummary(tipped.rows[1].cards, name),
-    "15 cards · near-collect → Wait for IntakeFull → Back and spin up → ShootAll → …",
+    "13 cards · near-collect → Wait for IntakeFull → near-back → SpinUp → …",
   );
   assertEqual(branchKey("did-tip", 1), "did-tip#1");
 });

@@ -49,11 +49,6 @@ public final class RedGardenBasicAuto {
         Pose park = p.of(16, 106, 90);
         Pose collectHome = p.of(60, 10, 90);
 
-        // Keep-out zones (from the .pp `shapes`), corners in order.
-        kit.keepOut(p.of(46.6, 51.2, 0), p.of(49.4, 51.2, 0), p.of(49.4, 90.3, 0), p.of(46.6, 90.3, 0)); // HIVE frame leg (red side)
-        kit.keepOut(p.of(92.6, 51.2, 0), p.of(95, 51.2, 0), p.of(95, 90.3, 0), p.of(92.6, 90.3, 0)); // HIVE frame leg (blue side)
-        kit.keepOut(p.of(70.8, 0, 0), p.of(141.5, 0, 0), p.of(141.5, 141.5, 0), p.of(70.8, 141.5, 0)); // Blue half: stay out
-
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
         Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);

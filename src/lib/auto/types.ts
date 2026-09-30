@@ -29,12 +29,6 @@ export interface AutoRegistry {
 /** `[x, y]` or `[x, y, headingDeg]`, inches in the Pedro field frame. */
 export type NamedPoint = [number, number] | [number, number, number];
 
-/** An action fired when the robot is `at` (0..1) of the way along a path. */
-export interface PathEvent {
-  at: number;
-  action: string;
-}
-
 /**
  * Runs a registered command (the file calls it an action). On the robot it runs until it finishes
  * or `timeoutS` (5 s when unset) has passed, whichever is first.
@@ -57,17 +51,15 @@ export interface PathCard {
   kind: "path";
   /** A top-level path (a single path or a group) of the project's `lines`. */
   lineId: string;
-  /** Actions started when the path starts and run while it is driven. */
-  while: string[];
-  events: PathEvent[];
   /** The branch's park path, used by the endgame guard. */
   park: boolean;
 }
 
 /**
- * Waits for the first of its rows to become true and runs that row's cards.
- * With no cards on any row it is a "Wait for" card; with cards it is a
- * decision. Cards after it continue once the chosen row's cards are done.
+ * The one branching block: wait for a trigger, at most some time. Its two rows are the ways out: a
+ * `when` row (the trigger fired, ✓) and an `afterMs` row (timed out). With no cards on either row
+ * it is a plain wait and the cards after it continue; with cards, each row holds the rest of its
+ * route.
  */
 export interface FirstOfCard {
   id: string;
@@ -75,57 +67,13 @@ export interface FirstOfCard {
   label: string;
   rows: AutoRow[];
   /**
-   * A command run while the card waits ("wait for Tip while LaunchAll"). It starts with the wait;
-   * when a row fires it is stopped if still running. A `finished` row fires when it ends by itself.
+   * A command run while the card waits ("LaunchAll · wait for Tip"): it starts with the wait and is
+   * stopped when a row fires, if still running.
    */
   alongside?: string;
 }
 
-/**
- * Runs a routine (a pattern defined relative to where it starts) placed at a
- * named point, facing `facingDeg`, optionally mirrored left↔right. It ends
- * when the routine's condition turns true, its time runs out or the pattern
- * is done, then drives straight to the `exit` point.
- */
-export interface RoutineCard {
-  id: string;
-  kind: "routine";
-  routine: string;
-  at: string;
-  facingDeg: number;
-  mirror: boolean;
-  exit: string;
-}
-
-/**
- * Drives straight to a named point if it is no more than `maxDistanceIn`
- * away; otherwise runs the `ifRefused` cards instead.
- */
-export interface GoToCard {
-  id: string;
-  kind: "goTo";
-  label: string;
-  point: string;
-  maxDistanceIn: number;
-  ifRefused: AutoCard[];
-}
-
-/** Runs its cards at the same time; done when ALL are, or the FIRST is. */
-export interface TogetherCard {
-  id: string;
-  kind: "together";
-  label: string;
-  ends: "ALL" | "FIRST";
-  cards: AutoCard[];
-}
-
-export type AutoCard =
-  | ActionCard
-  | PathCard
-  | FirstOfCard
-  | RoutineCard
-  | GoToCard
-  | TogetherCard;
+export type AutoCard = ActionCard | PathCard | FirstOfCard;
 export type AutoCardKind = AutoCard["kind"];
 
 interface RowCommon {
@@ -134,54 +82,14 @@ interface RowCommon {
   label?: string;
 }
 
+/** The trigger fired. The file keeps a list for older files; it holds exactly one name. */
 export type WhenRow = RowCommon & { when: string[] };
+/** The wait's time limit passed. */
 export type AfterMsRow = RowCommon & { afterMs: number };
-export type TimeLeftRow = RowCommon & { timeLeftBelowS: number };
-export type OtherwiseRow = RowCommon & { otherwise: true };
-export type NearPointRow = RowCommon & { nearPoint: string; radiusIn: number };
-export type InAreaRow = RowCommon & { inArea: [string, string] };
-/** Fires when the card's `alongside` command finishes by itself. */
-export type FinishedRow = RowCommon & { finished: true };
 
-export type AutoRow =
-  | WhenRow
-  | AfterMsRow
-  | TimeLeftRow
-  | OtherwiseRow
-  | NearPointRow
-  | InAreaRow
-  | FinishedRow;
+export type AutoRow = WhenRow | AfterMsRow;
 
-export type RowKind =
-  | "when"
-  | "afterMs"
-  | "timeLeftBelowS"
-  | "otherwise"
-  | "nearPoint"
-  | "inArea"
-  | "finished";
-
-/**
- * One step of a routine's pattern, in inches relative to where the routine
- * starts: `forward` along its facing, `left` to its left. With `control` the
- * step is a curve through that control point, otherwise a straight line.
- */
-export interface RoutineStep {
-  forward: number;
-  left: number;
-  control?: [number, number];
-}
-
-export interface RoutineDef {
-  /** The pattern, after the implicit start at (0, 0). */
-  steps: RoutineStep[];
-  /** Registered condition that ends the routine early. */
-  endsWhen: string;
-  timeoutMs: number;
-  while: string[];
-  /** Actions started as the robot leaves for the exit point. */
-  exit: string[];
-}
+export type RowKind = "when" | "afterMs";
 
 export interface AutoSection {
   version: typeof AUTO_FORMAT_VERSION;
@@ -200,26 +108,14 @@ export interface AutoSection {
   pathEnds: Record<string, string>;
   /** The named point the start pose is on, if any; same rules as `pathEnds`. */
   startAt?: string;
-  /** Routine definitions by name; placed on the field by routine cards. */
-  routines: Record<string, RoutineDef>;
   cards: AutoCard[];
 }
 
 export function rowKind(row: AutoRow): RowKind {
-  if ("when" in row) return "when";
-  if ("afterMs" in row) return "afterMs";
-  if ("timeLeftBelowS" in row) return "timeLeftBelowS";
-  if ("nearPoint" in row) return "nearPoint";
-  if ("inArea" in row) return "inArea";
-  if ("finished" in row) return "finished";
-  return "otherwise";
+  return "when" in row ? "when" : "afterMs";
 }
 
-/**
- * A row that becomes true on the clock alone, so a wait with one cannot hang. A `finished` row
- * counts: the command alongside always ends, by itself or at its timeout.
- */
+/** The time-limit row, which every wait needs so it cannot hang. */
 export function isTimeRow(row: AutoRow): boolean {
-  const kind = rowKind(row);
-  return kind === "afterMs" || kind === "timeLeftBelowS" || kind === "otherwise" || kind === "finished";
+  return rowKind(row) === "afterMs";
 }

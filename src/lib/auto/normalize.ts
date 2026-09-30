@@ -6,9 +6,6 @@ import {
   type AutoRow,
   type AutoSection,
   type NamedPoint,
-  type PathEvent,
-  type RoutineDef,
-  type RoutineStep,
 } from "./types";
 import { makeCardId } from "./tree";
 
@@ -25,14 +22,13 @@ export interface NormalizeResult {
   problems: string[];
 }
 
-export function createEmptyAuto(drawnFor: Alliance = "BLUE"): AutoSection {
+export function createEmptyAuto(drawnFor: Alliance = "RED"): AutoSection {
   return {
     version: AUTO_FORMAT_VERSION,
     drawnFor,
     registry: { actions: [], conditions: [] },
     points: {},
     pathEnds: {},
-    routines: {},
     cards: [],
   };
 }
@@ -80,11 +76,13 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     );
   }
 
-  let drawnFor: Alliance = "BLUE";
+  // Autos are drawn for RED; the robot turns them for BLUE. An older file drawn for BLUE keeps
+  // saying so, so the robot still turns it the right way.
+  let drawnFor: Alliance = "RED";
   if (raw.drawnFor === "RED" || raw.drawnFor === "BLUE") {
     drawnFor = raw.drawnFor;
   } else if (raw.drawnFor !== undefined) {
-    problems.push(`drawnFor must be "RED" or "BLUE"; used BLUE.`);
+    problems.push(`drawnFor must be "RED" or "BLUE"; used RED.`);
   }
 
   const registryRaw = isObject(raw.registry) ? raw.registry : {};
@@ -144,14 +142,8 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     else problems.push(`startAt: "${String(raw.startAt)}" is not a named point; unpinned the start.`);
   }
 
-  const routines: Record<string, RoutineDef> = {};
-  if (raw.routines !== undefined && !isObject(raw.routines)) {
-    problems.push("routines is not an object of name → routine; ignored it.");
-  } else if (isObject(raw.routines)) {
-    for (const [name, value] of Object.entries(raw.routines)) {
-      const routine = normalizeRoutine(value, `routines.${name}`, problems);
-      if (routine && name.trim()) routines[name.trim()] = routine;
-    }
+  if (isObject(raw.routines) && Object.keys(raw.routines).length > 0) {
+    problems.push("This file has routines, which this editor no longer supports; dropped them.");
   }
 
   const seenIds = new Set<string>();
@@ -163,7 +155,6 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     registry,
     points,
     pathEnds,
-    routines,
     cards,
   };
   if (startAt) auto.startAt = startAt;
@@ -226,33 +217,15 @@ function normalizeCard(
       return card;
     }
     case "path": {
-      const events: PathEvent[] = [];
-      if (Array.isArray(raw.events)) {
-        raw.events.forEach((event, index) => {
-          if (
-            isObject(event) &&
-            finite(event.at) &&
-            typeof event.action === "string" &&
-            event.action.trim()
-          ) {
-            events.push({
-              at: Math.min(1, Math.max(0, event.at)),
-              action: event.action.trim(),
-            });
-          } else {
-            problems.push(`${where}.events[${index}] needs "at" (0..1) and "action"; dropped it.`);
-          }
-        });
-      }
-      events.sort((a, b) => a.at - b.at);
       const lineId = typeof raw.lineId === "string" ? raw.lineId : "";
       if (!lineId) problems.push(`${where} is a path card with no lineId.`);
+      if ((Array.isArray(raw.while) && raw.while.length) || (Array.isArray(raw.events) && raw.events.length)) {
+        problems.push(`${where} runs commands while driving, which this editor no longer supports; dropped them.`);
+      }
       return {
         id: cardId(raw, seenIds),
         kind: "path",
         lineId,
-        while: nameList(raw.while, `${where}.while`, problems),
-        events,
         park: raw.park === true,
       };
     }
@@ -277,88 +250,20 @@ function normalizeCard(
       };
     }
     case "routine":
-      return {
-        id: cardId(raw, seenIds),
-        kind: "routine",
-        routine: typeof raw.routine === "string" ? raw.routine : "",
-        at: typeof raw.at === "string" ? raw.at : "",
-        facingDeg: finite(raw.facingDeg) ? raw.facingDeg : 0,
-        mirror: raw.mirror === true,
-        exit: typeof raw.exit === "string" ? raw.exit : "",
-      };
     case "goTo":
-      return {
-        id: cardId(raw, seenIds),
-        kind: "goTo",
-        label: typeof raw.label === "string" ? raw.label : "",
-        point: typeof raw.point === "string" ? raw.point : "",
-        maxDistanceIn: finite(raw.maxDistanceIn) && raw.maxDistanceIn > 0 ? raw.maxDistanceIn : 24,
-        ifRefused: normalizeCards(raw.ifRefused, `${where}.ifRefused`, problems, seenIds),
-      };
     case "together":
-      if (raw.ends !== undefined && raw.ends !== "ALL" && raw.ends !== "FIRST") {
-        problems.push(`${where}: ends must be "ALL" or "FIRST"; used ALL.`);
-      }
-      return {
-        id: cardId(raw, seenIds),
-        kind: "together",
-        label: typeof raw.label === "string" ? raw.label : "",
-        ends: raw.ends === "FIRST" ? "FIRST" : "ALL",
-        cards: normalizeCards(raw.cards, `${where}.cards`, problems, seenIds),
-      };
+      problems.push(`${where} is a ${raw.kind} card, which this editor no longer supports; dropped it.`);
+      return null;
     default:
       problems.push(
-        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path, firstOf, routine, goTo and together).`,
+        `${where} has unknown kind ${JSON.stringify(raw.kind)}; dropped it (this build knows action, path and firstOf).`,
       );
       return null;
   }
 }
 
-function normalizeRoutine(
-  raw: unknown,
-  where: string,
-  problems: string[],
-): RoutineDef | null {
-  if (!isObject(raw)) {
-    problems.push(`${where} is not a routine; dropped it.`);
-    return null;
-  }
-  const steps: RoutineStep[] = [];
-  if (Array.isArray(raw.steps)) {
-    raw.steps.forEach((step, index) => {
-      if (isObject(step) && finite(step.forward) && finite(step.left)) {
-        const out: RoutineStep = { forward: step.forward, left: step.left };
-        if (
-          Array.isArray(step.control) &&
-          step.control.length === 2 &&
-          step.control.every(finite)
-        ) {
-          out.control = [step.control[0], step.control[1]];
-        }
-        steps.push(out);
-      } else {
-        problems.push(`${where}.steps[${index}] needs numbers "forward" and "left"; dropped it.`);
-      }
-    });
-  }
-  return {
-    steps,
-    endsWhen: typeof raw.endsWhen === "string" ? raw.endsWhen.trim() : "",
-    timeoutMs: finite(raw.timeoutMs) && raw.timeoutMs > 0 ? raw.timeoutMs : 3000,
-    while: nameList(raw.while, `${where}.while`, problems),
-    exit: nameList(raw.exit, `${where}.exit`, problems),
-  };
-}
-
-const ROW_KEYS = [
-  "when",
-  "afterMs",
-  "timeLeftBelowS",
-  "otherwise",
-  "nearPoint",
-  "inArea",
-  "finished",
-] as const;
+const ROW_KEYS = ["when", "afterMs"] as const;
+const DROPPED_ROW_KEYS = ["timeLeftBelowS", "otherwise", "nearPoint", "inArea", "finished"];
 
 function normalizeRow(
   raw: unknown,
@@ -370,11 +275,16 @@ function normalizeRow(
     problems.push(`${where} is not a row; dropped it.`);
     return null;
   }
+  const dropped = DROPPED_ROW_KEYS.find((key) => raw[key] !== undefined);
+  if (dropped) {
+    problems.push(`${where} is a "${dropped}" row, which this editor no longer supports; dropped it and its cards.`);
+    return null;
+  }
   const keys = ROW_KEYS.filter((key) => raw[key] !== undefined);
   if (keys.length !== 1) {
     problems.push(
       keys.length === 0
-        ? `${where} has no condition (when, afterMs, timeLeftBelowS, otherwise, nearPoint, inArea or finished); dropped it.`
+        ? `${where} has no condition (when or afterMs); dropped it.`
         : `${where} has more than one condition (${keys.join(", ")}); dropped it.`,
     );
     return null;
@@ -385,49 +295,16 @@ function normalizeRow(
     common.label = raw.label.trim();
   }
 
-  const nonNegative = (value: unknown, what: string): number | null => {
-    if (finite(value) && value >= 0) return value;
-    problems.push(`${where}: ${what} must be a number ≥ 0; dropped the row.`);
-    return null;
-  };
-
-  switch (keys[0]) {
-    case "when":
-      return { ...common, when: nameList(raw.when, `${where}.when`, problems) };
-    case "afterMs": {
-      const ms = nonNegative(raw.afterMs, "afterMs");
-      return ms === null ? null : { ...common, afterMs: ms };
+  if (keys[0] === "when") {
+    const names = nameList(raw.when, `${where}.when`, problems);
+    if (names.length > 1) {
+      problems.push(`${where} waits for any of ${names.join(", ")}; a wait has one trigger now, so it waits for ${names[0]}.`);
     }
-    case "timeLeftBelowS": {
-      const s = nonNegative(raw.timeLeftBelowS, "timeLeftBelowS");
-      return s === null ? null : { ...common, timeLeftBelowS: s };
-    }
-    case "otherwise":
-      return { ...common, otherwise: true };
-    case "finished":
-      return { ...common, finished: true };
-    case "nearPoint": {
-      const radius = nonNegative(raw.radiusIn ?? 6, "radiusIn");
-      if (typeof raw.nearPoint !== "string" || radius === null) {
-        if (typeof raw.nearPoint !== "string")
-          problems.push(`${where}: nearPoint must name a point; dropped the row.`);
-        return null;
-      }
-      return { ...common, nearPoint: raw.nearPoint, radiusIn: radius };
-    }
-    case "inArea": {
-      const area = raw.inArea;
-      if (
-        !Array.isArray(area) ||
-        area.length !== 2 ||
-        !area.every((name) => typeof name === "string")
-      ) {
-        problems.push(`${where}: inArea must name two corner points; dropped the row.`);
-        return null;
-      }
-      return { ...common, inArea: [area[0], area[1]] as [string, string] };
-    }
+    return { ...common, when: names.slice(0, 1) };
   }
+  if (finite(raw.afterMs) && raw.afterMs >= 0) return { ...common, afterMs: raw.afterMs };
+  problems.push(`${where}: afterMs must be a number ≥ 0; dropped the row.`);
+  return null;
 }
 
 /**
@@ -450,8 +327,6 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           id: c.id,
           kind: "path",
           lineId: c.lineId,
-          while: [...c.while],
-          events: c.events.map((e) => ({ at: e.at, action: e.action })),
           park: c.park,
         };
       case "firstOf":
@@ -461,33 +336,6 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           label: c.label,
           rows: c.rows.map(row),
           ...(c.alongside ? { alongside: c.alongside } : {}),
-        };
-      case "routine":
-        return {
-          id: c.id,
-          kind: "routine",
-          routine: c.routine,
-          at: c.at,
-          facingDeg: c.facingDeg,
-          mirror: c.mirror,
-          exit: c.exit,
-        };
-      case "goTo":
-        return {
-          id: c.id,
-          kind: "goTo",
-          label: c.label,
-          point: c.point,
-          maxDistanceIn: c.maxDistanceIn,
-          ifRefused: c.ifRefused.map(card),
-        };
-      case "together":
-        return {
-          id: c.id,
-          kind: "together",
-          label: c.label,
-          ends: c.ends,
-          cards: c.cards.map(card),
         };
     }
   };
@@ -516,28 +364,8 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     // Always written, even empty: a file without it is one from before pins,
     // whose ends on named points the editor pins when it opens the file.
     pathEnds: { ...auto.pathEnds },
-    routines: Object.fromEntries(
-      Object.entries(auto.routines).map(([name, routine]) => [
-        name,
-        {
-          steps: routine.steps.map((step) =>
-            step.control
-              ? { forward: step.forward, left: step.left, control: [step.control[0], step.control[1]] }
-              : { forward: step.forward, left: step.left },
-          ),
-          endsWhen: routine.endsWhen,
-          timeoutMs: routine.timeoutMs,
-          while: [...routine.while],
-          exit: [...routine.exit],
-        },
-      ]),
-    ) as Record<string, RoutineDef>,
     cards: auto.cards.map(card),
   };
-  // Written only when there are some, so files without routines stay as they were.
-  if (Object.keys(out.routines).length === 0) {
-    delete (out as Partial<AutoSection>).routines;
-  }
   if (auto.startAt) out.startAt = auto.startAt;
   if (auto.exportName) out.exportName = auto.exportName;
   return out;

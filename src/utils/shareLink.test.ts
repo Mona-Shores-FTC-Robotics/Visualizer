@@ -74,17 +74,21 @@ test("round trip: an untitled project and non-ASCII names survive", async () => 
   assertEqual(shared.project, project);
 });
 
-test("a format 1 link made today still opens and still exports", async () => {
+test("a format 1 link made today still opens, and says what it no longer holds", async () => {
   const shared = expectOk(await decodeShareHash(frozenV1Link.trim()));
   assertEqual(shared.name, "hive-rush.pp");
   const { auto, problems } = normalizeAuto(shared.project.auto);
   assert(auto, "the frozen link has an auto section");
-  assertEqual(problems, []);
+  // The frozen link predates the simpler step set: what it can no longer hold
+  // (routines, commands while driving, together) is dropped and reported.
+  assert(problems.length > 0 && problems.every((p) => p.includes("no longer supports") || p.includes("one trigger now")),
+    problems.join("\n"));
+  // Its last decision lost its time rows, so the export says what to fix rather than guessing.
   const result = generateAutoJavaFromText(
     JSON.stringify(shared.project),
     "hive-rush.pp",
   );
-  assert(result.ok, JSON.stringify(result));
+  assert(!result.ok && result.errors.some((e) => e.includes("exactly one trigger and one time limit")), JSON.stringify(result));
 });
 
 test("fragments that are not share links are ignored", async () => {

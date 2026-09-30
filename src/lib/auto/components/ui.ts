@@ -39,9 +39,6 @@ export function cardColors(cards: AutoCard[]): Map<string, string> {
       if (card.kind === "firstOf") {
         card.rows.forEach((row, index) => walk(row.cards, branchColor(index)));
       }
-      // A together's cards run in the same branch; a goTo's fallback is its own.
-      if (card.kind === "together") walk(card.cards, color);
-      if (card.kind === "goTo") walk(card.ifRefused, "#ff8a3d");
     }
   };
   walk(cards, TRUNK_COLOR);

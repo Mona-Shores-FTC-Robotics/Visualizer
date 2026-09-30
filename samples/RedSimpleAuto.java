@@ -48,11 +48,6 @@ public final class RedSimpleAuto {
         // Other poses the paths need (control points, unnamed endpoints).
         Pose toGardenControl1 = p.of(40, 28, 0);
 
-        // Keep-out zones (from the .pp `shapes`), corners in order.
-        kit.keepOut(p.of(46.6, 51.2, 0), p.of(49.4, 51.2, 0), p.of(49.4, 90.3, 0), p.of(46.6, 90.3, 0)); // HIVE frame leg (red side)
-        kit.keepOut(p.of(92.6, 51.2, 0), p.of(95, 51.2, 0), p.of(95, 90.3, 0), p.of(92.6, 90.3, 0)); // HIVE frame leg (blue side)
-        kit.keepOut(p.of(70.8, 0, 0), p.of(141.5, 0, 0), p.of(141.5, 141.5, 0), p.of(70.8, 141.5, 0)); // Blue half: stay out
-
         // Paths, written as the stock Visualizer export writes them.
         Path underHive = Paths.line(start, rearShot).constant(rearShot);
         Path toGarden = Paths.curve(start, toGardenControl1, garden).linear(start, garden);

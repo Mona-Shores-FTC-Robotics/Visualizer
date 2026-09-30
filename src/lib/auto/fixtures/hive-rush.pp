@@ -318,33 +318,6 @@
       "far-up": "UpCellShot",
       "far-park": "ParkFar"
     },
-    "routines": {
-      "CollectFar": {
-        "steps": [
-          {
-            "forward": 12,
-            "left": 0
-          },
-          {
-            "forward": 12,
-            "left": -16,
-            "control": [
-              18,
-              -8
-            ]
-          }
-        ],
-        "endsWhen": "IntakeFull",
-        "timeoutMs": 2500,
-        "while": [
-          "IntakeOn"
-        ],
-        "exit": [
-          "IntakeOff",
-          "SpinUp"
-        ]
-      }
-    },
     "cards": [
       {
         "id": "spin-up",
@@ -381,8 +354,7 @@
         "rows": [
           {
             "when": [
-              "HiveTipped",
-              "CameraBlind"
+              "HiveTipped"
             ],
             "label": "If tipped",
             "cards": [
@@ -390,25 +362,19 @@
                 "id": "tip-1",
                 "kind": "path",
                 "lineId": "far-to",
-                "while": [
-                  "SpinDown"
-                ],
-                "events": [
-                  {
-                    "at": 0.6,
-                    "action": "IntakeOn"
-                  }
-                ],
                 "park": false
               },
               {
                 "id": "tip-2",
-                "kind": "routine",
-                "routine": "CollectFar",
-                "at": "FarPickup",
-                "facingDeg": 0,
-                "mirror": false,
-                "exit": "UpCellShot"
+                "kind": "path",
+                "lineId": "far-collect",
+                "park": false
+              },
+              {
+                "id": "tip-3",
+                "kind": "path",
+                "lineId": "far-up",
+                "park": false
               },
               {
                 "id": "tip-5",
@@ -420,8 +386,6 @@
                 "id": "tip-6",
                 "kind": "path",
                 "lineId": "far-park",
-                "while": [],
-                "events": [],
                 "park": true
               }
             ]
@@ -434,13 +398,6 @@
                 "id": "near-1",
                 "kind": "path",
                 "lineId": "near-collect",
-                "while": [],
-                "events": [
-                  {
-                    "at": 0.35,
-                    "action": "IntakeOn"
-                  }
-                ],
                 "park": false
               },
               {
@@ -462,27 +419,15 @@
               },
               {
                 "id": "near-3",
-                "kind": "together",
-                "label": "Back and spin up",
-                "ends": "ALL",
-                "cards": [
-                  {
-                    "id": "near-3a",
-                    "kind": "path",
-                    "lineId": "near-back",
-                    "while": [
-                      "IntakeOff"
-                    ],
-                    "events": [],
-                    "park": false
-                  },
-                  {
-                    "id": "near-3b",
-                    "kind": "action",
-                    "name": "SpinUp",
-                    "previewMs": 900
-                  }
-                ]
+                "kind": "path",
+                "lineId": "near-back",
+                "park": false
+              },
+              {
+                "id": "near-3b",
+                "kind": "action",
+                "name": "SpinUp",
+                "previewMs": 900
               },
               {
                 "id": "near-4",
@@ -505,25 +450,12 @@
                         "id": "late-1",
                         "kind": "path",
                         "lineId": "far-to",
-                        "while": [
-                          "SpinDown"
-                        ],
-                        "events": [
-                          {
-                            "at": 0.6,
-                            "action": "IntakeOn"
-                          }
-                        ],
                         "park": false
                       },
                       {
                         "id": "late-2",
                         "kind": "path",
                         "lineId": "far-collect",
-                        "while": [
-                          "IntakeOn"
-                        ],
-                        "events": [],
                         "park": false
                       },
                       {
@@ -535,10 +467,6 @@
                         "id": "late-4",
                         "kind": "path",
                         "lineId": "far-up",
-                        "while": [
-                          "SpinUp"
-                        ],
-                        "events": [],
                         "park": false
                       },
                       {
@@ -551,35 +479,20 @@
                         "id": "late-6",
                         "kind": "path",
                         "lineId": "far-park",
-                        "while": [],
-                        "events": [],
                         "park": true
                       }
                     ]
                   },
                   {
-                    "timeLeftBelowS": 6,
+                    "afterMs": 2000,
                     "label": "Out of time",
                     "cards": [
                       {
-                        "id": "late-hold",
-                        "kind": "goTo",
-                        "label": "Hold at ShootSpot",
-                        "point": "ShootSpot",
-                        "maxDistanceIn": 6,
-                        "ifRefused": [
-                          {
-                            "id": "late-out",
-                            "kind": "action",
-                            "name": "SpinDown"
-                          }
-                        ]
+                        "id": "late-out",
+                        "kind": "action",
+                        "name": "SpinDown"
                       }
                     ]
-                  },
-                  {
-                    "otherwise": true,
-                    "cards": []
                   }
                 ]
               }

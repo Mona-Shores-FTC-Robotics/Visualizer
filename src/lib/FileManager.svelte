@@ -41,8 +41,7 @@
     getDefaultStartPoint,
   } from "../config";
   import { showToast } from "./toast";
-  import NameDialog from "./components/NameDialog.svelte";
-  import { currentAuto, loadAutoFrom, rotateAutoData } from "./auto/store";
+  import { currentAuto, loadAutoFrom } from "./auto/store";
   import FileListItem from "./components/FileListItem.svelte";
   import FileActionsPanel from "./components/FileActionsPanel.svelte";
 
@@ -104,10 +103,6 @@
   const supportedFileTypes = [".pp", ".json"];
 
   // Name dialog state
-  let nameDialogOpen = $state(false);
-  let nameDialogTitle = $state("");
-  let nameDialogDefault = $state("");
-  let pendingMirrorData: any = null;
 
   // Helper to get error message from unknown error type
   function getErrorMessage(error: unknown): string {
@@ -670,203 +665,6 @@
     }
   }
 
-  async function duplicateAndMirrorFile() {
-    if (!selectedFile) {
-      showToast("No file selected to mirror", "warning");
-      return;
-    }
-
-    try {
-      const content = await browserFileStore.readFile(selectedFile.path);
-      const data = JSON.parse(content);
-
-      // normalize before mirroring
-      data.lines = normalizePaths(data.lines || []);
-      data.startPoint = normalizeStartPose(data.startPoint ?? {});
-
-      const mirroredData = rotatePathData(data);
-      mirroredData.sequence = deriveSequence(mirroredData, mirroredData.lines);
-
-      const baseName = stripPpExtension(selectedFile.name);
-      const defaultName = `${baseName}_other_alliance`;
-
-      // Store the mirrored data and open custom dialog
-      pendingMirrorData = mirroredData;
-      nameDialogTitle = "Name the other alliance's copy";
-      nameDialogDefault = defaultName;
-      nameDialogOpen = true;
-    } catch (error) {
-      console.error("Error duplicating and mirroring file:", error);
-      errorMessage = `Failed to create mirrored file: ${getErrorMessage(error)}`;
-      showToast("Failed to create mirrored file", "error");
-    }
-  }
-
-  async function handleMirrorNameConfirm(userInput: string) {
-    if (!pendingMirrorData) return;
-
-    try {
-      // Remove .pp extension if user added it
-      userInput = stripPpExtension(userInput);
-
-      let newFileName = `${userInput}.pp`;
-      let counter = 1;
-
-      // Find a unique name if the chosen name already exists
-      while (await browserFileStore.fileExists(newFileName)) {
-        newFileName = `${userInput}${counter}.pp`;
-        counter++;
-      }
-
-      await browserFileStore.writeFile(
-        newFileName,
-        JSON.stringify(pendingMirrorData, null, 2),
-      );
-      await refreshDirectory();
-
-      // Select and load the new file
-      const newFile = files.find((f) => f.name === newFileName);
-      if (newFile) {
-        await loadFile(newFile);
-      }
-
-      showToast(`Created mirrored: ${newFileName}`, "success");
-    } catch (error) {
-      console.error("Error saving mirrored file:", error);
-      errorMessage = `Failed to save mirrored file: ${getErrorMessage(error)}`;
-      showToast("Failed to save mirrored file", "error");
-    } finally {
-      pendingMirrorData = null;
-      nameDialogOpen = false;
-    }
-  }
-
-  function handleMirrorNameCancel() {
-    pendingMirrorData = null;
-    nameDialogOpen = false;
-  }
-
-  // BIOBUZZ is 180° rotationally symmetric, not mirrored: the other alliance's
-  // copy of a path is the same path turned half a turn about the field centre.
-  const turnDeg = (deg: number) => (((deg + 180) % 360) + 360) % 360;
-  const turnX = (x: number) => FIELD_SIZE - x;
-  const turnY = (y: number) => FIELD_SIZE - y;
-
-  function rotateHeading(heading: Heading): Heading {
-    switch (heading.type) {
-      case "linear":
-        return {
-          type: "linear",
-          startDeg: turnDeg(heading.startDeg),
-          endDeg: turnDeg(heading.endDeg),
-        };
-
-      case "constant":
-        return { type: "constant", degrees: turnDeg(heading.degrees) };
-
-      // A tangent turns with its path, so the reverse flag stays as it is
-      case "tangential":
-        return heading;
-
-      // Each piecewise segment carries its own angles and points, so turn them all
-      case "piecewise":
-        return {
-          type: "piecewise",
-          piecewiseHeading: {
-            ...heading.piecewiseHeading,
-            segments: (heading.piecewiseHeading?.segments ?? []).map(
-              (segment) => {
-                const parameters = segment.parameters;
-                if (!parameters) return segment;
-                return {
-                  ...segment,
-                  parameters: {
-                    ...parameters,
-                    startDeg:
-                      parameters.startDeg === undefined
-                        ? undefined
-                        : turnDeg(parameters.startDeg),
-                    endDeg:
-                      parameters.endDeg === undefined
-                        ? undefined
-                        : turnDeg(parameters.endDeg),
-                    degrees:
-                      parameters.degrees === undefined
-                        ? undefined
-                        : turnDeg(parameters.degrees),
-                    point: parameters.point
-                      ? {
-                          ...parameters.point,
-                          x: turnX(parameters.point.x),
-                          y: turnY(parameters.point.y),
-                        }
-                      : undefined,
-                  },
-                };
-              },
-            ),
-          },
-        };
-    }
-  }
-
-  function rotatePathData(data: any) {
-    const rotated = JSON.parse(JSON.stringify(data)); // Deep clone
-
-    if (rotated.startPoint) {
-      rotated.startPoint.x = turnX(rotated.startPoint.x);
-      rotated.startPoint.y = turnY(rotated.startPoint.y);
-      if (typeof rotated.startPoint.headingDeg === "number") {
-        rotated.startPoint.headingDeg = turnDeg(rotated.startPoint.headingDeg);
-      }
-    }
-
-    // Turn lines, descending into groups so nested segments turn too
-    const rotatePaths = (paths: Path[]) => {
-      paths.forEach((path) => {
-        if (path.heading) {
-          path.heading = rotateHeading(path.heading);
-        }
-
-        if (path.kind === "compound") {
-          rotatePaths(path.segments);
-          return;
-        }
-
-        if (path.endPoint) {
-          path.endPoint.x = turnX(path.endPoint.x);
-          path.endPoint.y = turnY(path.endPoint.y);
-        }
-
-        if (path.controlPoints && Array.isArray(path.controlPoints)) {
-          path.controlPoints.forEach((controlPoint) => {
-            controlPoint.x = turnX(controlPoint.x);
-            controlPoint.y = turnY(controlPoint.y);
-          });
-        }
-      });
-    };
-    if (rotated.lines && Array.isArray(rotated.lines)) {
-      rotatePaths(rotated.lines);
-    }
-
-    // Keep-out shapes turn too: the robot's export turns them with the Auto
-    if (Array.isArray(rotated.shapes)) {
-      rotated.shapes.forEach((shape: any) => {
-        (shape.vertices ?? []).forEach((v: any) => {
-          v.x = turnX(v.x);
-          v.y = turnY(v.y);
-        });
-      });
-    }
-
-    if (rotated.auto !== undefined) {
-      rotated.auto = rotateAutoData(rotated.auto);
-    }
-
-    return rotated;
-  }
-
   // Toast notification system
   function formatFileSize(bytes: number): string {
     if (bytes === 0) return "0 B";
@@ -1129,7 +927,6 @@
       onRename={startRename}
       onDelete={deleteFile}
       onDuplicate={duplicateFile}
-      onDuplicateAndMirror={duplicateAndMirrorFile}
       onOverwrite={saveCurrentToFile}
       onNew={() => (creatingNewFile = true)}
       onDownload={downloadCurrentToDisk}
@@ -1138,11 +935,4 @@
   </div>
 </div>
 
-<NameDialog
-  bind:isOpen={nameDialogOpen}
-  title={nameDialogTitle}
-  defaultValue={nameDialogDefault}
-  placeholder="Enter name..."
-  onConfirm={handleMirrorNameConfirm}
-  onCancel={handleMirrorNameCancel}
-/>
+

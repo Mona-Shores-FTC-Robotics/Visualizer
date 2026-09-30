@@ -94,7 +94,7 @@ test("the trunk is guarded when it holds a park card", () => {
   const auto = clone(loadSample().auto);
   auto.cards = [
     { id: "a", kind: "action", name: "SpinUp" },
-    { id: "p", kind: "path", lineId: "near-collect", while: [], events: [], park: true },
+    { id: "p", kind: "path", lineId: "near-collect", park: true },
   ];
   const source = sourceOf(auto);
   assert(
@@ -109,26 +109,24 @@ test("the trunk is guarded when it holds a park card", () => {
   assert(source.includes('kit.path("CollectNear", collectNear)));'), source);
 });
 
-test("near-point and in-area rows use the named point poses", () => {
+test("a wait exports as a trigger row and a time row, each with its route", () => {
   const auto = clone(loadSample().auto);
   auto.cards = [
     {
       id: "w",
       kind: "firstOf",
-      label: "At the shooting spot?",
+      label: "Ready?",
       rows: [
-        { nearPoint: "ShootSpot", radiusIn: 4.5, cards: [] },
-        { inArea: ["NearPickup", "FarPickup"], cards: [{ id: "x", kind: "action", name: "IntakeOn" }] },
+        { when: ["LauncherReady"], cards: [{ id: "x", kind: "action", name: "IntakeOn" }] },
         { afterMs: 250, cards: [] },
       ],
     },
   ];
   const source = sourceOf(auto);
-  assert(source.includes("kit.nearPoint(shootSpot, 4.5),"), source);
-  assert(source.includes("kit.inArea(nearPickup, farPickup).then("), source);
+  assert(source.includes('kit.when("LauncherReady").then('), source);
   assert(source.includes("kit.afterMs(250))"), source);
   assert(source.includes('public static final String[] COMMANDS = {"IntakeOn"};'), source);
-  assert(source.includes("public static final String[] TRIGGERS = {};"), source);
+  assert(source.includes('public static final String[] TRIGGERS = {"LauncherReady"};'), source);
 });
 
 test("errors block the export and say why", () => {

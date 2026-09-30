@@ -24,21 +24,21 @@ public final class RedSpotMapAuto {
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
     public static final String[] TRIGGERS = {};
 
-    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
+    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */
     public static final String DRAWN_FOR = "RED";
 
     /** Where the robot starts, for the given alliance. */
-    public static Pose startPose(boolean mirrored) {
-        return poses(mirrored).of(59, 9.5, 90);
+    public static Pose startPose(boolean rotated) {
+        return poses(rotated).of(59, 9.5, 90);
     }
 
-    private static PoseFactory poses(boolean mirrored) {
-        return mirrored ? PoseFactory.degrees().mirrorX(70.75) : PoseFactory.degrees();
+    private static PoseFactory poses(boolean rotated) {
+        return rotated ? PoseFactory.degrees().mirrorAroundPoint(70.75, 70.75) : PoseFactory.degrees();
     }
 
     /** Builds the whole Auto. Call once, at init; schedule the result at start. */
-    public static Command build(AutoKit kit, boolean mirrored) {
-        PoseFactory p = poses(mirrored);
+    public static Command build(AutoKit kit, boolean rotated) {
+        PoseFactory p = poses(rotated);
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
         Pose rIGHTSTART = p.of(59, 9.5, 90);
@@ -52,11 +52,6 @@ public final class RedSpotMapAuto {
         Pose yOURWALLFLOWER = p.of(15.2, 47.8, 180);
         Pose rIGHTDUMP = p.of(59, 23.7, 52);
         Pose gARDEN = p.of(10.5, 11.8, 180);
-
-        // Keep-out zones (from the .pp `shapes`), corners in order.
-        kit.keepOut(p.of(46.6, 51.2, 0), p.of(49.4, 51.2, 0), p.of(49.4, 90.3, 0), p.of(46.6, 90.3, 0)); // HIVE frame leg (red side)
-        kit.keepOut(p.of(92.6, 51.2, 0), p.of(95, 51.2, 0), p.of(95, 90.3, 0), p.of(92.6, 90.3, 0)); // HIVE frame leg (blue side)
-        kit.keepOut(p.of(70.8, 0, 0), p.of(141.5, 0, 0), p.of(141.5, 141.5, 0), p.of(70.8, 141.5, 0)); // Blue half: stay out
 
         // Paths, written as the stock Visualizer export writes them.
         Path toRIGHTHIVEENTRANCE = Paths.line(rIGHTSTART, rIGHTHIVEENTRANCE).linear(rIGHTSTART, rIGHTHIVEENTRANCE);

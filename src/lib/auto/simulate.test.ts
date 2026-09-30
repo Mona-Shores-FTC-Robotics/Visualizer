@@ -53,11 +53,10 @@ test("answered false, the time row fires at its time", () => {
 });
 
 test("a condition has one answer, whichever card asks it", () => {
-  // HiveTipped false: the first decision waits to its time row, and the later
-  // one falls through to "otherwise".
-  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped", "CameraBlind"));
+  // HiveTipped false: both waits on it run to their time limits.
+  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped"));
   assertEqual(result.taken.get("did-tip"), 1);
-  assertEqual(result.taken.get("near-5"), 2);
+  assertEqual(result.taken.get("near-5"), 1);
 });
 
 test("the questions are listed per card, in the order the Auto asks them", () => {
@@ -65,32 +64,16 @@ test("the questions are listed per card, in the order the Auto asks them", () =>
   assertEqual(questions, [
     "wait-ready:LauncherReady",
     "did-tip:HiveTipped",
-    "did-tip:CameraBlind",
-    "tip-2:IntakeFull",
     "near-2:IntakeFull",
     "near-5:HiveTipped",
   ]);
 });
 
-test("a routine's end condition changes what the log says, not when it ends", () => {
-  const yes = run(loadSample().auto).result;
-  const notYet = run(loadSample().auto, no("tip-2", "IntakeFull")).result;
-  const say = (r: typeof yes) => r.log.filter((e) => e.cardId === "tip-2").map((e) => e.text).join(" | ");
-  assert(say(yes).includes("IntakeFull true"), say(yes));
-  assert(say(notYet).includes("IntakeFull not true"), say(notYet));
-  assertEqual(yes.endTime, notYet.endTime);
-});
-
-test("path timing comes from the app's motion model and events land inside the drive", () => {
+test("path timing comes from the app's motion model", () => {
   const { result, catalog } = run(loadSample().auto);
   const drive = result.drives.find((d) => d.cardId === "tip-1")!;
   const path = catalog.byId.get("far-to")!;
   assert(Math.abs(drive.t1 - drive.t0 - path.seconds) < 1e-9);
-  const event = result.log.find((entry) => entry.kind === "event" && entry.cardId === "tip-1")!;
-  assert(event.t > drive.t0 && event.t < drive.t1, `${event.t} outside ${drive.t0}..${drive.t1}`);
-  // 60% of the distance is reached after more than 60% of a rest-to-rest profile's
-  // first half, and before its end.
-  assert(event.t - drive.t0 > 0.5 * path.seconds);
 });
 
 test("the preview timeline is contiguous and ends with the Auto", () => {
@@ -139,8 +122,6 @@ test("worst case: every wait runs to its time row", () => {
   const rows = worst.rows.get("did-tip")!;
   assert(rows[0]! < rows[1]!, "the near branch is the long one");
   assertEqual(worst.total, rows[1]);
-  // "time left < 6 s" cannot win against "otherwise" this early.
-  assertEqual(worst.rows.get("near-5")![1], null);
   // The worst case is at least as long as any preview.
   const { result } = run(auto, allNo(auto));
   assert(result.endTime <= worst.total + 1e-9, `${result.endTime} > ${worst.total}`);

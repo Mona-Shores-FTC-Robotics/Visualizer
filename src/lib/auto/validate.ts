@@ -1,7 +1,6 @@
 import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
-import { isTimeRow, rowKind, type AutoCard, type AutoSection } from "./types";
-import { describeRow } from "./tree";
+import { rowKind, type AutoCard, type AutoSection } from "./types";
 import { isUsed, pointUses } from "./pins";
 
 export type IssueLevel = "error" | "warning";
@@ -86,109 +85,29 @@ export function validateAuto(
               `${path.name} starts ${gap.toFixed(1)} in from where the robot can be (${from.x.toFixed(1)}, ${from.y.toFixed(1)}). Add a path that joins them.`,
             );
           }
-          card.while.forEach((name) => checkAction(card.id, "While driving", name));
-          card.events.forEach((event) => {
-            checkAction(card.id, `The event at ${Math.round(event.at * 100)}%`, event.action);
-            if (!(event.at >= 0 && event.at <= 1))
-              error(card.id, "An event must sit between 0% and 100% of the path.");
-          });
           at = [path.end];
           break;
         }
         case "firstOf": {
-          const name = card.label || "This card";
+          const name = card.label || "This wait";
           if (card.alongside) checkAction(card.id, "The command run while waiting", card.alongside);
-          if (!card.alongside && card.rows.some((row) => rowKind(row) === "finished"))
-            error(card.id, `${name} has a "when it finishes" row but runs no command while waiting.`);
-          if (card.rows.length === 0) {
-            error(card.id, `${name} has no rows, so it would wait forever.`);
-            break;
-          }
-          if (!card.rows.some(isTimeRow)) {
-            error(
-              card.id,
-              `${name} needs a time row (ms passed, time left, or otherwise) so it cannot wait forever.`,
-            );
+          const whens = card.rows.filter((row) => rowKind(row) === "when");
+          const limits = card.rows.filter((row) => rowKind(row) === "afterMs");
+          if (whens.length !== 1 || limits.length !== 1 || card.rows.length !== 2) {
+            error(card.id, `${name} needs exactly one trigger and one time limit.`);
           }
           const ends: BasePoint[] = [];
-          let earlierOtherwise = false;
           card.rows.forEach((row, rowIndex) => {
-            const kind = rowKind(row);
-            if (earlierOtherwise) {
-              warn(card.id, `Row ${rowIndex + 1} (${describeRow(row)}) can never fire: an earlier "otherwise" row always wins.`, rowIndex);
-            }
-            if (kind === "otherwise") earlierOtherwise = true;
-            if (kind === "when") {
-              const names = (row as { when: string[] }).when;
-              if (names.length === 0)
-                error(card.id, `Row ${rowIndex + 1} has no trigger chosen.`, rowIndex);
-              names.forEach((condition) => {
+            if ("when" in row) {
+              if (row.when.length === 0) error(card.id, `${name} has no trigger chosen.`, rowIndex);
+              for (const condition of row.when) {
                 if (!conditions.has(condition))
-                  error(card.id, `Row ${rowIndex + 1} uses "${condition}", which is not in the robot's list of triggers.`, rowIndex);
-              });
-            }
-            if (kind === "nearPoint") {
-              const point = (row as { nearPoint: string }).nearPoint;
-              if (!auto.points[point])
-                error(card.id, `Row ${rowIndex + 1} names point "${point}", which is not defined.`, rowIndex);
-            }
-            if (kind === "inArea") {
-              for (const point of (row as { inArea: [string, string] }).inArea) {
-                if (!auto.points[point])
-                  error(card.id, `Row ${rowIndex + 1} names point "${point}", which is not defined.`, rowIndex);
+                  error(card.id, `${name} waits for "${condition}", which is not in the robot's list of triggers.`, rowIndex);
               }
             }
             ends.push(...walk(row.cards, at, `Row ${rowIndex + 1} of ${name}`));
           });
           at = distinct(ends);
-          break;
-        }
-        case "routine": {
-          const routine = auto.routines[card.routine];
-          const start = auto.points[card.at];
-          if (!routine) {
-            error(card.id, card.routine ? `Routine "${card.routine}" is not defined.` : "No routine chosen.");
-          } else {
-            if (routine.steps.length === 0) error(card.id, `Routine "${card.routine}" has no steps.`);
-            if (!routine.endsWhen) error(card.id, `Routine "${card.routine}" needs a trigger that ends it.`);
-            else if (!conditions.has(routine.endsWhen))
-              error(card.id, `Routine "${card.routine}" ends on "${routine.endsWhen}", which is not in the robot's list of triggers.`);
-            routine.while.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (while)`, name));
-            routine.exit.forEach((name) => checkAction(card.id, `Routine "${card.routine}" (on exit)`, name));
-          }
-          if (!start) error(card.id, card.at ? `Start point "${card.at}" is not defined.` : "No start point chosen.");
-          if (!auto.points[card.exit])
-            error(card.id, card.exit ? `Exit point "${card.exit}" is not defined.` : "No exit point chosen.");
-          if (start) {
-            const from = farthest(at, { x: start[0], y: start[1] });
-            const gap = Math.hypot(start[0] - from.x, start[1] - from.y);
-            if (gap > DISCONTINUITY_LIMIT_IN)
-              warn(card.id, `The routine starts at ${card.at}, ${gap.toFixed(1)} in from where the robot can be.`);
-          }
-          const exit = auto.points[card.exit];
-          if (exit) at = [{ x: exit[0], y: exit[1] }];
-          break;
-        }
-        case "goTo": {
-          const target = auto.points[card.point];
-          if (!target) error(card.id, card.point ? `Point "${card.point}" is not defined.` : "No point chosen.");
-          if (!(card.maxDistanceIn > 0)) error(card.id, "The farthest distance must be more than 0 in.");
-          const refused = walk(card.ifRefused, at, `"If refused" of ${card.label || "Go to"}`);
-          at = distinct([...(target ? [{ x: target[0], y: target[1] }] : []), ...refused]);
-          break;
-        }
-        case "together": {
-          const drivers = card.cards.filter(
-            (child) => child.kind === "path" || child.kind === "routine" || child.kind === "goTo",
-          );
-          if (drivers.length > 1)
-            warn(card.id, "More than one card here drives the robot; it can follow only one at a time.");
-          if (card.cards.some((child) => child.kind === "path" && child.park))
-            error(card.id, "A park path cannot run alongside other cards; put it in a branch or the main sequence.");
-          const ends: BasePoint[] = [];
-          card.cards.forEach((child) => ends.push(...walk([child], at, card.label || "Together")));
-          const moved = ends.filter((end) => !at.includes(end));
-          at = distinct(moved.length ? moved : at);
           break;
         }
       }

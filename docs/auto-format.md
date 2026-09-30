@@ -1,8 +1,8 @@
 # The `auto` section of a `.pp` file
 
 This fork of the Pedro Pathing Visualizer adds an **Auto mode**: the Path List
-becomes a whole 30-second Autonomous made of cards (actions, waits, decisions
-with branches, path cards with while-driving actions and events, an endgame
+becomes a whole 30-second Autonomous made of cards (commands, paths, and waits
+for a trigger with a time limit, which is the one way to branch; plus an endgame
 guard), previewed on the field and exported as Java for the robot's `autokit`
 library.
 
@@ -17,13 +17,11 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 The fork is one screen: the **Auto** on the left, the **field** on the right.
 A file without an Auto opens with one path card per path, in Path List order.
 
-- **+ Action / + Wait for / + Decision / + Path** add a card after the
-  selected card (or at the end of a selected branch); **More** has Routine,
-  Go to and Together. **+ Path** and the field's **+ Add Path** make a new
+- **+ Command / + Wait for / + Decision / + Path** add a card after the
+  selected card (or at the end of a selected branch). **+ Path** and the field's **+ Add Path** make a new
   path that starts where the robot is at that point of the Auto.
 - Click a card to edit it in place, under the card. A path card shows
-  **Ends at** and **Park path**; **more** has the path, while-driving actions
-  and events. Clicking a path on the field selects its card.
+  **Ends at** and **Park path**; **more** has the path. Clicking a path on the field selects its card.
 - Above the field: one switch per condition (**✓** happens, **✗** never
   does). Below it: the play bar, the time against 30 s and the worst case.
   While it plays, the running card is outlined.
@@ -35,7 +33,7 @@ A file without an Auto opens with one path card per path, in Path List order.
 ```json
 "auto": {
   "version": 1,
-  "drawnFor": "BLUE",
+  "drawnFor": "RED",
   "exportName": "hive-rush",
   "registry": { "actions": ["ShootAll", "SpinUp"], "conditions": ["LauncherReady", "HiveTipped"] },
   "points": { "ShootSpot": [38, 71], "UpCellShot": [108, 84, 45] },
@@ -43,16 +41,15 @@ A file without an Auto opens with one path card per path, in Path List order.
     { "id": "c1", "kind": "action", "name": "SpinUp" },
     { "id": "c2", "kind": "firstOf", "label": "Wait for LauncherReady",
       "rows": [ { "when": ["LauncherReady"], "cards": [] }, { "afterMs": 800, "cards": [] } ] },
-    { "id": "c3", "kind": "path", "lineId": "<top-level path id>", "while": ["SpinDown"],
-      "events": [ { "at": 0.6, "action": "IntakeOn" } ], "park": false },
-    { "id": "c4", "kind": "firstOf", "label": "Did the HIVE tip?",
-      "rows": [ { "when": ["HiveTipped", "CameraBlind"], "label": "If tipped", "cards": [ ... ] },
+    { "id": "c3", "kind": "path", "lineId": "<top-level path id>", "park": false },
+    { "id": "c4", "kind": "firstOf", "label": "Did the HIVE tip?", "alongside": "ShootAll",
+      "rows": [ { "when": ["HiveTipped"], "label": "If tipped", "cards": [ ... ] },
                 { "afterMs": 1500, "label": "If not tipped", "cards": [ ... ] } ] }
   ]
 }
 ```
 
-A complete example that uses every card and row kind is
+A complete example that uses every card kind is
 `src/lib/auto/fixtures/hive-rush.pp`; its exported Java is the golden file
 `src/lib/codegen/auto/fixtures/HiveRushAuto.java`.
 
@@ -61,7 +58,7 @@ A complete example that uses every card and row kind is
 | Key | Type | Meaning |
 |---|---|---|
 | `version` | `1` | Format version. A newer version loads with a warning. |
-| `drawnFor` | `"RED"` \| `"BLUE"` | The alliance the Auto is drawn for. The robot mirrors it for the other alliance (`PoseFactory.mirrorX(70.75)`). |
+| `drawnFor` | `"RED"` \| `"BLUE"` | The alliance the Auto is drawn for; new Autos are drawn for RED. The robot turns it half a turn about the field centre for the other alliance (`PoseFactory.mirrorAroundPoint(70.75, 70.75)`); the editor never deals with BLUE. |
 | `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
@@ -79,34 +76,13 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 | `kind` | Fields | Meaning |
 |---|---|---|
 | `action` | `name`, `timeoutS?`, `previewMs?` | Runs a registered **command** (the editor calls it that; the file keeps the key `action`). On the robot it runs until it finishes or `timeoutS` (default 5 s), exported as `kit.command(name[, timeoutS])`. The preview uses the command's typical time from `registry.typicalS`, else `previewMs` (older files), else instant, never past the timeout. |
-| `path` | `lineId`, `while`, `events`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `while`: actions started with the path. `events`: `{at, action}` with `at` in 0..1 of the path's length. `park`: this is the branch's park path for the endgame guard. |
-| `firstOf` | `label`, `rows`, `alongside`? | Waits for the first true row, then runs that row's cards; the cards after it continue once they are done. With no cards on any row it is a **Wait for** card; otherwise it is a **decision**. `alongside` names a command run *while* it waits ("wait for Tip while LaunchAll"): it starts with the wait and is stopped when a row fires, if still running. |
-| `routine` | `routine`, `at`, `facingDeg`, `mirror`, `exit` | Runs the named routine (see below) placed at the named point `at`, facing `facingDeg`, optionally mirrored left↔right; then drives straight to the named point `exit`. |
-| `goTo` | `label`, `point`, `maxDistanceIn`, `ifRefused` | Drives straight to the named point if it is at most `maxDistanceIn` away; otherwise runs the `ifRefused` cards. |
-| `together` | `label`, `ends`, `cards` | Starts its cards at once; done when `"ALL"` of them are, or the `"FIRST"` one is. Only one of them should drive. |
+| `path` | `lineId`, `park` | Drives an existing path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `park`: this is the branch's park path for the endgame guard. Nothing runs while it drives. |
+| `firstOf` | `label`, `rows`, `alongside`? | **Wait for a trigger, at most a time**: exactly one `when` row and one `afterMs` row. With no cards on either row it is a plain **Wait for**; with cards each row holds the rest of its route (a **decision**). `alongside` names a command run *while* it waits ("LaunchAll · wait for Tip"): it starts with the wait and is stopped when a row fires, if still running. |
 
-### Routines
-
-`routines` (optional; written only when there are some) maps a name to a
-pattern defined **relative to where it starts**, so one routine can be placed
-at several points:
-
-```json
-"routines": {
-  "CollectFar": {
-    "steps": [ { "forward": 12, "left": 0 }, { "forward": 12, "left": -16, "control": [18, -8] } ],
-    "endsWhen": "IntakeFull", "timeoutMs": 2500,
-    "while": ["IntakeOn"], "exit": ["IntakeOff", "SpinUp"]
-  }
-}
-```
-
-`steps` follow the implicit start at (0, 0): `forward` along the facing, `left`
-to the robot's left, in inches; a step with `control` is a curve through that
-control point. The heading is held at the facing for the whole pattern. The
-routine ends when `endsWhen` (a registered condition) turns true, after
-`timeoutMs`, or when the pattern is done; `while` actions run during it and
-`exit` actions as it leaves for the card's exit point.
+Older files may hold `routine`, `goTo` and `together` cards, commands while driving (`while`,
+`events`) and other row kinds (`timeLeftBelowS`, `otherwise`, `nearPoint`, `inArea`,
+`finished`, or several triggers in one `when`). This editor drops them on load and lists
+what it dropped; they may come back if a real Auto needs them.
 
 ### Rows
 
@@ -115,35 +91,26 @@ optional `label` (the branch's name; defaults to one made from the condition).
 
 | Row | Becomes true |
 |---|---|
-| `{"when": ["A", "B"]}` | when any of the registered conditions is true (OR) |
+| `{"when": ["A"]}` | when the registered trigger is true (a list for older files; one name) |
 | `{"afterMs": 800}` | 800 ms after the card started |
-| `{"timeLeftBelowS": 5}` | when less than 5 s of the 30 s Auto remain |
-| `{"finished": true}` | when the card's `alongside` command finishes by itself (an error without one); counts as a time row, since the command always ends |
-| `{"otherwise": true}` | at once (= `afterMs: 0`): the "else" of an if |
-| `{"nearPoint": "ShootSpot", "radiusIn": 6}` | when the robot is within 6 in of the named point |
-| `{"inArea": ["CornerA", "CornerB"]}` | when the robot is inside the axis-aligned box with those named corners |
 
 Rules the editor enforces (errors block the Java export):
 
-- every `firstOf` has at least one **time row** (`afterMs`, `timeLeftBelowS`,
-  `otherwise`, or `finished` with a command alongside), so nothing can wait forever;
+- every `firstOf` has exactly one trigger row and one time row, so nothing can wait forever;
 - every action and condition name used anywhere is in the registry;
 - a path card names a top-level path that exists;
-- a list of cards has at most one park card, and a `together` holds none;
-- a routine card names a defined routine with steps and a registered
-  `endsWhen`, and its start and exit points exist; a `goTo` names a point.
+- a list of cards has at most one park card.
 
 Warnings (shown, not blocking): a path that starts more than 2 in from where
-the robot can be when it starts; a park card that is not last in its branch;
-rows that can never fire because an earlier `otherwise` always wins; a
+the robot can be when it starts; a park card that is not last in its branch; a
 branch whose worst case runs past 30 s.
 
 ### Loading
 
 `normalizeAuto` (`src/lib/auto/normalize.ts`) never throws. It keeps what it
-can, re-issues missing or duplicate ids, sorts events by `at`, and returns a
-list of plain-English problems for anything it dropped (unknown card kinds,
-rows with zero or two conditions, malformed points, …); the app shows them as
+can, re-issues missing or duplicate ids, and returns a list of plain-English
+problems for anything it dropped (unknown or retired card kinds and rows,
+malformed points, …); the app shows them as
 a toast. `serializeAuto` writes keys in a fixed order, so saving twice gives
 the same bytes.
 
@@ -183,25 +150,17 @@ field and gets a warning; it is not exported.
 contract with the robot's `autokit` library:
 
 - `SOURCE`, `COMMANDS`, `TRIGGERS` (every registered name used, sorted, no
-  duplicates), `DRAWN_FOR`, `startPose(boolean mirrored)`, a private
-  `poses(boolean mirrored)` factory and `build(AutoKit kit, boolean mirrored)`;
-- every pose is a `Pose` local built with `p.of(...)` so mirroring applies to
-  all of them; named points first, then the other poses the paths need;
-- shapes become `kit.keepOut(...)` with their corners in order;
+  duplicates), `DRAWN_FOR`, `startPose(boolean rotated)`, a private
+  `poses(boolean rotated)` factory and `build(AutoKit kit, boolean rotated)`;
+- every pose is a `Pose` local built with `p.of(...)` so the robot's half-turn
+  for the other alliance applies to all of them; named points first, then the
+  other poses the paths need;
 - paths are `Path` locals using the same expressions as the stock export
   (`Paths.line/curve/through/path` plus a heading suffix); `Interpolator` is
   imported only when a piecewise heading is used;
 - the cards become one `kit.sequence(...)`; a `firstOf` becomes
   `kit.firstOf(label, rows...)`, or `kit.firstOf(label, kit.command(name), rows...)` with
-  `alongside`; a row with cards is `kit.when(...).then(...)`, and a `finished` row is
-  `kit.finished()`;
-- a routine card becomes `kit.routine(label, pattern, endsWhen, timeoutMs,
-  while[], exit[], exitPose)`, where `pattern` is a `Path` local placed on the
-  field (`Paths.line/curve(...).constant(start)`, joined with `Paths.path`),
-  and the label is `"<routine> at <point>"`;
-- a `goTo` becomes `kit.goTo(label, point, maxDistanceIn, ifRefused)`, where
-  `ifRefused` is the one card, or `kit.sequence(...)` of several;
-- a `together` becomes `kit.together(label, AutoKit.Ends.ALL|FIRST, cards...)`;
+  `alongside`; a row with cards is `kit.when(...).then(...)` or `kit.afterMs(...).then(...)`;
 - a list that directly contains a park card is wrapped
   `kit.guarded(label, parkPath, seconds, cards...)`, where `seconds` is the
   park path's drive time by the preview's motion model, rounded **up** to
@@ -238,9 +197,8 @@ compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 
 The preview has one switch per condition the Auto asks, in the Preview
 panel: **✓** it happens, so a row asking it fires the moment its card is
-reached; **✗** it never happens, so the next row that can wins (a time row
-fires at its time). There is no timing to set. A row asking several
-conditions (`when: [A, B]`) fires if any is ✓. Every condition starts ✓ (the
+reached; **✗** it never happens, so the time row fires at its time. There is
+no timing to set. Every condition starts ✓ (the
 happy path); the switches are not saved in the file.
 
 The in-between (a TIP 1.5 s into a 3 s wait) is not previewed: ✓ is the
@@ -257,14 +215,6 @@ row and event with its time against the 30 s budget.
 
 Each branch also shows its **worst case**: the Auto's end time if that branch
 is taken and every later wait runs to its time row. Over 30 s it is flagged.
-
-Routines run their placed pattern to its end (or their timeout, if sooner),
-then drive straight to the exit point. Their end condition is a question too:
-T says it was met, F logs that it was not; either way the pattern is the
-preview's only source of timing. A
-`goTo` drives straight to its point or runs its fallback. A `together` follows
-the card that drives and counts the others' time; with `FIRST` it stops at
-the first card's end.
 
 The endgame guard is previewed the way `kit.guarded` is meant to work: once
 the time left is no more than the park path's seconds, whatever is running
@@ -350,7 +300,7 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
   and saves go to a new file).
 - `src/lib/FileManager.svelte` — load, save, new file, mirror.
 - `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
-- `src/utils/timeCalculator.ts` — exports `calculateMotionProfileTime`, so routine
+- `src/utils/timeCalculator.ts` — exports `calculateMotionProfileTime`, so straight
   patterns and straight drives are timed on the same profile as paths.
 - `src/lib/Navbar.svelte` — the Auto toggle; "Export Auto (Java)" in the export menu;
   the time readout shows the preview's length in Auto mode; reset clears the Auto;
@@ -358,7 +308,7 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
 - `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
   place of the Path List (Auto mode's card list).
 - `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
-  timeline (and its routine/straight drives), the stock path strokes are hidden (the
+  timeline, the stock path strokes are hidden (the
   overlay draws them by branch), and the Controls panel shows the Auto panel instead
   of `ControlTab`.
 - `package.json` — `test` script.

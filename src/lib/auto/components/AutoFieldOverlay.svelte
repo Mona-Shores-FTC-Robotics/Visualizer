@@ -1,11 +1,10 @@
 <script lang="ts">
   import type * as d3 from "d3";
   import type { BasePoint } from "../../../types";
-  import { pointAlong, type PathCatalog } from "../geometry";
+  import type { PathCatalog } from "../geometry";
   import type { PreviewResult } from "../simulate";
   import { allCards } from "../tree";
-  import type { AutoCard, AutoSection, PathCard, RoutineCard } from "../types";
-  import { placementAt, placeRoutine, segmentSamples } from "../motion";
+  import type { AutoCard, AutoSection, PathCard } from "../types";
   import { parseSelection, selectedCardId } from "../store";
   import { cardColors } from "./ui";
   import { isUsed, pointUses } from "../pins";
@@ -26,23 +25,6 @@
   let selectedId = $derived(parseSelection($selectedCardId).cardId);
   let pathCards = $derived(allCards(auto.cards).filter((card): card is PathCard => card.kind === "path"));
   let usedLineIds = $derived(new Set(pathCards.map((card) => card.lineId)));
-  let routineDrawings = $derived(
-    allCards(auto.cards)
-      .filter((card): card is RoutineCard => card.kind === "routine")
-      .flatMap((card) => {
-        const routine = auto.routines[card.routine];
-        const placement = placementAt(auto.points, card.at, card.facingDeg, card.mirror);
-        if (!routine || !placement) return [];
-        const samples = segmentSamples(placeRoutine(routine, placement), { x: placement.x, y: placement.y });
-        const exit = auto.points[card.exit];
-        return [{ card, samples, exit: exit ? { x: exit[0], y: exit[1] } : null }];
-      }),
-  );
-  let goToMotions = $derived(
-    preview
-      ? preview.motions.filter((record) => allCards(auto.cards).some((card) => card.id === record.cardId && card.kind === "goTo"))
-      : [],
-  );
   let unit = $derived(size / 141.5);
   let uses = $derived(pointUses(auto));
 
@@ -56,10 +38,6 @@
       let here = at;
       for (const card of list) {
         if (card.kind === "path") here = catalog.byId.get(card.lineId)?.end ?? here;
-        if (card.kind === "routine" && auto.points[card.exit]) {
-          const exit = auto.points[card.exit];
-          here = { x: exit[0], y: exit[1] };
-        }
         if (card.kind === "firstOf" && card.rows.some((row) => row.cards.length)) {
           if (here) spots.push({ id: card.id, at: here, taken: !preview || preview.ran.has(card.id) });
           card.rows.forEach((row) => walk(row.cards, here));
@@ -110,44 +88,8 @@
         {#if card.park}
           <text x={x(info.end.x)} y={y(info.end.y) - unit * 2.2} font-size={unit * 2.6} font-weight="700" text-anchor="middle" fill={color} stroke="#000" stroke-width={unit * 0.35} paint-order="stroke" opacity={layerTaken ? 1 : 0.6}>P</text>
         {/if}
-        {#each card.events as event, i (i)}
-          {@const at = pointAlong(info, event.at)}
-          <g opacity={layerTaken ? 1 : 0.55}>
-            <circle cx={x(at.x)} cy={y(at.y)} r={unit * 1.5} fill="#111111" stroke="#ffc516" stroke-width={unit * 0.4} />
-            <text x={x(at.x)} y={y(at.y) + unit * 0.65} font-size={unit * 1.9} text-anchor="middle" fill="#ffc516">⚡</text>
-          </g>
-        {/each}
       {/if}
     {/each}
-  {/each}
-
-  {#each routineDrawings as drawing (drawing.card.id)}
-    {@const taken = !preview || preview.ran.has(drawing.card.id)}
-    {@const color = colors.get(drawing.card.id) ?? "#5fd4e6"}
-    {#if taken || showUntaken}
-      {@const end = drawing.samples[drawing.samples.length - 1]}
-      <g opacity={taken ? 1 : 0.5}>
-        {#if drawing.exit}
-          {#each drawing.samples.filter((_, i) => i % 8 === 0) as sample, i (i)}
-            <line x1={x(sample.x)} y1={y(sample.y)} x2={x(drawing.exit.x)} y2={y(drawing.exit.y)} stroke={color} stroke-width={unit * 0.15} opacity="0.25" />
-          {/each}
-          <line x1={x(end.x)} y1={y(end.y)} x2={x(drawing.exit.x)} y2={y(drawing.exit.y)} stroke="#ffffff" stroke-width={unit * 0.4} stroke-dasharray={`${unit * 1.4} ${unit}`} />
-        {/if}
-        <polyline
-          points={polyline(drawing.samples)}
-          fill="none"
-          stroke={color}
-          stroke-width={unit * (selectedId === drawing.card.id ? 0.95 : 0.7)}
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-dasharray={taken ? undefined : `${unit * 2.4} ${unit * 1.8}`}
-        />
-      </g>
-    {/if}
-  {/each}
-
-  {#each goToMotions as record, i (i)}
-    <polyline points={polyline(record.motion.samples)} fill="none" stroke={colors.get(record.cardId) ?? "#ffc516"} stroke-width={unit * 0.7} stroke-linecap="round" />
   {/each}
 
   {#each decisionSpots as spot (spot.id)}
