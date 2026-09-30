@@ -5,6 +5,50 @@ obvious enough. This brief says what the tool is for, what an Auto is, what we l
 current version, and what we would like explored. Think big: the current layout is a starting
 point, not a constraint.
 
+## The problem to solve first: branching
+
+The part of the tool that matters most, and works worst, is **building the reacting part of an
+Auto**: decisions, waits and what happens in each branch. Today it is a form, and it is unusable:
+
+![The decision editor today](design-brief/decision-editor-today.png)
+
+What is wrong with it, concretely:
+
+- It shows the **engine, not the intent**. Internally a decision is "the first of these rows to
+  become true", and each row has a type (condition, time passed, time left, otherwise, near a
+  point, in an area). The editor shows exactly that: "Row 1", "Row 2", "Becomes true when",
+  "Condition is true", "Time passed (ms)", "+ Condition row / + Time row / + Otherwise", arrows to
+  reorder rows. None of these words are how a person thinks about "did the HIVE tip?".
+- The same thing is said three times: the question ("Did our HIVE tip?"), the row's condition
+  (Tip1) and the branch name ("Tipped: under the HIVE").
+- Units and bookkeeping are in the way: 3000 *milliseconds*, "2 cards · add here", "Worst case
+  with this branch: the Auto ends by 10.3 s" on every row.
+- The branch's steps are not here at all; they are further down the list. Editing the decision
+  and editing what happens after it are two different places.
+
+**What people actually want to say.** Almost every decision in an FTC Auto is one of these:
+
+1. **If X happens within N s, do A; otherwise do B.** ("If Tip1 within 3 s, go under the HIVE,
+   else go to the GARDEN.") This is by far the most common.
+2. **Wait until X, at most N s**, then carry on. ("Wait for IntakeFull, at most 1.5 s.") A
+   decision with one branch that does nothing.
+3. **If X or Y**, occasionally ("Tip1 or CameraBlind").
+4. **If time is running out, park** (the endgame guard, once per Auto, mostly automatic).
+
+The other row types (several time rows, "time left below", "near a point", "in an area") exist in
+the engine and are rare. They can be hard to reach; they must not shape the common case.
+
+**What already works, and should drive the design:** the preview switches. Each condition the
+robot offers is a chip at the top (✓ Tip1 · ✗ IntakeFull). Clicking one is like answering the
+robot's question for it, and the Auto instantly follows the other branch on the field. People
+understood that at once. Building a decision should feel as direct as answering one: pick the
+question (a chip), say how long to wait, and draw or pick what happens in each case.
+
+**What we would like from design here:** a way to create and edit a decision that reads like
+sentence 1 above, shows its branches and their steps together, and can be done largely on the
+field (the robot is at the spot where it waits; each branch is a route leaving that spot).
+Adding a branch, or steps to one, should be one gesture, not a form.
+
 ## What it is for
 
 FTC robots run a 30-second **Autonomous** period ("Auto") at the start of each match, with no
@@ -65,6 +109,8 @@ A bigger one with collection passes, a FLOWER pickup and parking is `samples/red
 
 ## What we learned (keep these)
 
+![The screen today](design-brief/screen-today.png)
+
 - **One screen.** A separate "paths" view that plays every path in a row, ignoring branches,
   was nonsense next to the Auto. Everything lives in one view of the whole Auto.
 - **No hand-holding.** Paragraphs explaining what a card does were noise; nobody read them. If a
@@ -81,6 +127,7 @@ A bigger one with collection passes, a FLOWER pickup and parking is `samples/red
 
 ## What still hurts
 
+- Building decisions (above).
 - The step list and the field are two separate pictures of the same Auto. Your eye goes back and
   forth to connect "UnderHive" in the list with the green line on the field.
 - Decisions are hard to see on the field: where the robot waits, and where each branch goes.
@@ -120,7 +167,9 @@ Not requirements; directions we have not tried.
 1. Two or three **distinct concepts** for the whole screen, not variations of the current one.
 2. For the strongest concept, the key flows as screens:
    - build the canonical example from an empty field;
+   - turn a plain "shoot, drive" Auto into "if Tip1 within 3 s … otherwise …";
    - add the "else" branch to an existing decision;
+   - add a wait ("IntakeFull, at most 1.5 s") inside a branch;
    - preview tipped vs not tipped and see the time of each;
    - at an event, move RearShot 2 in back and check it still fits in 30 s;
    - export.
