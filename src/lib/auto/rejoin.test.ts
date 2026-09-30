@@ -29,17 +29,16 @@ test("the RightStartTip sample loads and validates clean", () => {
   assertEqual(validateAuto(s.auto, s.catalog, s.startPoint), []);
 });
 
-test("its routes are the design's five, the retry joining the main plan at RIGHT_HIVE_ENTRANCE", () => {
+test("its routes: the GARDEN retry always rejoins the main plan at RIGHT_HIVE_ENTRANCE", () => {
   const routes = enumerateRoutes(sample().auto);
-  assertEqual(routes.map((r) => r.marks), ["✓ → ✓", "✓ → ✗", "✗ → ✓ → ✓", "✗ → ✓ → ✗", "✗ → ✗"]);
-  assertEqual(routes[2].label, "Not tipped → Tipped on the retry → Tipped back");
+  assertEqual(routes.map((r) => r.label), ["Tipped", "Not tipped"]);
 });
 
 test("a rejoined route drives its own path to the stop, then the main plan's steps after it", () => {
   const s = sample();
-  const route = enumerateRoutes(s.auto)[2]; // retry rejoins, then tips back
+  const route = enumerateRoutes(s.auto)[1]; // not tipped: GARDEN, then rejoins
   const result = simulateAuto(s.auto, s.catalog, s.startPoint, routeScenario(s.auto, route, true));
-  for (const id of ["s-garden", "s-rshot", "rejoin-rhe", "s-lhe", "s-lflower", "full-left", "s-lshot", "s-lpark"]) {
+  for (const id of ["s-garden", "s-rshot", "launch-right", "rejoin-rhe", "s-lhe", "s-lflower", "full-left", "s-lshot", "launch-left", "s-lpark"]) {
     assert(result.ran.has(id), `${id} should run: ${[...result.ran].join(", ")}`);
   }
   assert(!result.ran.has("s-rhe"), "the main plan's own path to RIGHT_HIVE_ENTRANCE is not driven");
@@ -50,7 +49,7 @@ test("a rejoined route drives its own path to the stop, then the main plan's ste
 
 test("joining a drive-through drives on through its chain without stopping", () => {
   const s = sample();
-  const route = enumerateRoutes(s.auto)[2];
+  const route = enumerateRoutes(s.auto)[1];
   const result = simulateAuto(s.auto, s.catalog, s.startPoint, routeScenario(s.auto, route, true));
   const ids = ["rshot-rhe", "to-lhe", "to-lflower"];
   const drives = result.drives.filter((d) => ids.includes(d.pathId));

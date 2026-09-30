@@ -119,85 +119,6 @@
       }
     },
     {
-      "id": "to-wflower",
-      "color": "#3cc8e4",
-      "name": "to YOUR_WALL_FLOWER",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": "",
-      "kind": "atomic",
-      "endPoint": {
-        "x": 15.2,
-        "y": 47.8
-      },
-      "controlPoints": [
-        {
-          "x": 30,
-          "y": 96
-        },
-        {
-          "x": 26,
-          "y": 50
-        }
-      ],
-      "heading": {
-        "type": "linear",
-        "startDeg": 308,
-        "endDeg": 180
-      }
-    },
-    {
-      "id": "to-wshot",
-      "color": "#3cc8e4",
-      "name": "to YOUR_WALL_SHOT",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": "",
-      "kind": "atomic",
-      "endPoint": {
-        "x": 30,
-        "y": 80
-      },
-      "controlPoints": [
-        {
-          "x": 26,
-          "y": 60
-        }
-      ],
-      "heading": {
-        "type": "linear",
-        "startDeg": 180,
-        "endDeg": 14
-      }
-    },
-    {
-      "id": "wshot-park",
-      "color": "#3cc8e4",
-      "name": "YOUR_WALL_SHOT to LEFT_LOADING_ZONE",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": "",
-      "kind": "atomic",
-      "endPoint": {
-        "x": 16,
-        "y": 115.7
-      },
-      "controlPoints": [
-        {
-          "x": 22,
-          "y": 96
-        }
-      ],
-      "heading": {
-        "type": "linear",
-        "startDeg": 14,
-        "endDeg": 90
-      }
-    },
-    {
       "id": "to-garden",
       "color": "#3cc8e4",
       "name": "to GARDEN",
@@ -261,31 +182,6 @@
         "y": 47
       },
       "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 54,
-        "endDeg": 90
-      }
-    },
-    {
-      "id": "rshot-park",
-      "color": "#3cc8e4",
-      "name": "RIGHT_SHOT to RIGHT_LOADING_ZONE",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0,
-      "waitBeforeName": "",
-      "waitAfterName": "",
-      "kind": "atomic",
-      "endPoint": {
-        "x": 16,
-        "y": 96.6
-      },
-      "controlPoints": [
-        {
-          "x": 26,
-          "y": 60
-        }
-      ],
       "heading": {
         "type": "linear",
         "startDeg": 54,
@@ -499,16 +395,6 @@
         115.7,
         90
       ],
-      "YOUR_WALL_FLOWER": [
-        15.2,
-        47.8,
-        180
-      ],
-      "YOUR_WALL_SHOT": [
-        30,
-        80,
-        14
-      ],
       "GARDEN": [
         10.5,
         11.8,
@@ -518,11 +404,6 @@
         36,
         30,
         54
-      ],
-      "RIGHT_LOADING_ZONE": [
-        16,
-        96.6,
-        90
       ]
     },
     "pathEnds": {
@@ -531,12 +412,8 @@
       "to-lflower": "LEFT_FLOWER",
       "to-lshot": "LEFT_SHOT",
       "lshot-park": "LEFT_LOADING_ZONE",
-      "to-wflower": "YOUR_WALL_FLOWER",
-      "to-wshot": "YOUR_WALL_SHOT",
-      "wshot-park": "LEFT_LOADING_ZONE",
       "to-garden": "GARDEN",
       "to-rshot": "RIGHT_SHOT",
-      "rshot-park": "RIGHT_LOADING_ZONE",
       "rshot-rhe": "RIGHT_HIVE_ENTRANCE"
     },
     "startAt": "RIGHT_START",
@@ -596,72 +473,15 @@
                 "park": false
               },
               {
-                "id": "tip-back",
-                "kind": "firstOf",
-                "label": "Did it tip back?",
-                "rows": [
-                  {
-                    "when": [
-                      "Tip"
-                    ],
-                    "label": "Tipped back",
-                    "cards": [
-                      {
-                        "id": "s-lpark",
-                        "kind": "path",
-                        "lineId": "lshot-park",
-                        "park": true
-                      }
-                    ]
-                  },
-                  {
-                    "afterMs": 4000,
-                    "label": "No tip back",
-                    "cards": [
-                      {
-                        "id": "s-wflower",
-                        "kind": "path",
-                        "lineId": "to-wflower",
-                        "park": false
-                      },
-                      {
-                        "id": "full-wall",
-                        "kind": "firstOf",
-                        "label": "Collect at YOUR_WALL_FLOWER",
-                        "rows": [
-                          {
-                            "when": [
-                              "IntakeFull"
-                            ],
-                            "cards": []
-                          },
-                          {
-                            "afterMs": 2000,
-                            "cards": []
-                          }
-                        ]
-                      },
-                      {
-                        "id": "s-wshot",
-                        "kind": "path",
-                        "lineId": "to-wshot",
-                        "park": false
-                      },
-                      {
-                        "id": "launch-wall",
-                        "kind": "action",
-                        "name": "LaunchAll"
-                      },
-                      {
-                        "id": "s-wpark",
-                        "kind": "path",
-                        "lineId": "wshot-park",
-                        "park": true
-                      }
-                    ]
-                  }
-                ],
-                "alongside": "LaunchAll"
+                "id": "launch-left",
+                "kind": "action",
+                "name": "LaunchAll"
+              },
+              {
+                "id": "s-lpark",
+                "kind": "path",
+                "lineId": "lshot-park",
+                "park": true
               }
             ]
           },
@@ -699,38 +519,15 @@
                 "park": false
               },
               {
-                "id": "retry-tip",
-                "kind": "firstOf",
-                "label": "Did it tip this time?",
-                "rows": [
-                  {
-                    "when": [
-                      "Tip"
-                    ],
-                    "label": "Tipped on the retry",
-                    "cards": [
-                      {
-                        "id": "rejoin-rhe",
-                        "kind": "rejoin",
-                        "lineId": "rshot-rhe",
-                        "target": "s-rhe"
-                      }
-                    ]
-                  },
-                  {
-                    "afterMs": 4000,
-                    "label": "Retry fails",
-                    "cards": [
-                      {
-                        "id": "s-rpark",
-                        "kind": "path",
-                        "lineId": "rshot-park",
-                        "park": true
-                      }
-                    ]
-                  }
-                ],
-                "alongside": "LaunchAll"
+                "id": "launch-right",
+                "kind": "action",
+                "name": "LaunchAll"
+              },
+              {
+                "id": "rejoin-rhe",
+                "kind": "rejoin",
+                "lineId": "rshot-rhe",
+                "target": "s-rhe"
               }
             ]
           }

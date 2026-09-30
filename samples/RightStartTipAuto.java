@@ -49,23 +49,15 @@ public final class RightStartTipAuto {
         Pose leftFlower = p.of(47.5, 129, 90);
         Pose leftShot = p.of(38, 112, 308);
         Pose leftLoadingZone = p.of(16, 115.7, 90);
-        Pose yourWallFlower = p.of(15.2, 47.8, 180);
-        Pose yourWallShot = p.of(30, 80, 14);
         Pose garden = p.of(10.5, 11.8, 180);
         Pose rightShot = p.of(36, 30, 54);
-        Pose rightLoadingZone = p.of(16, 96.6, 90);
 
         // Other poses the paths need (control points, unnamed endpoints).
         Pose toLeftFlowerControl1 = p.of(59, 125, 0);
         Pose toLeftShotControl1 = p.of(46, 116, 0);
         Pose leftShotToLeftLoadingZoneControl1 = p.of(26, 112, 0);
-        Pose toYourWallFlowerControl1 = p.of(30, 96, 0);
-        Pose toYourWallFlowerControl2 = p.of(26, 50, 0);
-        Pose toYourWallShotControl1 = p.of(26, 60, 0);
-        Pose yourWallShotToLeftLoadingZoneControl1 = p.of(22, 96, 0);
         Pose toGardenControl1 = p.of(36, 12, 0);
         Pose toRightShotControl1 = p.of(24, 16, 0);
-        Pose rightShotToRightLoadingZoneControl1 = p.of(26, 60, 0);
 
         // Paths, written as the stock Visualizer export writes them.
         Path toRightHiveEntrance = Paths.line(rightStart, rightHiveEntrance).constant(rightHiveEntrance);
@@ -73,51 +65,34 @@ public final class RightStartTipAuto {
         Path toLeftFlower = Paths.curve(leftHiveEntrance, toLeftFlowerControl1, leftFlower).constant(leftFlower);
         Path toLeftShot = Paths.curve(leftFlower, toLeftShotControl1, leftShot).linear(leftFlower, leftShot);
         Path leftShotToLeftLoadingZone = Paths.curve(leftShot, leftShotToLeftLoadingZoneControl1, leftLoadingZone).linear(leftShot, leftLoadingZone);
-        Path toYourWallFlower = Paths.curve(leftShot, toYourWallFlowerControl1, toYourWallFlowerControl2, yourWallFlower).linear(leftShot, yourWallFlower);
-        Path toYourWallShot = Paths.curve(yourWallFlower, toYourWallShotControl1, yourWallShot).linear(yourWallFlower, yourWallShot);
-        Path yourWallShotToLeftLoadingZone = Paths.curve(yourWallShot, yourWallShotToLeftLoadingZoneControl1, leftLoadingZone).linear(yourWallShot, leftLoadingZone);
         Path toGarden = Paths.curve(rightStart, toGardenControl1, garden).linear(rightStart, garden);
         Path toRightShot = Paths.curve(garden, toRightShotControl1, rightShot).linear(garden, rightShot);
         Path rightShotToRightHiveEntrance = Paths.line(rightShot, rightHiveEntrance).linear(rightShot, rightHiveEntrance);
-        Path rightShotToRightLoadingZone = Paths.curve(rightShot, rightShotToRightLoadingZoneControl1, rightLoadingZone).linear(rightShot, rightLoadingZone);
 
         // Steps two routes share: a rejoin runs them from the stop it joins at.
         Supplier<Command> afterLeftFlower = () -> kit.sequence(
-                kit.firstOf("Collect at LEFT_FLOWER",
-                        kit.when("IntakeFull"),
-                        kit.afterMs(2000)),
-                kit.path("to LEFT_SHOT", toLeftShot),
-                kit.firstOf("Did it tip back?", kit.command("LaunchAll"),
-                        kit.when("Tip").then(
-                                kit.guarded("Tipped back", leftShotToLeftLoadingZone, 1.3,
-                                        kit.path("LEFT_SHOT to LEFT_LOADING_ZONE", leftShotToLeftLoadingZone))),
-                        kit.afterMs(4000).then(
-                                kit.guarded("No tip back", yourWallShotToLeftLoadingZone, 1.7,
-                                        kit.path("to YOUR_WALL_FLOWER", toYourWallFlower),
-                                        kit.firstOf("Collect at YOUR_WALL_FLOWER",
-                                                kit.when("IntakeFull"),
-                                                kit.afterMs(2000)),
-                                        kit.path("to YOUR_WALL_SHOT", toYourWallShot),
-                                        kit.command("LaunchAll"),
-                                        kit.path("YOUR_WALL_SHOT to LEFT_LOADING_ZONE", yourWallShotToLeftLoadingZone)))));
+                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.3,
+                        kit.firstOf("Collect at LEFT_FLOWER",
+                                kit.when("IntakeFull"),
+                                kit.afterMs(2000)),
+                        kit.path("to LEFT_SHOT", toLeftShot),
+                        kit.command("LaunchAll"),
+                        kit.path("LEFT_SHOT to LEFT_LOADING_ZONE", leftShotToLeftLoadingZone)));
 
         return kit.sequence(
                 kit.firstOf("Did the HIVE tip?", kit.command("LaunchAll"),
                         kit.when("Tip").then(
-                                kit.path("to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(toRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
-                                afterLeftFlower.get()),
+                                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.3,
+                                        kit.path("to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(toRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
+                                        afterLeftFlower.get())),
                         kit.afterMs(4000).then(
                                 kit.path("to GARDEN", toGarden),
                                 kit.firstOf("Collect in the GARDEN",
                                         kit.when("IntakeFull"),
                                         kit.afterMs(2000)),
                                 kit.path("to RIGHT_SHOT", toRightShot),
-                                kit.firstOf("Did it tip this time?", kit.command("LaunchAll"),
-                                        kit.when("Tip").then(
-                                                kit.path("RIGHT_SHOT to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(rightShotToRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
-                                                afterLeftFlower.get()),
-                                        kit.afterMs(4000).then(
-                                                kit.guarded("Retry fails", rightShotToRightLoadingZone, 2.3,
-                                                        kit.path("RIGHT_SHOT to RIGHT_LOADING_ZONE", rightShotToRightLoadingZone)))))));
+                                kit.command("LaunchAll"),
+                                kit.path("RIGHT_SHOT to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(rightShotToRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
+                                afterLeftFlower.get())));
     }
 }
