@@ -102,9 +102,10 @@ Plus one marker: a route's **park path**, which the automatic bailout drives whe
 **Triggers are short true/false names** the robot code registers (`Tipped`, `IntakeFull`). The
 preview does not simulate *when* a trigger fires: each is a switch, **✓ happens** (fires the moment
 it is waited for) or **✗ never happens** (the wait times out). ✓ everywhere is the fastest the Auto
-can go, ✗ everywhere the slowest; a real match falls between. The HIVE trigger is naturally
-"the HIVE left the position it was in when the wait began", which reads the same for the first
-tip and the tip back.
+can go, ✗ everywhere the slowest; a real match falls between. The HIVE triggers describe what the camera sees now,
+so it does not matter when they are asked: `HiveLeftGarden` (the HIVE is mid-tip or settled
+LOADING_UP; used after launching at the GARDEN CELL) and `HiveLeftLoading` (the tip back). A tip
+that happens during the launch is already true when the wait begins.
 
 **Named spots** (RearShot, Park, Garden) are places the robot does something. Path ends pinned to
 a spot move with it: change RearShot and every path that ends there follows. They are also what a
@@ -211,6 +212,55 @@ Not requirements; directions we have not tried.
 - **Event mode**: a stripped-down view for the pits, showing just the named spots and the times,
   for quick nudges.
 - **Touch and projector friendly**: large targets, readable across a table.
+
+## What the original Pedro Visualizer does (don't lose it)
+
+This tool began as a fork of the [Pedro Pathing Visualizer](https://github.com/Pedro-Pathing/Visualizer),
+a path editor teams already know. Our Auto screen hid or dropped much of it, sometimes too quickly:
+its right-hand panel was cluttered, but it held the precise editing a team needs later in the
+season. The new design should keep these capabilities, reframed, even if most stay out of sight
+until needed. (Upstream stays available for pure path work; we are not bound to its layout.)
+
+**Editing a path precisely** (the old right-hand inspector):
+- Select a path, then a point on it (end point, control point 1, 2, …) and **type its x / y**.
+  Lock a point so it cannot be dragged by accident. Delete a control point.
+- **Heading along a path**, which is how the robot turns while it drives: constant (one angle),
+  linear (from one angle to another), tangential (face the direction of travel, optionally
+  reversed), or **piecewise** (a timeline along the path split into segments, each linear,
+  constant, tangential or "face a point on the field").
+- A **wait after a path** (ms), a path's name, and deleting a path.
+- The **start pose**: name, x, y, heading, and a lock.
+- The robot's **position and heading** at the current moment of playback.
+- **Groups** of paths that the robot follows as one smooth motion, with one heading rule for the
+  whole group.
+
+**Drawing on the field**
+- Drag end points and control points; add a path by double-clicking the field; add or remove a
+  control point (the curve's shape); a pen tool that turns a freehand stroke into paths.
+- **Grid** (1, 3, 6, 12 in) with **snap to grid**; a **ruler** with draggable ends; a
+  **protractor** that can follow the robot. The coordinate picker copies "x, y" from a click.
+- Keyboard: W add path, A / S add / remove control point, Space or K play, Delete, Cmd+Z / Cmd+S.
+
+**Seeing and comparing**
+- Play the whole motion with a scrubber and markers; the robot drawn at its real size, with a
+  heading arrow and optional "onion skin" copies along the path.
+- **Overlay up to four other saved files** (for example our partner's Auto, or a second version
+  of ours) on the same field.
+
+**Robot and timing settings** (they change every time the preview shows): robot width, height
+and safety margin; maximum velocity, acceleration and deceleration, turning speed, friction.
+The field image (including a custom one).
+
+**Files and export**: a file manager in the browser (new, rename, duplicate, **duplicate and
+mirror** for the other alliance), save and save-as, load from disk, a share link, export as Java
+or Kotlin path code (optionally mirrored), as a PNG of the field, or as an animated GIF.
+
+**Where these fit in the new design** is open. Our guess: exact x / y / heading entry, locking,
+heading along a path and curve shape belong to "select a path or spot, then edit it right there"
+(a popover or a slide-in inspector that is gone when nothing is selected); robot and timing
+settings, the field image and files belong in a settings / file area visited rarely; the grid,
+snap, ruler and protractor are light view tools worth keeping; overlaying a partner's Auto is
+worth keeping for BIOBUZZ, where two robots share one side of the field.
 
 ## Hard constraints
 
