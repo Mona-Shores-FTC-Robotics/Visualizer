@@ -80,7 +80,7 @@ export function parkSeconds(seconds: number): number {
 }
 
 class Names {
-  private readonly used = new Set<string>(["p", "kit", "mirrored"]);
+  private readonly used = new Set<string>(["p", "kit", "rotated"]);
 
   take(preferred: string): string {
     let base = preferred || "value";
@@ -326,7 +326,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   }
 
   // Routine patterns, placed where their cards start them. Every pose is a
-  // p.of() local like the rest, so the alliance mirror applies to them too.
+  // p.of() local like the rest, so the alliance rotation applies to them too.
   const routineDecls: string[] = [];
   const routineVars = new Map<string, string>();
   for (const card of cards) {
@@ -504,21 +504,21 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "    /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */",
     `    public static final String[] TRIGGERS = ${sortedList(used.conditions.keys())};`,
     "",
-    '    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */',
+    '    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */',
     `    public static final String DRAWN_FOR = ${javaString(auto.drawnFor)};`,
     "",
     "    /** Where the robot starts, for the given alliance. */",
-    "    public static Pose startPose(boolean mirrored) {",
-    `        return poses(mirrored).of(${javaNumber(startPoint.x)}, ${javaNumber(startPoint.y)}, ${javaNumber(startPoint.headingDeg)});`,
+    "    public static Pose startPose(boolean rotated) {",
+    `        return poses(rotated).of(${javaNumber(startPoint.x)}, ${javaNumber(startPoint.y)}, ${javaNumber(startPoint.headingDeg)});`,
     "    }",
     "",
-    "    private static PoseFactory poses(boolean mirrored) {",
-    `        return mirrored ? PoseFactory.degrees().mirrorX(${javaNumber(FIELD_SIZE / 2)}) : PoseFactory.degrees();`,
+    "    private static PoseFactory poses(boolean rotated) {",
+    `        return rotated ? PoseFactory.degrees().mirrorAroundPoint(${javaNumber(FIELD_SIZE / 2)}, ${javaNumber(FIELD_SIZE / 2)}) : PoseFactory.degrees();`,
     "    }",
     "",
     "    /** Builds the whole Auto. Call once, at init; schedule the result at start. */",
-    "    public static Command build(AutoKit kit, boolean mirrored) {",
-    "        PoseFactory p = poses(mirrored);",
+    "    public static Command build(AutoKit kit, boolean rotated) {",
+    "        PoseFactory p = poses(rotated);",
   );
 
   if (pointDecls.length > 0) {

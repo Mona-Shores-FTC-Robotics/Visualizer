@@ -42,7 +42,7 @@
   } from "../config";
   import { showToast } from "./toast";
   import NameDialog from "./components/NameDialog.svelte";
-  import { currentAuto, loadAutoFrom, mirrorAutoData } from "./auto/store";
+  import { currentAuto, loadAutoFrom, rotateAutoData } from "./auto/store";
   import FileListItem from "./components/FileListItem.svelte";
   import FileActionsPanel from "./components/FileActionsPanel.svelte";
 
@@ -684,15 +684,15 @@
       data.lines = normalizePaths(data.lines || []);
       data.startPoint = normalizeStartPose(data.startPoint ?? {});
 
-      const mirroredData = mirrorPathData(data);
+      const mirroredData = rotatePathData(data);
       mirroredData.sequence = deriveSequence(mirroredData, mirroredData.lines);
 
       const baseName = stripPpExtension(selectedFile.name);
-      const defaultName = `${baseName}_mirrored`;
+      const defaultName = `${baseName}_other_alliance`;
 
       // Store the mirrored data and open custom dialog
       pendingMirrorData = mirroredData;
-      nameDialogTitle = "Name Mirrored Path";
+      nameDialogTitle = "Name the other alliance's copy";
       nameDialogDefault = defaultName;
       nameDialogOpen = true;
     } catch (error) {
@@ -746,26 +746,29 @@
     nameDialogOpen = false;
   }
 
-  function mirrorHeading(heading: Heading): Heading {
+  // BIOBUZZ is 180° rotationally symmetric, not mirrored: the other alliance's
+  // copy of a path is the same path turned half a turn about the field centre.
+  const turnDeg = (deg: number) => (((deg + 180) % 360) + 360) % 360;
+  const turnX = (x: number) => FIELD_SIZE - x;
+  const turnY = (y: number) => FIELD_SIZE - y;
+
+  function rotateHeading(heading: Heading): Heading {
     switch (heading.type) {
-      // For linear heading, mirror both start and end degrees
       case "linear":
         return {
           type: "linear",
-          startDeg: 180 - heading.startDeg,
-          endDeg: 180 - heading.endDeg,
+          startDeg: turnDeg(heading.startDeg),
+          endDeg: turnDeg(heading.endDeg),
         };
 
-      // For constant heading, mirror the constant degree
       case "constant":
-        return { type: "constant", degrees: 180 - heading.degrees };
+        return { type: "constant", degrees: turnDeg(heading.degrees) };
 
-      // For tangential heading, keep the reverse flag unchanged so mirrored
-      // tangents stay mirrored
+      // A tangent turns with its path, so the reverse flag stays as it is
       case "tangential":
         return heading;
 
-      // Each piecewise segment carries its own angles, so mirror them all
+      // Each piecewise segment carries its own angles and points, so turn them all
       case "piecewise":
         return {
           type: "piecewise",
@@ -782,19 +785,20 @@
                     startDeg:
                       parameters.startDeg === undefined
                         ? undefined
-                        : 180 - parameters.startDeg,
+                        : turnDeg(parameters.startDeg),
                     endDeg:
                       parameters.endDeg === undefined
                         ? undefined
-                        : 180 - parameters.endDeg,
+                        : turnDeg(parameters.endDeg),
                     degrees:
                       parameters.degrees === undefined
                         ? undefined
-                        : 180 - parameters.degrees,
+                        : turnDeg(parameters.degrees),
                     point: parameters.point
                       ? {
                           ...parameters.point,
-                          x: FIELD_SIZE - parameters.point.x,
+                          x: turnX(parameters.point.x),
+                          y: turnY(parameters.point.y),
                         }
                       : undefined,
                   },
@@ -806,52 +810,61 @@
     }
   }
 
-  function mirrorPathData(data: any) {
-    const mirrored = JSON.parse(JSON.stringify(data)); // Deep clone
+  function rotatePathData(data: any) {
+    const rotated = JSON.parse(JSON.stringify(data)); // Deep clone
 
-    // Mirror start point
-    if (mirrored.startPoint) {
-      mirrored.startPoint.x = FIELD_SIZE - mirrored.startPoint.x;
-      mirrored.startPoint.headingDeg = 180 - mirrored.startPoint.headingDeg;
+    if (rotated.startPoint) {
+      rotated.startPoint.x = turnX(rotated.startPoint.x);
+      rotated.startPoint.y = turnY(rotated.startPoint.y);
+      if (typeof rotated.startPoint.headingDeg === "number") {
+        rotated.startPoint.headingDeg = turnDeg(rotated.startPoint.headingDeg);
+      }
     }
 
-    // Mirror lines, descending into groups so nested segments are mirrored too
-    const mirrorPaths = (paths: Path[]) => {
+    // Turn lines, descending into groups so nested segments turn too
+    const rotatePaths = (paths: Path[]) => {
       paths.forEach((path) => {
         if (path.heading) {
-          path.heading = mirrorHeading(path.heading);
+          path.heading = rotateHeading(path.heading);
         }
 
         if (path.kind === "compound") {
-          mirrorPaths(path.segments);
+          rotatePaths(path.segments);
           return;
         }
 
-        // Mirror end point
         if (path.endPoint) {
-          path.endPoint.x = FIELD_SIZE - path.endPoint.x;
+          path.endPoint.x = turnX(path.endPoint.x);
+          path.endPoint.y = turnY(path.endPoint.y);
         }
 
-        // Mirror control points
         if (path.controlPoints && Array.isArray(path.controlPoints)) {
           path.controlPoints.forEach((controlPoint) => {
-            controlPoint.x = FIELD_SIZE - controlPoint.x;
+            controlPoint.x = turnX(controlPoint.x);
+            controlPoint.y = turnY(controlPoint.y);
           });
         }
       });
     };
-    if (mirrored.lines && Array.isArray(mirrored.lines)) {
-      mirrorPaths(mirrored.lines);
+    if (rotated.lines && Array.isArray(rotated.lines)) {
+      rotatePaths(rotated.lines);
     }
 
-    if (mirrored.auto !== undefined) {
-      mirrored.auto = mirrorAutoData(mirrored.auto);
+    // Keep-out shapes turn too: the robot's export turns them with the Auto
+    if (Array.isArray(rotated.shapes)) {
+      rotated.shapes.forEach((shape: any) => {
+        (shape.vertices ?? []).forEach((v: any) => {
+          v.x = turnX(v.x);
+          v.y = turnY(v.y);
+        });
+      });
     }
 
-    // Don't mirror shapes/obstacles - they should remain in their original positions
-    // (removed mirroring logic for shapes)
+    if (rotated.auto !== undefined) {
+      rotated.auto = rotateAutoData(rotated.auto);
+    }
 
-    return mirrored;
+    return rotated;
   }
 
   // Toast notification system

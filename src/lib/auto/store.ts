@@ -113,20 +113,21 @@ export function currentAuto(): AutoSection | null {
 }
 
 /**
- * The Auto of a mirrored copy of the project: drawn for the other alliance,
- * its named points mirrored with the paths. Cards refer to paths by id and so
- * follow the mirrored paths on their own.
+ * The Auto of the other alliance's copy of the project: drawn for the other
+ * alliance, its named points turned half a turn about the field centre with the
+ * paths (BIOBUZZ is rotationally symmetric, not mirrored). Cards refer to paths
+ * by id and so follow the turned paths on their own.
  */
-export function mirrorAutoData(auto: unknown): unknown {
+export function rotateAutoData(auto: unknown): unknown {
   const { auto: normalized } = normalizeAuto(auto);
   if (!normalized) return auto;
   normalized.drawnFor = normalized.drawnFor === "RED" ? "BLUE" : "RED";
   for (const [name, point] of Object.entries(normalized.points)) {
-    const mirrored: NamedPoint =
+    const turned: NamedPoint =
       point.length === 3
-        ? [FIELD_SIZE - point[0], point[1], 180 - point[2]]
-        : [FIELD_SIZE - point[0], point[1]];
-    normalized.points[name] = mirrored;
+        ? [FIELD_SIZE - point[0], FIELD_SIZE - point[1], (((point[2] + 180) % 360) + 360) % 360]
+        : [FIELD_SIZE - point[0], FIELD_SIZE - point[1]];
+    normalized.points[name] = turned;
   }
   return normalized;
 }

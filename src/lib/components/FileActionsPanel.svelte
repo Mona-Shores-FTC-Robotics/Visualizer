@@ -82,7 +82,7 @@
     <button
       onclick={onDuplicateAndMirror}
       class="console-action console-action--accent w-full text-sm"
-      title="Create a mirrored copy of this path"
+      title="Copy this file for the other alliance: every point turned half a turn about the field centre"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -98,7 +98,7 @@
           d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
         />
       </svg>
-      <span>Duplicate &amp; Mirror Path</span>
+      <span>Copy for the other alliance</span>
     </button>
 
     <!-- Saving Operations -->

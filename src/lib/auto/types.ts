@@ -176,7 +176,7 @@ export interface RoutineDef {
 
 export interface AutoSection {
   version: typeof AUTO_FORMAT_VERSION;
-  /** The alliance the Auto is drawn for; the robot mirrors it for the other. */
+  /** The alliance the Auto is drawn for; the robot turns it half a turn about the field centre for the other. */
   drawnFor: Alliance;
   /** Name of the generated class, before the `Auto` suffix. Defaults to the file name. */
   exportName?: string;

@@ -25,21 +25,21 @@ public final class HiveRushAuto {
     /** Registered robot triggers this Auto uses; checked when the OpMode initialises. */
     public static final String[] TRIGGERS = {"CameraBlind", "HiveTipped", "IntakeFull", "LauncherReady"};
 
-    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it mirrored. */
+    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */
     public static final String DRAWN_FOR = "BLUE";
 
     /** Where the robot starts, for the given alliance. */
-    public static Pose startPose(boolean mirrored) {
-        return poses(mirrored).of(38, 71, 0);
+    public static Pose startPose(boolean rotated) {
+        return poses(rotated).of(38, 71, 0);
     }
 
-    private static PoseFactory poses(boolean mirrored) {
-        return mirrored ? PoseFactory.degrees().mirrorX(70.75) : PoseFactory.degrees();
+    private static PoseFactory poses(boolean rotated) {
+        return rotated ? PoseFactory.degrees().mirrorAroundPoint(70.75, 70.75) : PoseFactory.degrees();
     }
 
     /** Builds the whole Auto. Call once, at init; schedule the result at start. */
-    public static Command build(AutoKit kit, boolean mirrored) {
-        PoseFactory p = poses(mirrored);
+    public static Command build(AutoKit kit, boolean rotated) {
+        PoseFactory p = poses(rotated);
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
         Pose shootSpot = p.of(38, 71, 0);
