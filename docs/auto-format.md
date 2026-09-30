@@ -314,6 +314,24 @@ also serves them in dev). The link is short, so chat apps do not cut it, and
 it always opens the sample as last deployed:
 <https://mona-shores-ftc-robotics.github.io/Visualizer/#sample=red-garden-basic>.
 
+## Links to committed Autos
+
+`#gh=` opens an Auto committed in biobuzz's `TeamCode/autos/` as a shared copy.
+The link holds only where the file is, so it stays short and always shows what
+is in git:
+
+| Link | Opens `TeamCode/autos/red-simple.pp` from |
+|---|---|
+| `…/Visualizer/#gh=red-simple.pp` | the default branch (`master`), whatever is latest |
+| `…/Visualizer/#gh=a1b2c3d/red-simple.pp` | exactly that commit, forever |
+| `…/Visualizer/#gh=claude/some-branch/red-simple.pp` | a branch, e.g. a pull request's |
+
+The corner bar says where it came from ("From biobuzz master"). The file is
+read from raw.githubusercontent.com: no login while biobuzz is public, and a
+branch can be up to 5 minutes stale after a push (a commit never is). A file
+that is not there, or GitHub out of reach, is refused with a message saying
+which. Code: `src/utils/gitLink.ts`.
+
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
