@@ -29,7 +29,7 @@ test("the RightStartTip sample loads and validates clean", () => {
   assertEqual(validateAuto(s.auto, s.catalog, s.startPoint), []);
 });
 
-test("its routes are the design's five, the retry joining the main plan at LEFT_FLOWER", () => {
+test("its routes are the design's five, the retry joining the main plan at RIGHT_HIVE_ENTRANCE", () => {
   const routes = enumerateRoutes(sample().auto);
   assertEqual(routes.map((r) => r.marks), ["✓ → ✓", "✓ → ✗", "✗ → ✓ → ✓", "✗ → ✓ → ✗", "✗ → ✗"]);
   assertEqual(routes[2].label, "Not tipped → Tipped on the retry → Tipped back");
@@ -39,13 +39,24 @@ test("a rejoined route drives its own path to the stop, then the main plan's ste
   const s = sample();
   const route = enumerateRoutes(s.auto)[2]; // retry rejoins, then tips back
   const result = simulateAuto(s.auto, s.catalog, s.startPoint, routeScenario(s.auto, route, true));
-  for (const id of ["s-garden", "s-rshot", "rejoin-left", "full-left", "s-lshot", "s-lpark"]) {
+  for (const id of ["s-garden", "s-rshot", "rejoin-rhe", "s-lhe", "s-lflower", "full-left", "s-lshot", "s-lpark"]) {
     assert(result.ran.has(id), `${id} should run: ${[...result.ran].join(", ")}`);
   }
-  assert(!result.ran.has("s-lflower"), "the main plan's own path to LEFT_FLOWER is not driven");
+  assert(!result.ran.has("s-rhe"), "the main plan's own path to RIGHT_HIVE_ENTRANCE is not driven");
   // The rejoin's path starts where the robot is: RIGHT_SHOT.
-  const own = s.catalog.byId.get("rshot-lflower")!;
+  const own = s.catalog.byId.get("rshot-rhe")!;
   assertEqual({ x: own.start.x, y: own.start.y }, { x: 36, y: 30 });
+});
+
+test("joining a drive-through drives on through its chain without stopping", () => {
+  const s = sample();
+  const route = enumerateRoutes(s.auto)[2];
+  const result = simulateAuto(s.auto, s.catalog, s.startPoint, routeScenario(s.auto, route, true));
+  const ids = ["rshot-rhe", "to-lhe", "to-lflower"];
+  const drives = result.drives.filter((d) => ids.includes(d.pathId));
+  assertEqual(drives.map((d) => d.pathId), ids);
+  const chain = chainInfo(s.catalog, ids);
+  assert(Math.abs(drives[2].t1 - drives[0].t0 - chain.seconds) < 1e-6, JSON.stringify(drives));
 });
 
 test("a drive-through chain is one drive: faster than stopping at each spot", () => {
@@ -79,9 +90,8 @@ test("every route ends within 30 s, and the worst case covers every preview", ()
 test("rejoin and drive-through mistakes are errors", () => {
   const s = sample();
   const cases: [string, (auto: AutoSection) => void, string][] = [
-    ["missing target", (a) => { (findCard(a.cards, "rejoin-left") as unknown as { target: string }).target = "nope"; }, "target stop no longer exists"],
-    ["a loop", (a) => { (findCard(a.cards, "rejoin-left") as unknown as { target: string }).target = "s-rshot"; }, "loop"],
-    ["joins a drive-through", (a) => { (findCard(a.cards, "rejoin-left") as unknown as { target: string }).target = "s-lhe"; }, "joins a drive-through"],
+    ["missing target", (a) => { (findCard(a.cards, "rejoin-rhe") as unknown as { target: string }).target = "nope"; }, "target stop no longer exists"],
+    ["a loop", (a) => { (findCard(a.cards, "rejoin-rhe") as unknown as { target: string }).target = "s-rshot"; }, "loop"],
     ["through with nothing after", (a) => { (findCard(a.cards, "s-lpark") as PathCard).through = true; }, "must come straight after"],
   ];
   for (const [name, mutate, expected] of cases) {

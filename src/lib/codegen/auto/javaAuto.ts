@@ -345,6 +345,15 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const info = catalog.byId.get(lineId)!;
     return { info, varName: pathVars.get(info.index)! };
   };
+  const pathNode = (lineId: string): JNode => {
+    const { info, varName } = pathOf(lineId);
+    return `kit.path(${javaString(info.name)}, ${varName})`;
+  };
+  /** A drive-through chain: one Pedro path, so the robot does not stop between them. */
+  const chainNode = (lineIds: string[]): JNode => {
+    const parts = lineIds.map(pathOf);
+    return `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}))`;
+  };
 
   const cardNode = (card: AutoCard): JNode => {
     switch (card.kind) {
@@ -352,10 +361,8 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         return card.timeoutS
           ? `kit.command(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
           : `kit.command(${javaString(card.name)})`;
-      case "path": {
-        const { info, varName } = pathOf(card.lineId);
-        return `kit.path(${javaString(info.name)}, ${varName})`;
-      }
+      case "path":
+        return pathNode(card.lineId);
       case "firstOf":
         return {
           head: "kit.firstOf",
@@ -365,8 +372,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           children: card.rows.map(rowNode),
         };
       case "rejoin": {
-        const { info, varName } = pathOf(card.lineId);
-        return `kit.path(${javaString(info.name)}, ${varName})`;
+        // Joining a drive-through: one Pedro path on through the rest of its chain.
+        const through = rejoinTail(auto.cards, card.target)?.through ?? [];
+        return through.length > 0 ? chainNode([card.lineId, ...through.map((c) => c.lineId)]) : pathNode(card.lineId);
       }
     }
   };
@@ -376,14 +384,15 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const tailVars = new Map<string, string>();
   const tailDecls: { varName: string; targetId: string; size: number }[] = [];
   for (const card of cards) {
-    if (card.kind !== "rejoin" || tailVars.has(card.target)) continue;
+    if (card.kind !== "rejoin") continue;
     const tail = rejoinTail(auto.cards, card.target);
-    if (!tail) continue;
-    const spot = auto.pathEnds[catalog.byId.get(tail.target.lineId)?.endSegmentId ?? ""];
-    const base = `after${pascal(spot ?? catalog.byId.get(tail.target.lineId)?.name ?? "Stop")}`;
+    // Keyed by the stop the shared steps follow: a drive-through target's chain end.
+    if (!tail || tailVars.has(tail.join.id)) continue;
+    const spot = auto.pathEnds[catalog.byId.get(tail.join.lineId)?.endSegmentId ?? ""];
+    const base = `after${pascal(spot ?? catalog.byId.get(tail.join.lineId)?.name ?? "Stop")}`;
     const varName = names.take(base);
-    tailVars.set(card.target, varName);
-    tailDecls.push({ varName, targetId: card.target, size: allCards(tail.list.slice(tail.index)).length });
+    tailVars.set(tail.join.id, varName);
+    tailDecls.push({ varName, targetId: tail.join.id, size: allCards(tail.list.slice(tail.index)).length });
   }
   tailDecls.sort((a, b) => a.size - b.size);
 
@@ -398,10 +407,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           chain.push(list[i + chain.length] as typeof card);
         }
         if (chain.length > 1) {
-          const parts = chain.map((c) => pathOf(c.lineId));
-          nodes.push(
-            `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}))`,
-          );
+          nodes.push(chainNode(chain.map((c) => c.lineId)));
           i += chain.length - 1;
           const last = chain[chain.length - 1];
           if (tailVars.has(last.id)) {
@@ -412,7 +418,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         }
       }
       nodes.push(cardNode(card));
-      if (card.kind === "rejoin" && tailVars.has(card.target)) nodes.push(`${tailVars.get(card.target)}.get()`);
+      if (card.kind === "rejoin") {
+        const join = rejoinTail(auto.cards, card.target)?.join;
+        if (join && tailVars.has(join.id)) nodes.push(`${tailVars.get(join.id)}.get()`);
+      }
       if (tailVars.has(card.id)) {
         nodes.push(`${tailVars.get(card.id)}.get()`);
         break;

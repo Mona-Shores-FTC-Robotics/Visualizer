@@ -248,28 +248,19 @@
       }
     },
     {
-      "id": "rshot-lflower",
+      "id": "rshot-rhe",
       "color": "#3cc8e4",
-      "name": "RIGHT_SHOT to LEFT_FLOWER",
+      "name": "RIGHT_SHOT to RIGHT_HIVE_ENTRANCE",
       "waitBeforeMs": 0,
       "waitAfterMs": 0,
       "waitBeforeName": "",
       "waitAfterName": "",
       "kind": "atomic",
       "endPoint": {
-        "x": 47.5,
-        "y": 129
+        "x": 59,
+        "y": 47
       },
-      "controlPoints": [
-        {
-          "x": 30,
-          "y": 60
-        },
-        {
-          "x": 30,
-          "y": 112
-        }
-      ],
+      "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 54,
@@ -545,8 +536,8 @@
       "wshot-park": "LEFT_LOADING_ZONE",
       "to-garden": "GARDEN",
       "to-rshot": "RIGHT_SHOT",
-      "rshot-lflower": "LEFT_FLOWER",
-      "rshot-park": "RIGHT_LOADING_ZONE"
+      "rshot-park": "RIGHT_LOADING_ZONE",
+      "rshot-rhe": "RIGHT_HIVE_ENTRANCE"
     },
     "startAt": "RIGHT_START",
     "cards": [
@@ -719,10 +710,10 @@
                     "label": "Tipped on the retry",
                     "cards": [
                       {
-                        "id": "rejoin-left",
+                        "id": "rejoin-rhe",
                         "kind": "rejoin",
-                        "lineId": "rshot-lflower",
-                        "target": "s-lflower"
+                        "lineId": "rshot-rhe",
+                        "target": "s-rhe"
                       }
                     ]
                   },

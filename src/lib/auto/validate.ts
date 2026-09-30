@@ -106,9 +106,6 @@ export function validateAuto(
             if (allCards(tail.list.slice(tail.index)).includes(card) || allCards([tail.target]).includes(card)) {
               error(card.id, "This rejoin joins a stop before itself, so the Auto would loop.");
             }
-            if (tail.target.through) {
-              error(card.id, "This rejoin joins a drive-through; join at a stop, where the robot stops.");
-            }
             const targetPath = catalog.byId.get(tail.target.lineId);
             if (path && targetPath) {
               const gap = Math.hypot(path.end.x - targetPath.end.x, path.end.y - targetPath.end.y);

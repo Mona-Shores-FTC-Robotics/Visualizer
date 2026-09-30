@@ -23,7 +23,16 @@
   let size = $derived(x.range()[1]);
   let colors = $derived(cardColors(auto.cards));
   let selectedId = $derived(parseSelection($selectedCardId).cardId);
-  let pathCards = $derived(allCards(auto.cards).filter((card): card is PathCard => card.kind === "path"));
+  // A rejoin drives a path too; it is drawn like any other.
+  let pathCards = $derived(
+    allCards(auto.cards).flatMap((card): PathCard[] =>
+      card.kind === "path"
+        ? [card]
+        : card.kind === "rejoin"
+          ? [{ id: card.id, kind: "path", lineId: card.lineId, park: false }]
+          : [],
+    ),
+  );
   let usedLineIds = $derived(new Set(pathCards.map((card) => card.lineId)));
   let unit = $derived(size / 141.5);
   let uses = $derived(pointUses(auto));

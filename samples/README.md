@@ -11,7 +11,8 @@ The design's sample Auto (the route view's mockups use it), on the v1 spots. Fro
 **LaunchAll · wait for Tip ≤4 s**. ✓: drive through both HIVE entrances to LEFT_FLOWER in one
 drive, collect, shoot at LEFT_SHOT and wait for the tip back (✓ park in the LEFT LOADING ZONE, ✗
 the other FLOWER first). Timed out: collect in the GARDEN, shoot from RIGHT_SHOT and check again:
-✓ **rejoins the main plan at LEFT_FLOWER** (the steps after it are shared, not copied), ✗ parks
+✓ **rejoins the main plan at RIGHT_HIVE_ENTRANCE**, as if the first launch had tipped it (it
+drives on through the entrances without stopping; the steps after are shared, not copied), ✗ parks
 in the RIGHT LOADING ZONE. LEFT_SHOT, RIGHT_SHOT and YOUR_WALL_SHOT are placeholder spots.
 
 ## `red-spot-map.pp`

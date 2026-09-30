@@ -65,8 +65,6 @@ public final class RightStartTipAuto {
         Pose yourWallShotToLeftLoadingZoneControl1 = p.of(22, 96, 0);
         Pose toGardenControl1 = p.of(36, 12, 0);
         Pose toRightShotControl1 = p.of(24, 16, 0);
-        Pose rightShotToLeftFlowerControl1 = p.of(30, 60, 0);
-        Pose rightShotToLeftFlowerControl2 = p.of(30, 112, 0);
         Pose rightShotToRightLoadingZoneControl1 = p.of(26, 60, 0);
 
         // Paths, written as the stock Visualizer export writes them.
@@ -80,7 +78,7 @@ public final class RightStartTipAuto {
         Path yourWallShotToLeftLoadingZone = Paths.curve(yourWallShot, yourWallShotToLeftLoadingZoneControl1, leftLoadingZone).linear(yourWallShot, leftLoadingZone);
         Path toGarden = Paths.curve(rightStart, toGardenControl1, garden).linear(rightStart, garden);
         Path toRightShot = Paths.curve(garden, toRightShotControl1, rightShot).linear(garden, rightShot);
-        Path rightShotToLeftFlower = Paths.curve(rightShot, rightShotToLeftFlowerControl1, rightShotToLeftFlowerControl2, leftFlower).linear(rightShot, leftFlower);
+        Path rightShotToRightHiveEntrance = Paths.line(rightShot, rightHiveEntrance).linear(rightShot, rightHiveEntrance);
         Path rightShotToRightLoadingZone = Paths.curve(rightShot, rightShotToRightLoadingZoneControl1, rightLoadingZone).linear(rightShot, rightLoadingZone);
 
         // Steps two routes share: a rejoin runs them from the stop it joins at.
@@ -116,7 +114,7 @@ public final class RightStartTipAuto {
                                 kit.path("to RIGHT_SHOT", toRightShot),
                                 kit.firstOf("Did it tip this time?", kit.command("LaunchAll"),
                                         kit.when("Tip").then(
-                                                kit.path("RIGHT_SHOT to LEFT_FLOWER", rightShotToLeftFlower),
+                                                kit.path("RIGHT_SHOT to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(rightShotToRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
                                                 afterLeftFlower.get()),
                                         kit.afterMs(4000).then(
                                                 kit.guarded("Retry fails", rightShotToRightLoadingZone, 2.3,

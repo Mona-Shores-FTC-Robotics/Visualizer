@@ -141,12 +141,27 @@ export function isPlainWait(card: FirstOfCard): boolean {
 
 /**
  * Where a rejoin continues: the list holding its target stop and the index after it. Null when the
- * target is missing or not a path card.
+ * target is missing or not a path card. A drive-through target is joined on the move: the rejoin's
+ * path drives on through the rest of that chain (`through`) without stopping, and the steps after
+ * the chain's last stop (`join`) follow.
  */
-export function rejoinTail(cards: AutoCard[], targetId: string): { list: AutoCard[]; index: number; target: PathCard } | null {
+export function rejoinTail(
+  cards: AutoCard[],
+  targetId: string,
+): { list: AutoCard[]; index: number; target: PathCard; through: PathCard[]; join: PathCard } | null {
   const location = locateCard(cards, targetId);
   if (!location) return null;
   const target = location.list[location.index];
   if (target.kind !== "path") return null;
-  return { list: location.list, index: location.index + 1, target };
+  const through: PathCard[] = [];
+  let join = target;
+  let index = location.index + 1;
+  while (join.through) {
+    const next = location.list[index];
+    if (next?.kind !== "path") break;
+    through.push(next);
+    join = next;
+    index++;
+  }
+  return { list: location.list, index, target, through, join };
 }

@@ -347,9 +347,12 @@ export function simulateAuto(
         return runFirstOf(card, guards);
       case "rejoin": {
         const own: PathCard = { id: card.id, kind: "path", lineId: card.lineId, park: false };
-        const signal = runCard(own, guards);
-        if (signal) return signal;
         const tail = rejoinTail(auto.cards, card.target);
+        // Joining a drive-through: drive on through the rest of its chain without stopping.
+        const signal = tail?.through.length
+          ? runChain([{ ...own, through: true }, ...tail.through], guards)
+          : runCard(own, guards);
+        if (signal) return signal;
         if (!tail) {
           note("Rejoin: its target stop is missing", "warn", card.id);
           return null;
@@ -543,8 +546,10 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
         t += ids.length > 1 ? chainInfo(catalog, ids).seconds : catalog.byId.get(card.lineId)?.seconds ?? 0;
         i = j;
       } else if (card.kind === "rejoin") {
-        t += catalog.byId.get(card.lineId)?.seconds ?? 0;
         const tail = rejoinTail(auto.cards, card.target);
+        t += tail?.through.length
+          ? chainInfo(catalog, [card.lineId, ...tail.through.map((c) => c.lineId)]).seconds
+          : catalog.byId.get(card.lineId)?.seconds ?? 0;
         if (!tail || ++depth > MAX_REJOINS) return rest(t);
         return endOf(tail.list, t, tail.index, (x) => x);
       } else {

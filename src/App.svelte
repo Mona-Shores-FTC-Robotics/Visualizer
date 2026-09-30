@@ -199,6 +199,7 @@
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
   import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
+  import FieldAxes from "./lib/components/FieldAxes.svelte";
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
 
@@ -3491,6 +3492,7 @@
               class="absolute top-0 left-0 w-full h-full z-15 pointer-events-none"
               aria-hidden="true"
             ></canvas>
+            <FieldAxes {x} {y} />
             {#if autoActive && $autoSection && autoCatalog}
               <AutoFieldOverlay
                 auto={$autoSection}
