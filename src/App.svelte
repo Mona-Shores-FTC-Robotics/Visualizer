@@ -203,6 +203,11 @@
     type PreviewResult,
   } from "./lib/auto/simulate";
   import { normalizeAuto } from "./lib/auto/normalize";
+  import TimingControl from "./lib/timing/TimingControl.svelte";
+  import { previewTogether } from "./lib/timing/together";
+  import { timingMode, timingValues } from "./lib/timing/store";
+  import type { Tip } from "./lib/timing/model";
+  import type { AutoSection } from "./lib/auto/types";
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
   import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
@@ -411,16 +416,17 @@
     shapes: Shape[];
     settings: Settings;
     color?: string; // Optional custom color for this path
-    /** The file's Auto played with its waits and decisions, if it has one. */
-    preview: PreviewResult | null;
+    /** The file's Auto, if it has one: played with its waits and decisions. */
+    auto: AutoSection | null;
   }
 
   /** An Auto plays out its Auto (waits included); a plain file drives its paths back to back. */
   function additionalPrediction(pathData: AdditionalPathData) {
-    if (pathData.preview) {
+    const preview = additionalTogether.previews.get(pathData);
+    if (preview) {
       return {
-        totalTime: pathData.preview.endTime,
-        timeline: pathData.preview.timeline,
+        totalTime: preview.endTime,
+        timeline: preview.timeline,
       };
     }
     if (!pathData.startPoint) return null;
@@ -432,28 +438,42 @@
     );
   }
 
-  /** Previews a loaded file's Auto as the Auto list would, or null if it has none. */
-  function previewAdditionalAuto(
-    data: { auto?: unknown },
-    start: StartPose,
-    pathLines: Path[],
-    pathSettings: Settings,
-  ): PreviewResult | null {
-    const { auto } = normalizeAuto(data.auto);
-    if (!auto) return null;
-    try {
-      return simulateAuto(
-        auto,
-        buildPathCatalog(start, pathLines, pathSettings),
-        start,
-        {},
-      );
-    } catch (error) {
-      console.error("Could not preview the Auto of an additional path:", error);
-      return null;
-    }
-  }
   let additionalPaths: AdditionalPathData[] = $state([]);
+
+  /**
+   * The shown files' Autos previewed together: with Typical timing their volleys share one HIVE,
+   * so one robot's wait for its CELL ends on the other's TIP.
+   */
+  let additionalTogether = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const previews = new Map<AdditionalPathData, PreviewResult>();
+    let tips: Tip[] = [];
+    const withAuto = additionalPaths.filter((p) => p.auto && p.startPoint);
+    try {
+      const entries = withAuto.map((p) => ({
+        auto: p.auto!,
+        startPoint: p.startPoint!,
+        lines: p.lines,
+        settings: p.settings,
+        scenario: {},
+      }));
+      if ($timingMode === "typical") {
+        const together = previewTogether(entries, $timingValues);
+        tips = together.tips;
+        together.previews.forEach((preview, i) => previews.set(withAuto[i], preview));
+      } else {
+        entries.forEach((e, i) =>
+          previews.set(
+            withAuto[i],
+            simulateAuto(e.auto, buildPathCatalog(e.startPoint, e.lines, e.settings), e.startPoint, e.scenario),
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Could not preview the shown Autos:", error);
+    }
+    return { previews, tips, entries: withAuto.map((p) => ({ auto: p.auto!, startPoint: p.startPoint!, lines: p.lines, settings: p.settings, scenario: {} })) };
+  });
 
   const formatPathPoint = (value: number) =>
     Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
@@ -770,12 +790,7 @@
               })),
             settings: pathSettings,
             color: colors[i],
-            preview: previewAdditionalAuto(
-              data,
-              start,
-              normalizedLines,
-              pathSettings,
-            ),
+            auto: normalizeAuto(data.auto).auto,
           });
         }
       } catch (error) {
@@ -1409,7 +1424,7 @@
   let additionalPathCache = $state(
     new Map<AdditionalPathData, AdditionalPathEntry | null>(),
   );
-  let additionalPathCacheKey: AdditionalPathData[] | null = $state(null);
+  let additionalPathCacheKey: typeof additionalTogether | null = $state(null);
 
   // Calculate robot states for all additional paths (cheap: uses the cached
   // per-path predictions above, only evaluating positions for the current %).
@@ -2743,11 +2758,18 @@
       ? validateAuto($autoSection, autoCatalog, startPoint)
       : [],
   );
-  let autoPreview = $derived(
+  /** The Auto being edited, previewed alone (its own volleys TIP the HIVE with Typical timing). */
+  let autoTogether = $derived(
     autoActive && autoCatalog && $autoSection
-      ? simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario)
+      ? $timingMode === "typical"
+        ? previewTogether(
+            [{ auto: $autoSection, startPoint, lines, settings, scenario: $previewScenario }],
+            $timingValues,
+          )
+        : { previews: [simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario)], tips: [] }
       : null,
   );
+  let autoPreview = $derived(autoTogether ? autoTogether.previews[0] : null);
   let autoWorst = $derived(
     autoActive && autoCatalog && $autoSection
       ? worstCase($autoSection, autoCatalog)
@@ -3262,8 +3284,8 @@
     }
   });
   run(() => {
-    if (additionalPathCacheKey !== additionalPaths) {
-      additionalPathCacheKey = additionalPaths;
+    if (additionalPathCacheKey !== additionalTogether) {
+      additionalPathCacheKey = additionalTogether;
       // Built fresh and assigned wholesale below, so reactivity comes from the
       // assignment — a SvelteMap would only add proxy overhead.
       // eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -3319,9 +3341,10 @@
           y,
         );
         // Routine patterns and straight drives are not project paths.
-        const motion = pathData.preview
+        const shownPreview = additionalTogether.previews.get(pathData);
+        const motion = shownPreview
           ? motionPoseAt(
-              pathData.preview,
+              shownPreview,
               (normalizedPercent / 100) * entry.prediction.totalTime,
             )
           : null;
@@ -3518,6 +3541,14 @@
           <h3 class="module-title">Field</h3>
           {#if autoActive && $autoSection}
             <AutoPreviewSwitches auto={$autoSection} />
+            <TimingControl
+              tips={isMultiPathMode ? additionalTogether.tips : (autoTogether?.tips ?? [])}
+              entries={isMultiPathMode
+                ? additionalTogether.entries
+                : $autoSection
+                  ? [{ auto: $autoSection, startPoint, lines, settings, scenario: $previewScenario }]
+                  : []}
+            />
             <label class="module-caption flex items-center gap-2" title="Draw the branches this preview does not take, dashed">
               <input type="checkbox" bind:checked={showUntakenBranches} />
               Other branches
