@@ -25,7 +25,7 @@ export interface SharedProject {
   /** Where it was read from when that is git ("biobuzz master"); absent for a copy in the link. */
   from?: string;
   /** The file in biobuzz it was read from, when that is git: where "Save to GitHub" saves it back. */
-  git?: { ref: string | null; path: string };
+  git?: { ref: string | null; path: string; text: string };
 }
 
 export type ShareLinkResult =

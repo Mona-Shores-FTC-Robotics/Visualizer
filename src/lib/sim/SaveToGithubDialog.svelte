@@ -50,8 +50,13 @@
     source: { ref: string | null; path: string } | null;
     /** The open project as it would be saved. */
     projectText: () => string;
-    /** After a save: the project now is that file on that branch. */
-    onSaved: (branch: string, path: string) => void;
+    /**
+     * The file's text on GitHub when the draft on screen began, if it is one: a
+     * save first checks GitHub still has it, so nobody's change is replaced unseen.
+     */
+    baseText?: string | null;
+    /** After a save: the project now is that file on that branch, exactly `text`. */
+    onSaved: (branch: string, path: string, text: string) => void;
   }
 
   let {
@@ -59,6 +64,7 @@
     fileName,
     source,
     projectText,
+    baseText = null,
     onSaved,
   }: Props = $props();
 
@@ -290,6 +296,20 @@
         return;
       }
       let head = await branchHead(token, branch);
+      // Someone else's change since this draft began is not replaced without asking.
+      if (baseText !== null && source && ppPath === source.path && (source.ref ?? branch) === branch) {
+        const onGithub = await readText(token, ppPath, head);
+        if (
+          onGithub !== null &&
+          onGithub !== baseText &&
+          !confirm(
+            `${baseName(ppPath)} changed on ${branch} since you started editing it. Replace that version with yours?\n\n` +
+              "Cancel saves nothing and keeps your draft as it is.",
+          )
+        ) {
+          return;
+        }
+      }
       const existing = await listFiles(token, head);
       let partnerClass: string | null = null;
       if (partner) {
@@ -353,7 +373,7 @@
       saveJson(PENDING_KEY, { path: ppPath, commit: sha });
       exported.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
       showToast(`Saved ${baseName(ppPath)} to ${branch}`, "success");
-      onSaved(branch, ppPath);
+      onSaved(branch, ppPath, text);
       commit = sha;
       commitPath = ppPath;
       result = null;
@@ -742,7 +762,7 @@
               .best.seed}),
             {summary.best.autoTips} TIP{summary.best.autoTips === 1
               ? ""
-              : "s"}{#if summary.best.autoTips}{" at "}{summary.best.tipsAt
+              : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
                 .slice(0, summary.best.autoTips)
                 .map(secs)
                 .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots

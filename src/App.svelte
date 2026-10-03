@@ -52,6 +52,7 @@
     buildOtherFileProject,
     buildProject,
     settingsForFile,
+    fileSettings,
     newerVersionWarning,
     type OtherFilePaths,
   } from "./utils/project";
@@ -166,7 +167,9 @@
   } from "./lib/session/sessionSnapshot";
   import * as browserFileStore from "./utils/browserFileStore";
   import { resolveProjectHash } from "./utils/sampleLink";
-  import { resolveGitHash } from "./utils/gitLink";
+  import { gitHash, gitLinkFor, gitPath, resolveGitHash } from "./utils/gitLink";
+  import { currentText } from "./lib/github/api";
+  import { deleteDraft, draftStatus, loadDraft, projectFingerprint, saveDraft } from "./lib/session/drafts";
   import SaveToGithubDialog from "./lib/sim/SaveToGithubDialog.svelte";
   import {
     freeSharedFileName,
@@ -851,7 +854,14 @@
   } | null = null;
 
   async function openShareLink() {
-    const gitResult = await resolveGitHash(window.location.hash, async (url) => {
+    const gitResult = await resolveGitHash(window.location.hash, async (url, link) => {
+      // GitHub's API has the file as it is now; raw.githubusercontent.com is the
+      // fallback when the API refuses (about 60 requests an hour without a token).
+      try {
+        return await currentText(gitPath(link), link.ref);
+      } catch {
+        // Fall through to the raw file.
+      }
       const response = await fetch(url, { cache: "no-cache" });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
@@ -896,6 +906,34 @@
       from: result.shared.from ?? null,
     };
 
+    applySharedProject(project);
+
+    // From biobuzz: your draft of it if you have one, else GitHub's version.
+    const git = result.shared.git;
+    gitDraft = null;
+    if (git) {
+      const draft = loadDraft(git.ref, git.path);
+      gitDraft = {
+        ref: git.ref,
+        path: git.path,
+        baseText: draft?.baseText ?? git.text,
+        baseFingerprint: draft?.baseFingerprint ?? currentFingerprint(),
+        githubText: git.text,
+        draftFrom: draft?.editedAt ?? null,
+      };
+      if (draft) {
+        try {
+          applySharedProject(JSON.parse(draft.text), { quiet: true });
+        } catch {
+          deleteDraft(git.ref, git.path);
+          gitDraft = { ...gitDraft, baseText: git.text, baseFingerprint: currentFingerprint(), draftFrom: null };
+        }
+      }
+    }
+  }
+
+  /** Puts a project read from a link (or a draft of one) on screen as the shared copy. */
+  function applySharedProject(project: Record<string, unknown>, { quiet = false } = {}) {
     const shared = sharedCopyState(project, settings);
     startPoint = shared.startPoint;
     lines = shared.lines;
@@ -910,18 +948,89 @@
     dualPathMode.set(false);
 
     const versionWarning = newerVersionWarning(project.version);
-    if (versionWarning) showToast(versionWarning, "warning");
+    if (versionWarning && !quiet) showToast(versionWarning, "warning");
     const autoProblems = loadAutoFrom(project);
-    if (autoProblems.length) {
+    if (autoProblems.length && !quiet) {
       showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
     }
     if ($autoSection) autoMode.set(true);
     history.reset(getAppState());
   }
 
+  // A file opened from biobuzz: every edit is kept as a draft in this browser
+  // (lib/session/drafts.ts) until Save to GitHub, so nothing is lost on a
+  // reload and the same link brings the edits back.
+  let gitDraft = $state<{
+    ref: string | null;
+    path: string;
+    /** GitHub's text when the draft began, and that version's fingerprint. */
+    baseText: string;
+    baseFingerprint: string;
+    /** GitHub's text when the link was opened. */
+    githubText: string;
+    /** When the draft that was loaded had last been edited, if one was. */
+    draftFrom: number | null;
+  } | null>(null);
+  let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** The project on screen as an Auto, without what changes on its own (see projectFingerprint). */
+  function currentFingerprint(): string {
+    return projectFingerprint(buildProjectData(), fileSettings(settings));
+  }
+
+  let gitFingerprint = $derived(sharedCopy && gitDraft ? currentFingerprint() : null);
+  let gitEdited = $derived(gitDraft !== null && gitFingerprint !== null && gitFingerprint !== gitDraft.baseFingerprint);
+  let gitStatus = $derived(
+    gitDraft && sharedCopy ? draftStatus(gitEdited, gitDraft.baseText, gitDraft.githubText) : null,
+  );
+
+  $effect(() => {
+    const fingerprint = gitFingerprint;
+    const draft = gitDraft;
+    if (!draft || fingerprint === null) return;
+    if (draftTimer) clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      if (fingerprint === draft.baseFingerprint) deleteDraft(draft.ref, draft.path);
+      else if (
+        !saveDraft({
+          ref: draft.ref,
+          path: draft.path,
+          text: fingerprint,
+          baseText: draft.baseText,
+          baseFingerprint: draft.baseFingerprint,
+          editedAt: Date.now(),
+        })
+      ) {
+        showToast("This browser would not keep your draft: Save to GitHub before closing the tab.", "warning");
+      }
+    }, 400);
+  });
+
+  /** Throws away the draft and opens GitHub's version afresh. */
+  function discardDraft() {
+    if (!gitDraft) return;
+    if (gitEdited && !confirm(`Throw away your edits to ${gitDraft.path} and load GitHub's version?`)) return;
+    const { ref, path } = gitDraft;
+    if (draftTimer) clearTimeout(draftTimer);
+    gitDraft = null;
+    deleteDraft(ref, path);
+    window.location.hash = gitHash(gitLinkFor(ref, path));
+  }
+
+  /** After Save to GitHub: GitHub has exactly what is on screen, so there is no draft. */
+  function savedToGithub(branch: string, path: string, text: string) {
+    githubSource = { ref: branch, path };
+    if (!gitDraft) return;
+    if (draftTimer) clearTimeout(draftTimer);
+    deleteDraft(gitDraft.ref, gitDraft.path);
+    gitDraft = { ref: branch, path, baseText: text, baseFingerprint: currentFingerprint(), githubText: text, draftFrom: null };
+  }
+
   /** Close the shared copy and put the viewer's own work back. */
   function closeSharedCopy() {
     const stash = sharedStash;
+    if (draftTimer) clearTimeout(draftTimer);
+    gitDraft = null;
     sharedCopy = null;
     sharedStash = null;
     if (!stash) return;
@@ -1096,6 +1205,10 @@
   // Save Function
   // Save the current project into the browser-backed store (or download)
   async function saveProject() {
+    if (sharedCopy && gitDraft) {
+      showToast("Your edits are kept in this browser as a draft. Save to GitHub when it is ready.", "success");
+      return;
+    }
     if (sharedCopy) return saveSharedCopy();
     try {
       await saveFile();
@@ -1143,7 +1256,7 @@
     hotkeys("cmd+s, ctrl+s", function (event) {
       event.preventDefault();
       if (sharedCopy) {
-        saveSharedCopy();
+        saveProject();
       } else if ($activePaths.length > 0) {
         // Multiple paths mode - save all modified paths
         showDualPathSaveDialog = true;
@@ -3420,7 +3533,8 @@
     fileName={basename($currentFilePath)}
     source={githubSourceOnScreen}
     projectText={() => JSON.stringify(buildProjectData(), null, 2)}
-    onSaved={(branch, path) => (githubSource = { ref: branch, path })}
+    baseText={gitDraft?.baseText ?? null}
+    onSaved={savedToGithub}
   />
 
   <SaveDialog
@@ -3447,6 +3561,9 @@
     view={sharedCopy}
     error={shareLinkError}
     onSave={saveSharedCopy}
+    git={gitStatus && gitDraft ? { status: gitStatus, path: gitDraft.path, draftFrom: gitDraft.draftFrom } : null}
+    onSaveToGithub={() => (githubOpen = true)}
+    onDiscard={discardDraft}
     onClose={closeSharedCopy}
     onDismissError={() => (shareLinkError = null)}
   />

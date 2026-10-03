@@ -118,7 +118,7 @@ export async function listFiles(
     .map((entry) => entry.path);
 }
 
-/** A file's text at a ref, or null if it is not there. */
+/** A file's text at a ref ("": the default branch), or null if it is not there. */
 export async function readText(
   token: string | null,
   path: string,
@@ -127,7 +127,7 @@ export async function readText(
   try {
     const response = await call(
       token,
-      repo(`/contents/${encodePath(path)}?ref=${encodeURIComponent(ref)}`),
+      repo(`/contents/${encodePath(path)}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`),
       {
         accept: "application/vnd.github.raw+json",
       },
@@ -217,4 +217,14 @@ export async function runsFor(
 
 export function commitUrl(commit: string): string {
   return `https://github.com/${GIT_REPO}/commit/${commit}`;
+}
+
+/**
+ * A file's text as GitHub has it right now: the API, not raw.githubusercontent.com,
+ * which can serve a branch's file up to 5 minutes stale (so a draft would look
+ * older than GitHub just after its own save). Null if there is no such file;
+ * throws if the API refuses (a rate limit), so the caller can fall back.
+ */
+export async function currentText(path: string, ref: string | null): Promise<string | null> {
+  return readText(savedToken(), path, ref ?? "");
 }

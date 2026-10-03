@@ -99,7 +99,7 @@ export function gitSource(link: GitLink): string {
  */
 export async function resolveGitHash(
   hash: string,
-  fetchText: (url: string) => Promise<string | null>,
+  fetchText: (url: string, link: GitLink) => Promise<string | null>,
 ): Promise<ShareLinkResult> {
   const link = parseGitHash(hash);
   if (link === null) return { kind: "none" };
@@ -108,7 +108,7 @@ export async function resolveGitHash(
   const where = `${gitPath(link)} at ${link.ref ?? "biobuzz's default branch"}`;
   let text: string | null;
   try {
-    text = await fetchText(gitRawUrl(link));
+    text = await fetchText(gitRawUrl(link), link);
   } catch {
     return {
       kind: "error",
@@ -130,6 +130,6 @@ export async function resolveGitHash(
   if (!project || typeof project !== "object" || !project.startPoint || !Array.isArray(project.lines)) {
     return { kind: "error", message: `${where} does not contain a path project.` };
   }
-  const git = { ref: link.ref, path: gitPath(link) };
+  const git = { ref: link.ref, path: gitPath(link), text: text as string };
   return { kind: "ok", shared: { name: link.file, project, from: gitSource(link), git } };
 }
