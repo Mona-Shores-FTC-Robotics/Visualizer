@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { PathCatalog } from "../geometry";
   import type { AutoIssue } from "../validate";
-  import type { PreviewResult, WorstCase } from "../simulate";
-  import { AUTO_LENGTH_S } from "../simulate";
+  import type { PreviewResult } from "../simulate";
   import {
     DEFAULT_TIMEOUT_S,
     rowKind,
@@ -31,11 +30,10 @@
     catalog: PathCatalog;
     issues: AutoIssue[];
     preview: PreviewResult | null;
-    worst: WorstCase | null;
     shapes: Shape[];
   }
 
-  let { auto, catalog, issues, preview, worst, shapes }: Props = $props();
+  let { auto, catalog, issues, preview, shapes }: Props = $props();
 
   let selection = $derived(parseSelection($selectedCardId));
   let card: AutoCard | null = $derived(findCard(auto.cards, selection.cardId));
@@ -369,7 +367,6 @@
       {#each card.rows as row, rowIndex (rowIndex)}
         {@const kind = rowKind(row)}
         {@const rowSelected = selection.rowIndex === rowIndex}
-        {@const worstEnd = worst?.rows.get(card.id)?.[rowIndex]}
         <div
           class="space-y-2 border bg-[#1a1a1a] px-2 py-2 text-[11px] text-gray-300"
           class:border-[#333333]={!rowSelected}
@@ -438,13 +435,6 @@
               {row.cards.length} card{row.cards.length === 1 ? "" : "s"} · add here
             </button>
           </div>
-          {#if row.cards.length > 0 && worstEnd !== undefined}
-            <div class="text-[10px]" class:text-red-400={worstEnd !== null && worstEnd > AUTO_LENGTH_S} class:text-gray-500={worstEnd === null || worstEnd <= AUTO_LENGTH_S}>
-              {worstEnd === null
-                ? "Worst case: this row never wins when every wait runs to its time row."
-                : `Worst case with this branch: the Auto ends by ${seconds(worstEnd)}${worstEnd > AUTO_LENGTH_S ? " — over 30 s" : ""}.`}
-            </div>
-          {/if}
         </div>
       {/each}
       <div class="flex flex-wrap gap-1.5 text-[10px]">

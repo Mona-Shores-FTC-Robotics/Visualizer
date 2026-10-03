@@ -199,7 +199,6 @@
   import {
     motionPoseAt,
     simulateAuto,
-    worstCase,
     type PreviewResult,
   } from "./lib/auto/simulate";
   import { normalizeAuto } from "./lib/auto/normalize";
@@ -2748,11 +2747,6 @@
       ? simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario)
       : null,
   );
-  let autoWorst = $derived(
-    autoActive && autoCatalog && $autoSection
-      ? worstCase($autoSection, autoCatalog)
-      : null,
-  );
   let timePrediction = $derived(
     autoPreview
       ? {
@@ -3488,7 +3482,6 @@
             catalog={autoCatalog}
             issues={autoIssues}
             preview={autoPreview}
-            worst={autoWorst}
             {shapes}
             now={autoPreview ? (percent / 100) * autoPreview.endTime : 0}
             bind:startPoint
@@ -3648,7 +3641,6 @@
         {#if autoActive && autoPreview}
           <AutoTimeline
             preview={autoPreview}
-            worst={autoWorst}
             {playing}
             {play}
             {pause}

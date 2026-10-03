@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PathCatalog } from "../geometry";
   import type { AutoIssue } from "../validate";
-  import type { PreviewResult, WorstCase } from "../simulate";
-  import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
+  import type { PreviewResult } from "../simulate";
+  import { commandSeconds } from "../simulate";
   import type { AutoCard, AutoSection, FirstOfCard } from "../types";
   import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel, rejoinTail } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
@@ -25,7 +25,6 @@
     catalog: PathCatalog;
     issues: AutoIssue[];
     preview: PreviewResult | null;
-    worst: WorstCase | null;
     shapes: Shape[];
     /** Seconds into the preview the playback is at. */
     now: number;
@@ -41,7 +40,6 @@
     catalog,
     issues,
     preview,
-    worst,
     shapes,
     now,
     startPoint = $bindable(),
@@ -234,7 +232,7 @@
       <WaitSwitch {card} />
     {/if}
     {#if selected}
-      <CardEditor {auto} {catalog} {issues} preview={preview ?? null} {worst} {shapes} />
+      <CardEditor {auto} {catalog} {issues} preview={preview ?? null} {shapes} />
     {/if}
   </div>
 {/snippet}
@@ -247,7 +245,6 @@
         {#each branchesOf(card) as row, rowIndex (rowIndex)}
           {@const rowSelected = selection.cardId === card.id && selection.rowIndex === rowIndex}
           {@const takenHere = preview?.taken.get(card.id) === rowIndex}
-          {@const worstEnd = worst?.rows.get(card.id)?.[rowIndex]}
           {@const key = branchKey(card.id, rowIndex)}
           {@const folded = row.cards.length > 0 && $foldedBranches.has(key)}
           <div
@@ -278,17 +275,6 @@
               <span class="auto-branch-name">{row.label}</span>
               <span class="auto-branch-meta">
                 {#if takenHere}<span class="auto-run">this preview</span>{/if}
-                {#if row.cards.length && true}
-                  {#if worstEnd === null || worstEnd === undefined}
-                    <span class="auto-worst" title="Can never fire when every wait runs to its time row">—</span>
-                  {:else}
-                    <span
-                      class="auto-worst"
-                      class:auto-worst--over={worstEnd > AUTO_LENGTH_S}
-                      title="Worst case: the Auto ends by then if this branch is taken">≤ {seconds(worstEnd)}</span
-                    >
-                  {/if}
-                {/if}
               </span>
             </button>
             </div>
@@ -611,14 +597,6 @@
     background: color-mix(in srgb, var(--c) 18%, transparent);
     padding: 0 5px;
     border-radius: 4px;
-  }
-  .auto-worst {
-    font-size: 0.62rem;
-    font-weight: 600;
-    color: #999999;
-  }
-  .auto-worst--over {
-    color: #ff7a7a;
   }
   .auto-branch-cards {
     display: flex;

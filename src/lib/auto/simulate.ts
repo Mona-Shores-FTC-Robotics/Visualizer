@@ -504,6 +504,11 @@ export function motionPoseAt(
 /**
  * Worst-case timing: every wait runs until its time row fires (the robot's
  * conditions never help), and each decision may take any row that can fire.
+ *
+ * Not shown in the editor: it ignores the endgame guard, so its end time is a
+ * match that cannot happen, and "ends after 30 s" says nothing about points.
+ * Kept for the consistency work; before showing it again, make it respect the
+ * guard and report what each branch misses (its park, its last action).
  */
 export interface WorstCase {
   /** The Auto's latest possible end time. */

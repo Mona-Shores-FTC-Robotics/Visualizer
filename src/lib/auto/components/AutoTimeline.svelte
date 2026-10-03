@@ -1,11 +1,9 @@
 <script lang="ts">
   import PlaybackControls from "../../components/PlaybackControls.svelte";
-  import { AUTO_LENGTH_S, type PreviewResult, type WorstCase } from "../simulate";
-  import { seconds } from "./ui";
+  import { AUTO_LENGTH_S, type PreviewResult } from "../simulate";
 
   interface Props {
     preview: PreviewResult;
-    worst: WorstCase | null;
     playing: boolean;
     play: () => void;
     pause: () => void;
@@ -16,7 +14,6 @@
 
   let {
     preview,
-    worst,
     playing,
     play,
     pause,
@@ -43,9 +40,6 @@
   <PlaybackControls {playing} {play} {pause} bind:percent {handleSeek} bind:loopAnimation {markers} totalTime={preview.endTime} />
   <div class="auto-budget">
     <span class:over={preview.endTime > AUTO_LENGTH_S}>{preview.endTime.toFixed(1)} / {AUTO_LENGTH_S} s</span>
-    {#if worst}
-      <span class:over={worst.total > AUTO_LENGTH_S} title="Every wait runs to its time row">worst {seconds(worst.total)}</span>
-    {/if}
   </div>
 </div>
 
