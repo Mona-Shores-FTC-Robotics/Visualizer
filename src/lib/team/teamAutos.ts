@@ -13,6 +13,8 @@
  * allows about 60 listings an hour per laptop).
  */
 
+import { parseLinks, type PairLink } from "./tandem";
+
 export const TEAM_HASH_PREFIX = "#team=";
 export const TEAM_REPO = "Mona-Shores-FTC-Robotics/biobuzz";
 export const TEAM_DIR = "TeamCode/autos";
@@ -41,6 +43,8 @@ export interface TeamPair {
   name: string;
   files: string[];
   note?: string;
+  /** Waits that the other robot fires (see tandem.ts). */
+  links: PairLink[];
 }
 
 /** Reads a `#team=` fragment: the link, an error message, or null if it is not one. */
@@ -130,6 +134,7 @@ export function parsePairs(text: string): TeamPair[] {
       name: p.name,
       files,
       note: typeof p.note === "string" ? p.note : undefined,
+      links: parseLinks(p.links),
     });
   }
   return out;
@@ -181,7 +186,15 @@ export async function resolveTeamFiles(
   link: TeamLink,
   get: FetchText = fetchText,
 ): Promise<string[]> {
-  if (link.pair === null) return link.files;
+  return (await resolveTeamLink(link, get)).files;
+}
+
+/** The files a link opens and the pair's links: none for a link that lists files. */
+export async function resolveTeamLink(
+  link: TeamLink,
+  get: FetchText = fetchText,
+): Promise<{ files: string[]; links: PairLink[] }> {
+  if (link.pair === null) return { files: link.files, links: [] };
   const pairs = await loadPairs(link.ref, get);
   const pair = pairs.find((p) => p.name === link.pair);
   if (!pair) {
@@ -189,7 +202,7 @@ export async function resolveTeamFiles(
       `There is no pair called "${link.pair}" in ${TEAM_DIR}/${PAIRS_FILE} on ${link.ref}.`,
     );
   }
-  return pair.files;
+  return { files: pair.files, links: pair.links };
 }
 
 /**

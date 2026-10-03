@@ -311,6 +311,56 @@ branch can be up to 5 minutes stale after a push (a commit never is). A file
 that is not there, or GitHub out of reach, is refused with a message saying
 which. Code: `src/utils/gitLink.ts`.
 
+## Tandem view
+
+`#team=<branch>/<pair>` (or a pair in **Team Autos**) shows the robots of a pair together, and so
+does any set of files picked in multi-path mode. The Auto list on the left becomes the tandem
+panel (`src/lib/team/`):
+
+- **One timeline**, 0–30 s, a lane per robot: drives in the robot's colour, waits hatched (red
+  text: ran to its time limit), commands as yellow ticks. Click a lane to move the playhead; the
+  field and the playback bar follow it. Under each lane, the simulator's lane for that robot.
+- **Near-collisions**: the two robots' footprints (each file's own robot size) within 3 in of each
+  other, as orange marks on the timeline and rings on the field; red when they touch.
+- **The chosen robot's cards**, read only, with the times they start; the running card is lit and
+  the branches this preview does not take are dimmed. Click a card to jump to it.
+- **Simulation**: the pair's latest result from biobuzz's `sim-results` branch
+  (`<first file>/latest.json`): points, TIPs, a collision, each robot's launches; typical or best
+  seed. A result for other robots (a solo run of the first file) is not shown. If GitHub's API says
+  a file changed after the run, the panel says so.
+- **Edit** opens that robot in the Auto editor with the others playing as ghosts (a dashed trail
+  and a faded robot), timed against it, with near-collisions flagged. **Back to pair** keeps the
+  edit in the browser copy and shows the pair again; **Save to GitHub** saves a team copy back to
+  its file in `TeamCode/autos/`. Reload, or opening the pair again, replaces the copies.
+- **+ Partner file** adds any `.pp` from disk as another robot, saved in the browser as
+  `disk-<name>`. A file without an Auto drives its paths back to back, so another team's file from
+  the stock Visualizer works too. It is not in the copied link.
+
+Each partner plays its happy path (every switch ✓): the switches above the field belong to the
+Auto in the editor.
+
+### Pair links
+
+Without links each robot's preview is on its own: a wait for `LeftCellUp` fires at once because
+the switch says ✓, although on the field it is the other robot's TIP that puts the CELL up. A pair
+in biobuzz's `TeamCode/autos/pairs.json` can say so:
+
+```json
+{ "name": "recycle3", "files": ["recycle3-right.pp", "recycle3-left.pp"],
+  "links": [
+    { "file": "recycle3-left.pp", "wait": "TIP 1", "partner": "recycle3-right.pp", "card": "TIP 1?" }
+  ] }
+```
+
+"recycle3-left's wait **TIP 1** fires when recycle3-right's **TIP 1?** does." `wait` and `card` are
+a card's id or its name as the list shows it (a wait's label, a command's name, a path's name);
+every card with that name counts. The partner's card *happens* when a wait's trigger fires (not
+when it times out), a command finishes, or a path is driven to its end; the linked wait fires then,
+or at once if that was earlier, and runs to its time limit if the partner never gets there. A
+linked wait ignores its switch and shows **⇄ partner** in the card list. Robots that wait on each
+other are played again until neither changes (`simulatePair` in `src/lib/team/tandem.ts`); links
+that name nothing are listed under the timeline.
+
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
@@ -332,6 +382,9 @@ New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
   "Share Link" in the export menu.
 - `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
   place of the Path List (Auto mode's card list).
+- `src/App.svelte` also: in multi-path mode the left panel is the tandem panel, the playback bar
+  runs to the longest robot, the main file's Auto overlay and switches are hidden, and each robot
+  is drawn at its own file's size; editing one robot of a pair draws the others as ghosts.
 - `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
   timeline, the stock path strokes are hidden (the
   overlay draws them by branch), and the Controls panel shows the Auto panel instead

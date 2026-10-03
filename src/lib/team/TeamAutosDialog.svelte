@@ -91,10 +91,10 @@
     }
   }
 
-  async function show(chosen: string[], pair: string | null = null) {
+  async function show(chosen: string[], pair: TeamPair | null = null) {
     if (chosen.length === 0) return;
     busy = true;
-    const ok = await showTeamView(branch.trim(), chosen, pair);
+    const ok = await showTeamView(branch.trim(), chosen, pair?.name ?? null, pair?.links ?? []);
     busy = false;
     if (ok) isOpen = false;
   }
@@ -199,7 +199,7 @@
         {#each pairs as pair (pair.name)}
           <button
             class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
-            onclick={() => show(pair.files, pair.name)}
+            onclick={() => show(pair.files, pair)}
             disabled={busy}
           >
             <span class="font-medium text-neutral-900 dark:text-neutral-100"

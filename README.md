@@ -28,6 +28,11 @@ What the fork adds:
   and LEAVE/PARK and has **Download WPILOG** for AdvantageScope. Links may name any `.pp` in biobuzz
   by its whole path (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing
   results needs nothing; saving needs a fine-grained GitHub token, kept in the browser.
+- **Tandem view.** Team Autos (or a `#team=<branch>/<pair>` link) shows a pair together: one
+  timeline with a lane per robot, waits one robot holds for the other's TIP (pair links in
+  `pairs.json`), near-collisions, the simulator's result for the pair, and **Edit** to change one
+  robot with the other playing as a ghost. **+ Partner file** adds any `.pp`, another team's
+  included; see [`docs/auto-format.md`](docs/auto-format.md#tandem-view).
 
 `main` is deployed to GitHub Pages on every push (`.github/workflows/pages.yml`). Upstream changes
 are merged in between competitions, not during one. `npm test` runs the tests.

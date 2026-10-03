@@ -102,6 +102,7 @@ test("pairs.json: pairs with .pp files, the rest skipped", () => {
       name: "recycle3",
       files: ["recycle3-right.pp", "recycle3-left.pp"],
       note: "sisters",
+      links: [],
     },
   ]);
 });

@@ -108,6 +108,26 @@ export interface DriveRecord {
   t1: number;
 }
 
+/** A wait or a command, from when it started to when it ended. */
+export interface SpanRecord {
+  cardId: string;
+  kind: "wait" | "command";
+  label: string;
+  t0: number;
+  t1: number;
+  /**
+   * A wait that ended because its trigger fired (not its time limit), or a command that finished;
+   * false when the endgame guard cut either short.
+   */
+  fired: boolean;
+}
+
+/**
+ * When the other robot of a pair makes a wait's trigger true, by the wait's card id: seconds into
+ * the Auto (Infinity: never), and what it is, for the log. A linked wait ignores the switches.
+ */
+export type PartnerTimes = Map<string, { at: number; why: string }>;
+
 /** A drive that is not a project path (routine pattern, exit, goTo). */
 export interface MotionRecord {
   cardId: string;
@@ -126,6 +146,8 @@ export interface PreviewResult {
   /** Decision id → index of the row that fired. */
   taken: Map<string, number>;
   drives: DriveRecord[];
+  /** Every wait and command, in the order they started. */
+  spans: SpanRecord[];
   /**
    * Drives that are not project paths. The timeline holds a stand-in wait
    * for each; `motionPoseAt` gives the robot's pose during them.
@@ -160,8 +182,10 @@ export function simulateAuto(
   catalog: PathCatalog,
   startPoint: StartPose,
   scenario: Scenario,
+  partner: PartnerTimes = new Map(),
 ): PreviewResult {
   const timeline: TimelineEvent[] = [];
+  const spans: SpanRecord[] = [];
   const log: LogEntry[] = [];
   const ran = new Set<string>();
   const taken = new Map<string, number>();
@@ -225,6 +249,8 @@ export function simulateAuto(
    */
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
     const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card) : Infinity;
+    const linked = partner.get(card.id);
+    if ("when" in row && linked) return Math.max(t0, linked.at);
     if ("when" in row) {
       return row.when.some((name) => answerFor(scenario, card, name))
         ? (card.alongside ? alongEnd : t0)
@@ -235,6 +261,8 @@ export function simulateAuto(
 
   const whyRow = (card: FirstOfCard, row: AutoRow): string => {
     if (rowKind(row) === "when") {
+      const linked = partner.get(card.id);
+      if (linked) return linked.why;
       const first = (row as { when: string[] }).when.find((name) => answerFor(scenario, card, name));
       return `${first ?? "condition"} true`;
     }
@@ -286,6 +314,7 @@ export function simulateAuto(
     const deadline = pendingDeadline(guards);
     if (deadline && deadline.deadline < at) {
       stay(Math.max(0, deadline.deadline - t0));
+      spans.push({ cardId: card.id, kind: "wait", label, t0, t1: t, fired: false });
       note(`${label}: cut short by the endgame guard`, "warn", card.id);
       return { abortTo: deadline };
     }
@@ -301,6 +330,7 @@ export function simulateAuto(
     }
     stay(at - t0);
     const row = card.rows[winner];
+    spans.push({ cardId: card.id, kind: "wait", label, t0, t1: t, fired: rowKind(row) === "when" });
     taken.set(card.id, winner);
     const hasCards = card.rows.some((r) => r.cards.length > 0);
     note(
@@ -320,11 +350,15 @@ export function simulateAuto(
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
         const busy = commandSeconds(auto, card);
+        const t0 = t;
+        const label = card.name || "(no action)";
         if (deadline && deadline.deadline < t + busy) {
           stay(Math.max(0, deadline.deadline - t));
+          spans.push({ cardId: card.id, kind: "command", label, t0, t1: t, fired: false });
           return { abortTo: deadline };
         }
         stay(busy);
+        spans.push({ cardId: card.id, kind: "command", label, t0, t1: t, fired: true });
         return null;
       }
       case "path": {
@@ -483,7 +517,7 @@ export function simulateAuto(
     t <= AUTO_LENGTH_S && !stalled ? "end" : "warn",
   );
   log.sort((a, b) => a.t - b.t);
-  return { timeline, log, endTime: t, ran, taken, drives, motions, guard: guardFired, stalled };
+  return { timeline, log, endTime: t, ran, taken, drives, spans, motions, guard: guardFired, stalled };
 }
 
 /** The robot's pose during a preview motion that is not a project path, else null (none today). */

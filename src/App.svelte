@@ -208,6 +208,26 @@
   import { normalizeAuto } from "./lib/auto/normalize";
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
+  import TandemPanel, { type PanelRobot } from "./lib/team/TandemPanel.svelte";
+  import TandemFieldOverlay from "./lib/team/TandemFieldOverlay.svelte";
+  import PlaybackControls from "./lib/components/PlaybackControls.svelte";
+  import { get } from "svelte/store";
+  import {
+    laneOf,
+    laneOfPaths,
+    nearMisses,
+    poseAt,
+    robotName,
+    simulatePair,
+    type LinkProblem,
+    type RobotTrack,
+    type TandemRobot,
+  } from "./lib/team/tandem";
+  import { tandemEdit, teamView } from "./lib/team/teamView";
+  import { TEAM_DIR } from "./lib/team/teamAutos";
+  import type { PartnerTimes } from "./lib/auto/simulate";
+  import type { PathCatalog } from "./lib/auto/geometry";
+  import type { AutoSection } from "./lib/auto/types";
   import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
   import FieldAxes from "./lib/components/FieldAxes.svelte";
   // Browser-only build: file operations use the browser file store and
@@ -414,7 +434,10 @@
     shapes: Shape[];
     settings: Settings;
     color?: string; // Optional custom color for this path
-    /** The file's Auto played with its waits and decisions, if it has one. */
+    /** The file's Auto, if it has one, and its paths as the Auto sees them. */
+    auto: AutoSection | null;
+    catalog: PathCatalog;
+    /** The file's Auto played with its waits and decisions, against the others (tandem.ts). */
     preview: PreviewResult | null;
   }
 
@@ -435,25 +458,34 @@
     );
   }
 
-  /** Previews a loaded file's Auto as the Auto list would, or null if it has none. */
-  function previewAdditionalAuto(
-    data: { auto?: unknown },
-    start: StartPose,
-    pathLines: Path[],
-    pathSettings: Settings,
-  ): PreviewResult | null {
-    const { auto } = normalizeAuto(data.auto);
-    if (!auto) return null;
+  /** The robots of a tandem, as `simulatePair` takes them; partners play the happy path. */
+  function tandemRobot(pathData: AdditionalPathData): TandemRobot {
+    return {
+      file: pathData.filePath,
+      auto: pathData.auto,
+      catalog: pathData.catalog,
+      start: pathData.startPoint ?? { x: 0, y: 0, headingDeg: 0 },
+      scenario: {},
+    };
+  }
+
+  /** How the robots shown together played against each other: links, problems. */
+  let pairState = $state<{
+    partnerTimes: PartnerTimes[];
+    settled: boolean;
+    problems: LinkProblem[];
+  }>({ partnerTimes: [], settled: true, problems: [] });
+
+  /** Plays the files' Autos against each other with the pair's links; new objects, so caches refresh. */
+  function coupleAdditional(list: AdditionalPathData[]): AdditionalPathData[] {
     try {
-      return simulateAuto(
-        auto,
-        buildPathCatalog(start, pathLines, pathSettings),
-        start,
-        {},
-      );
+      const pair = simulatePair(list.map(tandemRobot), get(teamView)?.links ?? []);
+      pairState = { partnerTimes: pair.partnerTimes, settled: pair.settled, problems: pair.problems };
+      return list.map((pathData, i) => ({ ...pathData, preview: pair.previews[i] }));
     } catch (error) {
-      console.error("Could not preview the Auto of an additional path:", error);
-      return null;
+      console.error("Could not preview the Autos together:", error);
+      pairState = { partnerTimes: list.map(() => new Map()), settled: true, problems: [] };
+      return list.map((pathData) => ({ ...pathData, preview: null }));
     }
   }
   let additionalPaths: AdditionalPathData[] = $state([]);
@@ -762,6 +794,8 @@
           const pathSettings = data.settings || { ...DEFAULT_SETTINGS };
           newAdditionalPaths.push({
             filePath,
+            auto: normalizeAuto(data.auto).auto,
+            catalog: buildPathCatalog(start, normalizedLines, pathSettings),
             startPoint: start,
             lines: normalizedLines,
             shapes: data.shapes || [],
@@ -773,12 +807,7 @@
               })),
             settings: pathSettings,
             color: colors[i],
-            preview: previewAdditionalAuto(
-              data,
-              start,
-              normalizedLines,
-              pathSettings,
-            ),
+            preview: null,
           });
         }
       } catch (error) {
@@ -786,7 +815,7 @@
       }
     }
 
-    additionalPaths = newAdditionalPaths;
+    additionalPaths = coupleAdditional(newAdditionalPaths);
   }
 
   function buildSessionSnapshot(): SessionSnapshot {
@@ -2177,7 +2206,11 @@
   let githubOpen = $state(false);
   let githubSource = $state<{ ref: string | null; path: string } | null>(null);
   let githubSourceOnScreen = $derived(
-    githubSource && (sharedCopy || basename(githubSource.path) === basename($currentFilePath))
+    githubSource &&
+      (sharedCopy ||
+        basename(githubSource.path) === basename($currentFilePath) ||
+        ($tandemEdit?.editing === $currentFilePath &&
+          `${robotName($currentFilePath ?? "")}.pp` === basename(githubSource.path)))
       ? githubSource
       : null,
   );
@@ -2856,9 +2889,27 @@
       ? validateAuto($autoSection, autoCatalog, startPoint)
       : [],
   );
+  // One robot of the pair in the editor, the others playing alongside as ghosts.
+  let tandemGhosts: AdditionalPathData[] = $state([]);
+  let editPair = $derived.by(() => {
+    if (!$tandemEdit || tandemGhosts.length === 0 || !autoActive || !autoCatalog || !$autoSection) return null;
+    try {
+      return simulatePair(
+        [
+          { file: $tandemEdit.editing, auto: $autoSection, catalog: autoCatalog, start: startPoint, scenario: $previewScenario },
+          ...tandemGhosts.map(tandemRobot),
+        ],
+        $teamView?.links ?? [],
+      );
+    } catch (error) {
+      console.error("Could not preview the pair:", error);
+      return null;
+    }
+  });
   let autoPreview = $derived(
     autoActive && autoCatalog && $autoSection
-      ? simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario)
+      ? (editPair?.previews[0] ??
+          simulateAuto($autoSection, autoCatalog, startPoint, $previewScenario))
       : null,
   );
   let autoWorst = $derived(
@@ -2969,6 +3020,174 @@
       .range([effectiveSize || FIELD_SIZE, 0]),
   );
   let isMultiPathMode = $derived($activePaths.length > 0);
+
+  // --- Tandem view: several Autos together (lib/team/) -------------------------
+  // The pair's links can arrive after its files: play the robots against each other again.
+  let coupledLinks: unknown = null;
+  $effect(() => {
+    const links = $teamView?.links ?? null;
+    if (links === coupledLinks) return;
+    coupledLinks = links;
+    untrack(() => {
+      if (additionalPaths.length > 0) additionalPaths = coupleAdditional(additionalPaths);
+    });
+  });
+  /** A robot's footprint from its own file (length along its heading). */
+  const footprintOf = (pathSettings: Settings) => ({
+    length: pathSettings?.rWidth || DEFAULT_ROBOT_WIDTH,
+    width: pathSettings?.rHeight || DEFAULT_ROBOT_HEIGHT,
+  });
+  function trackOf(pathData: AdditionalPathData): RobotTrack | null {
+    const prediction = additionalPrediction(pathData);
+    if (!prediction || !pathData.startPoint) return null;
+    return {
+      timeline: prediction.timeline,
+      lines: pathData.lines,
+      start: pathData.startPoint,
+      settings: pathData.settings,
+      preview: pathData.preview,
+      total: prediction.totalTime,
+    };
+  }
+  // Seconds: the playback's duration is the longest robot's time (getAnimationDuration).
+  let tandemTotal = $derived(effectiveAnimationDuration);
+  let tandemNow = $derived((percent / 100) * tandemTotal);
+  let tandemRobots: PanelRobot[] = $derived(
+    isMultiPathMode
+      ? additionalPaths.map((pathData, i) => {
+          const track = trackOf(pathData);
+          return {
+            file: pathData.filePath,
+            color: pathData.color ?? "#cccccc",
+            lane: pathData.preview
+              ? laneOf(pathData.preview, pathData.catalog, pairState.partnerTimes[i])
+              : laneOfPaths(track?.timeline ?? [], pathData.lines),
+            total: track?.total ?? 0,
+            auto: pathData.auto,
+            catalog: pathData.catalog,
+            preview: pathData.preview,
+            partner: pairState.partnerTimes[i] ?? new Map(),
+          };
+        })
+      : [],
+  );
+  let tandemMisses = $derived.by(() => {
+    if (!isMultiPathMode) return [];
+    const tracks = additionalPaths.map(trackOf);
+    if (tracks.length < 2 || tracks.some((t) => !t)) return [];
+    return nearMisses(
+      tracks.map((t) => (time: number) => poseAt(t!, time)),
+      additionalPaths.map((p) => footprintOf(p.settings)),
+      Math.max(...tracks.map((t) => t!.total)),
+    );
+  });
+  function seekTandem(seconds: number) {
+    const total = isMultiPathMode ? tandemTotal : autoPreview?.endTime ?? 0;
+    if (total <= 0) return;
+    const next = Math.max(0, Math.min(100, (seconds / total) * 100));
+    percent = next;
+    handleSeek(next);
+  }
+
+  let ghostTracks = $derived(
+    tandemGhosts.map((ghost, i) =>
+      trackOf({ ...ghost, preview: editPair?.previews[i + 1] ?? ghost.preview }),
+    ),
+  );
+  let ghostNow = $derived(autoPreview ? (percent / 100) * autoPreview.endTime : 0);
+  let ghostPoses = $derived(ghostTracks.map((track) => (track ? poseAt(track, ghostNow) : null)));
+  let ghostTrails = $derived(
+    ghostTracks.flatMap((track, i) => {
+      if (!track) return [];
+      const points = [];
+      for (let t = 0; t <= track.total + 1e-9; t += 0.1) points.push(poseAt(track, t));
+      return [{ color: tandemGhosts[i].color ?? "#cccccc", points }];
+    }),
+  );
+  let editMisses = $derived.by(() => {
+    if (!autoPreview || ghostTracks.length === 0 || ghostTracks.some((t) => !t)) return [];
+    const main: RobotTrack = {
+      timeline: autoPreview.timeline,
+      lines,
+      start: startPoint,
+      settings,
+      preview: autoPreview,
+      total: autoPreview.endTime,
+    };
+    return nearMisses(
+      [main, ...ghostTracks.map((t) => t!)].map((t) => (time: number) => poseAt(t, time)),
+      [footprintOf(settings), ...tandemGhosts.map((g) => footprintOf(g.settings))],
+      autoPreview.endTime,
+      undefined,
+      0.1,
+    );
+  });
+
+  /** Opens one robot of the pair in the Auto editor; the others keep playing as ghosts. */
+  async function editTandemRobot(index: number) {
+    const target = additionalPaths[index];
+    if (!target) return;
+    if ($isUnsaved && $currentFilePath && $currentFilePath !== target.filePath) {
+      const name = basename($currentFilePath);
+      if (!confirm(`${name} has unsaved changes, which opening ${robotName(target.filePath)} will drop. Open it anyway?`)) return;
+    }
+    let data: Record<string, any>;
+    try {
+      data = JSON.parse(await browserFileStore.readFile(target.filePath));
+    } catch (error) {
+      showToast(`Could not open ${target.filePath}: ${(error as Error).message}`, "error");
+      return;
+    }
+    const normalizedLines = normalizePaths(data.lines || []);
+    startPoint = normalizeStartPose(data.startPoint);
+    lines = normalizedLines;
+    shapes = data.shapes || [];
+    sequence = (
+      data.sequence && data.sequence.length
+        ? data.sequence
+        : atomicSegments(normalizedLines).map((ln) => ({ kind: "path", lineId: ln.id }))
+    ) as SequenceItem[];
+    fieldPoints = normalizeFieldPoints(data);
+    settings = settingsForFile(settings, data.settings);
+    const autoProblems = loadAutoFrom(data);
+    if (autoProblems.length) showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
+    const view = get(teamView);
+    tandemGhosts = additionalPaths.filter((_, i) => i !== index);
+    tandemEdit.set({ files: [...$activePaths], editing: target.filePath });
+    currentFilePath.set(target.filePath);
+    // A team copy saves back to its file in biobuzz.
+    if (view && target.filePath.startsWith("biobuzz-")) {
+      githubSource = { ref: view.ref, path: `${TEAM_DIR}/${robotName(target.filePath)}.pp` };
+    }
+    activePaths.set([]);
+    recordChange();
+    // After the "something changed" effect has seen the newly loaded file.
+    await tick();
+    isUnsaved.set(false);
+  }
+
+  /** Back to the pair: the edited copy is kept in the browser, so the pair shows the edit. */
+  async function backToPair() {
+    const edit = $tandemEdit;
+    if (!edit) return;
+    if ($currentFilePath === edit.editing && $isUnsaved) {
+      await browserFileStore.writeFile(edit.editing, JSON.stringify(buildProjectData()));
+      isUnsaved.set(false);
+    }
+    tandemGhosts = [];
+    tandemEdit.set(null);
+    activePaths.set(edit.files);
+  }
+
+  // Opening another file ends editing within the pair.
+  $effect(() => {
+    if ($tandemEdit && $currentFilePath !== $tandemEdit.editing) {
+      untrack(() => {
+        tandemEdit.set(null);
+        tandemGhosts = [];
+      });
+    }
+  });
   let scales = $derived({ x, y });
   let pointSelection = $derived({
     lineId: selectedLineId,
@@ -3593,10 +3812,24 @@
         onGroup={groupSelectedPaths}
         onUngroup={ungroupSelectedPath}
         onReorderPath={reorderPath}
-        listOverride={autoActive && $autoSection && autoCatalog
-          ? autoListSnippet
-          : undefined}
+        listOverride={isMultiPathMode
+          ? tandemSnippet
+          : autoActive && $autoSection && autoCatalog
+            ? autoListSnippet
+            : undefined}
       />
+
+      {#snippet tandemSnippet()}
+        <TandemPanel
+          robots={tandemRobots}
+          misses={tandemMisses}
+          settled={pairState.settled}
+          problems={pairState.problems}
+          now={tandemNow}
+          onSeek={seekTandem}
+          onEdit={editTandemRobot}
+        />
+      {/snippet}
 
       {#snippet autoListSnippet()}
         {#if $autoSection && autoCatalog}
@@ -3633,7 +3866,18 @@
       <main class="panel-box center-stage">
         <div class="module-header-row mb-2">
           <h3 class="module-title">Field</h3>
-          {#if autoActive && $autoSection}
+          {#if $tandemEdit && !isMultiPathMode}
+            <span class="module-caption tandem-edit-banner">
+              Editing <strong>{robotName($tandemEdit.editing)}</strong>
+              with {tandemGhosts.map((g) => robotName(g.filePath)).join(", ")} as {tandemGhosts.length === 1 ? "a ghost" : "ghosts"}
+              {#if editPair && !editPair.settled}· waits on each other did not settle{/if}
+              {#if editMisses.length}· <span class="text-orange-400">{editMisses.length} near-collision{editMisses.length === 1 ? "" : "s"}</span>{/if}
+            </span>
+            <button class="console-action text-xs" onclick={backToPair} title="Keep the edit in this browser and show the pair again">Back to pair</button>
+          {/if}
+          {#if isMultiPathMode}
+            <span class="module-caption">{tandemRobots.length} Autos together · each partner plays its happy path</span>
+          {:else if autoActive && $autoSection}
             <AutoPreviewSwitches auto={$autoSection} />
             <label class="module-caption flex items-center gap-2" title="Draw the branches this preview does not take, dashed">
               <input type="checkbox" bind:checked={showUntakenBranches} />
@@ -3695,7 +3939,12 @@
               aria-hidden="true"
             ></canvas>
             <FieldAxes {x} {y} />
-            {#if autoActive && $autoSection && autoCatalog}
+            {#if isMultiPathMode}
+              <TandemFieldOverlay {x} {y} misses={tandemMisses} trails={[]} now={tandemNow} />
+            {:else if $tandemEdit && tandemGhosts.length > 0}
+              <TandemFieldOverlay {x} {y} misses={editMisses} trails={ghostTrails} now={ghostNow} />
+            {/if}
+            {#if autoActive && $autoSection && autoCatalog && !isMultiPathMode}
               <AutoFieldOverlay
                 auto={$autoSection}
                 catalog={autoCatalog}
@@ -3745,8 +3994,8 @@
                 <RobotSprite
                   xy={robotState.xy}
                   heading={robotState.heading}
-                  widthPx={x(robotWidth)}
-                  heightPx={x(robotHeight)}
+                  widthPx={x(additionalPaths[idx]?.settings?.rWidth || robotWidth)}
+                  heightPx={x(additionalPaths[idx]?.settings?.rHeight || robotHeight)}
                   {settings}
                   alt="Robot {idx + 1}"
                   zIndex={20 - idx}
@@ -3757,12 +4006,51 @@
                 />
               {/each}
             {/if}
+            <!-- Partner robots while one robot of a pair is in the editor -->
+            {#if !isMultiPathMode && $tandemEdit}
+              {#each ghostPoses as pose, idx (idx)}
+                {#if pose}
+                  <RobotSprite
+                    xy={{ x: x(pose.x), y: y(pose.y) }}
+                    heading={-pose.headingDeg}
+                    widthPx={x(tandemGhosts[idx]?.settings?.rWidth || robotWidth)}
+                    heightPx={x(tandemGhosts[idx]?.settings?.rHeight || robotHeight)}
+                    {settings}
+                    alt="Partner {robotName(tandemGhosts[idx]?.filePath ?? '')}"
+                    zIndex={19}
+                    arrowZIndex={19}
+                    opacity={0.45}
+                    arrowId="arrowhead-ghost-{idx}"
+                    onImageSettled={() => (robotImageLoaded = true)}
+                  />
+                {/if}
+              {/each}
+            {/if}
             {#if !initialAssetsReady}
               <FieldLoadingOverlay />
             {/if}
           </div>
         </div>
-        {#if autoActive && autoPreview}
+        {#if isMultiPathMode}
+          <div class="tandem-playback">
+            <PlaybackControls
+              {playing}
+              {play}
+              {pause}
+              bind:percent
+              {handleSeek}
+              bind:loopAnimation
+              totalTime={tandemTotal}
+              markers={tandemTotal > 0
+                ? tandemMisses.map((m) => ({
+                    percent: (m.t0 / tandemTotal) * 100,
+                    color: m.contact ? "#e5484d" : "#ff9f43",
+                    name: `${m.t0.toFixed(1)} s · ${m.contact ? "collision" : "within 3 in"}: ${robotName(additionalPaths[m.a]?.filePath ?? "")} and ${robotName(additionalPaths[m.b]?.filePath ?? "")}`,
+                  }))
+                : []}
+            />
+          </div>
+        {:else if autoActive && autoPreview}
           <AutoTimeline
             preview={autoPreview}
             worst={autoWorst}
