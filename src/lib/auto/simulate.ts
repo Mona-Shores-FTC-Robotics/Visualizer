@@ -17,8 +17,9 @@ import {
  * How long a command step keeps the robot busy in the preview: the command's typical time from
  * the robot's list, else an older file's preview time, else instant; never past its timeout.
  */
-export function commandSeconds(auto: AutoSection, card: ActionCard): number {
-  const typical = auto.registry.typicalS?.[card.name] ?? (card.previewMs ?? 0) / 1000;
+export function commandSeconds(auto: AutoSection, card: ActionCard, timing?: PreviewTiming): number {
+  const typical =
+    timing?.actionSeconds(card.name) ?? auto.registry.typicalS?.[card.name] ?? (card.previewMs ?? 0) / 1000;
   return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
 }
 
@@ -26,9 +27,25 @@ export function commandSeconds(auto: AutoSection, card: ActionCard): number {
  * How long a wait's `alongside` command runs in the preview: its typical time, capped at the
  * default timeout (the robot runs it with `kit.command(name)`). 0 with none.
  */
-export function alongsideSeconds(auto: AutoSection, card: FirstOfCard): number {
+export function alongsideSeconds(auto: AutoSection, card: FirstOfCard, timing?: PreviewTiming): number {
   if (!card.alongside) return 0;
-  return Math.min(auto.registry.typicalS?.[card.alongside] ?? 0, DEFAULT_TIMEOUT_S);
+  const typical = timing?.actionSeconds(card.alongside) ?? auto.registry.typicalS?.[card.alongside] ?? 0;
+  return Math.min(typical, DEFAULT_TIMEOUT_S);
+}
+
+/**
+ * Typical timing for the preview (see lib/timing): when each trigger answered ✓ actually becomes
+ * true, and how long commands take. Without it a ✓ trigger is true the moment it is asked.
+ */
+export interface PreviewTiming {
+  /** Seconds a command typically takes, or undefined to use the robot's list. */
+  actionSeconds(name: string): number | undefined;
+  /** The first time at or after `t0` that `condition` is true (Infinity: never), or undefined for "at once". */
+  trueAt(condition: string, t0: number): number | undefined;
+  /** Told when a command runs (from t0 to t1), so state such as a full intake can change. */
+  commandRan?(name: string, t0: number, t1: number): void;
+  /** Told when a wait ends because `condition` became true at `t`. */
+  becameTrue?(condition: string, t: number): void;
 }
 
 /** Length of the Autonomous period, as `AutoKit.AUTO_LENGTH_S`. */
@@ -108,6 +125,14 @@ export interface DriveRecord {
   t1: number;
 }
 
+/** A command run alongside a wait, from its start until it finished or the wait ended. */
+export interface LaunchRecord {
+  cardId: string;
+  command: string;
+  t0: number;
+  t1: number;
+}
+
 /** A drive that is not a project path (routine pattern, exit, goTo). */
 export interface MotionRecord {
   cardId: string;
@@ -131,6 +156,8 @@ export interface PreviewResult {
    * for each; `motionPoseAt` gives the robot's pose during them.
    */
   motions: MotionRecord[];
+  /** Commands run alongside a wait (a volley is LaunchAll), for the timing model's TIPs. */
+  launches: LaunchRecord[];
   /** Set when the endgame guard cut a branch short. */
   guard: { t: number; label: string } | null;
   /** True when a wait had no row that could ever fire. */
@@ -160,6 +187,7 @@ export function simulateAuto(
   catalog: PathCatalog,
   startPoint: StartPose,
   scenario: Scenario,
+  timing?: PreviewTiming,
 ): PreviewResult {
   const timeline: TimelineEvent[] = [];
   const log: LogEntry[] = [];
@@ -167,6 +195,7 @@ export function simulateAuto(
   const taken = new Map<string, number>();
   const drives: DriveRecord[] = [];
   const motions: MotionRecord[] = [];
+  const launches: LaunchRecord[] = [];
   let guardFired: PreviewResult["guard"] = null;
   let stalled = false;
 
@@ -224,11 +253,15 @@ export function simulateAuto(
    * HIVE), so ✓ never looks faster than the command it waits on.
    */
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
-    const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card) : Infinity;
+    const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card, timing) : Infinity;
     if ("when" in row) {
-      return row.when.some((name) => answerFor(scenario, card, name))
-        ? (card.alongside ? alongEnd : t0)
-        : Infinity;
+      let soonest = Infinity;
+      for (const name of row.when) {
+        if (!answerFor(scenario, card, name)) continue;
+        const at = Math.max(timing?.trueAt(name, t0) ?? t0, card.alongside ? alongEnd : t0);
+        soonest = Math.min(soonest, at);
+      }
+      return soonest;
     }
     return t0 + row.afterMs / 1000;
   };
@@ -295,13 +328,22 @@ export function simulateAuto(
       return null;
     }
     if (card.alongside) {
-      const along = alongsideSeconds(auto, card);
+      const along = alongsideSeconds(auto, card, timing);
+      launches.push({ cardId: card.id, command: card.alongside, t0, t1: Math.min(at, t0 + along) });
       note(`${label}: ${card.alongside} alongside`, "card", card.id);
       if (at < t0 + along - 1e-9) note(`${card.alongside} stopped after ${(at - t0).toFixed(2)} s`, "event", card.id);
     }
     stay(at - t0);
     const row = card.rows[winner];
     taken.set(card.id, winner);
+    if (card.alongside) timing?.commandRan?.(card.alongside, t0, at);
+    if ("when" in row) {
+      for (const name of row.when) {
+        if (answerFor(scenario, card, name) && fireTime(card, { ...row, when: [name] }, t0) <= at + 1e-9) {
+          timing?.becameTrue?.(name, at);
+        }
+      }
+    }
     const hasCards = card.rows.some((r) => r.cards.length > 0);
     note(
       hasCards
@@ -319,12 +361,13 @@ export function simulateAuto(
       case "action": {
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
-        const busy = commandSeconds(auto, card);
+        const busy = commandSeconds(auto, card, timing);
         if (deadline && deadline.deadline < t + busy) {
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
         stay(busy);
+        timing?.commandRan?.(card.name, t - busy, t);
         return null;
       }
       case "path": {
@@ -483,7 +526,7 @@ export function simulateAuto(
     t <= AUTO_LENGTH_S && !stalled ? "end" : "warn",
   );
   log.sort((a, b) => a.t - b.t);
-  return { timeline, log, endTime: t, ran, taken, drives, motions, guard: guardFired, stalled };
+  return { timeline, log, endTime: t, ran, taken, drives, motions, launches, guard: guardFired, stalled };
 }
 
 /** The robot's pose during a preview motion that is not a project path, else null (none today). */
