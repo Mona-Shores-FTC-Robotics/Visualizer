@@ -50,8 +50,13 @@
     source: { ref: string | null; path: string } | null;
     /** The open project as it would be saved. */
     projectText: () => string;
-    /** After a save: the project now is that file on that branch. */
-    onSaved: (branch: string, path: string) => void;
+    /**
+     * The file's text on GitHub when the draft on screen began, if it is one: a
+     * save first checks GitHub still has it, so nobody's change is replaced unseen.
+     */
+    baseText?: string | null;
+    /** After a save: the project now is that file on that branch, exactly `text`. */
+    onSaved: (branch: string, path: string, text: string) => void;
   }
 
   let {
@@ -59,6 +64,7 @@
     fileName,
     source,
     projectText,
+    baseText = null,
     onSaved,
   }: Props = $props();
 
@@ -192,11 +198,7 @@
         "error",
       );
     }
-    path = suggestPpPath(
-      fileName,
-      source?.path ?? null,
-      ppFiles,
-    );
+    path = suggestPpPath(fileName, source?.path ?? null, ppFiles);
   }
 
   async function loadLatest() {
@@ -294,6 +296,20 @@
         return;
       }
       let head = await branchHead(token, branch);
+      // Someone else's change since this draft began is not replaced without asking.
+      if (baseText !== null && source && ppPath === source.path && (source.ref ?? branch) === branch) {
+        const onGithub = await readText(token, ppPath, head);
+        if (
+          onGithub !== null &&
+          onGithub !== baseText &&
+          !confirm(
+            `${baseName(ppPath)} changed on ${branch} since you started editing it. Replace that version with yours?\n\n` +
+              "Cancel saves nothing and keeps your draft as it is.",
+          )
+        ) {
+          return;
+        }
+      }
       const existing = await listFiles(token, head);
       let partnerClass: string | null = null;
       if (partner) {
@@ -357,7 +373,7 @@
       saveJson(PENDING_KEY, { path: ppPath, commit: sha });
       exported.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
       showToast(`Saved ${baseName(ppPath)} to ${branch}`, "success");
-      onSaved(branch, ppPath);
+      onSaved(branch, ppPath, text);
       commit = sha;
       commitPath = ppPath;
       result = null;
@@ -452,6 +468,20 @@
 
   const secs = (t: number) => t.toFixed(1);
   const yesNo = (b: boolean) => (b ? "yes" : "no");
+  /** A published log's button label: which run it is. */
+  function logLabel(seed: number): string {
+    const best = seed === (shown?.bestSeed ?? summary.best?.seed);
+    const typical = seed === shown?.typicalSeed;
+    const what =
+      best && typical
+        ? "best and typical"
+        : best
+          ? "best"
+          : typical
+            ? "typical"
+            : "seed";
+    return `${what}, seed ${seed}`;
+  }
   const when = (iso: string) => new Date(iso).toLocaleString();
 </script>
 
@@ -726,26 +756,42 @@
       {/if}
 
       {#if runs.length}
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <p>
-            <strong>{summary.meanPoints.toFixed(1)}</strong> AUTO points on
-            average over {summary.runs} seeds.
-            {summary.tips
-              .map(
-                (tip, i) =>
-                  `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
-              )
-              .join(" ")}
-            LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
-            {#if summary.withProblems}<span class="text-amber-300"
-                >Problems in {summary.withProblems} of {summary.runs} seeds.</span
-              >{/if}
+        {#if summary.best}
+          <p class="mb-1 text-base">
+            Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
+              .best.seed}),
+            {summary.best.autoTips} TIP{summary.best.autoTips === 1
+              ? ""
+              : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
+                .slice(0, summary.best.autoTips)
+                .map(secs)
+                .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
+              .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+              .join(" · ")}.
           </p>
+        {/if}
+        <p class="mb-3 text-gray-400">
+          Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on average.
+          {summary.tips
+            .map(
+              (tip, i) =>
+                `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
+            )
+            .join(" ")}
+          LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
+          {#if summary.withProblems}<span class="text-amber-300"
+              >Problems in {summary.withProblems} of {summary.runs} seeds.</span
+            >{/if}
+        </p>
+        <div class="flex flex-wrap gap-2 mb-3">
           {#each Object.entries(shown.logs) as [seed, file] (seed)}
             <button
-              class="console-action console-action--accent shrink-0"
+              class="console-action {Number(seed) ===
+              (shown.bestSeed ?? summary.best?.seed)
+                ? 'console-action--accent'
+                : ''}"
               onclick={() => download(shown!, file)}
-              title={file}>Download WPILOG (seed {seed})</button
+              title={file}>Download WPILOG ({logLabel(Number(seed))})</button
             >
           {/each}
         </div>
@@ -766,7 +812,9 @@
                 onclick={() => (expanded = expanded === r.seed ? null : r.seed)}
               >
                 <td class="py-1"
-                  >{r.seed}{r.seed === shown.typicalSeed ? " ★" : ""}</td
+                  >{r.seed}{r.seed === (shown.bestSeed ?? summary.best?.seed)
+                    ? " ▲"
+                    : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
                 >
                 <td>{r.points}</td>
                 <td
@@ -806,8 +854,8 @@
           </tbody>
         </table>
         <p class="text-xs text-gray-400 mt-3">
-          ★ the median seed, whose log is published. In AdvantageScope open it,
-          then File → Import Layout with biobuzz's <code
+          ▲ the best seed, ★ the median one: both logs are published. In
+          AdvantageScope open one, then File → Import Layout with biobuzz's <code
             >sim-review/advantagescope-layout.json</code
           >; AUTO starts 10 s into the log. Its Metadata tab names the commit
           and .pp it simulated.

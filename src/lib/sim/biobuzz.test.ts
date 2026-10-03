@@ -144,6 +144,20 @@ test("the tally counts TIPs that count for AUTO and picks the median run", () =>
   // Sorted 43, 48 (seed 3), 48 (seed 4), 68: the lower middle.
   assertEqual(t.typicalSeed, 3);
   assertEqual(tally([]).typicalSeed, null);
+  // The best: the most points.
+  assertEqual(t.best?.seed, 1);
+  assertEqual(tally([]).best, null);
+});
+
+test("on equal points the best run is the one whose last TIP came first", () => {
+  // Seeds 3 and 4 both score 48; 4's TIP at 39 s is after AUTO and does not count.
+  const t = tally([
+    run(3, 48, [4, 16]),
+    run(4, 48, [3, 14, 39]),
+    run(5, 48, [3, 14]),
+  ]);
+  assertEqual(t.best?.seed, 4);
+  assertEqual(tally([run(7, 20, []), run(6, 20, [])]).best?.seed, 6);
 });
 
 test("the request names the .pp, the run and what to stamp on each log", () => {
