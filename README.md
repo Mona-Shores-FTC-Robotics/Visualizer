@@ -22,5 +22,17 @@ What the fork adds:
   (the robot no longer stops at every sub-path), the robot is placed by distance travelled, and
   "through" curves are drawn the way Pedro 3 follows them.
 
+## Run in simulator (on a laptop)
+
+With a biobuzz checkout beside this one (or `BIOBUZZ_DIR` pointing at it), `npm run dev` adds a
+**Simulator** button (▶) to the top bar. It opens `.pp` files straight from biobuzz's
+`TeamCode/autos/` and `TeamCode/src/test/resources/auto-builder/`, and **Run in simulator** saves
+the project back there, exports its Java over the generated class that names it, and runs
+biobuzz's `SimRunTest` with Gradle: the Auto (and a partner Auto, if chosen) on one robot design
+over several seeds. It shows points, TIP times, LEAVE/PARK and problems per seed, with each
+seed's `.wpilog` for AdvantageScope. The biobuzz branch must have `SimRunTest`; the first run
+builds TeamCode and takes minutes, later ones seconds. The hosted site has no button: it cannot
+reach a checkout. The files it writes are ordinary changes in biobuzz, committed as usual.
+
 `main` is deployed to GitHub Pages on every push (`.github/workflows/pages.yml`). Upstream changes
 are merged in between competitions, not during one. `npm test` runs the tests.
