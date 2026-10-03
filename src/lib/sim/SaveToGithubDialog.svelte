@@ -55,6 +55,14 @@
      * save first checks GitHub still has it, so nobody's change is replaced unseen.
      */
     baseText?: string | null;
+    /** The draft on screen, if the project is one: where it stands, for the top of the dialog. */
+    draft?: {
+      label: string;
+      status: "same" | "edited" | "newer-on-github" | "edited-and-newer";
+      from: number | null;
+    } | null;
+    /** Throws the draft away and loads GitHub's version. */
+    onDiscard?: () => void;
     /** After a save: the project now is that file on that branch, exactly `text`. */
     onSaved: (branch: string, path: string, text: string) => void;
   }
@@ -65,6 +73,8 @@
     source,
     projectText,
     baseText = null,
+    draft = null,
+    onDiscard,
     onSaved,
   }: Props = $props();
 
@@ -297,7 +307,12 @@
       }
       let head = await branchHead(token, branch);
       // Someone else's change since this draft began is not replaced without asking.
-      if (baseText !== null && source && ppPath === source.path && (source.ref ?? branch) === branch) {
+      if (
+        baseText !== null &&
+        source &&
+        ppPath === source.path &&
+        (source.ref ?? branch) === branch
+      ) {
         const onGithub = await readText(token, ppPath, head);
         if (
           onGithub !== null &&
@@ -494,6 +509,32 @@
   <h2 id="github-save-title" class="text-xl font-semibold text-[#e8e8e8] mb-1">
     Save to GitHub and simulate
   </h2>
+
+  {#if draft && source}
+    <div class="flex items-center justify-between gap-3 text-sm my-3">
+      <p class="text-gray-300">
+        <code>{source.path}</code> on {source.ref ?? "the default branch"}:
+        <span
+          class={draft.status === "same" ? "text-gray-400" : "text-amber-300"}
+          >{draft.label}</span
+        >{#if draft.from && draft.status !== "same"}<span class="text-gray-400"
+            >&nbsp;(edits from {new Date(draft.from).toLocaleString()})</span
+          >{/if}. Edits are kept in this browser until you save them here.
+      </p>
+      {#if draft.status !== "same" && onDiscard}
+        <button
+          class="console-action shrink-0"
+          onclick={() => {
+            close();
+            onDiscard();
+          }}
+          >{draft.status === "newer-on-github"
+            ? "Load GitHub's version"
+            : "Discard my edits"}</button
+        >
+      {/if}
+    </div>
+  {/if}
 
   {#if $teamView && !source}
     <div

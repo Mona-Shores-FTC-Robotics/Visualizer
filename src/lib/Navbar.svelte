@@ -74,6 +74,8 @@
     autoPreviewSeconds?: number | null;
     /** Opens "Save to GitHub and simulate". */
     onSaveToGithub?: () => void;
+    /** The biobuzz file on screen and where its draft stands, shown beside the cloud button. */
+    githubFile?: { name: string; label: string; changed: boolean } | null;
   }
 
   let {
@@ -107,6 +109,7 @@
     onToggleRightPanel = () => {},
     autoPreviewSeconds = null,
     onSaveToGithub,
+    githubFile = null,
   }: Props = $props();
 
   let fileManagerOpen = $state(false);
@@ -774,6 +777,16 @@
         {/if}
       </div>
 
+      {#if onSaveToGithub && githubFile}
+        <button
+          onclick={onSaveToGithub}
+          class="console-action text-xs whitespace-nowrap"
+          title="From biobuzz. Your edits are kept in this browser as a draft; Save to GitHub when it is ready."
+        >
+          {githubFile.name} ·
+          <span class={githubFile.changed ? "text-amber-300" : "text-gray-400"}>{githubFile.label}</span>
+        </button>
+      {/if}
       {#if onSaveToGithub}
         <button
           title="Save to GitHub and simulate"

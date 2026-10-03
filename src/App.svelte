@@ -972,6 +972,12 @@
     draftFrom: number | null;
   } | null>(null);
   let draftTimer: ReturnType<typeof setTimeout> | null = null;
+  const DRAFT_LABEL = {
+    same: "same as GitHub",
+    edited: "your draft · edited",
+    "newer-on-github": "GitHub has a newer version",
+    "edited-and-newer": "your draft · GitHub has a newer version",
+  } as const;
 
   /** The project on screen as an Auto, without what changes on its own (see projectFingerprint). */
   function currentFingerprint(): string {
@@ -3526,6 +3532,13 @@
         ? autoPreview.endTime
         : null}
     onSaveToGithub={() => (githubOpen = true)}
+    githubFile={gitStatus && gitDraft
+      ? {
+          name: basename(gitDraft.path),
+          label: DRAFT_LABEL[gitStatus],
+          changed: gitStatus !== "same",
+        }
+      : null}
   />
 
   <SaveToGithubDialog
@@ -3534,6 +3547,8 @@
     source={githubSourceOnScreen}
     projectText={() => JSON.stringify(buildProjectData(), null, 2)}
     baseText={gitDraft?.baseText ?? null}
+    draft={gitStatus && gitDraft ? { label: DRAFT_LABEL[gitStatus], status: gitStatus, from: gitDraft.draftFrom } : null}
+    onDiscard={discardDraft}
     onSaved={savedToGithub}
   />
 
@@ -3557,13 +3572,11 @@
 
   <ToastHost />
 
+  <!-- A file from biobuzz says where it stands in the top bar instead (nothing floats over the field). -->
   <SharedCopyBanner
-    view={sharedCopy}
+    view={gitDraft ? null : sharedCopy}
     error={shareLinkError}
     onSave={saveSharedCopy}
-    git={gitStatus && gitDraft ? { status: gitStatus, path: gitDraft.path, draftFrom: gitDraft.draftFrom } : null}
-    onSaveToGithub={() => (githubOpen = true)}
-    onDiscard={discardDraft}
     onClose={closeSharedCopy}
     onDismissError={() => (shareLinkError = null)}
   />
