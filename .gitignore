@@ -26,5 +26,3 @@ dist-ssr
 ws_client.html
 
 vite.config.d.ts
-vite/*.d.ts
-src/lib/sim/biobuzz.d.ts

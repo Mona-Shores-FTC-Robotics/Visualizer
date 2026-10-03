@@ -1,16 +1,18 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import {
-  generatedDirFor,
   GENERATED_DIRS,
+  generatedPathFor,
   ppPathProblem,
+  protectedBranch,
+  simRequestText,
+  simResultPath,
   simSpec,
-  sourceOf,
   suggestPpPath,
   tally,
   type SimRun,
 } from "./biobuzz";
 
-test("the bridge only touches .pp files in the two Auto folders", () => {
+test("Save to GitHub only writes .pp files in the two Auto folders", () => {
   assertEqual(ppPathProblem("TeamCode/autos/hive-rush.pp"), null);
   assertEqual(
     ppPathProblem(
@@ -32,25 +34,33 @@ test("the bridge only touches .pp files in the two Auto folders", () => {
   }
 });
 
-test("a new Auto's class goes to the robot only from TeamCode/autos", () => {
+test("the Java goes where its class already is, else by the .pp's folder", () => {
+  const robot = `${GENERATED_DIRS[0]}/HiveRushAuto.java`;
+  const sim = `${GENERATED_DIRS[1]}/Recycle5LeftAuto.java`;
   assertEqual(
-    generatedDirFor("TeamCode/autos/hive-rush.pp"),
-    GENERATED_DIRS[0],
+    generatedPathFor("TeamCode/autos/hive-rush.pp", "HiveRushAuto.java", []),
+    robot,
   );
   assertEqual(
-    generatedDirFor(
-      "TeamCode/src/test/resources/auto-builder/recycle5-left.pp",
+    generatedPathFor(
+      "TeamCode/src/test/resources/auto-builder/r.pp",
+      "Recycle5LeftAuto.java",
+      [],
     ),
-    GENERATED_DIRS[1],
+    sim,
+  );
+  // An Auto drawn in auto-builder but already promoted to the robot stays there.
+  assertEqual(
+    generatedPathFor(
+      "TeamCode/src/test/resources/auto-builder/hive-rush.pp",
+      "HiveRushAuto.java",
+      [robot],
+    ),
+    robot,
   );
 });
 
-test("reads a generated class's SOURCE and builds the study spec", () => {
-  assertEqual(
-    sourceOf('    public static final String SOURCE = "recycle5-left.pp";\n'),
-    "recycle5-left.pp",
-  );
-  assertEqual(sourceOf("public final class X {}"), null);
+test("builds the study spec", () => {
   assertEqual(simSpec("Recycle5LeftAuto", null, 50), "Recycle5LeftAuto@50");
   assertEqual(
     simSpec("DuoLzRightAuto", "DuoLzLeftAuto", 45),
@@ -65,6 +75,11 @@ test("an open file maps to the .pp it came from, else the one with its name", ()
     "TeamCode/src/test/resources/auto-builder/lean-left.pp",
   ];
   assertEqual(suggestPpPath("hive-rush.pp", known[1], known), known[1]);
+  // Opened from a link: saved back to that path, even where it is new.
+  assertEqual(
+    suggestPpPath("x.pp", "TeamCode/autos/x.pp", known),
+    "TeamCode/autos/x.pp",
+  );
   assertEqual(suggestPpPath("lean-left.pp", null, known), known[2]);
   // Two with that name: a new one, rather than a guess.
   assertEqual(
@@ -133,4 +148,40 @@ test("the tally counts TIPs that count for AUTO and picks the median run", () =>
   // Sorted 43, 48 (seed 3), 48 (seed 4), 68: the lower middle.
   assertEqual(t.typicalSeed, 3);
   assertEqual(tally([]).typicalSeed, null);
+});
+
+test("the request names the .pp, the run and what to stamp on each log", () => {
+  const path = "TeamCode/src/test/resources/auto-builder/recycle5-left.pp";
+  const text = simRequestText(
+    {
+      ppPath: path,
+      spec: "Recycle5LeftAuto,Recycle5RightAuto@50",
+      design: "two spring hoods, full-width intake",
+      partnerDesign: null,
+      partnerSpeed: null,
+      seeds: 3,
+      alliance: "RED",
+      savedBy: "someone",
+    },
+    new Date("2026-10-03T12:00:00Z"),
+  );
+  const request = JSON.parse(text);
+  assertEqual(request.seeds, [1, 2, 3]);
+  assertEqual(request.pp, path);
+  assertEqual(request.metadata, {
+    AutoSource: "recycle5-left.pp",
+    SavedBy: "someone",
+    SavedAt: "2026-10-03T12:00:00.000Z",
+  });
+  assert(text.endsWith("}\n"), "ends with a newline");
+  assertEqual(
+    simResultPath(path, "abc123"),
+    "recycle5-left/abc123/result.json",
+  );
+  assert(
+    protectedBranch("master") &&
+      protectedBranch("main") &&
+      !protectedBranch("claude/simulator"),
+    "not master",
+  );
 });

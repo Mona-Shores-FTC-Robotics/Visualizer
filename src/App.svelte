@@ -167,8 +167,7 @@
   import * as browserFileStore from "./utils/browserFileStore";
   import { resolveProjectHash } from "./utils/sampleLink";
   import { resolveGitHash } from "./utils/gitLink";
-  import SimulatorDialog from "./lib/sim/SimulatorDialog.svelte";
-  import { bridgeStatus } from "./lib/sim/bridgeClient";
+  import SaveToGithubDialog from "./lib/sim/SaveToGithubDialog.svelte";
   import {
     freeSharedFileName,
     sharedCopyState,
@@ -823,6 +822,7 @@
     shareLinkError = null;
 
     const { project, name } = result.shared;
+    githubSource = result.shared.git ?? null;
     // Opening a second link while a copy is shown keeps the first stash:
     // that is the viewer's own work.
     sharedStash ??= JSON.parse(
@@ -953,7 +953,6 @@
     }
     await openShareLink();
     window.addEventListener("hashchange", openShareLink);
-    simulatorAvailable = (await bridgeStatus()) !== null;
 
     // robotWidth/robotHeight derive from settings, so loading settings is enough.
     // Apply the saved panel widths, then clamp them to the current viewport.
@@ -2004,76 +2003,16 @@
     }
   }
 
-  /** Put a project read from a file on screen, as a fresh, saved state. */
-  function applyLoadedProject(data: any) {
-    const versionWarning = newerVersionWarning(data.version);
-    if (versionWarning) showToast(versionWarning, "warning");
-
-    startPoint = normalizeStartPose(data.startPoint ?? { x: 72, y: 72 });
-
-    // Normalize lines with all required fields
-    const normalizedLines = normalizePaths(data.lines || []);
-    lines = normalizedLines;
-
-    // Derive sequence from data or create default
-    sequence = (
-      data.sequence && data.sequence.length
-        ? data.sequence
-        : atomicSegments(normalizedLines).map((ln) => ({
-            kind: "path",
-            lineId: ln.id,
-          }))
-    ) as SequenceItem[];
-    // Load shapes with defaults
-    shapes = data.shapes || [];
-    fieldPoints = normalizeFieldPoints(data);
-    // The file's own robot size and motion model; the viewer's
-    // preferences (panels, colours, images) stay as they are.
-    settings = settingsForFile(settings, data.settings);
-
-    activePaths.set(Array.isArray(data.activePaths) ? data.activePaths : []);
-
-    const autoProblems = loadAutoFrom(data);
-    if (autoProblems.length) {
-      showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
-    }
-
-    isUnsaved.set(false);
-    recordChange();
-  }
-
-  /** Cache an opened file into the browser-backed store and make it the current file. */
-  async function cacheOpenedFile(fileName: string, data: unknown) {
-    try {
-      await browserFileStore.writeFile(fileName, JSON.stringify(data));
-      currentFilePath.set(fileName);
-    } catch (err) {
-      console.warn("Failed to cache opened file to store:", err);
-    }
-  }
-
-  // The Simulator dialog (dev server only), and which biobuzz .pp the open
-  // file was opened from, so a run saves back to the same one.
-  let simulatorOpen = $state(false);
-  let simulatorAvailable = $state(false);
-  let biobuzzSource = $state<{ fileName: string; path: string } | null>(null);
-  let biobuzzOpenedFrom = $derived(
-    biobuzzSource && biobuzzSource.fileName === basename($currentFilePath)
-      ? biobuzzSource.path
+  // Save to GitHub: where in biobuzz the project on screen came from, so a
+  // save goes back to the same file and branch. It holds while that file (or
+  // the shared copy read from it) is what is on screen.
+  let githubOpen = $state(false);
+  let githubSource = $state<{ ref: string | null; path: string } | null>(null);
+  let githubSourceOnScreen = $derived(
+    githubSource && (sharedCopy || basename(githubSource.path) === basename($currentFilePath))
+      ? githubSource
       : null,
   );
-
-  async function openFromBiobuzz(text: string, path: string) {
-    if ($isUnsaved && !confirm(`Discard the unsaved changes on screen and open ${path}?`)) {
-      return;
-    }
-    const data = JSON.parse(text);
-    const fileName = basename(path);
-    applyLoadedProject(data);
-    if ($autoSection) autoMode.set(true);
-    await cacheOpenedFile(fileName, data);
-    biobuzzSource = { fileName, path };
-  }
 
   async function loadFile(evt: Event) {
     const elem = evt.target as HTMLInputElement;
@@ -2092,8 +2031,49 @@
 
     // Parse and load the uploaded file, then cache it into the browser store.
     loadTrajectoryFromFile(evt, async (data) => {
-      applyLoadedProject(data);
-      await cacheOpenedFile(file.name, data);
+      const versionWarning = newerVersionWarning(data.version);
+      if (versionWarning) showToast(versionWarning, "warning");
+
+      startPoint = normalizeStartPose(data.startPoint ?? { x: 72, y: 72 });
+
+      // Normalize lines with all required fields
+      const normalizedLines = normalizePaths(data.lines || []);
+      lines = normalizedLines;
+
+      // Derive sequence from data or create default
+      sequence = (
+        data.sequence && data.sequence.length
+          ? data.sequence
+          : atomicSegments(normalizedLines).map((ln) => ({
+              kind: "path",
+              lineId: ln.id,
+            }))
+      ) as SequenceItem[];
+      // Load shapes with defaults
+      shapes = data.shapes || [];
+      fieldPoints = normalizeFieldPoints(data);
+      // The file's own robot size and motion model; the viewer's
+      // preferences (panels, colours, images) stay as they are.
+      settings = settingsForFile(settings, data.settings);
+
+      activePaths.set(Array.isArray(data.activePaths) ? data.activePaths : []);
+
+      const autoProblems = loadAutoFrom(data);
+      if (autoProblems.length) {
+        showToast(`Auto: ${autoProblems.join(" ")}`, "warning");
+      }
+
+      isUnsaved.set(false);
+      recordChange();
+
+      // Cache the uploaded file into the browser-backed store for later access
+      try {
+        const content = JSON.stringify(data);
+        await browserFileStore.writeFile(file.name, content);
+        currentFilePath.set(file.name);
+      } catch (err) {
+        console.warn("Failed to cache uploaded file to store:", err);
+      }
     });
 
     // Reset the file input
@@ -3370,15 +3350,15 @@
     onToggleLeftPanel={toggleLeftPanelVisibility}
     onToggleRightPanel={toggleRightPanelVisibility}
     autoPreviewSeconds={autoPreview ? autoPreview.endTime : null}
-    onOpenSimulator={simulatorAvailable ? () => (simulatorOpen = true) : undefined}
+    onSaveToGithub={() => (githubOpen = true)}
   />
 
-  <SimulatorDialog
-    bind:isOpen={simulatorOpen}
+  <SaveToGithubDialog
+    bind:isOpen={githubOpen}
     fileName={basename($currentFilePath)}
-    openedFrom={biobuzzOpenedFrom}
+    source={githubSourceOnScreen}
     projectText={() => JSON.stringify(buildProjectData(), null, 2)}
-    onOpen={openFromBiobuzz}
+    onSaved={(branch, path) => (githubSource = { ref: branch, path })}
   />
 
   <SaveDialog

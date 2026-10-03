@@ -2,7 +2,6 @@ import { defineConfig, type Plugin } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { biobuzzBridge } from "./vite/biobuzzBridge";
 
 /**
  * Publishes samples/*.pp at samples/ on the site, for sample links
@@ -30,7 +29,7 @@ function samples(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [svelte(), samples(), biobuzzBridge()],
+  plugins: [svelte(), samples()],
   server: {
     // Allow the sandboxed preview host used for live previews.
     host: "0.0.0.0",

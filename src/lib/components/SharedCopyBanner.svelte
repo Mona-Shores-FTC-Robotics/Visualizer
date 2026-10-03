@@ -28,7 +28,7 @@
   {#if view}
     <div class="shared-banner" role="status"
       title={view.from
-        ? `${view.name ?? "This Auto"}, read from ${view.from} (TeamCode/autos). Not saved here. Your own work is set aside until you close it.`
+        ? `${view.name ?? "This Auto"}, read from ${view.from}. Not saved here. Your own work is set aside until you close it.`
         : `${sharedCopyTitle(view)}. A copy, not the version in git, and not saved. Your own work is set aside until you close it.`}>
       <span class="shared-banner__text">
         <strong>{view.from ? `From ${view.from}` : "Shared copy"}</strong>{#if view.savedAs} · saved as {view.savedAs}{/if}

@@ -8,5 +8,5 @@
     "strict": true,
     "emitDeclarationOnly": true
   },
-  "include": ["vite.config.ts", "vite/**/*.ts", "src/lib/sim/biobuzz.ts"]
+  "include": ["vite.config.ts"]
 }

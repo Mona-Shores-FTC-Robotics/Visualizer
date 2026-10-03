@@ -1,6 +1,6 @@
 import { assert, assertEqual, test } from "../lib/testing/harness";
 import sampleText from "../lib/auto/fixtures/hive-rush.pp?raw";
-import { gitHash, gitRawUrl, parseGitHash, resolveGitHash } from "./gitLink";
+import { gitHash, gitLinkFor, gitPath, gitRawUrl, parseGitHash, resolveGitHash, type GitLink } from "./gitLink";
 import type { ShareLinkResult } from "./shareLink";
 
 const RAW = "https://raw.githubusercontent.com/Mona-Shores-FTC-Robotics/biobuzz";
@@ -70,4 +70,19 @@ test("missing files, no connection and bad contents each say so", async () => {
   expectError(await resolveGitHash("#gh=x.pp", async () => "not json"), "not a readable .pp file");
   expectError(await resolveGitHash("#gh=x.pp", async () => '{"lines": []}'), "does not contain a path project");
   assertEqual((await resolveGitHash("#data=1.abc", async () => null)).kind, "none");
+});
+
+test("a whole path reaches any .pp in biobuzz, on any branch", () => {
+  const dir = "TeamCode/src/test/resources/auto-builder";
+  const path = `${dir}/recycle5-left.pp`;
+  const link = parseGitHash(`#gh=claude/simulator/${path}`) as GitLink;
+  assertEqual(link, { ref: "claude/simulator", file: "recycle5-left.pp", dir });
+  assertEqual(gitRawUrl(link), `${RAW}/claude/simulator/${path}`);
+  assertEqual(parseGitHash(`#gh=${path}`), { ref: null, file: "recycle5-left.pp", dir });
+  // TeamCode/autos stays the short form, so both spellings are one link.
+  assertEqual(parseGitHash("#gh=master/TeamCode/autos/hive-rush.pp"), { ref: "master", file: "hive-rush.pp" });
+  assertEqual(gitHash(gitLinkFor("claude/simulator", path)), `#gh=claude/simulator/${path}`);
+  assertEqual(gitHash(gitLinkFor("master", "TeamCode/autos/hive-rush.pp")), "#gh=master/hive-rush.pp");
+  assertEqual(gitPath(gitLinkFor(null, path)), path);
+  assert("error" in (parseGitHash("#gh=main/TeamCode/../x.pp") as object), "no .. in the folder");
 });
