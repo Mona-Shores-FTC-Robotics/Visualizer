@@ -529,8 +529,21 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
     rows.set(id, list);
   };
 
-  let depth = 0;
-  const endOf = (list: AutoCard[], start: number, index: number, rest: (t: number) => number): number => {
+  // Every duration here is a fixed number of seconds, so whatever follows a card
+  // ends a fixed time after it starts: starting later only shifts it. Each
+  // decision therefore works out the cards after it once, from the latest any of
+  // its rows reaches them, instead of once per row and per combination of the
+  // decisions before it (that is 2^n for n two-row waits in a row, and froze the
+  // page for an Auto with twenty). `recording` is off for the pass that only
+  // finds that latest time, so the table keeps each row's true worst end.
+  const endOf = (
+    list: AutoCard[],
+    start: number,
+    index: number,
+    rest: (t: number) => number,
+    rejoins: number,
+    recording: boolean,
+  ): number => {
     let t = start;
     for (let i = index; i < list.length; i++) {
       const card = list[i];
@@ -550,23 +563,37 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
         t += tail?.through.length
           ? chainInfo(catalog, [card.lineId, ...tail.through.map((c) => c.lineId)]).seconds
           : catalog.byId.get(card.lineId)?.seconds ?? 0;
-        if (!tail || ++depth > MAX_REJOINS) return rest(t);
-        return endOf(tail.list, t, tail.index, (x) => x);
+        if (!tail || rejoins + 1 > MAX_REJOINS) return rest(t);
+        return endOf(tail.list, t, tail.index, (x) => x, rejoins + 1, recording);
       } else {
         const limit = waitLimit(card, t);
         if (!Number.isFinite(limit)) return Infinity;
-        const after = (end: number) => endOf(list, end, i + 1, rest);
-        let worst = -Infinity;
-        card.rows.forEach((row, rowIndex) => {
-          // The trigger may fire as late as the limit.
+        // The trigger may fire as late as the limit; a time row later than the
+        // earliest one never wins (null).
+        const times = card.rows.map((row) => {
           const time = "afterMs" in row ? t + row.afterMs / 1000 : limit;
-          // A time row later than the earliest one never wins.
-          if (time > limit + 1e-9) {
-            record(card.id, rowIndex, card.rows.length, null);
+          return time > limit + 1e-9 ? null : time;
+        });
+        // The latest any row comes back to the cards after this one…
+        let latest = -Infinity;
+        times.forEach((time, k) => {
+          if (time === null) return;
+          const fallsThrough = (x: number) => {
+            latest = Math.max(latest, x);
+            return x;
+          };
+          endOf(card.rows[k].cards, time, 0, fallsThrough, rejoins, false);
+        });
+        // …so those cards are worked out once, from there.
+        const afterwards = latest === -Infinity ? 0 : endOf(list, latest, i + 1, rest, rejoins, recording) - latest;
+        let worst = -Infinity;
+        times.forEach((time, k) => {
+          if (time === null) {
+            if (recording) record(card.id, k, card.rows.length, null);
             return;
           }
-          const end = endOf(row.cards, time, 0, after);
-          record(card.id, rowIndex, card.rows.length, end);
+          const end = endOf(card.rows[k].cards, time, 0, (x) => x + afterwards, rejoins, recording);
+          if (recording) record(card.id, k, card.rows.length, end);
           worst = Math.max(worst, end);
         });
         return worst;
@@ -575,6 +602,6 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
     return rest(t);
   };
 
-  const total = endOf(auto.cards, 0, 0, (t) => t);
+  const total = endOf(auto.cards, 0, 0, (t) => t, 0, true);
   return { total, rows };
 }
