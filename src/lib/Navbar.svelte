@@ -347,7 +347,7 @@
 <SettingsDialog bind:isOpen={settingsOpen} bind:settings />
 
 <div
-  class="absolute top-0 left-0 w-full bg-[#1a1a1a]/95 backdrop-blur-sm text-[#d8d8d8] flex flex-row justify-between items-center px-6 py-3 border-b border-[#333333] shadow-[inset_0_-1px_0_0_rgba(255,255,255,0.02)]"
+  class="absolute top-0 left-0 z-40 w-full bg-[#1a1a1a]/95 backdrop-blur-sm text-[#d8d8d8] flex flex-row justify-between items-center px-6 py-3 border-b border-[#333333] shadow-[inset_0_-1px_0_0_rgba(255,255,255,0.02)]"
 >
   <!-- Title -->
   <div class="font-semibold flex flex-col justify-start items-start">
@@ -699,9 +699,43 @@
         {#if saveDropdownOpen}
           <div
             bind:this={saveDropdownRef}
-            class="console-panel console-menu absolute right-0 mt-2 w-48 z-50 animate-in fade-in slide-in-from-top-2 duration-300"
+            class="console-panel console-menu absolute right-0 mt-2 {githubFile ? 'w-72' : 'w-48'} z-50 animate-in fade-in slide-in-from-top-2 duration-300"
             role="menu"
           >
+            {#if githubFile && onSaveToGithub}
+              <!-- An Auto from biobuzz: its draft is kept on its own; the saves are GitHub, or a copy in my files. -->
+              <p class="px-3 pt-2 pb-1 text-xs text-gray-400">
+                Your edits to {githubFile.name} are kept automatically, as a draft in this browser.
+              </p>
+              <button
+                onclick={() => {
+                  onSaveToGithub();
+                  saveDropdownOpen = false;
+                }}
+                class="console-menu-item"
+                role="menuitem"
+              >
+                <div class="flex flex-col">
+                  <span class="console-menu-item-title">Save to GitHub</span>
+                  <span class="console-menu-item-subtitle">Commit it to biobuzz and simulate it</span>
+                </div>
+              </button>
+              <button
+                onclick={() => {
+                  saveFileAs();
+                  saveDropdownOpen = false;
+                }}
+                class="console-menu-item"
+                role="menuitem"
+              >
+                <div class="flex flex-col">
+                  <span class="console-menu-item-title">Save a copy to my files</span>
+                  <span class="console-menu-item-subtitle"
+                    >In the File Manager, as {githubFile.name}; Save to GitHub still works from it</span
+                  >
+                </div>
+              </button>
+            {:else}
             <!-- Save option -->
             <button
               onclick={() => {
@@ -773,6 +807,7 @@
                 </span>
               </div>
             </button>
+            {/if}
           </div>
         {/if}
       </div>
