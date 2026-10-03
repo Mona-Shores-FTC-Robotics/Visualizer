@@ -196,7 +196,13 @@
   import { linkSegmentIds, relink } from "./lib/auto/links";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
-  import { motionPoseAt, simulateAuto, worstCase } from "./lib/auto/simulate";
+  import {
+    motionPoseAt,
+    simulateAuto,
+    worstCase,
+    type PreviewResult,
+  } from "./lib/auto/simulate";
+  import { normalizeAuto } from "./lib/auto/normalize";
   import { exportAutoJava } from "./lib/auto/exportAction";
   import AutoCardList from "./lib/auto/components/AutoCardList.svelte";
   import AutoFieldOverlay from "./lib/auto/components/AutoFieldOverlay.svelte";
@@ -405,6 +411,47 @@
     shapes: Shape[];
     settings: Settings;
     color?: string; // Optional custom color for this path
+    /** The file's Auto played with its waits and decisions, if it has one. */
+    preview: PreviewResult | null;
+  }
+
+  /** An Auto plays out its Auto (waits included); a plain file drives its paths back to back. */
+  function additionalPrediction(pathData: AdditionalPathData) {
+    if (pathData.preview) {
+      return {
+        totalTime: pathData.preview.endTime,
+        timeline: pathData.preview.timeline,
+      };
+    }
+    if (!pathData.startPoint) return null;
+    return calculateVisualizationPathTime(
+      pathData.startPoint,
+      pathData.lines,
+      pathData.settings,
+      pathData.sequence,
+    );
+  }
+
+  /** Previews a loaded file's Auto as the Auto list would, or null if it has none. */
+  function previewAdditionalAuto(
+    data: { auto?: unknown },
+    start: StartPose,
+    pathLines: Path[],
+    pathSettings: Settings,
+  ): PreviewResult | null {
+    const { auto } = normalizeAuto(data.auto);
+    if (!auto) return null;
+    try {
+      return simulateAuto(
+        auto,
+        buildPathCatalog(start, pathLines, pathSettings),
+        start,
+        {},
+      );
+    } catch (error) {
+      console.error("Could not preview the Auto of an additional path:", error);
+      return null;
+    }
   }
   let additionalPaths: AdditionalPathData[] = $state([]);
 
@@ -708,9 +755,11 @@
 
         if (data.startPoint && data.lines) {
           const normalizedLines = normalizePaths(data.lines || []);
+          const start = normalizeStartPose(data.startPoint);
+          const pathSettings = data.settings || { ...DEFAULT_SETTINGS };
           newAdditionalPaths.push({
             filePath,
-            startPoint: normalizeStartPose(data.startPoint),
+            startPoint: start,
             lines: normalizedLines,
             shapes: data.shapes || [],
             sequence:
@@ -719,8 +768,14 @@
                 kind: "path",
                 lineId: ln.id,
               })),
-            settings: data.settings || { ...DEFAULT_SETTINGS },
+            settings: pathSettings,
             color: colors[i],
+            preview: previewAdditionalAuto(
+              data,
+              start,
+              normalizedLines,
+              pathSettings,
+            ),
           });
         }
       } catch (error) {
@@ -1348,7 +1403,7 @@
   // scaling ONCE per edit (keyed by the additionalPaths array reference)
   // instead of rebuilding the full path timeline on every animation frame.
   type AdditionalPathEntry = {
-    prediction: ReturnType<typeof calculateVisualizationPathTime>;
+    prediction: NonNullable<ReturnType<typeof additionalPrediction>>;
     completionPercent: number;
   };
   let additionalPathCache = $state(
@@ -2730,12 +2785,7 @@
         let maxTime = 0;
         additionalPaths.forEach((pathData) => {
           if (pathData.startPoint && pathData.lines.length > 0) {
-            const pathTime = calculateVisualizationPathTime(
-              pathData.startPoint,
-              pathData.lines,
-              pathData.settings,
-              pathData.sequence,
-            );
+            const pathTime = additionalPrediction(pathData);
             if (pathTime) {
               maxTime = Math.max(maxTime, pathTime.totalTime);
             }
@@ -3223,12 +3273,7 @@
           cache.set(pathData, null);
           return;
         }
-        const prediction = calculateVisualizationPathTime(
-          pathData.startPoint,
-          pathData.lines,
-          pathData.settings,
-          pathData.sequence,
-        );
+        const prediction = additionalPrediction(pathData);
         if (
           !prediction ||
           !prediction.timeline ||
@@ -3273,6 +3318,19 @@
           x,
           y,
         );
+        // Routine patterns and straight drives are not project paths.
+        const motion = pathData.preview
+          ? motionPoseAt(
+              pathData.preview,
+              (normalizedPercent / 100) * entry.prediction.totalTime,
+            )
+          : null;
+        if (motion) {
+          return {
+            xy: { x: x(motion.x), y: y(motion.y) },
+            heading: -motion.headingDeg,
+          };
+        }
 
         return {
           xy: { x: state.x, y: state.y },
@@ -3349,7 +3407,11 @@
     {rightPanelHidden}
     onToggleLeftPanel={toggleLeftPanelVisibility}
     onToggleRightPanel={toggleRightPanelVisibility}
-    autoPreviewSeconds={autoPreview ? autoPreview.endTime : null}
+    autoPreviewSeconds={isMultiPathMode
+      ? effectiveAnimationDuration
+      : autoPreview
+        ? autoPreview.endTime
+        : null}
     onSaveToGithub={() => (githubOpen = true)}
   />
 
