@@ -1052,11 +1052,15 @@
   /** Save the shared copy under a new name; it stays on screen as a copy. */
   async function saveSharedCopy() {
     if (!sharedCopy) return;
-    const suggested = await freeSharedFileName(
-      sharedCopy.name,
-      browserFileStore.fileExists,
+    // A copy of a biobuzz Auto keeps its file name, so Save to GitHub from it
+    // later still finds the file it came from.
+    const suggested = gitDraft
+      ? basename(gitDraft.path)
+      : await freeSharedFileName(sharedCopy.name, browserFileStore.fileExists);
+    const answer = window.prompt(
+      gitDraft ? "Save a copy to your files (the File Manager) as" : "Save the shared copy as a new file",
+      suggested,
     );
-    const answer = window.prompt("Save the shared copy as a new file", suggested);
     const trimmed = answer?.trim();
     if (!trimmed) return;
 
