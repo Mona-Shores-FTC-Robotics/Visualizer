@@ -68,7 +68,7 @@ test("builds the study spec", () => {
   );
 });
 
-test("an open file maps to the .pp it came from, else the one with its name", () => {
+test("an open file maps to the .pp it came from, else the one with its name, else nothing", () => {
   const known = [
     "TeamCode/autos/hive-rush.pp",
     "TeamCode/src/test/resources/auto-builder/hive-rush.pp",
@@ -81,15 +81,11 @@ test("an open file maps to the .pp it came from, else the one with its name", ()
     "TeamCode/autos/x.pp",
   );
   assertEqual(suggestPpPath("lean-left.pp", null, known), known[2]);
-  // Two with that name: a new one, rather than a guess.
-  assertEqual(
-    suggestPpPath("hive-rush", null, known),
-    "TeamCode/src/test/resources/auto-builder/hive-rush.pp",
-  );
-  assertEqual(
-    suggestPpPath("new-idea.pp", null, known),
-    "TeamCode/src/test/resources/auto-builder/new-idea.pp",
-  );
+  // Two with that name, a name biobuzz does not have, or no file at all (the blank
+  // project): nothing, so a new file is only ever made on purpose.
+  assertEqual(suggestPpPath("hive-rush", null, known), "");
+  assertEqual(suggestPpPath("new-idea.pp", null, known), "");
+  assertEqual(suggestPpPath("", null, known), "");
 });
 
 function run(

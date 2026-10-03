@@ -82,9 +82,9 @@ export function simSpec(
 }
 
 /**
- * The .pp in biobuzz that a file open in the editor most likely is: the
- * one it was opened from, else the only one with its name, else a new one
- * beside the simulator's Autos.
+ * The .pp in biobuzz that the project on screen is: the one it was opened
+ * from, else the only one with its file name, else "" — never a guess at a
+ * new file, which the person must name on purpose.
  */
 export function suggestPpPath(
   fileName: string,
@@ -92,10 +92,10 @@ export function suggestPpPath(
   known: string[],
 ): string {
   if (openedFrom) return openedFrom;
+  if (!fileName) return "";
   const name = fileName.endsWith(".pp") ? fileName : `${fileName}.pp`;
   const same = known.filter((path) => baseName(path) === name);
-  if (same.length === 1) return same[0];
-  return `${PP_DIRS[1]}/${name}`;
+  return same.length === 1 ? same[0] : "";
 }
 
 export interface SimRequestOptions {
