@@ -4,6 +4,7 @@
   import { generateAutoJavaFromText } from "../codegen/auto/fromFile";
   import { autoClassName } from "../codegen/auto/javaAuto";
   import { gitHash, gitLinkFor } from "../../utils/gitLink";
+  import { teamView } from "../team/teamView";
   import {
     GitHubError,
     branchHead,
@@ -94,12 +95,19 @@
   let timer: ReturnType<typeof setTimeout> | null = null;
   let polls = 0;
 
-  let pathProblem = $derived(ppPathProblem(path.trim()));
+  let pathProblem = $derived(
+    path.trim()
+      ? ppPathProblem(path.trim())
+      : "Choose the file to save to: pick one from the list, or type a new name in " +
+          PP_DIRS.join(" or "),
+  );
   let ppFiles = $derived(
     files.filter(
       (f) => f.endsWith(".pp") && PP_DIRS.some((d) => f.startsWith(`${d}/`)),
     ),
   );
+  /** Saving would create a file biobuzz does not have yet. */
+  let isNew = $derived(files.length > 0 && !ppFiles.includes(path.trim()));
   let partners = $derived(ppFiles.filter((f) => f !== path.trim()));
   let shown = $derived(result ?? latest);
   let runs = $derived(shown?.runs ?? []);
@@ -185,7 +193,7 @@
       );
     }
     path = suggestPpPath(
-      fileName || "untitled.pp",
+      fileName,
       source?.path ?? null,
       ppFiles,
     );
@@ -269,6 +277,14 @@
     if (pathProblem) return void (blocked = [pathProblem]);
     if (protectedBranch(branch))
       return void (blocked = [`Save to a working branch, not ${branch}.`]);
+    if (
+      isNew &&
+      !confirm(
+        `${ppPath} is not in biobuzz on ${branch} yet. Save the project on screen as a new Auto there?`,
+      )
+    ) {
+      return;
+    }
     saving = true;
     try {
       const text = projectText();
@@ -422,6 +438,14 @@
     }
   }
 
+  /** Opens one of Team Autos' files on its own, as a copy that Save to GitHub saves back. */
+  function editTeamFile(file: string) {
+    const view = $teamView;
+    if (!view) return;
+    location.hash = gitHash(gitLinkFor(view.ref, `TeamCode/autos/${file}`));
+    close();
+  }
+
   function close() {
     isOpen = false;
   }
@@ -440,6 +464,26 @@
   <h2 id="github-save-title" class="text-xl font-semibold text-[#e8e8e8] mb-1">
     Save to GitHub and simulate
   </h2>
+
+  {#if $teamView && !source}
+    <div
+      class="text-sm text-amber-200 border border-amber-300/40 rounded p-3 my-3"
+    >
+      <p>
+        Team Autos is showing {$teamView.files.join(", ")} to watch. Those are not
+        what this saves: it saves the project you are editing. To change one of them,
+        open it on its own first:
+      </p>
+      <div class="flex flex-wrap gap-2 mt-2">
+        {#each $teamView.files as file (file)}
+          <button
+            class="console-action text-xs"
+            onclick={() => editTeamFile(file)}>Edit {file}</button
+          >
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   {#if token && login}
     <p class="text-xs text-gray-400 mb-4">
@@ -549,8 +593,9 @@
           {pathProblem}.
         {:else}
           One commit on <code>{branch}</code>: <code>{path}</code>
-          {ppFiles.includes(path.trim()) ? "(updated)" : "(new)"}, its Java, and
-          the simulation request. GitHub then runs
+          {#if isNew}<strong class="text-amber-300">(a new file)</strong
+            >{:else}(updated){/if}, its Java, and the simulation request. GitHub
+          then runs
           {seeds} seed{seeds === 1 ? "" : "s"}, usually in 1–6 minutes; you can
           keep working meanwhile.
         {/if}
