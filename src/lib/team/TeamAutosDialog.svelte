@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import Modal from "../components/ui/Modal.svelte";
   import {
+    DEFAULT_REF,
     listTeamFiles,
     loadPairs,
     MAX_FILES,
@@ -27,12 +28,13 @@
   }
   let { isOpen = $bindable(false) }: Props = $props();
 
-  const BRANCH_KEY = "teamAutosBranch";
+  // Renamed from "teamAutosBranch", which remembered "master" (it has no Autos) for some laptops.
+  const BRANCH_KEY = "teamAutosRef";
   function savedBranch(): string {
     try {
-      return localStorage.getItem(BRANCH_KEY) || "master";
+      return localStorage.getItem(BRANCH_KEY) || DEFAULT_REF;
     } catch {
-      return "master";
+      return DEFAULT_REF;
     }
   }
 
@@ -53,11 +55,13 @@
     try {
       [files, pairs] = await Promise.all([listTeamFiles(ref), loadPairs(ref)]);
       loadedFor = ref;
-      try {
-        localStorage.setItem(BRANCH_KEY, ref);
-      } catch {
-        /* private window: the branch is just not remembered */
-      }
+      // Remember only a branch that has Autos, so an empty one is not the next default.
+      if (files.length > 0)
+        try {
+          localStorage.setItem(BRANCH_KEY, ref);
+        } catch {
+          /* private window: the branch is just not remembered */
+        }
     } catch (error) {
       files = [];
       pairs = [];
@@ -156,7 +160,7 @@
       id="team-branch"
       class="console-input flex-1 px-2 py-1 text-sm"
       bind:value={branch}
-      placeholder="master"
+      placeholder={DEFAULT_REF}
       onkeydown={(e) => e.key === "Enter" && load()}
     />
     <button class="console-action text-sm" onclick={load} disabled={loading}>
@@ -218,7 +222,8 @@
       </div>
       {#if files.length === 0}
         <div class="p-4 text-sm text-neutral-500">
-          No .pp files on this branch.
+          No .pp files in {TEAM_DIR} on this branch. The team's Autos are on
+          <code>{DEFAULT_REF}</code>.
         </div>
       {/if}
       {#each files as file (file)}
