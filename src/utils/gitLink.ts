@@ -2,7 +2,8 @@
  * Links to Autos committed in biobuzz: `#gh=<file>.pp` opens
  * `TeamCode/autos/<file>.pp` from the default branch, and
  * `#gh=<branch or commit>/<file>.pp` from that branch or commit, as a shared
- * copy. The link holds only where the file is, so it stays short (about 70
+ * copy. A file elsewhere in biobuzz is named by its whole path, which starts
+ * at `TeamCode/`: `#gh=claude/simulator/TeamCode/src/test/resources/auto-builder/x.pp`. The link holds only where the file is, so it stays short (about 70
  * characters) and shows what is in git: pinned to a commit it never changes.
  *
  * The file is read from raw.githubusercontent.com, which needs no login while
@@ -22,6 +23,21 @@ export interface GitLink {
   /** Branch, tag or commit; null for the default branch. */
   ref: string | null;
   file: string;
+  /** The folder in biobuzz, when not TeamCode/autos (it then starts with "TeamCode"). */
+  dir?: string;
+}
+
+/** The file's path in biobuzz. */
+export function gitPath(link: GitLink): string {
+  return `${link.dir ?? GIT_AUTOS_DIR}/${link.file}`;
+}
+
+/** A link to the file at `path` in biobuzz (the short form when it is in TeamCode/autos). */
+export function gitLinkFor(ref: string | null, path: string): GitLink {
+  const slash = path.lastIndexOf("/");
+  const dir = path.slice(0, slash);
+  const file = path.slice(slash + 1);
+  return dir === GIT_AUTOS_DIR ? { ref, file } : { ref, file, dir };
 }
 
 /** Where a `#gh=` fragment points, or an error message; null if it is not one. */
@@ -35,25 +51,40 @@ export function parseGitHash(hash: string): GitLink | { error: string } | null {
   }
   const slash = body.lastIndexOf("/");
   const file = body.slice(slash + 1);
-  const ref = slash >= 0 ? body.slice(0, slash) : null;
+  let ref = slash >= 0 ? body.slice(0, slash) : null;
   if (!FILE.test(file)) {
     return { error: `"${file}" is not a .pp file name.` };
+  }
+  // A whole path: from "TeamCode" on is the folder, and before it the ref.
+  let dir: string | undefined;
+  if (ref !== null) {
+    const inner = ref.indexOf("/TeamCode/");
+    const at = ref === "TeamCode" || ref.startsWith("TeamCode/") ? 0 : inner >= 0 ? inner + 1 : -1;
+    if (at >= 0) {
+      dir = ref.slice(at);
+      ref = at === 0 ? null : ref.slice(0, at - 1);
+      if (!REF.test(dir) || dir.split("/").some((part) => part === "." || part === "..")) {
+        return { error: `"${dir}" is not a folder in biobuzz.` };
+      }
+    }
   }
   if (ref !== null && (!REF.test(ref) || ref.split("/").includes(".."))) {
     return { error: `"${ref}" is not a branch or commit.` };
   }
-  return { ref, file };
+  return dir === undefined || dir === GIT_AUTOS_DIR ? { ref, file } : { ref, file, dir };
 }
 
 /** The raw file on GitHub. */
 export function gitRawUrl(link: GitLink): string {
   const ref = (link.ref ?? "HEAD").split("/").map(encodeURIComponent).join("/");
-  return `https://raw.githubusercontent.com/${GIT_REPO}/${ref}/${GIT_AUTOS_DIR}/${encodeURIComponent(link.file)}`;
+  const dir = (link.dir ?? GIT_AUTOS_DIR).split("/").map(encodeURIComponent).join("/");
+  return `https://raw.githubusercontent.com/${GIT_REPO}/${ref}/${dir}/${encodeURIComponent(link.file)}`;
 }
 
 /** The fragment for a committed Auto (the reverse of `parseGitHash`). */
 export function gitHash(link: GitLink): string {
-  return `${GIT_HASH_PREFIX}${link.ref ? `${link.ref}/` : ""}${encodeURIComponent(link.file)}`;
+  const dir = link.dir ? `${link.dir}/` : "";
+  return `${GIT_HASH_PREFIX}${link.ref ? `${link.ref}/` : ""}${dir}${encodeURIComponent(link.file)}`;
 }
 
 /** Where the file came from, for the banner: "biobuzz master" or "biobuzz a1b2c3d". */
@@ -74,7 +105,7 @@ export async function resolveGitHash(
   if (link === null) return { kind: "none" };
   if ("error" in link) return { kind: "error", message: link.error };
 
-  const where = `${GIT_AUTOS_DIR}/${link.file} at ${link.ref ?? "biobuzz's default branch"}`;
+  const where = `${gitPath(link)} at ${link.ref ?? "biobuzz's default branch"}`;
   let text: string | null;
   try {
     text = await fetchText(gitRawUrl(link));
@@ -99,5 +130,6 @@ export async function resolveGitHash(
   if (!project || typeof project !== "object" || !project.startPoint || !Array.isArray(project.lines)) {
     return { kind: "error", message: `${where} does not contain a path project.` };
   }
-  return { kind: "ok", shared: { name: link.file, project, from: gitSource(link) } };
+  const git = { ref: link.ref, path: gitPath(link) };
+  return { kind: "ok", shared: { name: link.file, project, from: gitSource(link), git } };
 }

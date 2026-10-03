@@ -167,6 +167,7 @@
   import * as browserFileStore from "./utils/browserFileStore";
   import { resolveProjectHash } from "./utils/sampleLink";
   import { resolveGitHash } from "./utils/gitLink";
+  import SaveToGithubDialog from "./lib/sim/SaveToGithubDialog.svelte";
   import {
     freeSharedFileName,
     sharedCopyState,
@@ -821,6 +822,7 @@
     shareLinkError = null;
 
     const { project, name } = result.shared;
+    githubSource = result.shared.git ?? null;
     // Opening a second link while a copy is shown keeps the first stash:
     // that is the viewer's own work.
     sharedStash ??= JSON.parse(
@@ -2000,6 +2002,17 @@
       alert("Failed to rename the path file.");
     }
   }
+
+  // Save to GitHub: where in biobuzz the project on screen came from, so a
+  // save goes back to the same file and branch. It holds while that file (or
+  // the shared copy read from it) is what is on screen.
+  let githubOpen = $state(false);
+  let githubSource = $state<{ ref: string | null; path: string } | null>(null);
+  let githubSourceOnScreen = $derived(
+    githubSource && (sharedCopy || basename(githubSource.path) === basename($currentFilePath))
+      ? githubSource
+      : null,
+  );
 
   async function loadFile(evt: Event) {
     const elem = evt.target as HTMLInputElement;
@@ -3337,6 +3350,15 @@
     onToggleLeftPanel={toggleLeftPanelVisibility}
     onToggleRightPanel={toggleRightPanelVisibility}
     autoPreviewSeconds={autoPreview ? autoPreview.endTime : null}
+    onSaveToGithub={() => (githubOpen = true)}
+  />
+
+  <SaveToGithubDialog
+    bind:isOpen={githubOpen}
+    fileName={basename($currentFilePath)}
+    source={githubSourceOnScreen}
+    projectText={() => JSON.stringify(buildProjectData(), null, 2)}
+    onSaved={(branch, path) => (githubSource = { ref: branch, path })}
   />
 
   <SaveDialog

@@ -22,5 +22,12 @@ What the fork adds:
   (the robot no longer stops at every sub-path), the robot is placed by distance travelled, and
   "through" curves are drawn the way Pedro 3 follows them.
 
+- **Save to GitHub and simulate.** The cloud button in the top bar commits the project to biobuzz
+  (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). biobuzz's
+  "Simulate Auto" workflow runs it in the Java simulator; the dialog shows each seed's points, TIPs
+  and LEAVE/PARK and has **Download WPILOG** for AdvantageScope. Links may name any `.pp` in biobuzz
+  by its whole path (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing
+  results needs nothing; saving needs a fine-grained GitHub token, kept in the browser.
+
 `main` is deployed to GitHub Pages on every push (`.github/workflows/pages.yml`). Upstream changes
 are merged in between competitions, not during one. `npm test` runs the tests.
