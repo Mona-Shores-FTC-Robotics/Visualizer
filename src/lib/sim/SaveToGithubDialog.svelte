@@ -192,11 +192,7 @@
         "error",
       );
     }
-    path = suggestPpPath(
-      fileName,
-      source?.path ?? null,
-      ppFiles,
-    );
+    path = suggestPpPath(fileName, source?.path ?? null, ppFiles);
   }
 
   async function loadLatest() {
@@ -452,6 +448,20 @@
 
   const secs = (t: number) => t.toFixed(1);
   const yesNo = (b: boolean) => (b ? "yes" : "no");
+  /** A published log's button label: which run it is. */
+  function logLabel(seed: number): string {
+    const best = seed === (shown?.bestSeed ?? summary.best?.seed);
+    const typical = seed === shown?.typicalSeed;
+    const what =
+      best && typical
+        ? "best and typical"
+        : best
+          ? "best"
+          : typical
+            ? "typical"
+            : "seed";
+    return `${what}, seed ${seed}`;
+  }
   const when = (iso: string) => new Date(iso).toLocaleString();
 </script>
 
@@ -726,26 +736,42 @@
       {/if}
 
       {#if runs.length}
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <p>
-            <strong>{summary.meanPoints.toFixed(1)}</strong> AUTO points on
-            average over {summary.runs} seeds.
-            {summary.tips
-              .map(
-                (tip, i) =>
-                  `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
-              )
-              .join(" ")}
-            LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
-            {#if summary.withProblems}<span class="text-amber-300"
-                >Problems in {summary.withProblems} of {summary.runs} seeds.</span
-              >{/if}
+        {#if summary.best}
+          <p class="mb-1 text-base">
+            Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
+              .best.seed}),
+            {summary.best.autoTips} TIP{summary.best.autoTips === 1
+              ? ""
+              : "s"}{#if summary.best.autoTips}{" at "}{summary.best.tipsAt
+                .slice(0, summary.best.autoTips)
+                .map(secs)
+                .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
+              .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+              .join(" · ")}.
           </p>
+        {/if}
+        <p class="mb-3 text-gray-400">
+          Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on average.
+          {summary.tips
+            .map(
+              (tip, i) =>
+                `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
+            )
+            .join(" ")}
+          LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
+          {#if summary.withProblems}<span class="text-amber-300"
+              >Problems in {summary.withProblems} of {summary.runs} seeds.</span
+            >{/if}
+        </p>
+        <div class="flex flex-wrap gap-2 mb-3">
           {#each Object.entries(shown.logs) as [seed, file] (seed)}
             <button
-              class="console-action console-action--accent shrink-0"
+              class="console-action {Number(seed) ===
+              (shown.bestSeed ?? summary.best?.seed)
+                ? 'console-action--accent'
+                : ''}"
               onclick={() => download(shown!, file)}
-              title={file}>Download WPILOG (seed {seed})</button
+              title={file}>Download WPILOG ({logLabel(Number(seed))})</button
             >
           {/each}
         </div>
@@ -766,7 +792,9 @@
                 onclick={() => (expanded = expanded === r.seed ? null : r.seed)}
               >
                 <td class="py-1"
-                  >{r.seed}{r.seed === shown.typicalSeed ? " ★" : ""}</td
+                  >{r.seed}{r.seed === (shown.bestSeed ?? summary.best?.seed)
+                    ? " ▲"
+                    : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
                 >
                 <td>{r.points}</td>
                 <td
@@ -806,8 +834,8 @@
           </tbody>
         </table>
         <p class="text-xs text-gray-400 mt-3">
-          ★ the median seed, whose log is published. In AdvantageScope open it,
-          then File → Import Layout with biobuzz's <code
+          ▲ the best seed, ★ the median one: both logs are published. In
+          AdvantageScope open one, then File → Import Layout with biobuzz's <code
             >sim-review/advantagescope-layout.json</code
           >; AUTO starts 10 s into the log. Its Metadata tab names the commit
           and .pp it simulated.

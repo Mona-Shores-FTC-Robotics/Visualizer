@@ -188,6 +188,8 @@ export interface SimResult {
   runUrl: string;
   finishedAt: string;
   typicalSeed: number | null;
+  /** The best run's seed (absent in results from before it was published). */
+  bestSeed?: number | null;
   /** Seed → the .wpilog published for it, beside result.json. */
   logs: Record<string, string>;
 }
@@ -232,6 +234,13 @@ export interface SimTally {
   withProblems: number;
   /** The median run by points (the earlier seed on a tie): the one to watch. */
   typicalSeed: number | null;
+  /** The best run: the most points, then the earliest last TIP, then the lower seed. */
+  best: SimRun | null;
+}
+
+/** When a run's last TIP that counts for AUTO completed; Infinity with none. */
+function lastTip(run: SimRun): number {
+  return run.autoTips > 0 ? run.tipsAt[run.autoTips - 1] : Infinity;
 }
 
 export function tally(runs: SimRun[]): SimTally {
@@ -268,5 +277,16 @@ export function tally(runs: SimRun[]): SimTally {
     robots,
     withProblems,
     typicalSeed: typical ? typical.seed : null,
+    best: runs.reduce<SimRun | null>(
+      (best, run) =>
+        !best ||
+        run.points > best.points ||
+        (run.points === best.points &&
+          (lastTip(run) < lastTip(best) ||
+            (lastTip(run) === lastTip(best) && run.seed < best.seed)))
+          ? run
+          : best,
+      null,
+    ),
   };
 }
