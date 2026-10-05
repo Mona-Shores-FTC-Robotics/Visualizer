@@ -2,10 +2,11 @@ import type { StartPose, AtomicPath, Shape, Settings } from "../types";
 import { makePathId } from "../utils/ids";
 
 /**
- * Default robot dimensions
+ * Default robot dimensions, inches: the 18 in start-size limit, which biobuzz's Autos plan with and
+ * which public/robot.png is drawn for (scripts/robot-image.mjs, ENVELOPE).
  */
-export const DEFAULT_ROBOT_WIDTH = 16;
-export const DEFAULT_ROBOT_HEIGHT = 16;
+export const DEFAULT_ROBOT_WIDTH = 18;
+export const DEFAULT_ROBOT_HEIGHT = 18;
 
 /**
  * Default canvas drawing settings
