@@ -1,4 +1,5 @@
-import type { BasePoint, Path, Settings, StartPose } from "../../types";
+import type { BasePoint, Path, SequenceItem, Settings, StartPose } from "../../types";
+import { atomicSegments } from "../../utils/pathTraversal";
 import { buildPathCatalog } from "./geometry";
 import { atomicPaths } from "./pins";
 import type { AutoCard, AutoSection } from "./types";
@@ -127,6 +128,31 @@ export function relink(
     linkIds.length !== oldLinks.size ||
     linkIds.some((id) => !oldLinks.has(id));
   return { lines: changed ? out : lines, linkIds, changed };
+}
+
+/** A file shown beside others (the team's Together view): what it needs to be laid out. */
+export interface ShownFile {
+  startPoint: StartPose | null;
+  lines: Path[];
+  sequence: SequenceItem[];
+  settings: Settings;
+  auto: AutoSection | null;
+}
+
+/**
+ * A shown file with its paths laid out as the editor lays out the file it has open (`relink`),
+ * so each path its Auto drives starts where the robot is. Without it a branch's path starts where
+ * the path above it in the file ends, and the robot jumps there. The same object if nothing moved.
+ */
+export function layOutShown<T extends ShownFile>(file: T): T {
+  if (!file.auto || !file.startPoint) return file;
+  const result = relink(file.startPoint, file.lines, file.auto, file.settings);
+  if (!result.changed) return file;
+  const auto: AutoSection = { ...file.auto };
+  if (result.linkIds.length) auto.linkPaths = result.linkIds;
+  else delete auto.linkPaths;
+  const sequence = atomicSegments(result.lines).map((line) => ({ kind: "path" as const, lineId: line.id }));
+  return { ...file, lines: result.lines, sequence, auto };
 }
 
 /** Whether `id` is a link path (hidden in the editor, never driven). */

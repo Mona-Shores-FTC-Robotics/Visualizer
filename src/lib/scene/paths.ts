@@ -111,13 +111,21 @@ export function buildPathElements(
   registry?: PointRegistry,
   container: PointContainer = "main",
 ): (TwoPath | PathLine)[] {
-  const { startPoint, lines, idPrefix, color, honorLocked = true } = spec;
+  const {
+    startPoint,
+    lines,
+    idPrefix,
+    color,
+    honorLocked = true,
+    hidden,
+  } = spec;
   const opacityScale = spec.opacityScale ?? 1;
   const baseOpacity = (settings.pathOpacity || 1.0) * opacityScale;
   const elements: (TwoPath | PathLine)[] = [];
 
   flattenToAtomicSegments(startPoint, lines).forEach(
     ({ line, index: idx, start: segmentStart }) => {
+      if (hidden?.has(line.id)) return;
       const lineElem = buildSegmentPath(segmentStart, line, scales);
 
       lineElem.id = `${idPrefix}-${idx + 1}`;

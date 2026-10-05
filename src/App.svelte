@@ -196,7 +196,7 @@
   import AutoPreviewSwitches from "./lib/auto/components/AutoPreviewSwitches.svelte";
   import AutoTimeline from "./lib/auto/components/AutoTimeline.svelte";
   import { adoptPins, atomicPaths, pinState, resolvePins, type PinState } from "./lib/auto/pins";
-  import { linkSegmentIds, relink } from "./lib/auto/links";
+  import { layOutShown, linkSegmentIds, relink } from "./lib/auto/links";
   import { buildPathCatalog } from "./lib/auto/geometry";
   import { validateAuto } from "./lib/auto/validate";
   import {
@@ -780,7 +780,8 @@
           const normalizedLines = normalizePaths(data.lines || []);
           const start = normalizeStartPose(data.startPoint);
           const pathSettings = data.settings || { ...DEFAULT_SETTINGS };
-          newAdditionalPaths.push({
+          // Laid out as the editor would, so a branch's paths start where the robot is.
+          newAdditionalPaths.push(layOutShown({
             filePath,
             startPoint: start,
             lines: normalizedLines,
@@ -794,7 +795,7 @@
             settings: pathSettings,
             color: colors[i],
             auto: normalizeAuto(data.auto).auto,
-          });
+          }));
         }
       } catch (error) {
         console.error(`Failed to load additional path ${filePath}:`, error);
@@ -1255,6 +1256,7 @@
         shapes: pathData.shapes,
         sequence: pathData.sequence,
         settings: pathData.settings,
+        ...(pathData.auto ? { linkPaths: pathData.auto.linkPaths ?? [] } : {}),
       });
 
       await browserFileStore.writeFile(pathData.filePath, fileData);
@@ -1448,6 +1450,7 @@
             lineWidth: pathLineWidth,
             color: pathData.color,
             honorLocked: false,
+            hidden: pathData.auto ? linkSegmentIds(pathData.auto, pathData.lines) : undefined,
             opacity: pathData.settings.pathOpacity ?? settings.pathOpacity ?? 1,
           });
         });
@@ -1895,7 +1898,8 @@
           });
         } else if (ref.container === "additional") {
           scheduleDragCommit(() => {
-            additionalPaths = [...additionalPaths];
+            // Re-laid out, as the editor does after every edit: a moved end moves the links.
+            additionalPaths = additionalPaths.map(layOutShown);
           });
           // Debounce the auto-save so it fires after the drag settles instead of
           // writing the file on every mousemove.
@@ -3069,6 +3073,7 @@
                     registry,
                     container: "additional",
                     scope: String(pathIdx),
+                    hidden: pathData.auto ? linkSegmentIds(pathData.auto, pathData.lines) : undefined,
                   },
                 ),
           )
@@ -3108,6 +3113,7 @@
               startPoint: pathData.startPoint,
               lines: pathData.lines,
               idPrefix: `additional-path-${pathIdx}-line`,
+              hidden: pathData.auto ? linkSegmentIds(pathData.auto, pathData.lines) : undefined,
               color: pathData.color,
               opacityScale: 1.0 - pathIdx * 0.1,
               honorLocked: false,

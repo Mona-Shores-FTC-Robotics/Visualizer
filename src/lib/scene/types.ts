@@ -13,4 +13,6 @@ export interface PathRenderSpec {
   color?: string;
   opacityScale?: number;
   honorLocked?: boolean;
+  /** Segment ids not to draw (an Auto's link paths, never driven). */
+  hidden?: Set<string>;
 }

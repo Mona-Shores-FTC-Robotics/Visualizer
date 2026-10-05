@@ -31,6 +31,15 @@ test("saving a second file keeps its own Auto, field points and settings", () =>
   assertEqual(saved.version, PROJECT_VERSION);
 });
 
+test("saving a second file keeps its laid-out links in its Auto", () => {
+  const stored = JSON.parse(sampleText);
+  const saved = buildOtherFileProject(sampleText, { ...onScreen, linkPaths: ["link-1"] });
+  assertEqual((saved.auto as { linkPaths: string[] }).linkPaths, ["link-1"]);
+  assertEqual({ ...(saved.auto as object), linkPaths: undefined }, { ...stored.auto, linkPaths: undefined });
+  const none = buildOtherFileProject(JSON.stringify(saved), { ...onScreen, linkPaths: [] });
+  assert(!("linkPaths" in (none.auto as object)), "no links, no list");
+});
+
 test("saving a second file never writes the main project's Auto into it", () => {
   // A file without an Auto stays without one, whatever the main file holds.
   const plain = JSON.stringify({ startPoint: { x: 1, y: 2 }, lines: [] });
