@@ -4,6 +4,10 @@ import { normalizePaths, normalizeStartPose } from "../../utils/normalize";
 import { DEFAULT_SETTINGS } from "../../utils";
 import rightText from "./fixtures/recycle5-right.pp?raw";
 import leftText from "./fixtures/recycle5-left.pp?raw";
+import o3Text from "./fixtures/qual-right-o3.pp?raw";
+import partnerRightText from "./fixtures/partner-preloads-right.pp?raw";
+import { buildPathCatalog } from "../auto/geometry";
+import { layOutShown } from "../auto/links";
 import {
   cleanValue,
   FACTS,
@@ -143,4 +147,30 @@ test("breakpoints: driving slower eventually costs a TIP", () => {
     speed.down !== null && speed.down.to < speed.down.from,
     "slower driving loses a TIP somewhere above 0.5×",
   );
+});
+
+test("Together view: a branch's paths start where the robot is once laid out (qual-right-o3)", () => {
+  const shown = (text: string) => {
+    const e = entry(text);
+    return layOutShown({ ...e, sequence: [] });
+  };
+  // The farthest a drive starts from where the previous drive ended.
+  const worstJump = (pair: FieldEntry[]) => {
+    const preview = previewTogether(pair, values).previews[0];
+    const catalog = buildPathCatalog(pair[0].startPoint, pair[0].lines, pair[0].settings);
+    let at: { x: number; y: number } = pair[0].startPoint;
+    let worst = 0;
+    for (const drive of preview.drives) {
+      const path = catalog.byId.get(drive.pathId)!;
+      worst = Math.max(worst, Math.hypot(path.start.x - at.x, path.start.y - at.y));
+      at = path.end;
+    }
+    return { worst, drives: preview.drives.length };
+  };
+  // As the file lists them, "S_FIRE to GARDEN" (No TIP 3 yet?) follows a path to PARK.
+  const raw = worstJump([entry(o3Text), entry(partnerRightText)]);
+  assert(raw.worst > 70, `the file as listed jumps (${raw.worst.toFixed(1)} in)`);
+  const laidOut = worstJump([shown(o3Text), shown(partnerRightText)]);
+  assert(laidOut.drives >= 10, `it drives the route (${laidOut.drives} paths)`);
+  assert(laidOut.worst < 1e-6, `no drive starts away from the robot (${laidOut.worst.toFixed(2)} in)`);
 });

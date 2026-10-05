@@ -131,6 +131,8 @@ export interface OtherFilePaths {
   shapes: Shape[];
   sequence: SequenceItem[];
   settings?: Settings;
+  /** The Auto's link paths after laying the lines out (see lib/auto/links.ts); kept in its `auto`. */
+  linkPaths?: string[];
 }
 
 /**
@@ -155,7 +157,20 @@ export function buildOtherFileProject(
       // Unreadable: write the paths alone rather than keep nothing at all.
     }
   }
-  const { startPoint, settings, ...edited } = paths;
+  const { startPoint, settings, linkPaths, ...edited } = paths;
+  if (
+    linkPaths &&
+    existing.auto &&
+    typeof existing.auto === "object" &&
+    !Array.isArray(existing.auto)
+  ) {
+    const auto: Record<string, unknown> = {
+      ...(existing.auto as Record<string, unknown>),
+    };
+    if (linkPaths.length) auto.linkPaths = linkPaths;
+    else delete auto.linkPaths;
+    existing = { ...existing, auto };
+  }
   return {
     ...existing,
     ...(startPoint ? { startPoint } : {}),

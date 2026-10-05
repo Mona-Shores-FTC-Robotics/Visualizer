@@ -42,6 +42,8 @@ export interface CanvasPathLayer {
   opacity?: number;
   /** Whether locked paths should render dashed/dimmer. */
   honorLocked?: boolean;
+  /** Segment ids not to draw (an Auto's link paths, never driven). */
+  hidden?: Set<string>;
 }
 
 export function drawPathLayer(
@@ -57,12 +59,14 @@ export function drawPathLayer(
     color,
     opacity = 1,
     honorLocked = true,
+    hidden,
   } = layer;
 
   const segments = flattenToAtomicSegments(startPoint, paths);
 
   for (const segment of segments) {
     const line = segment.line;
+    if (hidden?.has(line.id)) continue;
     const points = segment.points; // [start, ...controlPoints, end] in inches
     if (points.length < 2) continue;
 
