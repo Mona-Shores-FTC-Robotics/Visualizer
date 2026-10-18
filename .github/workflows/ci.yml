@@ -1,12 +1,12 @@
-# Checks every pull request and every push to a branch other than main: types, lint, the unit
-# tests and a production build, the same commands a contributor runs locally (`npm run check`,
-# `npm run lint`, `npm test`, `npx vite build`). Pushes to main are built and tested by pages.yml.
+# Checks every pull request: types, lint, the unit tests and a production build, the same
+# commands a contributor runs locally (`npm run check`, `npm run lint`, `npm test`,
+# `npx vite build`). Pushes to main are built and tested by pages.yml. A branch without a pull
+# request can be checked by hand from the Actions tab (workflow_dispatch).
 name: CI
 
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
