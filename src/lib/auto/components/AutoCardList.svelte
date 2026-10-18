@@ -3,10 +3,12 @@
   import type { AutoIssue } from "../validate";
   import type { PreviewResult, WorstCase } from "../simulate";
   import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
-  import type { AutoCard, AutoSection, FirstOfCard } from "../types";
-  import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel, rejoinTail } from "../tree";
+  import type { AutoCard, AutoSection } from "../types";
+  import { allCards, cardTitle, childLists, findCard, isPlainWait, rowLabel, rejoinTail } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
   import { insertNewCard, moveCard, removeCard, canMove, type NewCardKind } from "../edit";
+  import { exitText, insertPreset, PRESETS, waitSentence, type PresetKind } from "../presets";
+  import { get } from "svelte/store";
   import {
     addNewPath,
     parseSelection,
@@ -129,6 +131,31 @@
     if (created) selectedCardId.set(created);
   }
 
+  /** One of the game's verbs (Fire, Load, Wait for TIP): a wait card with the robot's names filled in. */
+  function addPreset(kind: PresetKind) {
+    let created: string | null = null;
+    updateAuto((draft) => {
+      created = insertPreset(draft, kind, selection);
+    });
+    if (created) selectedCardId.set(created);
+  }
+
+  /** A new path from where the robot is, marked as the park path for the endgame guard. */
+  function addPark() {
+    addNewPath("after");
+    const id = parseSelection(get(selectedCardId)).cardId;
+    if (!id) return;
+    updateAuto((draft) => {
+      const created = findCard(draft.cards, id);
+      if (created?.kind === "path") created.park = true;
+    });
+  }
+
+  /** "instead…" on a wait's ✗ exit: select that exit, so the next step added starts its route. */
+  function startInstead(cardId: string, rowIndex: number) {
+    selectedCardId.set(`${cardId}#${rowIndex}`);
+  }
+
   function move(id: string, delta: -1 | 1) {
     updateAuto((draft) => void moveCard(draft, id, delta));
   }
@@ -153,25 +180,56 @@
     return preview !== null && !preview.ran.has(cardId);
   }
 
-  function firstOfSummary(card: FirstOfCard): string {
-    return card.rows.map(describeRow).join(" · ") || "no rows";
-  }
-
-  /** The branches a card shows in the list: a decision's rows, or its one inner list. */
-  function branchesOf(card: AutoCard): { label: string; detail: string; cards: AutoCard[]; color: string; asks: string[] }[] {
+  /**
+   * The exits a wait shows in the list: its ✓ row (the trigger) and ✗ row (the time limit). An exit
+   * with no steps just continues; the ✗ exit offers "instead…" to start a route of its own.
+   */
+  function branchesOf(card: AutoCard): {
+    label: string;
+    cards: AutoCard[];
+    color: string;
+    continues: boolean;
+    timedOut: boolean;
+  }[] {
     if (card.kind === "firstOf") {
       return card.rows.map((row, index) => ({
-        label: row.cards.length || row.label ? rowLabel(row) : describeRow(row),
-        detail: describeRow(row),
+        label: row.cards.length || row.label ? `${exitText(row).slice(0, 1)} ${rowLabel(row)}` : exitText(row),
         cards: row.cards,
         color: branchColor(index),
-        // The conditions this row asks; the preview's answers sit next to them.
-        asks: rowKind(row) === "when" ? (row as { when: string[] }).when : [],
+        continues: row.cards.length === 0,
+        timedOut: rowKind(row) === "afterMs",
       }));
     }
     return [];
   }
+
+  /**
+   * A plain wait (both exits continue) is one line until it is selected; a wait with a route shows
+   * both exits, so the ✓ side's "continue" is read next to the route.
+   */
+  function showsExits(card: AutoCard): boolean {
+    return card.kind === "firstOf" && (!isPlainWait(card) || selection.cardId === card.id);
+  }
 </script>
+
+{#snippet addBar()}
+  <!-- The game's verbs first; the generic cards under "more" for the rare case. -->
+  <div class="auto-add-row">
+    <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is, after the selected card">+ Drive to</button>
+    {#each PRESETS as preset (preset.kind)}
+      <button type="button" class="path-list-action" onclick={() => addPreset(preset.kind)} title={preset.hint}>+ {preset.button}</button>
+    {/each}
+    <button type="button" class="path-list-action" onclick={addPark} title="A new path to the park spot: the endgame guard drives it when time is short">+ Park</button>
+    <details class="auto-more">
+      <summary class="path-list-action" title="The generic cards the verbs are made of">more</summary>
+      <div class="auto-add-row auto-more-row">
+        <button type="button" class="path-list-action" onclick={() => add("action")} title="A robot command, after the selected card">+ Command</button>
+        <button type="button" class="path-list-action" onclick={() => add("wait")} title="Wait for any trigger, at most a time">+ Wait for</button>
+        <button type="button" class="path-list-action" onclick={() => add("rejoin")} title="End this route by joining another at one of its stops">+ Rejoin</button>
+      </div>
+    </details>
+  </div>
+{/snippet}
 
 {#snippet cardButton(card: AutoCard)}
   {@const selected = selection.cardId === card.id && selection.rowIndex === null}
@@ -226,7 +284,7 @@
         {:else if card.kind === "rejoin"}
           via {pathName(card.lineId)} · then the steps after that stop
         {:else if card.kind === "firstOf"}
-          {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}
+          {waitSentence(card)}
         {/if}
       </div>
     </button>
@@ -241,7 +299,7 @@
 
 {#snippet cardList(list: AutoCard[])}
   {#each list as card (card.id)}
-    {#if childLists(card).length > 0}
+    {#if showsExits(card)}
       <div class="path-group" class:path-group--selected={selection.cardId === card.id}>
         {@render cardButton(card)}
         {#each branchesOf(card) as row, rowIndex (rowIndex)}
@@ -275,7 +333,7 @@
               onclick={() => selectedCardId.set(rowSelected ? card.id : `${card.id}#${rowIndex}`)}
               title="Select this branch: new cards go at its end"
             >
-              <span class="auto-branch-name">{row.label}</span>
+              <span class="auto-branch-name">{row.label}{#if row.continues}<span class="auto-continue">&nbsp;· continue</span>{/if}</span>
               <span class="auto-branch-meta">
                 {#if takenHere}<span class="auto-run">this preview</span>{/if}
                 {#if row.cards.length && true}
@@ -291,6 +349,14 @@
                 {/if}
               </span>
             </button>
+            {#if row.continues && row.timedOut && !rowSelected}
+              <button
+                type="button"
+                class="auto-instead"
+                title="If the wait times out, do something else: add the steps of that route here"
+                onclick={() => startInstead(card.id, rowIndex)}>instead…</button
+              >
+            {/if}
             </div>
             {#if folded}
               {@const level = levelInside(row.cards)}
@@ -308,7 +374,10 @@
                 {@render cardList(row.cards)}
               </div>
             {:else if rowSelected}
-              <div class="list-empty">No cards yet. Add cards with the buttons above.</div>
+              <div class="auto-instead-hint">
+                {row.timedOut ? "What happens instead? Add its steps:" : "Steps for this exit only:"}
+              </div>
+              {@render addBar()}
             {/if}
           </div>
         {/each}
@@ -339,18 +408,12 @@
       </div>
     </div>
   {/if}
-  <div class="auto-add-row">
-    <button type="button" class="path-list-action" onclick={() => add("action")} title="A robot command, after the selected card">+ Command</button>
-    <button type="button" class="path-list-action" onclick={() => add("wait")} title="Add a wait: the first of a condition or a time">+ Wait for</button>
-    <button type="button" class="path-list-action" onclick={() => add("decision")} title="Add a decision with a branch per row">+ Decision</button>
-    <button type="button" class="path-list-action" onclick={() => add("path")} title="A new path from where the robot is">+ Path</button>
-    <button type="button" class="path-list-action" onclick={() => add("rejoin")} title="End this route by joining another at one of its stops">+ Rejoin</button>
-  </div>
+  {@render addBar()}
 
   <div class="module-list" role="list">
     {@render cardList(auto.cards)}
     {#if auto.cards.length === 0}
-      <div class="list-empty">No cards yet. Start with + Action or + Path.</div>
+      <div class="list-empty">No steps yet. Start with + Drive to or + Fire.</div>
     {/if}
     <!-- The endgame guard shows once a branch has a park path to use. -->
     {#if parkBranches.length}
@@ -380,8 +443,44 @@
     gap: 4px;
     margin-top: 8px;
   }
-  .auto-add-hint {
+  .auto-more {
+    display: inline-block;
+  }
+  .auto-more > summary {
+    list-style: none;
+    cursor: pointer;
+    color: #888888;
+  }
+  .auto-more > summary::-webkit-details-marker {
+    display: none;
+  }
+  .auto-more[open] > summary {
+    color: #cfcfcf;
+  }
+  .auto-more-row {
     margin-top: 4px;
+  }
+  .auto-continue {
+    font-weight: 400;
+    color: #8a8a8a;
+  }
+  .auto-instead {
+    flex: none;
+    background: none;
+    border: 1px dashed #444444;
+    border-radius: 5px;
+    padding: 0 6px;
+    font-size: 0.66rem;
+    color: #9a9a9a;
+  }
+  .auto-instead:hover {
+    border-color: var(--c);
+    color: var(--c);
+  }
+  .auto-instead-hint {
+    font-size: 0.68rem;
+    color: #bbbbbb;
+    padding: 2px 0 0 2px;
   }
   .auto-card {
     display: flex;
