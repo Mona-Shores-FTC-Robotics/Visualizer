@@ -14,6 +14,7 @@
   import type { Shape } from "../../../types";
   import { allCards, findCard, isPlainWait, rowLabel } from "../tree";
   import { canMove, duplicateCard, moveCard, removeCard, rowOfKind } from "../edit";
+  import { exitText, isSimpleWait, limitRow, triggerRow } from "../presets";
   import { commitAuto, parseSelection, selectedCardId, updateAuto } from "../store";
   import {
     ACTION_CLASS,
@@ -333,17 +334,44 @@
     </div>
     <div class="text-[11px] text-gray-500">After it, this route runs the steps after that stop, shared with the route it joins.</div>
   {:else if card?.kind === "firstOf"}
+    {@const simple = isSimpleWait(card)}
+    {@const trigger = triggerRow(card)}
+    {@const limit = limitRow(card)}
+    {@const triggerIndex = trigger ? card.rows.indexOf(trigger) : -1}
+    {@const limitIndex = limit ? card.rows.indexOf(limit) : -1}
     <div class={CELL_CLASS}>
-      <label class={LABEL_CLASS} for="auto-firstof-label">{isPlainWait(card) ? "Wait name" : "Question"}</label>
+      <label class={LABEL_CLASS} for="auto-firstof-label">Name</label>
       <input
         id="auto-firstof-label"
         class={FIELD_CLASS}
         value={card.label}
-        placeholder={isPlainWait(card) ? "Wait for LauncherReady" : "Did the HIVE tip?"}
+        placeholder={isPlainWait(card) ? "Fire the preloads" : "Did the HIVE tip?"}
         oninput={(e) => edit((c) => { if (c.kind === "firstOf") c.label = e.currentTarget.value; }, false)}
         onchange={commitAuto}
       />
     </div>
+    {#if simple && trigger && limit}
+      <!-- The one sentence every wait is: wait for a trigger, at most a time. -->
+      <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+        <div class={CELL_CLASS}>
+          <span class={LABEL_CLASS}>Wait for</span>
+          {@render nameSelect(trigger.when[0] ?? "", conditions, "a trigger", (name) => editRow(triggerIndex, (r) => { if ("when" in r) r.when = [name]; }))}
+        </div>
+        <div class={CELL_CLASS}>
+          <label class={LABEL_CLASS} for="auto-wait-limit" title="If the trigger has not fired by then, the wait ends anyway (✗).">At most (s)</label>
+          <input
+            id="auto-wait-limit"
+            class={FIELD_CLASS}
+            type="number"
+            min="0.1"
+            step="0.5"
+            value={limit.afterMs / 1000}
+            oninput={(e) => editRow(limitIndex, (r) => { if ("afterMs" in r) { const s = numberOr(e.currentTarget.value, r.afterMs / 1000); if (s > 0) r.afterMs = Math.round(s * 1000); } }, false)}
+            onchange={commitAuto}
+          />
+        </div>
+      </div>
+    {/if}
     <div class={CELL_CLASS}>
       <label class={LABEL_CLASS} for="auto-firstof-alongside">While waiting, run</label>
       <select
@@ -365,6 +393,25 @@
         {#each actions as name (name)}<option value={name}>{name}</option>{/each}
       </select>
     </div>
+    {#if simple}
+      <!-- The two exits. A route's name is the guard's label and the branch's name on the field. -->
+      <div class="space-y-1 text-[11px] text-gray-400">
+        {#each card.rows as row, rowIndex (rowIndex)}
+          <div class="flex items-center gap-2" style={`color: ${branchColor(rowIndex)}`}>
+            <span class="w-28 shrink-0 font-semibold">{exitText(row)}</span>
+            {#if row.cards.length}
+              <input class="{FIELD_CLASS} !w-auto flex-1" value={row.label ?? ""} placeholder={rowLabel({ ...row, label: undefined })}
+                aria-label="Route name"
+                oninput={(e) => editRow(rowIndex, (r) => { const v = e.currentTarget.value; if (v.trim()) r.label = v; else delete r.label; }, false)}
+                onchange={commitAuto} />
+              <span class="text-gray-500">{row.cards.length} step{row.cards.length === 1 ? "" : "s"}</span>
+            {:else}
+              <span class="text-gray-500">continue{"afterMs" in row ? " (or add steps with instead… in the list)" : ""}</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {:else}
     <div class="space-y-2">
       {#each card.rows as row, rowIndex (rowIndex)}
         {@const kind = rowKind(row)}
@@ -452,6 +499,7 @@
         <button type="button" class={ACTION_CLASS} onclick={() => edit((c) => { if (c.kind === "firstOf") c.rows.push(rowOfKind("afterMs", null, auto)); })}>+ Time row</button>
       </div>
     </div>
+    {/if}
   {/if}
 </div>
 {/if}

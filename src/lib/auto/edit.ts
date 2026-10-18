@@ -23,7 +23,7 @@ export type NewCardKind =
   | "rejoin";
 
 /** Where a new card goes: after the selected card, into a selected branch, or at the end. */
-function insertionPoint(
+export function insertionPoint(
   auto: AutoSection,
   cardId: string | null,
   rowIndex: number | null,

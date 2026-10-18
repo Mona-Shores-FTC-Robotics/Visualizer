@@ -17,12 +17,23 @@ key, `auto`. Everything the Auto builder adds lives under it, so:
 The fork is one screen: the **Auto** on the left, the **field** on the right.
 A file without an Auto opens with one path card per path, in Path List order.
 
-- **+ Command / + Wait for / + Decision / + Path** add a card after the
-  selected card (or at the end of a selected branch). **+ Path** and the field's **+ Add Path** make a new
-  path that starts where the robot is at that point of the Auto.
+- The add bar speaks the game: **+ Drive to** (a new path from where the robot is), **+ Fire**
+  (LaunchAll until Empty, at most 3 s), **+ Load** (until IntakeFull, at most 3 s) and **+ Wait
+  for TIP** (until Tip, at most 5 s). Each goes after the selected card, or at the end of a
+  selected exit. Parking is not drawn: it is the robot's job (biobuzz #188); until that lands, a
+  path card's **Park path** checkbox still marks the endgame guard's path. Fire, Load and Wait for TIP are presets of
+  the one wait card (`src/lib/auto/presets.ts`): they fill in the robot's names and add them to
+  the file's registry, and the file, preview and export see an ordinary wait. **more** holds the
+  generic cards they are made of (Command, Wait for, Rejoin).
+- A wait reads as a sentence: "LaunchAll until Empty · at most 3.0 s". Select it to see its two
+  exits, **✓ Empty · continue** and **✗ not after 3.0 s · continue**, and to change the trigger
+  or the limit (in seconds).
+- **Branching is "instead…"** on a wait's ✗ exit: click it, and the steps you add next are what
+  the robot does if the wait times out. End that route with **+ Rejoin** (more), or let it run to
+  the end of the Auto. The ✓ exit always continues the list.
 - Click a card to edit it in place, under the card. A path card shows
   **Ends at** and **Park path**; **more** has the path. Clicking a path on the field selects its card.
-- Above the field: one switch per condition (**✓** happens, **✗** never
+- Above the field: one switch per wait that branches (**✓** happens, **✗** never
   does). Below it: the play bar, the time against 30 s and the worst case.
   While it plays, the running card is outlined.
 - **Setup** (start pose, registry, named points, alliance, export name) and
