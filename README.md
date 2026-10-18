@@ -9,9 +9,9 @@ Visualizer and is not endorsed by Pedro Pathing.
 What the fork adds:
 
 - **Auto mode.** The Auto button in the top bar turns the Path List into the whole Autonomous,
-  in the game's words: Drive to, Fire, Load, Wait for TIP, Park. Every wait is "until a trigger, at
-  most N s"; branching is **instead…** on its timed-out exit. An endgame guard parks when time is
-  short, and the preview's ✓/✗ switches play any scenario against the 30 s budget.
+  in the game's words: Drive to, Fire, Load, Wait for TIP. Every wait is "until a trigger, at most
+  N s"; branching is **instead…** on its timed-out exit. The preview's ✓/✗ switches play any
+  scenario against the 30 s budget.
 - **Export Auto (Java).** Writes a class for the `autokit` library in the robot code. The format of
   the `auto` section of `.pp` files is in [`docs/auto-format.md`](docs/auto-format.md); the stock
   Visualizer still opens these files and ignores that section.

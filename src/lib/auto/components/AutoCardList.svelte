@@ -4,11 +4,10 @@
   import type { PreviewResult, WorstCase } from "../simulate";
   import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
   import type { AutoCard, AutoSection } from "../types";
-  import { allCards, cardTitle, childLists, findCard, isPlainWait, rowLabel, rejoinTail } from "../tree";
+  import { allCards, cardTitle, childLists, isPlainWait, rowLabel, rejoinTail } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
   import { insertNewCard, moveCard, removeCard, canMove, type NewCardKind } from "../edit";
   import { exitText, insertPreset, PRESETS, waitSentence, type PresetKind } from "../presets";
-  import { get } from "svelte/store";
   import {
     addNewPath,
     parseSelection,
@@ -140,17 +139,6 @@
     if (created) selectedCardId.set(created);
   }
 
-  /** A new path from where the robot is, marked as the park path for the endgame guard. */
-  function addPark() {
-    addNewPath("after");
-    const id = parseSelection(get(selectedCardId)).cardId;
-    if (!id) return;
-    updateAuto((draft) => {
-      const created = findCard(draft.cards, id);
-      if (created?.kind === "path") created.park = true;
-    });
-  }
-
   /** "instead…" on a wait's ✗ exit: select that exit, so the next step added starts its route. */
   function startInstead(cardId: string, rowIndex: number) {
     selectedCardId.set(`${cardId}#${rowIndex}`);
@@ -219,7 +207,6 @@
     {#each PRESETS as preset (preset.kind)}
       <button type="button" class="path-list-action" onclick={() => addPreset(preset.kind)} title={preset.hint}>+ {preset.button}</button>
     {/each}
-    <button type="button" class="path-list-action" onclick={addPark} title="A new path to the park spot: the endgame guard drives it when time is short">+ Park</button>
     <details class="auto-more">
       <summary class="path-list-action" title="The generic cards the verbs are made of">more</summary>
       <div class="auto-add-row auto-more-row">

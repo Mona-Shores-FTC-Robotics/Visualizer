@@ -18,9 +18,10 @@ The fork is one screen: the **Auto** on the left, the **field** on the right.
 A file without an Auto opens with one path card per path, in Path List order.
 
 - The add bar speaks the game: **+ Drive to** (a new path from where the robot is), **+ Fire**
-  (LaunchAll until Empty, at most 3 s), **+ Load** (until IntakeFull, at most 3 s), **+ Wait for
-  TIP** (until Tip, at most 5 s) and **+ Park** (a path the endgame guard drives). Each goes after
-  the selected card, or at the end of a selected exit. Fire, Load and Wait for TIP are presets of
+  (LaunchAll until Empty, at most 3 s), **+ Load** (until IntakeFull, at most 3 s) and **+ Wait
+  for TIP** (until Tip, at most 5 s). Each goes after the selected card, or at the end of a
+  selected exit. Parking is not drawn: it is the robot's job (biobuzz #188); until that lands, a
+  path card's **Park path** checkbox still marks the endgame guard's path. Fire, Load and Wait for TIP are presets of
   the one wait card (`src/lib/auto/presets.ts`): they fill in the robot's names and add them to
   the file's registry, and the file, preview and export see an ordinary wait. **more** holds the
   generic cards they are made of (Command, Wait for, Rejoin).
@@ -28,8 +29,8 @@ A file without an Auto opens with one path card per path, in Path List order.
   exits, **✓ Empty · continue** and **✗ not after 3.0 s · continue**, and to change the trigger
   or the limit (in seconds).
 - **Branching is "instead…"** on a wait's ✗ exit: click it, and the steps you add next are what
-  the robot does if the wait times out. End that route with **+ Park** or **+ Rejoin** (more), or
-  let it run to the end of the Auto. The ✓ exit always continues the list.
+  the robot does if the wait times out. End that route with **+ Rejoin** (more), or let it run to
+  the end of the Auto. The ✓ exit always continues the list.
 - Click a card to edit it in place, under the card. A path card shows
   **Ends at** and **Park path**; **more** has the path. Clicking a path on the field selects its card.
 - Above the field: one switch per wait that branches (**✓** happens, **✗** never
