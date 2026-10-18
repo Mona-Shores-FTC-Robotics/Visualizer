@@ -1,7 +1,7 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import { normalizeAuto } from "../auto/normalize";
 import { normalizePaths, normalizeStartPose } from "../../utils/normalize";
-import { DEFAULT_SETTINGS } from "../../utils";
+import { DEFAULT_SETTINGS } from "../../config";
 import rightText from "./fixtures/recycle5-right.pp?raw";
 import leftText from "./fixtures/recycle5-left.pp?raw";
 import o3Text from "./fixtures/qual-right-o3.pp?raw";

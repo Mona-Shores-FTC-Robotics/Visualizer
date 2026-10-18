@@ -92,10 +92,9 @@
   /** Switches a condition between event (stays true) and state (can change back). */
   function toggleEvent(name: string) {
     updateAuto((draft) => {
-      const events = new Set(draft.registry.events ?? []);
-      if (events.has(name)) events.delete(name);
-      else events.add(name);
-      if (events.size) draft.registry.events = draft.registry.conditions.filter((c) => events.has(c));
+      const events = draft.registry.events ?? [];
+      const next = events.includes(name) ? events.filter((c) => c !== name) : [...events, name];
+      if (next.length) draft.registry.events = draft.registry.conditions.filter((c) => next.includes(c));
       else delete draft.registry.events;
     });
   }
