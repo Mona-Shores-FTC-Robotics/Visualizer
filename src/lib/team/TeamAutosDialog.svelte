@@ -140,11 +140,11 @@
 >
   <h2
     id="team-autos-title"
-    class="text-2xl font-semibold text-neutral-900 dark:text-neutral-100 mb-1"
+    class="text-2xl font-semibold text-heading mb-1"
   >
     Team Autos
   </h2>
-  <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+  <p class="text-sm text-body mb-4">
     The latest pushed Autos in biobuzz <code>{TEAM_DIR}</code>. Pick up to {MAX_FILES}
     to watch together. They open as copies named <code>biobuzz-…</code>; your
     own files are not touched.
@@ -153,7 +153,7 @@
   <div class="flex items-center gap-2 mb-4">
     <label
       for="team-branch"
-      class="text-sm font-medium text-neutral-700 dark:text-neutral-300"
+      class="text-sm font-medium text-heading"
       >Branch</label
     >
     <input
@@ -172,7 +172,7 @@
     <div
       class="console-section mb-4 p-3 flex flex-wrap items-center gap-2 text-sm"
     >
-      <span class="flex-1 text-neutral-700 dark:text-neutral-300">
+      <span class="flex-1 text-heading">
         Showing <strong>{$teamView.files.join(" + ")}</strong> from {$teamView.ref},
         fetched
         {age($teamView.fetchedAt)}.
@@ -186,42 +186,42 @@
 
   <div class="console-section flex-1 overflow-y-auto mb-4">
     {#if loading}
-      <div class="p-6 text-center text-neutral-500">Loading…</div>
+      <div class="p-6 text-center text-body">Loading…</div>
     {:else if errorMessage}
-      <div class="p-6 text-center text-red-500">{errorMessage}</div>
+      <div class="p-6 text-center text-danger">{errorMessage}</div>
     {:else}
       {#if pairs.length > 0}
         <div
-          class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-neutral-500"
+          class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-body"
         >
           Pairs
         </div>
         {#each pairs as pair (pair.name)}
           <button
-            class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
+            class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-body/10"
             onclick={() => show(pair.files, pair.name)}
             disabled={busy}
           >
-            <span class="font-medium text-neutral-900 dark:text-neutral-100"
+            <span class="font-medium text-heading"
               >{pair.name}</span
             >
-            <span class="text-xs text-neutral-500"
+            <span class="text-xs text-body"
               >{pair.files.join(" + ")}</span
             >
             {#if pair.note}<span
-                class="text-xs text-neutral-500 flex-1 text-right"
+                class="text-xs text-body flex-1 text-right"
                 >{pair.note}</span
               >{/if}
           </button>
         {/each}
       {/if}
       <div
-        class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-neutral-500"
+        class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-body"
       >
         Autos
       </div>
       {#if files.length === 0}
-        <div class="p-4 text-sm text-neutral-500">
+        <div class="p-4 text-sm text-body">
           No .pp files in {TEAM_DIR} on this branch. The team's Autos are on
           <code>{DEFAULT_REF}</code>.
         </div>
@@ -229,7 +229,7 @@
       {#each files as file (file)}
         {@const n = selected.indexOf(file)}
         <button
-          class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
+          class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-body/10"
           onclick={() => toggle(file)}
         >
           {#if n >= 0}
@@ -239,10 +239,10 @@
             >
           {:else}
             <span
-              class="size-6 border-2 border-neutral-300 dark:border-neutral-600"
+              class="size-6 border-2 border-border"
             ></span>
           {/if}
-          <span class="text-neutral-900 dark:text-neutral-100">{file}</span>
+          <span class="text-heading">{file}</span>
         </button>
       {/each}
     {/if}

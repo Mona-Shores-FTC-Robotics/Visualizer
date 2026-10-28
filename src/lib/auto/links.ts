@@ -167,3 +167,13 @@ export function linkSegmentIds(auto: AutoSection, lines: Path[]): Set<string> {
   segments.forEach((_, id) => ids.add(id));
   return ids;
 }
+
+/** `layOutShown` for a whole project document (an overlay): the same object if nothing moved. */
+export function layOutDoc<
+  T extends { startPoint: StartPose; lines: Path[]; sequence: SequenceItem[]; auto?: AutoSection | null },
+>(doc: T, settings: Settings): T {
+  if (!doc.auto) return doc;
+  const laid = layOutShown({ ...doc, auto: doc.auto, settings });
+  if (laid.lines === doc.lines) return doc;
+  return { ...doc, lines: laid.lines, sequence: laid.sequence, auto: laid.auto };
+}

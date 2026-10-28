@@ -1,4 +1,6 @@
+import "@fontsource-variable/instrument-sans";
 import "./app.css";
+import "./lib/auto/auto.css";
 import { mount } from "svelte";
 import App from "./App.svelte";
 
@@ -9,9 +11,11 @@ const app = mount(App, { target: document.body });
 // check the server for a new sw.js, never a browser-cached one, so a deploy is
 // picked up on the next load.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch((error) => {
-    console.error(`Service worker registration failed: ${error}`);
-  });
+  navigator.serviceWorker
+    .register("sw.js", { updateViaCache: "none" })
+    .catch((error) => {
+      console.error(`Service worker registration failed: ${error}`);
+    });
 }
 
 export default app;

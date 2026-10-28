@@ -1,20 +1,22 @@
 import { get, writable } from "svelte/store";
-import { isUnsaved } from "../../stores";
-import { normalizeAuto } from "./normalize";
-import { predatesPins } from "./pins";
+import type { ProjectStore } from "../../state/project.svelte";
 import type { Scenario } from "./simulate";
 import type { AutoSection } from "./types";
 import { foldedBranches } from "./fold";
 
 /**
- * The open project's `auto` section. A store rather than a prop so the many
- * places that load and save a project can carry it without threading it
- * through every upstream component. Null when the project has no Auto.
+ * The open project's `auto` section, mirrored from `project.doc.auto` (see
+ * `connectAutoStore`) so components can read it as `$autoSection`. Null when
+ * the project has no Auto. Edit it through `updateAuto`, never `set`.
  */
 export const autoSection = writable<AutoSection | null>(null);
 
-/** Whether the left and right panels show the Auto instead of the paths. */
-export const autoMode = writable(false);
+let project: ProjectStore | null = null;
+
+/** Called once by App: the Auto lives in the project document from then on. */
+export function connectAutoStore(store: ProjectStore): void {
+  project = store;
+}
 
 /**
  * What is selected in the card list: a card id, or `<decision id>#<row>` for
@@ -24,18 +26,6 @@ export const selectedCardId = writable<string | null>(null);
 
 /** The preview's answers: whether each card's condition is true when it asks. Not saved. */
 export const previewScenario = writable<Scenario>({});
-
-let recorder: (() => void) | null = null;
-
-/** Set when the file just loaded predates pins; see `takePinsToAdopt`. */
-let pinsToAdopt = false;
-
-/** Whether the loaded file's pins still have to be adopted; clears the flag. */
-export function takePinsToAdopt(): boolean {
-  const pending = pinsToAdopt;
-  pinsToAdopt = false;
-  return pending;
-}
 
 let newPathHandler: ((where: "after" | "branchEnd") => void) | null = null;
 
@@ -49,29 +39,33 @@ export function addNewPath(where: "after" | "branchEnd"): void {
   newPathHandler?.(where);
 }
 
-/** The app's undo recorder, called after each committed Auto edit. */
-export function setAutoRecorder(record: () => void): void {
-  recorder = record;
+/**
+ * Edit the Auto: `mutate` works on a copy, which replaces the document's.
+ * Pass `record: false` while typing: those edits merge into one undo step
+ * (the project store coalesces them), so undo goes back a whole value.
+ */
+export function updateAuto(mutate: (auto: AutoSection) => void, record = true): void {
+  const current = project?.doc.auto;
+  if (!project || !current) return;
+  const draft = structuredClone(current) as AutoSection;
+  mutate(draft);
+  project.apply((doc) => ({ ...doc, auto: draft }), record ? {} : { coalesce: "auto" });
 }
 
 /**
- * Edit the Auto: `mutate` works on a copy, which then replaces the store's
- * value. Pass `record: false` while typing and call `commitAuto()` when the
- * edit is done, so undo gets one step per edit rather than per keystroke.
+ * Adjust the Auto without an undo step, for what follows from an edit (pins,
+ * link paths) rather than being one.
  */
-export function updateAuto(mutate: (auto: AutoSection) => void, record = true): void {
-  const current = get(autoSection);
-  if (!current) return;
-  const draft = JSON.parse(JSON.stringify(current)) as AutoSection;
+export function amendAuto(mutate: (auto: AutoSection) => void): void {
+  const current = project?.doc.auto;
+  if (!project || !current) return;
+  const draft = structuredClone(current) as AutoSection;
   mutate(draft);
-  autoSection.set(draft);
-  isUnsaved.set(true);
-  if (record) recorder?.();
+  project.amend((doc) => ({ ...doc, auto: draft }));
 }
 
-export function commitAuto(): void {
-  recorder?.();
-}
+/** The end of a typed edit. Coalescing already made it one step. */
+export function commitAuto(): void {}
 
 export function parseSelection(
   selection: string | null,
@@ -85,29 +79,14 @@ export function parseSelection(
   };
 }
 
-/**
- * Replace the Auto with the one in a freshly read file. Returns what the
- * loader had to repair, for the caller to show.
- */
-export function loadAutoFrom(data: unknown): string[] {
-  const raw =
-    typeof data === "object" && data !== null
-      ? (data as { auto?: unknown }).auto
-      : undefined;
-  const { auto, problems } = normalizeAuto(raw);
-  // A file from before pins: the ends already on named points get pinned once
-  // the app has its paths (see App.svelte and pins.ts).
-  pinsToAdopt = auto !== null && predatesPins(raw);
-  autoSection.set(auto);
+/** Forget the previous project's selection and preview answers, after a load. */
+export function resetAutoView(): void {
   selectedCardId.set(null);
   foldedBranches.set(new Set());
   previewScenario.set({});
-  if (!auto) autoMode.set(false);
-  return problems;
 }
 
 /** The current Auto, for the save paths that build a project document. */
 export function currentAuto(): AutoSection | null {
-  return get(autoSection);
+  return project?.doc.auto ?? get(autoSection);
 }
-

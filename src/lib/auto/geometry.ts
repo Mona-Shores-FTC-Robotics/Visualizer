@@ -5,15 +5,14 @@ import type {
   StartPose,
   TimelineEvent,
 } from "../../types";
-import { calculatePathTime, runDistanceAt } from "../../utils/timeCalculator";
+import { calculatePathTime } from "../../utils/timeCalculator";
 import {
   atomicSegments,
-  effectiveHeadingAt,
   flattenToAtomicSegments,
   type FlatSegment,
 } from "../../utils/pathTraversal";
-import { getLineEndHeading, getLineStartHeading } from "../../utils/headingInterpolation";
-import { easeInOutQuad, getCurvePoint } from "../../utils/math";
+import { segmentHeadingAt } from "../../utils/headingInterpolation";
+import { motionProfile } from "../../sim/motionProfile";
 
 /**
  * What the Auto needs to know about one of the project's paths.
@@ -115,8 +114,6 @@ export function buildPathCatalog(
 
     const first = segments[0];
     const last = segments[segments.length - 1];
-    const startHeading = effectiveHeadingAt(flat, first.index, 0);
-    const endHeading = effectiveHeadingAt(flat, last.index, 1);
     const prediction = calculatePathTime(
       startPoint,
       lines,
@@ -129,7 +126,7 @@ export function buildPathCatalog(
     let travelled = 0;
     segments.forEach((segment, segmentIndex) => {
       for (let k = segmentIndex === 0 ? 0 : 1; k <= SAMPLES_PER_SEGMENT; k++) {
-        const point = getCurvePoint(k / SAMPLES_PER_SEGMENT, segment.points);
+        const point = segment.curve.pointAt(k / SAMPLES_PER_SEGMENT);
         const previous = samples[samples.length - 1];
         if (previous) travelled += Math.hypot(point.x - previous.x, point.y - previous.y);
         samples.push(point);
@@ -145,19 +142,9 @@ export function buildPathCatalog(
       start: first.start,
       end: last.line.endPoint,
       endSegmentId: last.line.id,
-      startHeadingDeg: getLineStartHeading(
-        first.line,
-        first.start,
-        startHeading.heading,
-        startHeading.t,
-      ),
-      endHeadingDeg: getLineEndHeading(
-        last.line,
-        last.start,
-        endHeading.heading,
-        endHeading.t,
-      ),
-      length: segments.reduce((sum, segment) => sum + segment.arcLength, 0),
+      startHeadingDeg: segmentHeadingAt(flat, first.index, 0),
+      endHeadingDeg: segmentHeadingAt(flat, last.index, 1),
+      length: segments.reduce((sum, segment) => sum + segment.curve.length, 0),
       seconds: prediction.totalTime,
       travel: prediction.timeline.filter((event) => event.type === "travel"),
       samples,
@@ -165,9 +152,8 @@ export function buildPathCatalog(
       distanceAt: (time: number) => {
         const run = prediction.timeline.find((event) => event.run)?.run;
         if (!run) return 0;
-        return Math.min(
-          run.totalLength,
-          runDistanceAt(run, Math.min(time, run.totalTime), settings, easeInOutQuad),
+        return motionProfile(run.totalLength, settings).distanceAt(
+          Math.min(time, run.totalTime),
         );
       },
     });

@@ -1,13 +1,29 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import { loadSample } from "./fixtures/load";
 import { createEmptyAuto, normalizeAuto, serializeAuto } from "./normalize";
-import { buildProject, serializeProject } from "../../utils/project";
+import { serializeProject, type ProjectDoc } from "../../io";
 import { buildPathCatalog } from "./geometry";
 import { validateAuto, type AutoIssue } from "./validate";
 import { findCard, usedNames } from "./tree";
 import type { AutoSection, FirstOfCard, PathCard } from "./types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+function docOf(
+  sample: ReturnType<typeof loadSample>,
+  auto: AutoSection | null,
+): ProjectDoc {
+  return {
+    startPoint: sample.startPoint,
+    lines: sample.lines,
+    shapes: sample.shapes,
+    sequence: [],
+    fieldPoints: [],
+    robot: sample.settings,
+    activePaths: [],
+    auto,
+  };
+}
 
 function issuesOf(auto: AutoSection): AutoIssue[] {
   const sample = loadSample();
@@ -28,16 +44,7 @@ test("serializing a normalized section gives back the file's section", () => {
 
 test("save then load round-trips the auto section through a project file", () => {
   const sample = loadSample();
-  const text = serializeProject(
-    {
-      startPoint: sample.startPoint,
-      lines: sample.lines,
-      shapes: sample.shapes,
-      sequence: [],
-      auto: sample.auto,
-    },
-    { pretty: true },
-  );
+  const text = serializeProject(docOf(sample, sample.auto), { pretty: true });
   const reread = JSON.parse(text);
   const { auto, problems } = normalizeAuto(reread.auto);
   assertEqual(problems, []);
@@ -48,13 +55,7 @@ test("save then load round-trips the auto section through a project file", () =>
 
 test("a project without an Auto writes no auto key", () => {
   const sample = loadSample();
-  const project = buildProject({
-    startPoint: sample.startPoint,
-    lines: sample.lines,
-    shapes: [],
-    sequence: [],
-    auto: null,
-  });
+  const project = JSON.parse(serializeProject(docOf(sample, null)));
   assert(!("auto" in project), "no auto key expected");
   assertEqual(normalizeAuto(undefined), { auto: null, problems: [] });
 });

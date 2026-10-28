@@ -1,0 +1,116 @@
+{
+  "totalTime": 12.095613341675573,
+  "segmentTimes": [
+    1.469693845669907,
+    1.2483157575412847,
+    1.2517355303159192,
+    2.4800925421998885,
+    2.9135610245503596
+  ],
+  "totalDistance": 287.9632149659248,
+  "timeline": [
+    {
+      "type": "travel",
+      "duration": 1.469693845669907,
+      "startTime": 0,
+      "endTime": 1.469693845669907,
+      "lineId": "line-straight",
+      "run": {
+        "totalLength": 27,
+        "totalTime": 1.469693845669907,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    },
+    {
+      "type": "wait",
+      "name": "Path visualization wait",
+      "duration": 0.75,
+      "startTime": 1.469693845669907,
+      "endTime": 2.219693845669907,
+      "startHeading": 0,
+      "targetHeading": 0,
+      "atPoint": {
+        "x": 36,
+        "y": 60
+      }
+    },
+    {
+      "type": "wait",
+      "name": "Spin up",
+      "duration": 1,
+      "startTime": 2.219693845669907,
+      "endTime": 3.219693845669907,
+      "startHeading": 0,
+      "targetHeading": 0,
+      "atPoint": {
+        "x": 36,
+        "y": 60
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 1.2483157575412847,
+      "startTime": 3.219693845669907,
+      "endTime": 4.468009603211192,
+      "lineId": "line-quadratic",
+      "run": {
+        "totalLength": 78.12820552395578,
+        "totalTime": 2.500051287857204,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 1.2517355303159192,
+      "startTime": 4.468009603211192,
+      "endTime": 5.719745133527111,
+      "lineId": "line-cubic",
+      "run": {
+        "totalLength": 78.12820552395578,
+        "totalTime": 2.500051287857204,
+        "startDistance": 38.957305763146785,
+        "startTime": 1.2483157575412847
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 2.4800925421998885,
+      "startTime": 5.719745133527111,
+      "endTime": 8.199837675727,
+      "lineId": "line-high-order",
+      "run": {
+        "totalLength": 76.88573772344384,
+        "totalTime": 2.4800925421998885,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    },
+    {
+      "type": "wait",
+      "duration": 0.9822146413982134,
+      "startTime": 8.199837675727,
+      "endTime": 9.182052317125214,
+      "startHeading": 67.8596311914382,
+      "targetHeading": -108.93900426024018,
+      "atPoint": {
+        "x": 120,
+        "y": 72
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 2.9135610245503596,
+      "startTime": 9.182052317125214,
+      "endTime": 12.095613341675573,
+      "lineId": "line-through",
+      "run": {
+        "totalLength": 105.94927171852517,
+        "totalTime": 2.9135610245503596,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    }
+  ]
+}

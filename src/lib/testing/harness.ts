@@ -1,23 +1,8 @@
 /**
- * The smallest test harness that does the job: `test()` registers, the runner
- * in scripts/run-tests.mjs executes. No dependency beyond Vite, which the
- * project already has.
+ * Assertions for the fork's tests, which run under vitest with upstream's
+ * (`pnpm test`). `test` is vitest's own.
  */
-type TestFn = () => void | Promise<void>;
-
-let tests: { name: string; fn: TestFn }[] = [];
-
-export function test(name: string, fn: TestFn): void {
-  tests.push({ name, fn });
-}
-
-export function registeredTests(): { name: string; fn: TestFn }[] {
-  return tests;
-}
-
-export function resetTests(): void {
-  tests = [];
-}
+export { test } from "vitest";
 
 export function assert(condition: unknown, message = "assertion failed"): asserts condition {
   if (!condition) throw new Error(message);

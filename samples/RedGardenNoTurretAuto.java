@@ -57,19 +57,16 @@ public final class RedGardenNoTurretAuto {
         Pose collectHome = p.of(60, 10, 90);
 
         // Other poses the paths need (control points, unnamed endpoints).
-        Pose toGardenSide = p.of(40, 30, 90);
-        Pose gardenToPark = p.of(16, 106, 20.7);
         Pose toPark = p.of(16, 106, 287.3);
+        Pose toGardenSide = p.of(40, 30, 90);
+        Pose toGardenFlowerStart = p.of(40, 30, 90);
+        Pose gardenToPark = p.of(16, 106, 20.7);
 
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
         Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
         Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
         Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
-        Path toGardenSidePath = Paths.line(collectHome, toGardenSide).constant(toGardenSide);
-        Path toGardenFlower = Paths.line(toGardenSide, gardenFlower).linear(toGardenSide, gardenFlower);
-        Path turnToGardenCell = Paths.line(gardenFlower, gardenShot).linear(gardenFlower, gardenShot);
-        Path gardenToParkPath = Paths.line(gardenShot, gardenToPark).constant(gardenToPark);
         Path toHiveEntrance = Paths.line(collectHome, hiveEntrance).constant(hiveEntrance);
         Path underHive = Paths.line(hiveEntrance, corridorExit).constant(corridorExit);
         Path clearToTurnPath = Paths.line(corridorExit, clearToTurn).constant(clearToTurn);
@@ -77,6 +74,10 @@ public final class RedGardenNoTurretAuto {
         Path toLoadingFlower = Paths.line(rearShot, loadingFlower).linear(rearShot, loadingFlower);
         Path turnToLoadingCellAgain = Paths.line(loadingFlower, flowerShot).linear(loadingFlower, flowerShot);
         Path toParkPath = Paths.line(flowerShot, toPark).constant(toPark);
+        Path toGardenSidePath = Paths.line(start, toGardenSide).constant(toGardenSide);
+        Path toGardenFlower = Paths.line(toGardenFlowerStart, gardenFlower).linear(toGardenFlowerStart, gardenFlower);
+        Path turnToGardenCell = Paths.line(gardenFlower, gardenShot).linear(gardenFlower, gardenShot);
+        Path gardenToParkPath = Paths.line(gardenShot, gardenToPark).constant(gardenToPark);
 
         return kit.sequence(
                 kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),

@@ -97,3 +97,19 @@ test("pins: point uses count ends, the start and cards; unused points warn", () 
   const warnings = validateAuto(auto, catalog, start).filter((issue) => issue.message.includes("Nowhere"));
   assertEqual(warnings.map((w) => w.level), ["warning"]);
 });
+
+test("a mirrored project's pins still hold: its points mirror with the paths", async () => {
+  const { mirrorProject } = await import("../../model/mirror");
+  const { projectFromJson, robotConfigOf } = await import("../../io");
+  const { DEFAULT_SETTINGS } = await import("../../config");
+  const sample = loadSample();
+  const loaded = projectFromJson(sample.data, robotConfigOf(DEFAULT_SETTINGS));
+  assert(loaded.ok, "the sample loads");
+  const doc = loaded.doc;
+  const mirrored = mirrorProject(doc);
+  const auto = mirrored.auto!;
+  assert(auto.drawnFor !== doc.auto!.drawnFor, "drawn for the other alliance");
+  // Nothing to move: every pinned end is already on its mirrored point.
+  const result = resolvePins(auto, mirrored.startPoint, mirrored.lines, null);
+  assertEqual(result.moves, []);
+});

@@ -4,7 +4,8 @@ import golden from "../lib/codegen/auto/fixtures/HiveRushAuto.java?raw";
 import frozenV1Link from "./fixtures/hive-rush.v1.link?raw";
 import { generateAutoJavaFromText } from "../lib/codegen/auto/fromFile";
 import { normalizeAuto } from "../lib/auto/normalize";
-import { fileSettings } from "./project";
+import { projectFromJson, robotConfigOf } from "../io";
+import { DEFAULT_SETTINGS } from "../config";
 import {
   decodeShareHash,
   encodeShareHash,
@@ -134,7 +135,11 @@ test("link length budget: the hive-rush sample stays under 2,200 characters", as
   // Real Autos are longer than the sample; if this grows, the dialog's
   // advice about where a link fits needs checking again.
   const project = sample();
-  project.settings = fileSettings(project.settings as object);
+  // As the app shares it: the robot block, not the sender's preferences.
+  const loaded = projectFromJson(project, robotConfigOf(DEFAULT_SETTINGS));
+  if (!loaded.ok) throw new Error(loaded.error);
+  project.robot = loaded.doc.robot;
+  delete project.settings;
   const url = shareUrl(
     await encodeShareHash({ name: "hive-rush.pp", project }),
     PAGES,

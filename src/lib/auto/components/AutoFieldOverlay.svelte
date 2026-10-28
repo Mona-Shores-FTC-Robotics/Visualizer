@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type * as d3 from "d3";
+  import type { Axis } from "../../../view/viewport";
+  import { FIELD_SIZE } from "../../../config";
   import type { BasePoint } from "../../../types";
   import type { PathCatalog } from "../geometry";
   import type { PreviewResult } from "../simulate";
@@ -13,14 +14,14 @@
     auto: AutoSection;
     catalog: PathCatalog;
     preview: PreviewResult | null;
-    x: d3.ScaleLinear<number, number>;
-    y: d3.ScaleLinear<number, number>;
+    x: Axis;
+    y: Axis;
     showUntaken: boolean;
   }
 
   let { auto, catalog, preview, x, y, showUntaken }: Props = $props();
 
-  let size = $derived(x.range()[1]);
+  let size = $derived(x(FIELD_SIZE));
   let colors = $derived(cardColors(auto.cards));
   let selectedId = $derived(parseSelection($selectedCardId).cardId);
   // A rejoin drives a path too; it is drawn like any other.
@@ -34,7 +35,7 @@
     ),
   );
   let usedLineIds = $derived(new Set(pathCards.map((card) => card.lineId)));
-  let unit = $derived(size / 141.5);
+  let unit = $derived(size / FIELD_SIZE);
   let uses = $derived(pointUses(auto));
 
   const polyline = (points: BasePoint[]) =>
@@ -95,7 +96,7 @@
           opacity={layerTaken ? 1 : 0.5}
         />
         {#if card.park}
-          <text x={x(info.end.x)} y={y(info.end.y) - unit * 2.2} font-size={unit * 2.6} font-weight="700" text-anchor="middle" fill={color} stroke="#000" stroke-width={unit * 0.35} paint-order="stroke" opacity={layerTaken ? 1 : 0.6}>P</text>
+          <text x={x(info.end.x)} y={y(info.end.y) - unit * 2.2} font-size={unit * 2.6} font-weight="700" text-anchor="middle" fill={color} stroke="var(--base)" stroke-width={unit * 0.35} paint-order="stroke" opacity={layerTaken ? 1 : 0.6}>P</text>
         {/if}
       {/if}
     {/each}
@@ -118,6 +119,6 @@
   {#each Object.entries(auto.points) as [name, point] (name)}
     {@const used = isUsed(uses.get(name))}
     <circle cx={x(point[0])} cy={y(point[1])} r={unit * (used ? 0.8 : 0.7)} fill={used ? "#ffc516" : "none"} stroke={used ? "#111" : "#9a9a9a"} stroke-width={unit * 0.25} />
-    <text x={x(point[0])} y={y(point[1]) + unit * 3.4} font-size={unit * 2.2} text-anchor="middle" fill={used ? "#ffffff" : "#9a9a9a"} stroke="#000000" stroke-width={unit * 0.4} paint-order="stroke">{used ? name : `${name} (unused)`}</text>
+    <text x={x(point[0])} y={y(point[1]) + unit * 3.4} font-size={unit * 2.2} text-anchor="middle" fill={used ? "var(--heading)" : "var(--body)"} stroke="var(--base)" stroke-width={unit * 0.4} paint-order="stroke">{used ? name : `${name} (unused)`}</text>
   {/each}
 </svg>

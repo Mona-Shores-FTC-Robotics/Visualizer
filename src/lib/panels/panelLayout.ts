@@ -5,22 +5,16 @@ import { clamp } from "../../utils/math";
 export const CENTER_MIN_WIDTH = 300;
 export const PANEL_DIVIDER_WIDTH = 18;
 
-/**
- * In Auto mode the left panel holds the card list, which is unreadable when narrow. Below this
- * width the right panel gives up space instead of the left one.
- */
-export const AUTO_LEFT_PANEL_MIN_WIDTH = 320;
+/** Window height not available to the field: top bar, padding and playback bar. */
+const FIELD_VERTICAL_CHROME = 136;
+/** The field panel's padding, plus room beside the field for the two tool rails. */
+const FIELD_HORIZONTAL_CHROME = 16 + 2 * 56;
 
-/**
- * Minimum center width needed to keep the field square or wider. The field
- * height is set by the center-stage layout, roughly: window height minus
- * navbar (~80px), ui-shell padding (~24px), center-stage padding (~20px),
- * and field-stage padding (~16px).
- */
+/** Minimum center width that keeps the field as tall as the window allows. */
 export function getMinCenterWidthForSquare(): number {
   return Math.max(
     CENTER_MIN_WIDTH,
-    window.innerHeight - 80 - 24 - 20 - 16 - PANEL_DIVIDER_WIDTH * 2,
+    window.innerHeight - FIELD_VERTICAL_CHROME + FIELD_HORIZONTAL_CHROME,
   );
 }
 
@@ -33,9 +27,15 @@ export function getRightPanelMinWidth(settings: Settings | undefined): number {
   );
 }
 
+/**
+ * Fork: the left panel holds the Auto's card list, which is unreadable when
+ * narrow. Below this width the inspector gives up space instead.
+ */
+export const AUTO_LEFT_PANEL_MIN_WIDTH = 340;
+
 export function getLeftPanelMinWidth(settings: Settings | undefined): number {
   return Math.max(
-    0,
+    AUTO_LEFT_PANEL_MIN_WIDTH,
     Number(
       settings?.leftPanelMinWidth ?? DEFAULT_SETTINGS.leftPanelMinWidth ?? 0,
     ) || 0,
@@ -76,20 +76,4 @@ export function clampPanelWidth(
   // stage below the width that keeps the field square.
   const effectiveMax = Math.max(minWidth, maxPanelWidth);
   return clamp(desiredWidth, minWidth, effectiveMax);
-}
-
-export function getCenterWidth(
-  leftPanelWidth: number,
-  rightPanelWidth: number,
-  leftPanelHidden: boolean,
-  rightPanelHidden: boolean,
-): number {
-  return Math.max(
-    CENTER_MIN_WIDTH,
-    window.innerWidth -
-      24 -
-      (leftPanelHidden ? 0 : leftPanelWidth) -
-      (rightPanelHidden ? 0 : rightPanelWidth) -
-      PANEL_DIVIDER_WIDTH * 2,
-  );
 }

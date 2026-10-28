@@ -57,14 +57,17 @@ test("the bar says whether the draft is edited and whether GitHub moved on", () 
   assertEqual(draftStatus(true, "v1", "v2"), "edited-and-newer");
 });
 
-test("saving time, display settings and files shown beside it are not edits", () => {
-  const project = { startPoint: { x: 1 }, lines: [], timestamp: "2026-10-03T12:00:00Z", activePaths: ["a.pp"] };
-  const a = projectFingerprint({ ...project, settings: { rWidth: 18, leftPanelWidth: 300 } }, { rWidth: 18 });
-  const b = projectFingerprint(
-    { ...project, timestamp: "2026-10-04T09:00:00Z", activePaths: [], settings: { rWidth: 18, leftPanelWidth: 500 } },
-    { rWidth: 18 },
-  );
+test("saving time and files shown beside it are not edits", () => {
+  const project = {
+    startPoint: { x: 1 },
+    lines: [],
+    robot: { rWidth: 18 },
+    timestamp: "2026-10-03T12:00:00Z",
+    activePaths: ["a.pp"],
+  };
+  const a = projectFingerprint(project);
+  const b = projectFingerprint({ ...project, timestamp: "2026-10-04T09:00:00Z", activePaths: [] });
   assertEqual(a, b);
-  assert(a !== projectFingerprint({ ...project, startPoint: { x: 2 } }, { rWidth: 18 }), "a moved start is an edit");
-  assert(a !== projectFingerprint(project, { rWidth: 20 }), "a wider robot is an edit");
+  assert(a !== projectFingerprint({ ...project, startPoint: { x: 2 } }), "a moved start is an edit");
+  assert(a !== projectFingerprint({ ...project, robot: { rWidth: 20 } }), "a wider robot is an edit");
 });

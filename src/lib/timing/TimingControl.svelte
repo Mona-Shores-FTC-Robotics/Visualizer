@@ -136,11 +136,11 @@
 >
   <h2
     id="timing-title"
-    class="text-2xl font-semibold text-neutral-900 dark:text-neutral-100 mb-1"
+    class="text-2xl font-semibold text-heading mb-1"
   >
     Timing facts
   </h2>
-  <p class="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+  <p class="text-sm text-body mb-3">
     How the robot and the HIVE behave, used by the Typical preview. They
     describe the world, not one Auto: the team's values live in biobuzz <code
       >TeamCode/autos/{TIMING_FILE}</code
@@ -156,7 +156,7 @@
   <div class="console-section flex-1 overflow-y-auto mb-3">
     <table class="w-full text-sm">
       <thead>
-        <tr class="text-xs uppercase text-neutral-500 text-left">
+        <tr class="text-xs uppercase text-body text-left">
           <th class="px-3 py-2">Fact</th>
           <th class="px-2 py-2">Value</th>
           <th class="px-2 py-2">Team</th>
@@ -168,12 +168,12 @@
         {#each FACTS as fact (fact.id)}
           {@const team = $teamTiming?.file.facts[fact.id]}
           {@const mine = $timingOverrides[fact.id]}
-          <tr class="border-t border-neutral-200 dark:border-neutral-700">
+          <tr class="border-t border-border">
             <td class="px-3 py-2">
-              <div class="text-neutral-900 dark:text-neutral-100">
+              <div class="text-heading">
                 {fact.label}
               </div>
-              <div class="text-xs text-neutral-500">
+              <div class="text-xs text-body">
                 {fact.times}{team?.note ? ` · ${team.note}` : ""}
               </div>
             </td>
@@ -189,9 +189,9 @@
                 onchange={(e) =>
                   onInput(fact.id, (e.target as HTMLInputElement).value)}
               />
-              <span class="text-xs text-neutral-500">{unit(fact.id)}</span>
+              <span class="text-xs text-body">{unit(fact.id)}</span>
             </td>
-            <td class="px-2 py-2 text-xs text-neutral-500 whitespace-nowrap">
+            <td class="px-2 py-2 text-xs text-body whitespace-nowrap">
               {team
                 ? `${team.value} ${unit(fact.id)} · ${team.source ?? "?"}`
                 : `${fact.fallback} · sim`}
@@ -201,7 +201,7 @@
               <td
                 class="px-2 py-2 text-xs {b?.up || b?.down
                   ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-neutral-500'}"
+                  : 'text-body'}"
               >
                 {describe(b)}
               </td>
@@ -221,14 +221,14 @@
   </div>
 
   {#if tips.length}
-    <p class="text-sm text-neutral-700 dark:text-neutral-300 mb-1">
+    <p class="text-sm text-heading mb-1">
       TIPs in this preview (settled), {tipsInAuto(tips)} by 30 s:
       {tips
         .map((tip, i) => `TIP ${i + 1} ${tip.settled.toFixed(1)} s`)
         .join(" · ")}
     </p>
   {/if}
-  <p class="text-xs text-neutral-500 mb-3">
+  <p class="text-xs text-body mb-3">
     Breakpoints: for each fact, the nearest values (others held where they are)
     at which the TIPs by 30 s change for the Autos on screen. A fact with a
     breakpoint close to its value is the one to measure first.

@@ -49,9 +49,9 @@
     align-items: center;
     gap: 4px;
     flex: none;
-    border: 1px solid #2f6b4a;
-    background: #10261a;
-    color: #7ee2a8;
+    border: 1px solid color-mix(in srgb, #3fcf8e 45%, transparent);
+    background: color-mix(in srgb, #3fcf8e 15%, transparent);
+    color: color-mix(in srgb, #3fcf8e 65%, var(--heading));
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 0.75rem;
@@ -59,14 +59,14 @@
     cursor: pointer;
   }
   .answer--no {
-    border-color: #444444;
-    background: #1a1a1a;
-    color: #8a8a8a;
+    border-color: var(--border);
+    background: var(--base);
+    color: var(--body);
   }
   .answer--mixed {
-    border-color: #6b5a2a;
-    background: #231d0d;
-    color: #e6c56b;
+    border-color: color-mix(in srgb, var(--color-warning) 45%, transparent);
+    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+    color: color-mix(in srgb, var(--color-warning) 70%, var(--heading));
   }
   .answer--no .answer-name {
     text-decoration: line-through;

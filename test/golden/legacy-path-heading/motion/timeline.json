@@ -1,0 +1,87 @@
+{
+  "totalTime": 8.013531882315592,
+  "segmentTimes": [
+    1.6,
+    1.9221996106481345,
+    1.9913322716674573
+  ],
+  "totalDistance": 127.75319449200146,
+  "timeline": [
+    {
+      "type": "travel",
+      "duration": 1.6,
+      "startTime": 0,
+      "endTime": 1.6,
+      "lineId": "line-mjuohs00-000d57",
+      "run": {
+        "totalLength": 32,
+        "totalTime": 1.6,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    },
+    {
+      "type": "wait",
+      "name": "Path visualization wait",
+      "duration": 0.5,
+      "startTime": 1.6,
+      "endTime": 2.1,
+      "startHeading": 0,
+      "targetHeading": 0,
+      "atPoint": {
+        "x": 40,
+        "y": 64
+      }
+    },
+    {
+      "type": "wait",
+      "duration": 1,
+      "startTime": 2.1,
+      "endTime": 3.1,
+      "startHeading": 0,
+      "targetHeading": 180,
+      "atPoint": {
+        "x": 40,
+        "y": 64
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 1.9221996106481345,
+      "startTime": 3.1,
+      "endTime": 5.022199610648134,
+      "lineId": "line-mjuohs00-4qh0z0",
+      "run": {
+        "totalLength": 46.18564178969799,
+        "totalTime": 1.9221996106481345,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    },
+    {
+      "type": "wait",
+      "duration": 1,
+      "startTime": 5.022199610648134,
+      "endTime": 6.022199610648134,
+      "startHeading": -90,
+      "targetHeading": 90,
+      "atPoint": {
+        "x": 60,
+        "y": 100
+      }
+    },
+    {
+      "type": "travel",
+      "duration": 1.9913322716674573,
+      "startTime": 6.022199610648134,
+      "endTime": 8.013531882315592,
+      "lineId": "line-mjuohs00-r79ise",
+      "run": {
+        "totalLength": 49.56755270230345,
+        "totalTime": 1.9913322716674573,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    }
+  ]
+}

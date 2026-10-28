@@ -1,3 +1,5 @@
+import { pathStem } from "../../utils/filename";
+
 const RESERVED = new Set([
   // Java
   "abstract",
@@ -100,10 +102,9 @@ export function toClassName(
   input: string | null | undefined,
   fallback: string,
 ): string {
-  const baseName = (input || "").split(/[\\/]/).pop() || "";
-  const cleaned = baseName.replace(/\.pp$/i, "").replace(/[^a-zA-Z0-9]/g, "");
+  const cleaned = pathStem(input).replace(/[^a-zA-Z0-9]/g, "");
   if (!cleaned) return fallback;
-  // A class name cannot start with a digit, so "2024Auto.pp" -> "Path2024Auto".
+  // A class name cannot start with a digit, so "2024Auto.pp.json" -> "Path2024Auto".
   const name = pascalCase(/^[0-9]/.test(cleaned) ? `Path${cleaned}` : cleaned);
   return RESERVED.has(name.toLowerCase()) ? `${name}Path` : name;
 }

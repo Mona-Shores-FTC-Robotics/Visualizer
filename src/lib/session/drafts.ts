@@ -100,10 +100,10 @@ export function draftStatus(
 
 /**
  * A project as it would be saved, minus what changes without anyone editing
- * it (the save time, the viewer's own display settings, which other files are
- * shown beside it): two projects with the same fingerprint are the same Auto.
+ * it (the save time, which other files are shown beside it): two projects
+ * with the same fingerprint are the same Auto. Its robot block is part of it.
  */
-export function projectFingerprint(project: Record<string, unknown>, fileSettings: object): string {
-  const { timestamp: _timestamp, activePaths: _activePaths, settings: _settings, ...rest } = project;
-  return JSON.stringify({ ...rest, settings: fileSettings });
+export function projectFingerprint(project: Record<string, unknown>): string {
+  const { timestamp: _timestamp, activePaths: _activePaths, ...rest } = project;
+  return JSON.stringify(rest);
 }

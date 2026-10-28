@@ -42,7 +42,7 @@ function atSpeed(settings: Settings, speed: number): Settings {
   if (!(speed > 0) || Math.abs(speed - 1) < 1e-9) return settings;
   const s = settings as Settings & Record<string, number>;
   const scaled: Record<string, number> = {};
-  for (const key of ["maxVelocity", "xVelocity", "yVelocity", "aVelocity"]) {
+  for (const key of ["maxVelocity", "forwardVelocity", "strafeVelocity", "aVelocity"]) {
     if (typeof s[key] === "number") scaled[key] = s[key] * speed;
   }
   for (const key of ["maxAcceleration", "maxDeceleration"]) {
