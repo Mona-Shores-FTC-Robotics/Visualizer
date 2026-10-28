@@ -1,7 +1,8 @@
 # Auto Builder redesign: mock-up
 
-`tip-mockup.src.html` is the clickable mock-up of the redesigned Auto Builder (TIP chapters, a
-ladder of tries when a tip doesn't come, every possible run listed). It is a design prototype, not
+`tip-mockup.src.html` is the clickable mock-up of the redesigned Auto Builder (the good path in TIP
+chapters, one miss open at a time with its ladder of tries, every outcome behind a button, and a
+start-from-scratch flow). It is a design prototype, not
 app code: one HTML file, no build, with `l-quals`'s spots and steps hard-coded and rough times.
 
 The two field images are placeholders (`__FIELD_LIGHT__`, `__FIELD_DARK__`). To view it, replace

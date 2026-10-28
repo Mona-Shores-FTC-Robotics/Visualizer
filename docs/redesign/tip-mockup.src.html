@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: the stock Visualizer's three bands — step list | field | (nothing else) — with one playback bar. */
+/* Layout: the stock Visualizer's bands — steps | field — and one playback bar. One calm state, one temporary state (a miss open). */
 :root {
   --bg: #f6f6f8;
   --surface: #ffffff;
@@ -11,25 +11,27 @@
   --body: #6b6b78;
   --heading: #121218;
   --accent: #c2427c;
-  --tip: #1f9e63;
-  --notip: #d9661f;
+  --path: #1f9e63;
+  --miss: #d9661f;
   --chip: #f0eef3;
+  --warn: #f59e0b;
   --sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f0f14; --surface: #17171d; --line: #80808033; --body: #9c9cab;
-    --heading: #f4f4f7; --chip: #23232b; --tip: #3fcf8e; --notip: #ff8a3d;
+    --heading: #f4f4f7; --chip: #23232b; --path: #3fcf8e; --miss: #ff8a3d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f0f14; --surface: #17171d; --line: #80808033; --body: #9c9cab;
-  --heading: #f4f4f7; --chip: #23232b; --tip: #3fcf8e; --notip: #ff8a3d;
+  --heading: #f4f4f7; --chip: #23232b; --path: #3fcf8e; --miss: #ff8a3d;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--heading); font: 14px/1.45 var(--sans);
@@ -37,114 +39,111 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 12px;
 }
-button { font: inherit; color: inherit; }
-button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, select { font: inherit; color: inherit; }
+button:focus-visible, [tabindex]:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .35; cursor: default; }
 
-.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .bar h1 { font-size: 15px; margin: 0; font-weight: 600; }
-.bar .note { font-size: 12px; color: var(--body); }
 .tag { font-size: 11px; border: 1px solid var(--line); background: var(--chip); border-radius: 999px; padding: 2px 9px; color: var(--body); }
+.bar .spacer { flex: 1; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.small { padding: 3px 9px; font-size: 12px; border-radius: 8px; }
 
 .app { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 12px; align-items: start; }
 @media (max-width: 860px) { .app { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; min-width: 0; }
+.side { display: flex; flex-direction: column; gap: 10px; }
 
-/* Step list: the base Visualizer's path list, one row per thing the robot does. */
-.list-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px; }
-.list-head h2 { margin: 0; font-size: 14px; }
-.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.total { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px; }
+.total .big { font: 600 20px var(--mono); font-variant-numeric: tabular-nums; }
+.total .of { color: var(--body); font-size: 12px; }
+.over { color: #e5484d; }
+
+/* Chapters */
+.chapters { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chapters button { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 4px 9px; cursor: pointer; text-align: left; line-height: 1.2; }
+.chapters .ct { display: block; font-size: 12px; font-weight: 600; }
+.chapters .cs { display: block; font: 10px var(--mono); color: var(--body); }
+.chapters button[aria-current="step"] { border-color: var(--path); background: var(--chip); }
+.chapters .arrow { color: var(--body); font-size: 11px; }
+
+/* Steps */
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .step { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: center;
   padding: 6px 8px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; }
 .step:hover { background: var(--chip); }
 .step.sel { border-color: var(--accent); background: var(--chip); }
-.step.now { box-shadow: inset 3px 0 0 var(--accent); }
+.step.now { box-shadow: inset 3px 0 0 var(--path); }
 .ico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--chip); color: var(--body); }
 .ico.shoot { color: var(--accent); }
 .ico.collect { color: #c99400; }
+.ico.tip { color: var(--miss); }
 .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { font-size: 11px; color: var(--body); }
-.sub b { font-weight: 600; color: var(--heading); }
 .t { font: 12px var(--mono); color: var(--body); font-variant-numeric: tabular-nums; }
-
-/* Chapters: the Auto in TIP-sized pieces. One is open at a time. */
-.chapters { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 0 2px 10px; }
-.chapters button { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 4px 9px; cursor: pointer; text-align: left; line-height: 1.2; }
-.chapters button .ct { display: block; font-size: 12px; font-weight: 600; }
-.chapters button .cs { display: block; font: 10px var(--mono); color: var(--body); }
-.chapters button[aria-current="step"] { border-color: var(--accent); background: var(--chip); }
-.chapters .arrow { color: var(--body); font-size: 11px; }
-.chapters .fork { font-size: 11px; font-weight: 700; }
-.goal { font-size: 12px; color: var(--body); padding: 0 4px 8px; }
-/* Every possible run */
-.runs h3 { font-size: 13px; margin: 0 0 2px; }
-.runs .sub { margin: 0 0 8px; }
-.tablewrap { overflow-x: auto; }
-.runs table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.runs td { padding: 5px 6px; border-top: 1px solid var(--line); vertical-align: top; }
-.runs td:first-child { white-space: nowrap; font-weight: 600; }
-.runs td.route { color: var(--body); }
-.runs td.t { text-align: right; white-space: nowrap; }
-.runs tr { cursor: pointer; }
-.runs tr.on td { background: var(--chip); }
-li.warn { list-style: none; margin: 0 0 4px; }
-/* The ladder of tries */
-.ladder-h { margin-top: 8px; font-size: 12px; font-weight: 600; }
-.ladder { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.rung { border: 1px solid var(--line); border-left: 3px solid var(--notip); border-radius: 10px; padding: 6px 8px; background: var(--surface); }
-.rung-park { border-left-color: var(--body); }
-.rung-head { display: flex; align-items: center; gap: 8px; }
-.rung-n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--chip); color: var(--notip); flex: none; }
-.rung-park .rung-n { color: var(--body); }
-.rung-t { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; }
-.rung-tools { display: flex; gap: 2px; }
-.rung-tools button { border: 1px solid var(--line); background: transparent; border-radius: 6px; width: 24px; height: 22px; cursor: pointer; font-size: 12px; color: var(--body); }
-.rung-tools button:disabled { opacity: .3; cursor: default; }
-.rung-sub { margin-top: 4px; font-size: 12px; color: var(--body); }
-.shared { font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; }
-.warn { margin-top: 5px; font-size: 11px; color: var(--heading); background: color-mix(in srgb, #f59e0b 16%, transparent); border-radius: 6px; padding: 4px 6px; }
-.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 9px; font-size: 12px; cursor: pointer; color: var(--heading); }
-.decision .row { margin-top: 6px; font-size: 12px; }
-.decision .switch { margin-top: 0; flex-wrap: wrap; }
-.next { margin-top: 8px; width: 100%; border: 1px solid var(--line); background: var(--chip); border-radius: 10px; padding: 8px; cursor: pointer; font-weight: 600; }
-.from { font-size: 11px; color: var(--body); padding: 0 8px 4px; }
-
-/* The one decision: a fork in the list, same switch as on the field. */
-.decision { margin: 6px 0; padding: 8px; border-radius: 12px; border: 1px dashed var(--line); background: var(--chip); }
-.decision .q { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; }
-.switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-top: 6px; }
-.switch button { border: 0; background: transparent; padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--body); }
-.switch button[aria-pressed="true"].tip { background: var(--tip); color: #fff; }
-.switch button[aria-pressed="true"].notip { background: var(--notip); color: #fff; }
-
-/* Editing a step: steppers, no typing. */
-.editor { margin: 2px 0 6px 30px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
+.pill { font-size: 10px; border: 1px solid var(--miss); color: var(--miss); border-radius: 999px; padding: 0 6px; margin-left: 4px; white-space: nowrap; }
+.editor { margin: 0 0 4px 30px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .stepper button { border: 0; background: var(--chip); width: 28px; height: 26px; cursor: pointer; font-weight: 700; }
 .stepper span { min-width: 56px; text-align: center; font: 12px var(--mono); }
+.pick { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .pick button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 12px; color: var(--body); }
-.pick button[aria-pressed="true"] { border-color: var(--accent); color: var(--heading); }
+.pick button[aria-pressed="true"] { border-color: var(--accent); color: var(--heading); background: var(--chip); }
+.next { width: 100%; }
+
+/* A miss, open */
+.miss-head { display: flex; align-items: center; gap: 8px; }
+.miss-head h2 { margin: 0; font-size: 14px; flex: 1; color: var(--miss); }
+.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rung { border: 1px solid var(--line); border-left: 3px solid var(--miss); border-radius: 10px; padding: 6px 8px; }
+.rung.end { border-left-color: var(--body); }
+.rung-head { display: flex; align-items: center; gap: 8px; }
+.rung-n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--chip); color: var(--miss); flex: none; }
+.rung.end .rung-n { color: var(--body); }
+.rung-t { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; }
+.tools { display: flex; gap: 2px; }
+.tools button { border: 1px solid var(--line); background: transparent; border-radius: 6px; width: 24px; height: 22px; cursor: pointer; font-size: 12px; color: var(--body); }
+.rung .row { margin-top: 4px; font-size: 12px; color: var(--body); }
+.note { font-size: 12px; background: color-mix(in srgb, var(--warn) 15%, transparent); border-radius: 8px; padding: 6px 8px; }
+.label { font-size: 12px; color: var(--body); }
 
 /* Field */
-.field-wrap { display: flex; flex-direction: column; gap: 10px; }
-.field { width: 100%; max-width: 760px; aspect-ratio: 1 / 1; margin: 0 auto; border-radius: 12px; overflow: hidden; background: var(--chip); }
+.field-wrap { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.field { width: 100%; max-width: 760px; aspect-ratio: 1 / 1; margin: 0 auto; border-radius: 12px; overflow: hidden; background: var(--chip); position: relative; }
 .field svg { width: 100%; height: 100%; display: block; }
 .img-light { display: inline; } .img-dark { display: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .img-light { display: none; } :root:not([data-theme="light"]) .img-dark { display: inline; } }
 :root[data-theme="dark"] .img-light { display: none; } :root[data-theme="dark"] .img-dark { display: inline; }
-.spot-label { font: 600 2.6px var(--sans); fill: var(--heading); stroke: var(--surface); stroke-width: .7px; paint-order: stroke; }
+.spot-label { font: 600 2.6px var(--sans); fill: var(--heading); stroke: var(--surface); stroke-width: .7px; paint-order: stroke; pointer-events: none; }
 .marker { cursor: pointer; }
 .marker:focus { outline: none; }
+.hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 500; white-space: nowrap; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; }
 
 /* Playback */
 .play { display: flex; align-items: center; gap: 10px; }
-.play button.pp { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
-.track { position: relative; flex: 1; height: 8px; background: var(--chip); border-radius: 999px; min-width: 0; }
-.track .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 999px; opacity: .75; }
-.track .band { position: absolute; top: -3px; bottom: -3px; border-radius: 999px; border: 1.5px solid var(--accent); }
-.track .limit { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--body); }
+.play .pp { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; flex: none; }
+.track { position: relative; flex: 1; height: 8px; background: var(--chip); border-radius: 999px; min-width: 0; cursor: pointer; }
+.track .fill { position: absolute; inset: 0 auto 0 0; background: var(--path); border-radius: 999px; opacity: .8; }
+.track .band { position: absolute; top: -3px; bottom: -3px; border-radius: 999px; border: 1.5px solid var(--path); }
+.track .limit { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--body); }
 .readout { font: 12px var(--mono); color: var(--body); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.over { color: #e5484d; font-weight: 600; }
+
+/* Outcomes dialog */
+dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--heading); padding: 16px; width: min(680px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+dialog h2 { margin: 0 0 4px; font-size: 15px; }
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { padding: 6px 8px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 11px; color: var(--body); font-weight: 600; border-top: 0; }
+td.route { color: var(--body); }
+td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--chip); }
 
 .tasks { font-size: 13px; }
 .tasks h3 { font-size: 13px; margin: 0 0 6px; }
@@ -153,240 +152,225 @@ li.warn { list-style: none; margin: 0 0 4px; }
 </style>
 
 <div class="bar">
-  <h1>Auto Builder · l-quals</h1>
+  <h1 id="title">Auto Builder · l-quals</h1>
   <span class="tag">Mock-up for student testing, not the real tool</span>
-  <span class="note">Your real Auto's spots. The main path is the Auto when everything works; tries are shared plays. Times are rough.</span>
+  <span class="spacer"></span>
+  <button class="btn" id="outcomesBtn">All outcomes</button>
+  <button class="btn" id="buildBtn">Start from scratch</button>
 </div>
 
 <div class="app">
-  <section class="panel" aria-label="Steps">
-    <div class="chapters" id="chapters" aria-label="Chapters"></div>
-    <div class="goal" id="goal"></div>
-    <div class="list-head"><h2>Steps</h2><span class="t" id="count"></span></div>
-    <ul class="steps" id="steps"></ul>
-  </section>
-
+  <section class="side" id="side" aria-label="The Auto"></section>
   <section class="field-wrap">
     <div class="panel">
-      <div class="field"><svg id="field" viewBox="-1.25 -1.25 144 144" role="img" aria-label="Field with the route the preview takes"></svg></div>
+      <div class="field">
+        <svg id="field" viewBox="-1.25 -1.25 144 144" role="img" aria-label="Field"></svg>
+        <div class="hint" id="hint" hidden></div>
+      </div>
     </div>
     <div class="panel play">
       <button class="pp" id="pp" aria-label="Play">▶</button>
-      <div class="track" id="track"><div class="band" id="band" title="The open chapter"></div><div class="fill" id="fill"></div><div class="limit" id="limit" title="30 s"></div></div>
+      <div class="track" id="track"><div class="band" id="band"></div><div class="fill" id="fill"></div><div class="limit" id="limit" title="30 s"></div></div>
       <span class="readout" id="readout"></span>
-    </div>
-    <div class="panel runs">
-      <h3>Every way this Auto can run</h3>
-      <p class="sub">Each outcome is one fixed route, decided now by three rules, not by the robot during the match: a try that works goes back to the main path; a source a try emptied is skipped; a chapter that can't finish before 30 s becomes Park. Click a row to preview it.</p>
-      <div class="tablewrap"><table><tbody id="runs"></tbody></table></div>
     </div>
     <div class="panel tasks">
       <h3>Try these (for testing with students)</h3>
       <ol>
-        <li>What does the robot do if TIP 1 never comes, and nothing it tries works?</li>
-        <li>Our partner says they'll tip within 5 s. Change the wait.</li>
-        <li>Try refilling at the wall FLOWER first, before shooting it ourselves.</li>
-        <li>Swap the wall FLOWER try for the GARDEN one. How does TIP 3 change?</li>
-        <li>In "Every way this Auto can run", which outcome takes longest?</li>
-        <li>Give the GARDEN pickup one more second. Does the Auto still finish in 30 s?</li>
+        <li>Our partner says they'll tip within 5 s. Change TIP 1's wait.</li>
+        <li>What does the robot do if TIP 1 never comes and nothing it tries works?</li>
+        <li>Make it refill at the wall FLOWER before shooting the CELL ourselves.</li>
+        <li>Which outcome takes the longest? Does every outcome park in time?</li>
+        <li>Start from scratch: start at START, shoot for TIP 1 at N FIRE, collect at the far FLOWER, shoot again, park.</li>
       </ol>
     </div>
   </section>
 </div>
 
+<dialog id="outcomes" aria-labelledby="outcomesTitle">
+  <h2 id="outcomesTitle">Every way this Auto can run</h2>
+  <div class="sub">Each outcome is one fixed route, decided now. Click one to see it on the field.</div>
+  <div class="tablewrap"><table><thead><tr><th>If…</th><th>Route</th><th>Time</th></tr></thead><tbody id="outcomeRows"></tbody></table></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="outcomesClose">Close</button></div>
+</dialog>
+
 <script>
+// ---------- The field ----------
 const SPOTS = {
-  START: [59, 133.69], FAR_FLOWER_TURN: [47.36, 118.34], FAR_FLOWER: [47.36, 126.64],
-  N_FIRE: [57.5, 119], WALL_FLOWER_TURN: [23.16, 47.36], WALL_FLOWER: [14.86, 47.36],
-  FIRE3: [45, 26], GARDEN_IN: [9.5, 20.56], GARDEN: [9.5, 10.96], FIRE_G: [45, 29],
-  PARK: [14, 95], LANE_TOP: [57.5, 108], S_CATCH: [57.5, 18], LANE_LOW: [56, 36],
+  START: [59, 133.69], FAR_FLOWER: [47.36, 126.64], FAR_FLOWER_TURN: [47.36, 118.34], N_FIRE: [57.5, 119],
+  WALL_FLOWER: [14.86, 47.36], WALL_FLOWER_TURN: [23.16, 47.36], FIRE3: [45, 26], GARDEN: [9.5, 10.96],
+  GARDEN_IN: [9.5, 20.56], FIRE_G: [45, 29], PARK: [14, 95], LANE_TOP: [57.5, 108], S_CATCH: [57.5, 18], LANE_LOW: [56, 36],
 };
+/** Spots a student can click while building: places, not waypoints. */
+const PLACES = ["START", "FAR_FLOWER", "N_FIRE", "WALL_FLOWER", "FIRE3", "GARDEN", "FIRE_G", "S_CATCH", "PARK"];
+const SOURCES = { FAR_FLOWER: "the far FLOWER", WALL_FLOWER: "the wall FLOWER", GARDEN: "the GARDEN" };
+const LABEL_AT = { FAR_FLOWER: [-2, -1.6, "end"], N_FIRE: [2, 1, "start"], START: [2.4, -1.4, "start"], FIRE3: [2, 4.2, "start"], FIRE_G: [2, -1.2, "start"] };
 const nice = (s) => s.replace(/_/g, " ");
-const LABEL_AT = { FAR_FLOWER: [-2, -1.6, "end"], N_FIRE: [2, 1, "start"], START: [2.4, -1.4, "start"] };
-/** Pickup spots: a FLOWER or the GARDEN can only be emptied once. */
-const PICKUPS = { WALL_FLOWER: "the wall FLOWER", GARDEN: "the GARDEN", FAR_FLOWER: "the far FLOWER" };
 
-// ---- The main path: the Auto when everything works, in TIP chapters. ----
-const MAIN = [
-  { id: "start", title: "Start", goal: "Drive up and wait for the partner's TIP 1.", steps: [
-    { kind: "drive", to: "FAR_FLOWER_TURN", label: "Drive to the far FLOWER" },
-  ] },
-  { id: "tip2", title: "TIP 2", goal: "Shoot at the left CELL, collect the far FLOWER, shoot for TIP 2.", steps: [
-    { kind: "shoot", label: "Shoot at the left CELL", until: "empty", max: 3, typical: 1.5 },
-    { kind: "drive", to: "FAR_FLOWER", label: "Drive into the far FLOWER", visit: "FAR_FLOWER" },
-    { kind: "collect", at: "FAR_FLOWER", label: "Collect at the far FLOWER", max: 3, typical: 1.2, visit: "FAR_FLOWER" },
-    { kind: "drive", to: "N_FIRE", label: "Drive to N FIRE", visit: "FAR_FLOWER" },
-    { kind: "shoot", label: "Shoot for TIP 2", until: "empty", max: 2, typical: 1.5, visit: "FAR_FLOWER" },
-  ] },
-  { id: "tip3", title: "TIP 3", goal: "Collect the wall FLOWER and the GARDEN, shoot for TIP 3.", steps: [
-    { kind: "drive", to: "WALL_FLOWER", via: ["WALL_FLOWER_TURN"], label: "Drive to the wall FLOWER", visit: "WALL_FLOWER" },
-    { kind: "collect", at: "WALL_FLOWER", label: "Collect at the wall FLOWER", max: 3, typical: 1.2, visit: "WALL_FLOWER" },
-    { kind: "drive", to: "FIRE3", label: "Drive to FIRE 3", visit: "WALL_FLOWER" },
-    { kind: "shoot", label: "Shoot at the right CELL", until: "empty", max: 2, typical: 1.5, visit: "WALL_FLOWER" },
-    { kind: "drive", to: "GARDEN", via: ["GARDEN_IN"], label: "Drive into the GARDEN", visit: "GARDEN" },
-    { kind: "collect", at: "GARDEN", label: "Collect in the GARDEN", max: 1.5, typical: 1.2, visit: "GARDEN" },
-    { kind: "drive", to: "FIRE_G", label: "Drive to FIRE G", visit: "GARDEN" },
-    { kind: "shoot", label: "Shoot for TIP 3", until: "tip", max: 2.5, typical: 1.8, visit: "GARDEN" },
-  ] },
-  { id: "park", title: "Park", goal: "Drive to PARK before time runs out.", steps: [
-    { kind: "drive", to: "PARK", label: "Park", park: true },
-  ] },
-];
+// ---------- The Auto: one good path. A tip-wait ends a chapter and may carry a ladder of tries. ----------
+let AUTO = {
+  name: "l-quals",
+  start: "START",
+  steps: [
+    { kind: "drive", to: "FAR_FLOWER_TURN" },
+    { kind: "wait", tip: "TIP 1", label: "Wait for the partner's TIP 1", max: 7, typical: 3, ladder: ["ourselves", "wall"], ifAllMiss: "park" },
+    { kind: "shoot", label: "Shoot at the left CELL", max: 3, typical: 1.5 },
+    { kind: "drive", to: "FAR_FLOWER", source: "FAR_FLOWER" },
+    { kind: "collect", at: "FAR_FLOWER", max: 3, typical: 1.2, source: "FAR_FLOWER" },
+    { kind: "drive", to: "N_FIRE", source: "FAR_FLOWER" },
+    { kind: "shoot", tip: "TIP 2", label: "Shoot for TIP 2", max: 2, typical: 1.5, ladder: [], ifAllMiss: "carry", source: "FAR_FLOWER" },
+    { kind: "drive", to: "WALL_FLOWER", via: ["WALL_FLOWER_TURN"], source: "WALL_FLOWER" },
+    { kind: "collect", at: "WALL_FLOWER", max: 3, typical: 1.2, source: "WALL_FLOWER" },
+    { kind: "drive", to: "FIRE3", source: "WALL_FLOWER" },
+    { kind: "shoot", label: "Shoot at the right CELL", max: 2, typical: 1.5, source: "WALL_FLOWER" },
+    { kind: "drive", to: "GARDEN", via: ["GARDEN_IN"], source: "GARDEN" },
+    { kind: "collect", at: "GARDEN", max: 1.5, typical: 1.2, source: "GARDEN" },
+    { kind: "drive", to: "FIRE_G", source: "GARDEN" },
+    { kind: "shoot", tip: "TIP 3", label: "Shoot for TIP 3", max: 2.5, typical: 1.8, ladder: [], ifAllMiss: "carry", source: "GARDEN" },
+    { kind: "drive", to: "PARK", park: true },
+  ],
+};
 
-/** The wait that ends the Start chapter, and its ladder of tries if TIP 1 doesn't come. */
-const WAIT = { label: "Wait for TIP 1 (partner's preloads)", max: 7, typical: 3, ladder: ["ourselves", "wall"], rejoin: "tip2" };
-
-// ---- Plays: short tries, written once, shared by every Auto. Each ends with a shot that waits for the tip. ----
+/** Shared plays: short tries, written once, used by any Auto. Each ends with a shot that waits for the tip. */
 const PLAYS = {
-  ourselves: { title: "Shoot the right CELL ourselves", usedBy: "L-Quals, R-Quals", steps: [
-    { kind: "drive", to: "S_CATCH", via: ["LANE_TOP"], label: "Drive down the lane" },
-    { kind: "shoot", label: "Shoot at the right CELL", until: "tip", max: 4, typical: 2.5, tries: true },
-    { kind: "collect", label: "Catch the spill", max: 1.5, typical: 1.2, ifTipped: true },
+  ourselves: { title: "Shoot the right CELL ourselves", short: "shoot it ourselves", steps: [
+    { kind: "drive", to: "S_CATCH", via: ["LANE_TOP"] },
+    { kind: "shoot", label: "Shoot at the right CELL", max: 4, typical: 2.5, tries: true },
   ] },
-  wall: { title: "Refill at the wall FLOWER, shoot again", usedBy: "L-Quals", steps: [
-    { kind: "drive", to: "WALL_FLOWER", via: ["WALL_FLOWER_TURN"], label: "Drive to the wall FLOWER" },
-    { kind: "collect", at: "WALL_FLOWER", label: "Collect at the wall FLOWER", max: 3, typical: 1.2 },
-    { kind: "drive", to: "FIRE3", label: "Drive to FIRE 3" },
-    { kind: "shoot", label: "Shoot at the right CELL", until: "tip", max: 3, typical: 2, tries: true },
+  wall: { title: "Refill at the wall FLOWER, shoot again", short: "refill at wall FLOWER", steps: [
+    { kind: "drive", to: "WALL_FLOWER", via: ["WALL_FLOWER_TURN"] },
+    { kind: "collect", at: "WALL_FLOWER", max: 3, typical: 1.2 },
+    { kind: "drive", to: "FIRE3" },
+    { kind: "shoot", label: "Shoot at the right CELL", max: 3, typical: 2, tries: true },
   ] },
-  garden: { title: "Refill in the GARDEN, shoot again", usedBy: "R-Quals", steps: [
-    { kind: "drive", to: "GARDEN", via: ["GARDEN_IN"], label: "Drive into the GARDEN" },
-    { kind: "collect", at: "GARDEN", label: "Collect in the GARDEN", max: 1.5, typical: 1.2 },
-    { kind: "drive", to: "FIRE_G", label: "Drive to FIRE G" },
-    { kind: "shoot", label: "Shoot at the left CELL", until: "tip", max: 3, typical: 2, tries: true },
+  garden: { title: "Refill in the GARDEN, shoot again", short: "refill in GARDEN", steps: [
+    { kind: "drive", to: "GARDEN", via: ["GARDEN_IN"] },
+    { kind: "collect", at: "GARDEN", max: 1.5, typical: 1.2 },
+    { kind: "drive", to: "FIRE_G" },
+    { kind: "shoot", label: "Shoot at the left CELL", max: 3, typical: 2, tries: true },
   ] },
 };
 
-// Preview: 0 = TIP 1 came; k = try k worked; ladder.length + 1 = nothing worked.
-let scenario = 0;
-let chapter = "start";
-let selected = null;
+const isTip = (s) => Boolean(s.tip);
+const stepLabel = (s) => s.label ?? (s.kind === "drive" ? (s.park ? "Park" : `Drive to ${nice(s.to)}`) : s.kind === "collect" ? `Collect at ${nice(s.at)}` : "Shoot");
+
+// ---------- State ----------
+let mode = "view";          // "view" | "miss" | "build"
+let chapter = 0;            // open chapter (view)
+let missAt = null;          // index of the tip-wait whose miss is open
+let rung = 0;               // which try works in the open miss (ladder.length = none)
+let selected = null;        // step being edited
+let buildStage = "start";   // "start" | "path" | "misses"
+let pendingSpot = null;     // build: the spot just clicked, waiting for "what here?"
 let playing = false, t = 0, last = 0;
 
+// ---------- Timing ----------
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const driveTime = (pts) => pts.slice(1).reduce((d, p, i) => d + dist(pts[i], p), 0) / 48 + 0.45;
 const fmt = (s) => s.toFixed(1) + " s";
-const tryShot = (play) => play.steps.find((s) => s.tries);
+const typical = (s) => Math.min(s.typical, s.max);
 
-/** Which pickups a chapter (or play) empties. */
-const usesOf = (steps) => steps.filter((s) => s.kind === "collect" && s.at).map((s) => s.at);
-
-/** What happens to the rest of the plan when try `i` (1-based) works, read off that route. */
-function consequences(i) {
+/** Chapters of the good path: each ends at a tip-wait, the last at the park. */
+function chapters() {
   const out = [];
-  const list = chapterList(timeline(i));
-  list.forEach((c, k) => {
-    (c.skipped ?? []).forEach((v) => out.push(`If this works, ${c.title} skips ${PICKUPS[v]} (already emptied).`));
-    const before = list[k - 1]?.title;
-    if (c.why === "time") out.push(`If this works, there isn't time for ${c.dropped}: the robot parks after ${before}.`);
-    if (c.why === "empty") out.push(`If this works, ${c.dropped} has nothing left to collect: the robot parks after ${before}.`);
+  let cur = [];
+  AUTO.steps.forEach((s, i) => {
+    cur.push(i);
+    if (isTip(s)) { out.push({ name: s.tip, steps: cur }); cur = []; }
   });
+  if (cur.length) out.push({ name: "Park", steps: cur });
   return out;
 }
 
-/** The route the preview takes for the chosen scenario: steps with times and chapters. */
-function timeline(sc = scenario) {
-  const steps = [];
-  let at = SPOTS.START, time = 0;
-  const add = (step, ch, dur) => {
+/**
+ * The route for an outcome: { miss: index of a tip-wait that missed, works: which try works (ladder.length = none) }.
+ * The three rules: a try that works goes back to the path; a source a try emptied is skipped; a stretch that can't
+ * finish and still park by 30 s becomes Park.
+ */
+function route(outcome = null) {
+  const segs = [];
+  let at = SPOTS[AUTO.start], time = 0;
+  const add = (step, part, dur, play) => {
     let pts = [at];
     if (step.kind === "drive") {
       pts = [at, ...(step.via ?? []).map((n) => SPOTS[n]), SPOTS[step.to]];
       dur = driveTime(pts);
       at = SPOTS[step.to];
     }
-    steps.push({ step, ch, pts, t0: time, t1: time + dur });
+    segs.push({ step, part, pts, t0: time, t1: time + dur, play });
     time += dur;
   };
-  const typical = (s) => Math.min(s.typical, s.max);
-  /** Whether these steps, then the drive to PARK, end by 30 s. */
-  const fits = (list, back) => {
-    let pos = back && list[0]?.kind !== "drive" ? SPOTS.FAR_FLOWER_TURN : at;
-    let end = time + (back && list[0]?.kind !== "drive" ? driveTime([at, pos]) : 0);
-    for (const s of list) {
+  const park = (part, why) => add({ kind: "drive", to: "PARK", park: true, why }, part);
+  const fits = (steps) => {
+    let pos = at, end = time;
+    for (const s of steps) {
       if (s.kind === "drive") { const pts = [pos, ...(s.via ?? []).map((n) => SPOTS[n]), SPOTS[s.to]]; end += driveTime(pts); pos = SPOTS[s.to]; }
       else end += typical(s);
     }
     return end + driveTime([pos, SPOTS.PARK]) <= 30;
   };
-  const chapterOf = (c) => c.steps.forEach((s) => add(s, c, typical(s)));
 
-  const start = MAIN[0];
-  chapterOf(start);
-  add({ kind: "wait", ...WAIT }, start, sc === 0 ? typical(WAIT) : WAIT.max);
-
-  const n = WAIT.ladder.length;
   const used = new Set();
-  for (let i = 1; i <= Math.min(sc, n); i++) {
-    const play = PLAYS[WAIT.ladder[i - 1]];
-    const ch = { id: `try${i}`, title: `Try ${i}`, goal: `TIP 1 hasn't come: ${play.title.toLowerCase()}.`, try: i, play };
-    for (const s of play.steps) {
-      if (s.ifTipped && i !== sc) continue; // nothing spills from a CELL that didn't tip
-      add(s, ch, s.tries ? (i === sc ? typical(s) : s.max) : typical(s));
+  const chs = chapters();
+  for (let c = 0; c < chs.length; c++) {
+    let idxs = chs[c].steps;
+    const afterMiss = outcome && c > chs.findIndex((ch) => ch.steps.includes(outcome.miss));
+    if (afterMiss) {
+      const sources = [...new Set(idxs.map((i) => AUTO.steps[i].source).filter(Boolean))];
+      const left = sources.filter((s) => !used.has(s));
+      if (sources.length && !left.length) { park("rule", `Nothing left to collect for ${chs[c].name}`); break; }
+      idxs = idxs.filter((i) => !used.has(AUTO.steps[i].source));
+      const steps = idxs.map((i) => AUTO.steps[i]);
+      if (chs[c].name !== "Park" && !fits(steps)) { park("rule", `No time left for ${chs[c].name}`); break; }
     }
-    usesOf(play.steps).forEach((u) => used.add(u));
+    for (const i of idxs) {
+      const s = AUTO.steps[i];
+      if (outcome && i === outcome.miss) {
+        add(s, "path", s.max); // the tip never came: the wait runs to its limit
+        const ladder = s.ladder ?? [];
+        for (let k = 0; k < Math.min(outcome.works + 1, ladder.length); k++) {
+          const play = PLAYS[ladder[k]];
+          for (const p of play.steps) add(p, "try", p.tries ? (k === outcome.works ? typical(p) : p.max) : typical(p), play.short);
+          play.steps.forEach((p) => p.at && used.add(p.at));
+        }
+        if (outcome.works >= ladder.length && s.ifAllMiss === "park") { park("miss", "Every try missed"); return { segs, total: time }; }
+      } else {
+        add(s, outcome && c > chs.findIndex((ch) => ch.steps.includes(outcome?.miss)) ? "rest" : "path", typical(s));
+      }
+    }
   }
-  if (sc > n) {
-    chapterOf({ ...MAIN[MAIN.length - 1], goal: "Every try missed: park." });
-    return { steps, total: time };
-  }
-  const from = MAIN.findIndex((c) => c.id === (sc === 0 ? "tip2" : WAIT.rejoin));
-  for (const [k, c] of MAIN.slice(from).entries()) {
-    const visits = [...new Set(c.steps.filter((s) => s.visit).map((s) => s.visit))];
-    const skipped = visits.filter((v) => used.has(v));
-    if (visits.length && skipped.length === visits.length) {
-      chapterOf({ ...MAIN[MAIN.length - 1], goal: `Nothing left to collect for ${c.title} (${skipped.map((v) => PICKUPS[v]).join(", ")} already emptied): park early.`, dropped: c.title, why: "empty" });
-      break;
-    }
-    const ch = { ...c, skipped };
-    const left = c.steps.filter((s) => !s.visit || !used.has(s.visit));
-    // Time decides too: a chapter that can't finish and still park by 30 s is not started.
-    if (c.id !== "park" && !fits(left, k === 0 && sc > 0)) {
-      chapterOf({ ...MAIN[MAIN.length - 1], goal: `Not enough time left for ${c.title}: park.`, dropped: c.title, why: "time" });
-      break;
-    }
-    // A chapter that starts with a stop (not a drive) needs the robot back where it begins.
-    if (k === 0 && sc > 0 && left[0]?.kind !== "drive") {
-      add({ kind: "drive", to: "FAR_FLOWER_TURN", label: "Back to the main path", link: true }, ch, 0);
-    }
-    left.forEach((s) => add(s, ch, typical(s)));
-  }
-  return { steps, total: time };
+  return { segs, total: time };
 }
 
-/** The longest the Auto can take: every wait and every try runs to its limit, then park. */
-function worstCase() {
-  let time = 0;
-  MAIN[0].steps.forEach(() => (time += 0.9));
-  time += WAIT.max;
-  WAIT.ladder.forEach((id) => PLAYS[id].steps.forEach((s) => (time += s.kind === "drive" ? 2.4 : s.ifTipped ? 0 : s.max)));
-  return time + 2.4;
-}
-
-function chapterList(tl = timeline()) {
-  const list = [];
-  for (const s of tl.steps) {
-    const lastC = list[list.length - 1];
-    if (lastC && lastC.id === s.ch.id) { lastC.t1 = s.t1; lastC.steps.push(s); }
-    else list.push({ ...s.ch, t0: s.t0, t1: s.t1, steps: [s] });
-  }
+/** Every outcome: the good path, then each try (and "none") at each tip-wait. */
+function allOutcomes() {
+  const list = [{ label: "Everything works", outcome: null }];
+  AUTO.steps.forEach((s, i) => {
+    if (!isTip(s)) return;
+    (s.ladder ?? []).forEach((id, k) => list.push({ label: `${s.tip} missed, try ${k + 1} works`, outcome: { miss: i, works: k } }));
+    list.push({ label: `${s.tip} missed, ${s.ladder?.length ? "nothing works" : "no backups"}`, outcome: { miss: i, works: (s.ladder ?? []).length } });
+  });
   return list;
 }
-const currentChapter = (tl) => { const l = chapterList(tl); return l.find((c) => c.id === chapter) ?? l[0]; };
-function openChapter(id) { chapter = id; selected = null; playing = false; t = currentChapter().t0; render(); }
-function setScenario(k) {
-  scenario = k;
-  if (!chapterList().some((c) => c.id === chapter)) chapter = "start";
-  t = currentChapter().t0;
-  render();
-}
-const scenarioName = (k) => k === 0 ? "TIP 1 came" : k <= WAIT.ladder.length ? `Try ${k} works` : "Nothing works";
+const routeName = (r) => {
+  const names = [];
+  for (const seg of r.segs) {
+    const s = seg.step;
+    const n = seg.part === "try" ? seg.play : s.tip ?? (s.park ? "Park" : null);
+    if (n && names[names.length - 1] !== n) names.push(n);
+  }
+  return names.join(" → ");
+};
 
-function poseAt(tl, time) {
-  for (const s of tl.steps) {
+function current() {
+  if (mode === "miss") return route({ miss: missAt, works: rung });
+  return route();
+}
+
+function poseAt(r, time) {
+  for (const s of r.segs) {
     if (time > s.t1) continue;
     if (s.step.kind !== "drive") return s.pts[0];
-    const f = Math.max(0, Math.min(1, (time - s.t0) / (s.t1 - s.t0)));
+    const f = Math.max(0, Math.min(1, (time - s.t0) / Math.max(1e-6, s.t1 - s.t0)));
     const e = f < .5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
     let want = e * s.pts.slice(1).reduce((d, p, i) => d + dist(s.pts[i], p), 0);
     for (let i = 1; i < s.pts.length; i++) {
@@ -398,10 +382,10 @@ function poseAt(tl, time) {
       want -= seg;
     }
   }
-  return tl.steps.length ? tl.steps[tl.steps.length - 1].pts.at(-1) : SPOTS.START;
+  return r.segs.length ? r.segs[r.segs.length - 1].pts.at(-1) : SPOTS[AUTO.start] ?? SPOTS.START;
 }
 
-// ---- Field ----
+// ---------- Drawing ----------
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => {
   const e = document.createElementNS(NS, tag);
@@ -410,270 +394,461 @@ const el = (tag, attrs = {}, parent) => {
   return e;
 };
 const Y = (y) => 141.5 - y;
-const colorOf = (c) => c.try ? "var(--notip)" : c.id === "start" ? "#ffc516" : "var(--tip)";
+const line = (pts, attrs, svg) => el("polyline", { points: pts.map((p) => `${p[0]},${Y(p[1])}`).join(" "), fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", ...attrs }, svg);
+
+function label(svg, n) {
+  const [x, y] = SPOTS[n];
+  const [ox, oy, anchor] = LABEL_AT[n] ?? [1.6, 3.6, "start"];
+  el("text", { x: x + ox, y: Y(y) + oy, "text-anchor": anchor, class: "spot-label" }, svg).textContent = nice(n);
+}
+
+function badge(svg, s, x, y, onClick) {
+  const g = el("g", { class: "marker", tabindex: 0, role: "button", "aria-label": stepLabel(s) }, svg);
+  const off = s.kind === "shoot" ? -3.2 : 3.2;
+  el("circle", { cx: x + off, cy: Y(y) - 3.2, r: 2.1, fill: s.kind === "shoot" ? "var(--accent)" : "#c99400", stroke: "var(--surface)", "stroke-width": .5 }, g);
+  el("text", { x: x + off, y: Y(y) - 2.35, "text-anchor": "middle", "font-size": 2.4, "font-weight": 700, fill: "#fff" }, g).textContent = s.kind === "shoot" ? "◎" : "✿";
+  if (onClick) g.addEventListener("click", onClick);
+}
+
+/** The ◆ on the path where a tip-wait can miss; opens that miss. */
+function diamond(svg, i, x, y, open) {
+  const s = AUTO.steps[i];
+  const n = s.ladder?.length ?? 0;
+  const g = el("g", { class: "marker", tabindex: 0, role: "button", "aria-label": `${s.tip}: what if it doesn't come` }, svg);
+  const text = n ? `◆ ${s.tip} · ${n} backup${n === 1 ? "" : "s"}` : `◆ ${s.tip}`;
+  const w = text.length * 1.45 + 3, h = 5;
+  const bx = x - w - 3, by = Y(y) + 3;
+  el("rect", { x: bx, y: by, width: w, height: h, rx: 2.5, fill: open ? "var(--miss)" : "var(--surface)", stroke: "var(--miss)", "stroke-width": .5 }, g);
+  el("text", { x: bx + w / 2, y: by + 3.5, "text-anchor": "middle", "font-size": 2.4, "font-weight": 700, fill: open ? "#fff" : "var(--miss)" }, g).textContent = text;
+  const go = () => openMiss(i);
+  g.addEventListener("click", go);
+  g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+}
 
 function drawField() {
   const svg = document.getElementById("field");
   svg.innerHTML = "";
   el("image", { href: "__FIELD_LIGHT__", x: -1.25, y: -1.25, width: 144, height: 144, class: "img-light" }, svg);
   el("image", { href: "__FIELD_DARK__", x: -1.25, y: -1.25, width: 144, height: 144, class: "img-dark" }, svg);
-  const tl = timeline();
-  const cur = currentChapter(tl);
-  const color = colorOf(cur);
-  cur.steps.forEach((s) => {
-    if (s.step.kind !== "drive") return;
-    el("polyline", {
-      points: s.pts.map((p) => `${p[0]},${Y(p[1])}`).join(" "), fill: "none",
-      stroke: color, "stroke-width": selected === s.step ? 1.6 : 1, "stroke-dasharray": s.step.link ? "2 1.4" : "none",
-      "stroke-linecap": "round", "stroke-linejoin": "round",
-    }, svg);
-  });
-  cur.steps.forEach((s) => {
-    if (s.step.kind !== "shoot" && s.step.kind !== "collect") return;
-    const [x, y] = s.pts[0];
-    const g = el("g", { class: "marker", tabindex: 0, role: "button", "aria-label": s.step.label }, svg);
-    const off = s.step.kind === "shoot" ? -3.2 : 3.2;
-    el("circle", { cx: x + off, cy: Y(y) - 3.2, r: 2.1, fill: s.step.kind === "shoot" ? "var(--accent)" : "#c99400", stroke: "var(--surface)", "stroke-width": .5 }, g);
-    const tx = el("text", { x: x + off, y: Y(y) - 2.35, "text-anchor": "middle", "font-size": 2.4, "font-weight": 700, fill: "#fff" }, g);
-    tx.textContent = s.step.kind === "shoot" ? "◎" : "✿";
-    g.addEventListener("click", () => select(s.step));
-  });
-  const from = cur.steps[0].pts[0];
-  el("circle", { cx: from[0], cy: Y(from[1]), r: 1.6, fill: "none", stroke: "var(--heading)", "stroke-width": .5, "stroke-dasharray": ".8 .6" }, svg);
-  const used = new Set();
-  cur.steps.forEach((s) => s.step.to && used.add(s.step.to));
-  used.forEach((n) => {
-    if (n.endsWith("_TURN")) return;
-    const [x, y] = SPOTS[n];
-    el("circle", { cx: x, cy: Y(y), r: .9, fill: "var(--heading)" }, svg);
-    const [ox, oy, anchor] = LABEL_AT[n] ?? [1.6, 3.6, "start"];
-    el("text", { x: x + ox, y: Y(y) + oy, "text-anchor": anchor, class: "spot-label" }, svg).textContent = nice(n);
-  });
+  const hint = document.getElementById("hint");
+  hint.hidden = true;
 
-  if (cur.id === "start") {
-    // The wait, on the path: click it to step through what the preview shows.
-    const [dx, dy] = SPOTS.FAR_FLOWER_TURN;
-    const g = el("g", { class: "marker", tabindex: 0, role: "button", "aria-label": "TIP 1: show the next outcome" }, svg);
-    const w = 34, h = 6.4, bx = dx - w - 8, by = Y(dy) + 6;
-    const tone = scenario === 0 ? "var(--tip)" : "var(--notip)";
-    el("rect", { x: bx, y: by, width: w, height: h, rx: 3.2, fill: tone }, g);
-    el("text", { x: bx + w / 2, y: by + 4.3, "text-anchor": "middle", "font-size": 2.6, "font-weight": 700, fill: "#fff" }, g).textContent = `◆ ${scenarioName(scenario)} ▸`;
-    el("text", { x: bx + w / 2, y: by + h + 3.2, "text-anchor": "middle", class: "spot-label" }, g).textContent = `TIP 1 · wait up to ${WAIT.max} s`;
-    const next = () => setScenario((scenario + 1) % (WAIT.ladder.length + 2));
-    g.addEventListener("click", next);
-    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); next(); } });
+  if (mode === "build") return drawBuild(svg, hint);
+
+  const r = current();
+  const chs = chapters();
+  const open = mode === "view" ? new Set(chs[chapter]?.steps ?? []) : null;
+  const shown = new Set();
+  // Where each good-path step sits, for its badge and ◆.
+  const where = new Map();
+  for (const seg of r.segs) if (seg.part !== "try") where.set(seg.step, seg.pts.at(-1));
+
+  for (const seg of r.segs) {
+    const s = seg.step;
+    if (s.kind !== "drive") continue;
+    const idx = AUTO.steps.indexOf(s);
+    let color = "var(--path)", width = 1, opacity = 1;
+    if (mode === "view") opacity = open.has(idx) ? 1 : 0.3;
+    if (mode === "miss") {
+      if (seg.part === "path") opacity = 0.3;
+      else color = "var(--miss)";
+    }
+    if (selected === s) width = 1.6;
+    line(seg.pts, { stroke: color, "stroke-width": width, opacity }, svg);
+    if (s.to) shown.add(s.to);
   }
-  const [rx, ry] = poseAt(tl, Math.max(cur.t0, Math.min(t, cur.t1)));
+  for (const seg of r.segs) {
+    const s = seg.step;
+    if (s.kind !== "shoot" && s.kind !== "collect") continue;
+    const idx = AUTO.steps.indexOf(s);
+    if (mode === "view" && !open.has(idx)) continue;
+    if (mode === "miss" && seg.part === "path") continue;
+    badge(svg, s, seg.pts[0][0], seg.pts[0][1], idx >= 0 ? () => select(s) : null);
+  }
+  shown.forEach((n) => { if (PLACES.includes(n)) { const [x, y] = SPOTS[n]; el("circle", { cx: x, cy: Y(y), r: .9, fill: "var(--heading)" }, svg); label(svg, n); } });
+  label(svg, AUTO.start);
+  el("circle", { cx: SPOTS[AUTO.start][0], cy: Y(SPOTS[AUTO.start][1]), r: 1.2, fill: "var(--heading)" }, svg);
+
+  for (const seg of r.segs) {
+    const i = AUTO.steps.indexOf(seg.step);
+    if (i < 0 || !isTip(seg.step) || seg.part === "try") continue;
+    if (mode === "view" && !open.has(i)) continue;
+    if (mode === "miss" && i !== missAt) continue;
+    diamond(svg, i, seg.pts[0][0], seg.pts[0][1], mode === "miss");
+  }
+
+  const [rx, ry] = poseAt(r, t);
   el("rect", { x: rx - 9, y: Y(ry) - 9, width: 18, height: 18, rx: 2, fill: "none", stroke: "var(--accent)", "stroke-width": .8 }, svg);
   el("circle", { cx: rx, cy: Y(ry), r: 1.2, fill: "var(--accent)" }, svg);
 }
 
-// ---- Controls ----
-function select(step) { selected = selected === step ? null : step; render(); }
+function drawBuild(svg, hint) {
+  // The path so far.
+  let at = SPOTS[AUTO.start] ?? null;
+  for (const s of AUTO.steps) {
+    if (s.kind === "drive" && at) { const pts = [at, SPOTS[s.to]]; line(pts, { stroke: "var(--path)", "stroke-width": 1 }, svg); at = SPOTS[s.to]; }
+    else if (at && (s.kind === "shoot" || s.kind === "collect")) badge(svg, s, at[0], at[1]);
+  }
+  if (pendingSpot && at) line([at, SPOTS[pendingSpot]], { stroke: "var(--path)", "stroke-width": 1, "stroke-dasharray": "1.5 1" }, svg);
+  // Every place, clickable.
+  const clickable = buildStage === "start" || (buildStage === "path" && !pendingSpot);
+  for (const n of PLACES) {
+    const [x, y] = SPOTS[n];
+    const g = el("g", { class: clickable ? "marker" : "", tabindex: clickable ? 0 : -1, role: "button", "aria-label": nice(n) }, svg);
+    el("circle", { cx: x, cy: Y(y), r: 2.4, fill: n === pendingSpot ? "var(--accent)" : "var(--surface)", stroke: "var(--heading)", "stroke-width": .5, opacity: clickable || n === pendingSpot ? 1 : .5 }, g);
+    label(svg, n);
+    if (clickable) {
+      const go = () => clickPlace(n);
+      g.addEventListener("click", go);
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    }
+  }
+  if (at) { el("rect", { x: at[0] - 9, y: Y(at[1]) - 9, width: 18, height: 18, rx: 2, fill: "none", stroke: "var(--accent)", "stroke-width": .8 }, svg); }
+  hint.hidden = false;
+  hint.textContent = buildStage === "start" ? "Click where the robot starts"
+    : buildStage === "path" ? (pendingSpot ? `What happens at ${nice(pendingSpot)}?` : "Click the next place the robot goes")
+    : "The good path is done. Choose backups on the left.";
+}
+
+// ---------- Panels ----------
 const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 function button(text, onClick, attrs = {}) {
-  const b = node("button", attrs.cls, text);
+  const b = node("button", attrs.cls ?? null, text);
   for (const [k, v] of Object.entries(attrs)) if (k !== "cls") b.setAttribute(k, v);
   b.onclick = (e) => { e.stopPropagation(); onClick(); };
   return b;
 }
 function stepper(value, onChange, min = 0.5, max = 15) {
-  const wrap = node("span", "stepper");
-  const val = node("span", null, fmt(value));
-  wrap.append(
-    button("−", () => onChange(Math.max(min, +(value - 0.5).toFixed(1))), { "aria-label": "Less time" }),
-    val,
-    button("+", () => onChange(Math.min(max, +(value + 0.5).toFixed(1))), { "aria-label": "More time" }),
-  );
-  return wrap;
+  const w = node("span", "stepper");
+  w.append(button("−", () => onChange(Math.max(min, +(value - 0.5).toFixed(1))), { "aria-label": "Less time" }),
+    node("span", null, fmt(value)),
+    button("+", () => onChange(Math.min(max, +(value + 0.5).toFixed(1))), { "aria-label": "More time" }));
+  return w;
+}
+function totalBox(r) {
+  const box = node("div", "total");
+  const big = node("span", "big" + (r.total > 30 ? " over" : ""), fmt(r.total));
+  box.append(big, node("span", "of", "of 30 s"));
+  return box;
 }
 
-function editorFor(step) {
+function editorFor(s) {
   const box = node("div", "editor");
   box.addEventListener("click", (e) => e.stopPropagation());
   const row = node("div", "row");
-  if (step.kind === "shoot") {
-    row.append(step.until === "tip" ? "Shoot until the CELL tips, but at most" : "Shoot until empty, but at most", stepper(step.max, (v) => { step.max = v; render(); }));
-  } else if (step.kind === "collect") {
-    row.append("Collect until full, but at most", stepper(step.max, (v) => { step.max = v; render(); }));
-  } else {
-    row.append(step.link
-      ? "Drawn by the tool: from wherever the try ended back to where the main path carries on."
-      : `Drag the end point on the field to move ${nice(step.to)}. Spin-up starts on the way when the next step shoots.`);
-  }
+  if (s.kind === "wait") row.append("Wait for the tip, up to", stepper(s.max, (v) => { s.max = v; render(); }, 1, 15));
+  else if (s.kind === "shoot") row.append(s.tip ? "Shoot until the CELL tips, up to" : "Shoot until empty, up to", stepper(s.max, (v) => { s.max = v; render(); }));
+  else if (s.kind === "collect") row.append("Collect until full, up to", stepper(s.max, (v) => { s.max = v; render(); }));
+  else row.append(`Drag ${nice(s.to)} on the field to move it.`);
   box.append(row);
   return box;
 }
 
-/** The ladder: what happens, in order, if TIP 1 doesn't come. */
-function ladderBox() {
-  const box = node("li", "decision");
-  box.append(node("div", "q", `◆ ${WAIT.label}`));
-  const r = node("div", "row");
-  r.append("Wait up to", stepper(WAIT.max, (v) => { WAIT.max = v; render(); }, 1, 15));
-  box.append(r);
-
-  box.append(node("div", "ladder-h", "If TIP 1 doesn't come, try in order:"));
-  const ol = node("ol", "ladder");
-  WAIT.ladder.forEach((id, i) => {
-    const play = PLAYS[id];
-    const li = node("li", "rung");
-    const head = node("div", "rung-head");
-    head.append(node("span", "rung-n", `${i + 1}`), node("span", "rung-t", play.title));
-    const tools = node("span", "rung-tools");
-    tools.append(
-      button("↑", () => { WAIT.ladder.splice(i - 1, 0, WAIT.ladder.splice(i, 1)[0]); render(); }, { "aria-label": "Try this earlier", ...(i === 0 ? { disabled: "" } : {}) }),
-      button("↓", () => { WAIT.ladder.splice(i + 1, 0, WAIT.ladder.splice(i, 1)[0]); render(); }, { "aria-label": "Try this later", ...(i === WAIT.ladder.length - 1 ? { disabled: "" } : {}) }),
-      button("×", () => { WAIT.ladder.splice(i, 1); if (scenario > WAIT.ladder.length + 1) scenario = 0; render(); }, { "aria-label": "Remove this try" }),
-    );
-    head.append(tools);
-    li.append(head);
-    const shot = tryShot(play);
-    const r2 = node("div", "row rung-sub");
-    r2.append("Give it up to", stepper(shot.max, (v) => { shot.max = v; render(); }), node("span", "shared", `shared play · ${play.usedBy}`));
-    li.append(r2);
-    consequences(i + 1).forEach((text) => li.append(node("div", "warn", text)));
-    ol.append(li);
-  });
-  const parkLi = node("li", "rung rung-park");
-  const ph = node("div", "rung-head");
-  ph.append(node("span", "rung-n", "P"), node("span", "rung-t", "Nothing worked: park"));
-  parkLi.append(ph);
-  ol.append(parkLi);
-  box.append(ol);
-
-  const unused = Object.keys(PLAYS).filter((id) => !WAIT.ladder.includes(id));
-  if (unused.length) {
-    const add = node("div", "row");
-    add.append("Add a try:");
-    unused.forEach((id) => add.append(button(`+ ${PLAYS[id].title}`, () => { WAIT.ladder.push(id); render(); }, { cls: "chip" })));
-    box.append(add);
-  }
-  const rj = node("div", "row");
-  rj.append("A try that works goes back to the main path at");
-  const sel = node("select", "chip");
-  sel.id = "rejoin";
-  MAIN.slice(1).forEach((c) => { const o = node("option", null, c.title); o.value = c.id; o.selected = c.id === WAIT.rejoin; sel.append(o); });
-  sel.onchange = () => { WAIT.rejoin = sel.value; render(); };
-  rj.append(sel);
-  box.append(rj);
-
-  const pv = node("div", "row");
-  pv.append("Preview:");
-  const sw = node("span", "switch");
-  for (let k = 0; k <= WAIT.ladder.length + 1; k++) {
-    sw.append(button(scenarioName(k), () => setScenario(k), { cls: k === 0 ? "tip" : "notip", "aria-pressed": scenario === k }));
-  }
-  pv.append(sw);
-  box.append(pv);
-  return box;
-}
-
-function renderList() {
-  const ul = document.getElementById("steps");
-  ul.innerHTML = "";
-  const tl = timeline();
-  const chapters = chapterList(tl);
-  const cur = currentChapter(tl);
-
-  const strip = document.getElementById("chapters");
-  strip.innerHTML = "";
-  chapters.forEach((c, i) => {
-    if (i > 0) {
-      const a = node("span", "arrow", c.try ? "✗ →" : chapters[i - 1].try ? "✓ →" : i === 1 && scenario === 0 ? "✓ →" : "→");
-      a.style.color = c.try ? "var(--notip)" : chapters[i - 1].try || (i === 1 && scenario === 0) ? "var(--tip)" : "";
-      strip.append(a);
-    }
-    const b = node("button");
-    b.setAttribute("aria-current", c.id === cur.id ? "step" : "false");
-    b.innerHTML = `<span class="ct" style="color:${c.try ? "var(--notip)" : ""}">${c.title}</span><span class="cs">${fmt(c.t1 - c.t0)}</span>`;
-    b.onclick = () => openChapter(c.id);
+function viewPanel(side) {
+  const r = route();
+  const chs = chapters();
+  const p1 = node("div", "panel side");
+  p1.append(totalBox(r));
+  const strip = node("div", "chapters");
+  chs.forEach((c, i) => {
+    if (i) strip.append(node("span", "arrow", "→"));
+    const seg = r.segs.filter((sg) => c.steps.includes(AUTO.steps.indexOf(sg.step)));
+    const b = button("", () => openChapter(i), { "aria-current": i === chapter ? "step" : "false" });
+    b.innerHTML = `<span class="ct">${c.name}</span><span class="cs">${fmt(seg.length ? seg.at(-1).t1 - seg[0].t0 : 0)}</span>`;
     strip.append(b);
   });
-  document.getElementById("goal").textContent = cur.goal;
+  p1.append(strip);
+  side.append(p1);
 
-  let n = 0;
-  if (cur.id !== "start") ul.append(node("li", "from", `Starts at ${fmt(cur.t0)}, where the last chapter ended.`));
-  (cur.skipped ?? []).forEach((v) => ul.append(node("li", "warn", `Skips ${PICKUPS[v]}: a try already emptied it.`)));
-  cur.steps.forEach((s) => {
-    const step = s.step;
-    if (step.kind === "wait") { ul.append(ladderBox()); return; }
-    n++;
-    const li = node("li", "step" + (selected === step ? " sel" : "") + (t >= s.t0 && t < s.t1 && t > cur.t0 ? " now" : ""));
+  const p2 = node("div", "panel side");
+  const ul = node("ul", "steps");
+  for (const i of chs[chapter].steps) {
+    const s = AUTO.steps[i];
+    const seg = r.segs.find((sg) => sg.step === s);
+    const li = node("li", "step" + (selected === s ? " sel" : "") + (seg && t >= seg.t0 && t < seg.t1 && t > 0 ? " now" : ""));
     li.tabIndex = 0;
-    const ico = step.kind === "drive" ? (step.park ? "P" : step.link ? "↩" : "→") : step.kind === "shoot" ? "◎" : "✿";
-    let detail;
-    if (step.kind === "shoot" && step.tries) detail = `until the CELL tips, at most ${fmt(step.max)} · <b>no tip? next try</b>`;
-    else if (step.kind === "shoot") detail = step.until === "tip" ? `until the CELL tips, at most ${fmt(step.max)} · <b>no tip? carry on</b>` : `until empty, at most ${fmt(step.max)}`;
-    else if (step.kind === "collect") detail = `until full, at most ${fmt(step.max)}`;
-    else detail = step.link ? `to ${nice(step.to)}, drawn by the tool` : `to ${nice(step.to)}`;
-    li.innerHTML = `<span class="ico ${step.kind}">${ico}</span><span style="min-width:0"><div class="name">${step.label}</div><div class="sub">${detail}</div></span><span class="t">${fmt(s.t1 - s.t0)}</span>`;
-    li.onclick = () => select(step);
-    li.onkeydown = (e) => { if (e.key === "Enter") select(step); };
+    const ico = s.kind === "drive" ? (s.park ? "P" : "→") : s.kind === "shoot" ? "◎" : s.kind === "collect" ? "✿" : "◆";
+    const sub = s.kind === "wait" ? `up to ${fmt(s.max)}` : s.kind === "shoot" ? (s.tip ? `until the CELL tips, up to ${fmt(s.max)}` : `until empty, up to ${fmt(s.max)}`) : s.kind === "collect" ? `until full, up to ${fmt(s.max)}` : `to ${nice(s.to)}`;
+    const n = s.ladder?.length ?? 0;
+    const pill = isTip(s) ? `<span class="pill">${n ? `${n} backup${n === 1 ? "" : "s"}` : "no backups"}</span>` : "";
+    li.innerHTML = `<span class="ico ${s.kind}${isTip(s) && s.kind === "wait" ? " tip" : ""}">${ico}</span><span style="min-width:0"><div class="name">${stepLabel(s)}</div><div class="sub">${sub}${pill}</div></span><span class="t">${seg ? fmt(seg.t1 - seg.t0) : ""}</span>`;
+    li.onclick = () => select(s);
+    li.onkeydown = (e) => { if (e.key === "Enter") select(s); };
     ul.append(li);
-    if (selected === step) { const ed = node("li"); ed.style.listStyle = "none"; ed.append(editorFor(step)); ul.append(ed); }
+    if (selected === s) {
+      const ed = node("li"); ed.style.listStyle = "none"; ed.append(editorFor(s));
+      if (isTip(s)) ed.firstChild.append(button(`What if ${s.tip} doesn't come? →`, () => openMiss(i), { cls: "btn small" }));
+      ul.append(ed);
+    }
+  }
+  p2.append(ul);
+  if (chapter < chs.length - 1) p2.append(button(`Next: ${chs[chapter + 1].name} →`, () => openChapter(chapter + 1), { cls: "btn next" }));
+  side.append(p2);
+}
+
+/** What happens to the rest of the plan in the route shown. */
+function consequence(r) {
+  const out = [];
+  const usedNames = new Set();
+  r.segs.forEach((sg) => { if (sg.part === "try" && sg.step.at) usedNames.add(sg.step.at); });
+  const ruled = r.segs.find((sg) => sg.step.why);
+  const skipped = AUTO.steps.filter((s) => s.kind === "collect" && usedNames.has(s.at) && !r.segs.some((sg) => sg.step === s) && r.segs.some((sg) => sg.part === "rest"));
+  skipped.forEach((s) => out.push(`${SOURCES[s.at] ?? nice(s.at)} was used by a try, so the rest of the path skips it.`));
+  if (ruled) out.push(`${ruled.step.why}: the robot parks.`);
+  return out;
+}
+
+function missPanel(side) {
+  const s = AUTO.steps[missAt];
+  const ladder = s.ladder ?? [];
+  const r = current();
+  const p = node("div", "panel side");
+  const head = node("div", "miss-head");
+  head.append(node("h2", null, `◆ If ${s.tip} doesn't come`), button("Close", closeMiss, { cls: "btn small" }));
+  p.append(head);
+  const w = node("div", "row");
+  w.append(node("span", "label", s.kind === "wait" ? "Wait for it up to" : "Keep shooting up to"), stepper(s.max, (v) => { s.max = v; render(); }, 1, 15));
+  p.append(w);
+  p.append(node("div", "label", "Then try, in order:"));
+  const ol = node("ol", "ladder");
+  ladder.forEach((id, k) => {
+    const play = PLAYS[id];
+    const li = node("li", "rung");
+    const h = node("div", "rung-head");
+    const tools = node("span", "tools");
+    tools.append(
+      button("↑", () => { ladder.splice(k - 1, 0, ladder.splice(k, 1)[0]); render(); }, { "aria-label": "Try earlier", ...(k ? {} : { disabled: "" }) }),
+      button("↓", () => { ladder.splice(k + 1, 0, ladder.splice(k, 1)[0]); render(); }, { "aria-label": "Try later", ...(k < ladder.length - 1 ? {} : { disabled: "" }) }),
+      button("×", () => { ladder.splice(k, 1); rung = Math.min(rung, ladder.length); render(); }, { "aria-label": "Remove" }),
+    );
+    h.append(node("span", "rung-n", `${k + 1}`), node("span", "rung-t", play.title), tools);
+    li.append(h);
+    const shot = play.steps.find((x) => x.tries);
+    const row = node("div", "row");
+    row.append("Give it up to", stepper(shot.max, (v) => { shot.max = v; render(); }));
+    li.append(row);
+    ol.append(li);
   });
-  document.getElementById("count").textContent = `${n} steps`;
-  const i = chapters.findIndex((c) => c.id === cur.id);
-  if (i < chapters.length - 1) ul.append(button(`Next: ${chapters[i + 1].title} →`, () => openChapter(chapters[i + 1].id), { cls: "next" }));
+  const end = node("li", "rung end");
+  const eh = node("div", "rung-head");
+  eh.append(node("span", "rung-n", ladder.length ? "✗" : "→"), node("span", "rung-t", ladder.length ? "Nothing worked:" : "No backups:"));
+  const pick = node("span", "pick");
+  [["park", "park"], ["carry", "carry on"]].forEach(([k, txt]) => pick.append(button(txt, () => { s.ifAllMiss = k; render(); }, { "aria-pressed": s.ifAllMiss === k })));
+  eh.append(pick);
+  end.append(eh);
+  ol.append(end);
+  p.append(ol);
+  const unused = Object.keys(PLAYS).filter((id) => !ladder.includes(id));
+  if (unused.length) {
+    const add = node("div", "row");
+    add.append(node("span", "label", "Add a try:"));
+    unused.forEach((id) => add.append(button(`+ ${PLAYS[id].title}`, () => { ladder.push(id); render(); }, { cls: "btn small" })));
+    p.append(add);
+  }
+  side.append(p);
+
+  const q = node("div", "panel side");
+  q.append(totalBox(r));
+  const sw = node("div", "row");
+  sw.append(node("span", "label", "Show:"));
+  const pk = node("span", "pick");
+  for (let k = 0; k <= ladder.length; k++) {
+    pk.append(button(k < ladder.length ? `Try ${k + 1} works` : ladder.length ? "Nothing works" : "It never tips", () => { rung = k; t = 0; render(); }, { "aria-pressed": rung === k }));
+  }
+  sw.append(pk);
+  q.append(sw);
+  q.append(node("div", "sub", routeName(r)));
+  consequence(r).forEach((txt) => q.append(node("div", "note", txt)));
+  side.append(q);
+}
+
+function buildPanel(side) {
+  const p = node("div", "panel side");
+  const head = node("div", "miss-head");
+  head.append(node("h2", null, "New Auto"), button("Cancel", cancelBuild, { cls: "btn small" }));
+  head.querySelector("h2").style.color = "var(--heading)";
+  p.append(head);
+  const stages = node("div", "sub", buildStage === "start" ? "Step 1 of 3: where does it start?" : buildStage === "path" ? "Step 2 of 3: lay out the path when everything works." : "Step 3 of 3: what if a tip doesn't come?");
+  p.append(stages);
+  side.append(p);
+
+  if (buildStage === "path" || buildStage === "misses") {
+    const q = node("div", "panel side");
+    const ul = node("ul", "steps");
+    ul.append(Object.assign(node("li", "sub", `Start at ${nice(AUTO.start)}`), { style: "padding:0 8px" }));
+    AUTO.steps.forEach((s) => {
+      const li = node("li", "step");
+      const ico = s.kind === "drive" ? (s.park ? "P" : "→") : s.kind === "shoot" ? "◎" : s.kind === "collect" ? "✿" : "◆";
+      const sub = s.kind === "shoot" ? (s.tip ? `until ${s.tip} tips, up to ${fmt(s.max)}` : `until empty, up to ${fmt(s.max)}`) : s.kind === "collect" ? `until full, up to ${fmt(s.max)}` : s.kind === "wait" ? `up to ${fmt(s.max)}` : "";
+      li.innerHTML = `<span class="ico ${s.kind}">${ico}</span><span style="min-width:0"><div class="name">${stepLabel(s)}</div><div class="sub">${sub}</div></span><span></span>`;
+      ul.append(li);
+    });
+    q.append(ul);
+    if (buildStage === "path" && pendingSpot) {
+      const ask = node("div", "editor");
+      ask.style.marginLeft = "0";
+      ask.append(node("div", null, `At ${nice(pendingSpot)}:`));
+      const row = node("div", "row");
+      const atSource = Boolean(SOURCES[pendingSpot]);
+      row.append(button("Shoot", () => addAt("shoot"), { cls: "btn small" }));
+      if (atSource) row.append(button("Collect", () => addAt("collect"), { cls: "btn small" }));
+      row.append(button("Wait for partner's tip", () => addAt("wait"), { cls: "btn small" }));
+      row.append(button("Just drive through", () => addAt("none"), { cls: "btn small" }));
+      ask.append(row);
+      q.append(ask);
+    }
+    const last = AUTO.steps.at(-1);
+    if (buildStage === "path" && !pendingSpot && last?.kind === "shoot" && !last.tip) {
+      const tw = node("div", "editor");
+      tw.style.marginLeft = "0";
+      const row = node("div", "row");
+      row.append("This shot:", button("Wait for a tip", () => { tipCount++; last.tip = `TIP ${tipCount}`; last.label = `Shoot for TIP ${tipCount}`; last.max = 3; last.ladder = []; last.ifAllMiss = "park"; render(); }, { cls: "btn small" }));
+      tw.append(row);
+      q.append(tw);
+    }
+    const actions = node("div", "row");
+    if (buildStage === "path") {
+      actions.append(button("Undo", undoBuild, { cls: "btn small", ...(AUTO.steps.length ? {} : { disabled: "" }) }));
+      actions.append(button("Finish: drive to Park", finishPath, { cls: "btn small primary", ...(AUTO.steps.length && !pendingSpot ? {} : { disabled: "" }) }));
+    }
+    q.append(actions);
+    side.append(q);
+  }
+  if (buildStage === "misses") {
+    const m = node("div", "panel side");
+    const tips = AUTO.steps.map((s, i) => [s, i]).filter(([s]) => isTip(s));
+    if (!tips.length) m.append(node("div", "sub", "No shot waits for a tip, so there is nothing to back up."));
+    tips.forEach(([s, i]) => {
+      const box = node("div", "rung");
+      const h = node("div", "rung-head");
+      h.append(node("span", "rung-t", `If ${s.tip} doesn't come:`));
+      box.append(h);
+      const r = node("div", "row");
+      (s.ladder.length ? s.ladder : []).forEach((id, k) => r.append(node("span", "pill", `${k + 1}. ${PLAYS[id].title}`)));
+      r.append(node("span", "label", s.ladder.length ? "then park" : "park"));
+      box.append(r);
+      const add = node("div", "row");
+      Object.keys(PLAYS).filter((id) => !s.ladder.includes(id)).forEach((id) => add.append(button(`+ ${PLAYS[id].title}`, () => { s.ladder.push(id); render(); }, { cls: "btn small" })));
+      box.append(add);
+      m.append(box);
+    });
+    m.append(button("Done", () => { mode = "view"; chapter = 0; t = 0; render(); }, { cls: "btn primary" }));
+    side.append(m);
+  }
+}
+
+function renderSide() {
+  const side = document.getElementById("side");
+  side.innerHTML = "";
+  if (mode === "view") viewPanel(side);
+  else if (mode === "miss") missPanel(side);
+  else buildPanel(side);
 }
 
 function renderPlayback() {
-  const tl = timeline();
-  const cur = currentChapter(tl);
-  const worst = worstCase();
-  const span = Math.max(30, tl.total, worst) + 1;
+  const r = current();
+  const span = Math.max(30, r.total) + 1;
   document.getElementById("fill").style.width = `${(t / span) * 100}%`;
-  const band = document.getElementById("band");
-  band.style.left = `${(cur.t0 / span) * 100}%`;
-  band.style.width = `${((cur.t1 - cur.t0) / span) * 100}%`;
   document.getElementById("limit").style.left = `${(30 / span) * 100}%`;
-  document.getElementById("readout").innerHTML =
-    `${fmt(t)} / <span class="${tl.total > 30 ? "over" : ""}">${fmt(tl.total)}</span> of 30 s · ${scenarioName(scenario)} · every try missing: <span class="${worst > 30 ? "over" : ""}">${fmt(worst)}</span>`;
+  const band = document.getElementById("band");
+  if (mode === "view") {
+    const idxs = chapters()[chapter].steps;
+    const seg = r.segs.filter((sg) => idxs.includes(AUTO.steps.indexOf(sg.step)));
+    band.hidden = !seg.length;
+    if (seg.length) { band.style.left = `${(seg[0].t0 / span) * 100}%`; band.style.width = `${((seg.at(-1).t1 - seg[0].t0) / span) * 100}%`; }
+  } else band.hidden = true;
+  document.getElementById("readout").innerHTML = `${fmt(Math.min(t, r.total))} / <span class="${r.total > 30 ? "over" : ""}">${fmt(r.total)}</span>`;
   document.getElementById("pp").textContent = playing ? "❚❚" : "▶";
   document.getElementById("pp").setAttribute("aria-label", playing ? "Pause" : "Play");
+  document.querySelector(".play").hidden = mode === "build";
+  const count = allOutcomes().length;
+  const ob = document.getElementById("outcomesBtn");
+  ob.textContent = `All outcomes (${count})`;
+  ob.hidden = mode === "build";
+  document.getElementById("buildBtn").hidden = mode === "build";
+  document.getElementById("title").textContent = mode === "build" ? "Auto Builder · new Auto" : `Auto Builder · ${AUTO.name}`;
 }
 
-/** Every way this Auto can run: one fixed route per outcome, decided when it is built. */
-function renderRuns() {
-  const tbody = document.getElementById("runs");
+function render() { drawField(); renderSide(); renderPlayback(); }
+
+// ---------- Actions ----------
+function select(s) { selected = selected === s ? null : s; render(); }
+function openChapter(i) { chapter = i; selected = null; playing = false; const r = route(); const seg = r.segs.find((sg) => chapters()[i].steps.includes(AUTO.steps.indexOf(sg.step))); t = seg ? seg.t0 : 0; render(); }
+function openMiss(i) { mode = "miss"; missAt = i; rung = 0; selected = null; playing = false; t = 0; render(); }
+function closeMiss() { mode = "view"; missAt = null; t = 0; render(); }
+
+let saved = null, tipCount = 0;
+function startBuild() {
+  saved = { auto: structuredClone(AUTO), chapter };
+  AUTO = { name: "new Auto", start: null, steps: [] };
+  mode = "build"; buildStage = "start"; pendingSpot = null; tipCount = 0; selected = null; playing = false; t = 0;
+  render();
+}
+function cancelBuild() { AUTO = saved.auto; chapter = saved.chapter; mode = "view"; render(); }
+function clickPlace(n) {
+  if (buildStage === "start") { AUTO.start = n; buildStage = "path"; render(); return; }
+  pendingSpot = n; render();
+}
+function addAt(what) {
+  AUTO.steps.push({ kind: "drive", to: pendingSpot, source: SOURCES[pendingSpot] ? pendingSpot : undefined });
+  if (what === "shoot") AUTO.steps.push({ kind: "shoot", label: "Shoot", max: 2, typical: 1.5 });
+  if (what === "collect") AUTO.steps.push({ kind: "collect", at: pendingSpot, max: 2, typical: 1.2, source: pendingSpot });
+  if (what === "wait") { tipCount++; AUTO.steps.push({ kind: "wait", tip: `TIP ${tipCount}`, label: `Wait for the partner's TIP ${tipCount}`, max: 5, typical: 3, ladder: [], ifAllMiss: "park" }); }
+  pendingSpot = null;
+  render();
+}
+function undoBuild() {
+  if (pendingSpot) { pendingSpot = null; render(); return; }
+  const last = AUTO.steps.pop();
+  if (last && last.kind !== "drive" && AUTO.steps.at(-1)?.kind === "drive") AUTO.steps.pop();
+  render();
+}
+function finishPath() { AUTO.steps.push({ kind: "drive", to: "PARK", park: true }); buildStage = "misses"; render(); }
+
+document.getElementById("buildBtn").onclick = startBuild;
+const dlg = document.getElementById("outcomes");
+document.getElementById("outcomesClose").onclick = () => dlg.close();
+document.getElementById("outcomesBtn").onclick = () => {
+  const tbody = document.getElementById("outcomeRows");
   tbody.innerHTML = "";
-  for (let k = 0; k <= WAIT.ladder.length + 1; k++) {
-    const tl = timeline(k);
+  for (const o of allOutcomes()) {
+    const r = route(o.outcome);
     const tr = node("tr");
-    if (k === scenario) tr.className = "on";
-    tr.onclick = () => setScenario(k);
-    const route = chapterList(tl).map((c) => c.title).join(" → ");
-    tr.append(node("td", null, scenarioName(k)), node("td", "route", route));
-    const td = node("td", "t", fmt(tl.total));
-    if (tl.total > 30) td.classList.add("over");
-    tr.append(td);
+    const tm = node("td", "num" + (r.total > 30 ? " over" : ""), fmt(r.total));
+    tr.append(node("td", null, o.label), node("td", "route", routeName(r)), tm);
+    tr.onclick = () => {
+      dlg.close();
+      if (o.outcome) { mode = "miss"; missAt = o.outcome.miss; rung = o.outcome.works; } else { mode = "view"; }
+      t = 0; render();
+    };
     tbody.append(tr);
   }
-}
+  dlg.showModal();
+};
 
-function render() { drawField(); renderList(); renderPlayback(); renderRuns(); }
 function frame(now) {
   if (!playing) return;
   t += (now - last) / 1000; last = now;
-  const end = currentChapter().t1;
+  const end = current().total;
   if (t >= end) { t = end; playing = false; }
   render();
   if (playing) requestAnimationFrame(frame);
 }
 document.getElementById("pp").onclick = () => {
-  if (!playing && t >= currentChapter().t1) t = currentChapter().t0;
+  if (!playing && t >= current().total) t = 0;
   playing = !playing; last = performance.now(); render();
   if (playing) requestAnimationFrame(frame);
 };
 document.getElementById("track").onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
-  const tl = timeline();
-  const span = Math.max(30, tl.total, worstCase()) + 1;
-  const at = Math.min(tl.total, ((e.clientX - r.left) / r.width) * span);
-  const hit = chapterList(tl).find((c) => at >= c.t0 && at <= c.t1);
-  if (hit) chapter = hit.id;
-  t = at; render();
+  const cur = current();
+  t = Math.min(cur.total, ((e.clientX - r.left) / r.width) * (Math.max(30, cur.total) + 1));
+  if (mode === "view") {
+    const seg = cur.segs.find((sg) => t >= sg.t0 && t <= sg.t1);
+    const i = chapters().findIndex((c) => seg && c.steps.includes(AUTO.steps.indexOf(seg.step)));
+    if (i >= 0) chapter = i;
+  }
+  render();
 };
 render();
 </script>
