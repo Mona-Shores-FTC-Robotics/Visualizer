@@ -207,7 +207,7 @@
   } from "./lib/auto/simulate";
   import { normalizeAuto } from "./lib/auto/normalize";
   import TimingControl from "./lib/timing/TimingControl.svelte";
-  import { previewTogether } from "./lib/timing/together";
+  import { atSpeed, previewTogether } from "./lib/timing/together";
   import { timingMode, timingValues } from "./lib/timing/store";
   import type { Tip } from "./lib/timing/model";
   import type { AutoSection } from "./lib/auto/types";
@@ -2897,6 +2897,13 @@
       : null,
   );
   let autoPreview = $derived(autoTogether ? autoTogether.previews[0] : null);
+  /**
+   * Typical timing times every preview path at the measured drive speed (`atSpeed`), so the robot
+   * must be placed on those paths with the same settings, or it lags and snaps ahead at each end.
+   */
+  let previewDriveSpeed = $derived(
+    $timingMode === "typical" ? ($timingValues.driveSpeed ?? 1) : 1,
+  );
   let autoWorst = $derived(
     autoActive && autoCatalog && $autoSection
       ? worstCase($autoSection, autoCatalog)
@@ -3346,7 +3353,7 @@
         timePrediction.timeline,
         lines,
         startPoint,
-        settings,
+        autoPreview ? atSpeed(settings, previewDriveSpeed) : settings,
         x,
         y,
       );
@@ -3465,7 +3472,9 @@
           entry.prediction.timeline,
           pathData.lines,
           pathData.startPoint,
-          pathData.settings,
+          additionalTogether.previews.has(pathData)
+            ? atSpeed(pathData.settings, previewDriveSpeed)
+            : pathData.settings,
           x,
           y,
         );

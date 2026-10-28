@@ -37,8 +37,12 @@ export interface TogetherResult {
 /** Rounds of preview before giving up on the TIPs settling (each round is cheap). */
 const MAX_ROUNDS = 12;
 
-/** The settings with the robot driving `speed` times as fast: every path takes 1/speed as long. */
-function atSpeed(settings: Settings, speed: number): Settings {
+/**
+ * The settings with the robot driving `speed` times as fast: every path takes 1/speed as long.
+ * A preview's paths are timed with these, so whatever places the robot on that preview's timeline
+ * must use the same settings, or the robot lags along each path and snaps ahead at its end.
+ */
+export function atSpeed(settings: Settings, speed: number): Settings {
   if (!(speed > 0) || Math.abs(speed - 1) < 1e-9) return settings;
   const s = settings as Settings & Record<string, number>;
   const scaled: Record<string, number> = {};

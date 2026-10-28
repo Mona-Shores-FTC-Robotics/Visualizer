@@ -17,7 +17,9 @@ import {
   timingFileText,
   tipsFrom,
 } from "./model";
+import { calculateRobotState } from "../../utils/animation";
 import {
+  atSpeed,
   breakpoints,
   previewTogether,
   tipsInAuto,
@@ -173,4 +175,29 @@ test("Together view: a branch's paths start where the robot is once laid out (qu
   const laidOut = worstJump([shown(o3Text), shown(partnerRightText)]);
   assert(laidOut.drives >= 10, `it drives the route (${laidOut.drives} paths)`);
   assert(laidOut.worst < 1e-6, `no drive starts away from the robot (${laidOut.worst.toFixed(2)} in)`);
+});
+
+test("a faster drive speed: the robot moves smoothly along the preview, no snap at a path's end", () => {
+  const e = layOutShown({ ...entry(o3Text), sequence: [] });
+  const fast = { ...values, driveSpeed: 1.5 };
+  const preview = previewTogether([e], fast).previews[0];
+  const same = (v: number) => v;
+  const scale = same as unknown as Parameters<typeof calculateRobotState>[5];
+  // The largest move between two frames 1/2000 of the Auto apart.
+  const worstStep = (settings: typeof e.settings) => {
+    let worst = 0;
+    let prev: { x: number; y: number } | null = null;
+    for (let k = 0; k <= 2000; k++) {
+      const at = calculateRobotState(k / 20, preview.timeline, e.lines, e.startPoint, settings, scale, scale);
+      if (prev) worst = Math.max(worst, Math.hypot(at.x - prev.x, at.y - prev.y));
+      prev = { x: at.x, y: at.y };
+    }
+    return worst;
+  };
+  // Placed with the settings the paths were timed with: the robot never moves far in one frame.
+  const scaled = worstStep(atSpeed(e.settings, fast.driveSpeed));
+  assert(scaled < 3, `no jump with the scaled settings (${scaled.toFixed(1)} in)`);
+  // The bug this guards: placed with the drawing's own speed, it lags and snaps ahead.
+  const unscaled = worstStep(e.settings);
+  assert(unscaled > scaled, `the unscaled settings snap (${unscaled.toFixed(1)} in)`);
 });
