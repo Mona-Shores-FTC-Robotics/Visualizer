@@ -306,9 +306,9 @@ describe("the simple builder", () => {
   });
 });
 
-// --- the park from a late spot (src/lib/simple/parkFrom.ts) -----------------------------------------
+// --- the park from each spot (src/lib/simple/parkFrom.ts) -----------------------------------------
 
-/** What the editor does after every edit: lay the paths out, then give late spots their parks. */
+/** What the editor does after every edit: lay the paths out, then give the spots their parks. */
 function settled(doc: ProjectDoc): ProjectDoc {
   for (let i = 0; i < 5; i++) {
     const laid = layOutDoc(doc, settings);
@@ -333,10 +333,17 @@ function lateFarPick(): ProjectDoc {
   return settled(doc);
 }
 
-describe("the park from a late spot", () => {
-  it("gives none to an Auto that parks with time to spare", () => {
+describe("the park from each spot", () => {
+  it("gives every drive before Park its park, even with time to spare", () => {
+    // The plan's times are only a plan: a slow launch can put the robot on any spot late.
     const doc = settled(rQualsV2());
-    expect(doc.auto!.parkFrom).toBeUndefined();
+    const drives = doc.auto!.cards.filter((c) => c.kind === "path" && !c.park);
+    expect(Object.keys(doc.auto!.parkFrom ?? {}).sort()).toEqual(
+      drives
+        .slice(0, -1)
+        .map((c) => c.id)
+        .sort(),
+    );
   });
 
   it("gives a late spot a straight park to the park spot, starting on the spot", () => {
@@ -361,7 +368,8 @@ describe("the park from a late spot", () => {
     expect(nextInfo!.start.x).toBeCloseTo(47.36, 1);
     expect(nextInfo!.start.y).toBeCloseTo(114.79, 1);
     // The drive just before Park needs none.
-    expect(Object.keys(auto.parkFrom!)).toEqual([farCard.id]);
+    const lastDrive = after.filter((c) => c.kind === "path" && !c.park).at(-1)!;
+    expect(auto.parkFrom![lastDrive.id]).toBeUndefined();
     // Settled means settled.
     expect(settled(doc)).toBe(doc);
   });
@@ -397,18 +405,19 @@ describe("the park from a late spot", () => {
       expect(java.source).toMatch(/kit\.path\("[^"]*", \w+, \w+, [\d.]+\)/);
   });
 
-  it("drops a spot's park when the spot is no longer late, and keeps a bent one", () => {
+  it("drops a spot's park when its drive becomes the last before Park, and keeps a bent one", () => {
     const doc = lateFarPick();
     const farCard = doc.auto!.cards.find(
       (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "FAR_PICK",
     )!;
     const lineId = doc.auto!.parkFrom![farCard.id];
+    // The drive back to LEFT_FIRE after FAR_PICK goes: FAR_PICK is now the last spot before Park.
     const at = doc.auto!.cards.indexOf(farCard);
-    const launches = doc.auto!.cards.slice(at + 1, at + 1 + EXTRA_LAUNCHES);
-    let quick = doc;
-    for (const card of launches) quick = removeStep(quick, card.id);
-    quick = settled(quick);
-    expect(quick.auto!.parkFrom).toBeUndefined();
+    const nextDrive = doc
+      .auto!.cards.slice(at + 1)
+      .find((c) => c.kind === "path")!;
+    const quick = settled(removeStep(doc, nextDrive.id));
+    expect(quick.auto!.parkFrom?.[farCard.id]).toBeUndefined();
     expect(quick.lines.some((l) => l.id === lineId)).toBe(false);
 
     const bent = {
@@ -419,9 +428,7 @@ describe("the park from a late spot", () => {
           : l,
       ),
     };
-    let kept = bent;
-    for (const card of launches) kept = removeStep(kept, card.id);
-    kept = settled(kept);
+    const kept = settled(removeStep(bent, nextDrive.id));
     expect(kept.auto!.parkFrom?.[farCard.id]).toBe(lineId);
   });
 

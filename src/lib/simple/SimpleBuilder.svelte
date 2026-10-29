@@ -105,7 +105,7 @@
 
   let doc = $derived(project.doc);
   let steps = $derived(stepsOf(doc));
-  /** Fork: the late spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
+  /** Fork: the spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
   let parks = $derived(spotParks(doc, auto.catalog));
   let side = $derived(startSide(doc));
   let spots = $derived(
@@ -267,7 +267,7 @@
     auto.editingPark = false;
   }
 
-  // Selecting a step, or the park going away (its spot is no longer late), puts it back.
+  // Selecting a step, or the park going away (its step removed or moved last), puts it back.
   $effect(() => {
     void selectedId;
     untrack(closePark);
@@ -426,7 +426,7 @@
                 "simple-park",
                 focusedCard === step.cardId && "simple-park--on",
               ]}
-              title="If time runs short here, the robot parks from this spot. Show its park path"
+              title="Where the robot parks from this spot if time runs short. Show its park path"
               aria-label={`Park path from ${step.spot ?? "this spot"}`}
               aria-pressed={focusedCard === step.cardId}
               onclick={() => togglePark(step.cardId)}>P</button
@@ -478,9 +478,10 @@
             {@const by = spotLeaveBy(park.lineId)}
             <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
               <span class="flex-1"
-                >The robot is here until {fmt(park.leaveS)} s at worst. If time
-                runs short here it parks along this path{by !== null
-                  ? `, leaving by ${fmt(by)} s`
+                >Planned to leave here at {fmt(park.leaveS)} s. If the robot runs
+                behind and time runs short here, it parks along this path{by !==
+                null
+                  ? `, leaving by ${fmt(by)} s at the latest`
                   : ""}.</span
               >
               {#if auto.editingPark}
@@ -501,7 +502,7 @@
               If time runs short, the robot stops what it's doing (never a
               drive, pick or gather) and parks here. It leaves for {step.spot}
               by {fmt(parkLeaveBy(step)!)} s at the latest.{parks.size
-                ? " A late spot marked P parks from where it is instead."
+                ? " Before that, it parks from the spot it is on, along that spot's P path."
                 : ""}
             </p>
           {/if}

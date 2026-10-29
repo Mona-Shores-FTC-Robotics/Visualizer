@@ -1,34 +1,30 @@
 /**
- * The park from each late spot (AutoSection.parkFrom). When time runs short the robot's endgame
+ * The park from each spot (AutoSection.parkFrom). When time runs short the robot's endgame
  * guard parks from the spot it is on, not along the Park step's own path, which starts from
  * wherever the drive before Park ends (biobuzz AutoKit `path(label, path, parkPath, parkSeconds)`).
  *
- * A spot gets its own park path when the guard could fire while the robot is there: the robot
- * leaves it, at the worst case, later than LATE_CUSHION_S before the Park step's guard time. The
- * path is a straight line to the park spot, which a student may bend like any other path; a bent
- * one is kept even once its spot is no longer late. The drive just before Park needs none: the
- * Park step's own path already starts there.
+ * Every drive before Park gets one: the plan's times say when the robot should reach a spot, but
+ * a slow launch or a long pick can put it there seconds later, and the guard parks from wherever
+ * it is. The path is a straight line to the park spot, which a student may bend like any other
+ * path. The drive just before Park needs none: the Park step's own path already starts there.
  */
 import type { ProjectDoc } from "../../io/project";
 import type { AtomicPath } from "../../types";
 import { createSegment } from "../../utils/normalize";
 import type { PathCatalog } from "../auto/geometry";
-import { AUTO_LENGTH_S, commandSeconds, guardSeconds } from "../auto/simulate";
+import { commandSeconds } from "../auto/simulate";
 import { isSimple } from "./steps";
 
-/** Seconds before the guard's time from which a spot counts as late. */
-export const LATE_CUSHION_S = 5;
-
-/** A spot's park, for the builder: the path card it parks after, the path, and when it is late. */
+/** A spot's park, for the builder: the path card it parks after, the path, and when it leaves. */
 export interface SpotPark {
   cardId: string;
   lineId: string;
-  /** The latest, at the worst case, the robot leaves the spot. */
+  /** When the plan has the robot leave the spot, every step taking its typical time. */
   leaveS: number;
 }
 
 /**
- * The document with a park path for each late spot, and none for the others (unless bent).
+ * The document with a park path for each drive before Park, and none for the others (unless bent).
  * Returns `doc` itself when nothing changes, so it can run after every edit.
  */
 export function withSpotParks(
@@ -37,7 +33,7 @@ export function withSpotParks(
 ): ProjectDoc {
   const auto = doc.auto;
   if (!auto || !catalog || !isSimple(doc)) return doc;
-  const wanted = lateSpots(doc, catalog);
+  const wanted = parkedSpots(doc);
   const parkCard = auto.cards.find((c) => c.kind === "path" && c.park);
   const parkSpot =
     parkCard?.kind === "path" ? auto.pathEnds[parkCard.lineId] : undefined;
@@ -146,18 +142,15 @@ export function isSpotPark(doc: ProjectDoc, lineId: string): boolean {
 
 // --- inside -------------------------------------------------------------------------------------
 
-/** Drive card id → its spot, for the drives whose spot is late. */
-function lateSpots(doc: ProjectDoc, catalog: PathCatalog): Map<string, string> {
+/**
+ * Drive card id → its spot, for every drive before Park: the robot may run behind its plan and
+ * reach any of them late, so each has its own park. The last drive before Park needs none.
+ */
+function parkedSpots(doc: ProjectDoc): Map<string, string> {
   const auto = doc.auto!;
   const out = new Map<string, string>();
   const parkIndex = auto.cards.findIndex((c) => c.kind === "path" && c.park);
   if (parkIndex < 0) return out;
-  const parkCard = auto.cards[parkIndex];
-  const parkPath =
-    parkCard.kind === "path" ? catalog.byId.get(parkCard.lineId) : undefined;
-  if (!parkPath) return out;
-  const late = AUTO_LENGTH_S - guardSeconds(parkPath) - LATE_CUSHION_S;
-  const leaves = leaveTimes(doc, catalog);
   // The last drive before Park: Park's own path starts on its spot.
   let lastBefore: string | null = null;
   for (let i = parkIndex - 1; i >= 0; i--) {
@@ -169,8 +162,7 @@ function lateSpots(doc: ProjectDoc, catalog: PathCatalog): Map<string, string> {
   for (const card of auto.cards.slice(0, parkIndex)) {
     if (card.kind !== "path" || card.id === lastBefore) continue;
     const spot = auto.pathEnds[card.lineId];
-    const leave = leaves.get(card.id);
-    if (spot && leave !== undefined && leave >= late) out.set(card.id, spot);
+    if (spot) out.set(card.id, spot);
   }
   return out;
 }
