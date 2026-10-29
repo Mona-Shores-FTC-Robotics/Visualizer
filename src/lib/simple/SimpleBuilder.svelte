@@ -11,7 +11,7 @@
     SquareParking,
     X,
   } from "@lucide/svelte";
-  import type { Component } from "svelte";
+  import { untrack, type Component } from "svelte";
   import { useProject } from "../../state/project.svelte";
   import { useAuto } from "../../state/auto.svelte";
   import { usePlayback } from "../../state/playback.svelte";
@@ -19,6 +19,8 @@
   import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
   import { fieldClass } from "../components/ui/styles";
   import { flowerLinedUp, pickSpot } from "./flowers";
+  import { spotParks } from "./parkFrom";
+  import { useEditor } from "../../state/editor.svelte";
   import {
     addSpot,
     addStep,
@@ -103,6 +105,8 @@
 
   let doc = $derived(project.doc);
   let steps = $derived(stepsOf(doc));
+  /** Fork: the late spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
+  let parks = $derived(spotParks(doc, auto.catalog));
   let side = $derived(startSide(doc));
   let spots = $derived(
     Object.keys(doc.auto?.points ?? {}).filter((name) => name !== START_SPOT),
@@ -231,6 +235,51 @@
 
   function select(step: Step) {
     selectedCardId.set(selectedId === step.cardId ? null : step.cardId);
+  }
+
+  // --- a spot's park: its P shows it, a second press (or Edit) puts out its control points --------
+
+  const editor = useEditor();
+  /** The drive card whose park is shown. */
+  let focusedCard = $derived(
+    [...parks.values()].find((park) => park.lineId === auto.focusedPark)
+      ?.cardId ?? null,
+  );
+
+  function togglePark(cardId: string) {
+    const park = parks.get(cardId);
+    if (!park) return;
+    if (auto.focusedPark !== park.lineId) {
+      auto.focusedPark = park.lineId;
+      auto.editingPark = false;
+    } else if (!auto.editingPark) editPark();
+    else closePark();
+  }
+
+  function editPark() {
+    if (!auto.focusedPark) return;
+    auto.editingPark = true;
+    editor.select([auto.focusedPark]);
+  }
+
+  function closePark() {
+    auto.focusedPark = null;
+    auto.editingPark = false;
+  }
+
+  // Selecting a step, or the park going away (its spot is no longer late), puts it back.
+  $effect(() => {
+    void selectedId;
+    untrack(closePark);
+  });
+  $effect(() => {
+    if (auto.focusedPark && !focusedCard) untrack(closePark);
+  });
+
+  /** The latest the guard sends the robot to park from a spot, along that spot's park. */
+  function spotLeaveBy(lineId: string): number | null {
+    const path = auto.catalog?.byId.get(lineId);
+    return path ? AUTO_LENGTH_S - guardSeconds(path) : null;
   }
 
   // --- dragging: palette tiles into the list, and steps within it ---------------------------------
@@ -370,6 +419,19 @@
                 >advanced</span
               >{/if}
           </button>
+          {#if parks.has(step.cardId)}
+            <button
+              type="button"
+              class={[
+                "simple-park",
+                focusedCard === step.cardId && "simple-park--on",
+              ]}
+              title="If time runs short here, the robot parks from this spot. Show its park path"
+              aria-label={`Park path from ${step.spot ?? "this spot"}`}
+              aria-pressed={focusedCard === step.cardId}
+              onclick={() => togglePark(step.cardId)}>P</button
+            >
+          {/if}
           <button
             type="button"
             class="simple-icon"
@@ -411,14 +473,36 @@
               />°
             </label>
           </div>
+          {#if focusedCard === step.cardId}
+            {@const park = parks.get(step.cardId)!}
+            {@const by = spotLeaveBy(park.lineId)}
+            <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
+              <span class="flex-1"
+                >The robot is here until {fmt(park.leaveS)} s at worst. If time
+                runs short here it parks along this path{by !== null
+                  ? `, leaving by ${fmt(by)} s`
+                  : ""}.</span
+              >
+              {#if auto.editingPark}
+                <button type="button" class="simple-tile" onclick={closePark}
+                  >Done</button
+                >
+              {:else}
+                <button type="button" class="simple-tile" onclick={editPark}
+                  >Edit park path</button
+                >
+              {/if}
+            </div>
+          {/if}
           {#if step.problem}
             <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
           {:else if step.kind === "park" && parkLeaveBy(step) !== null}
             <p class="mt-1 pl-6 text-xs text-body">
               If time runs short, the robot stops what it's doing (never a
-              drive) and parks here. It leaves for {step.spot} by {fmt(
-                parkLeaveBy(step)!,
-              )} s at the latest.
+              drive, pick or gather) and parks here. It leaves for {step.spot}
+              by {fmt(parkLeaveBy(step)!)} s at the latest.{parks.size
+                ? " A late spot marked P parks from where it is instead."
+                : ""}
             </p>
           {/if}
         {:else if step.kind === "gather"}
@@ -604,5 +688,21 @@
   }
   .simple-icon:hover {
     color: var(--danger);
+  }
+  .simple-park {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.35rem;
+    border: 1px solid #ff8a3d;
+    color: #ff8a3d;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+  .simple-park--on {
+    background: #ff8a3d;
+    color: var(--base);
   }
 </style>

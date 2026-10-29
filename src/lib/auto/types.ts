@@ -176,6 +176,15 @@ export interface AutoSection {
    * so each driven path starts where the robot is (see links.ts). Rebuilt after every edit.
    */
   linkPaths?: string[];
+  /**
+   * Fork: the park from a spot, by the id of the path card that drives there: the id of a path
+   * from that card's end to the park spot. When the robot's endgame guard parks after that card
+   * arrives, it drives this path instead of the park card's own (biobuzz AutoKit's
+   * `path(label, path, parkPath, parkSeconds)`). The simple builder keeps them for the spots where
+   * the guard could fire (lib/simple/parkFrom.ts). Never driven otherwise, and hidden on the field
+   * unless shown.
+   */
+  parkFrom?: Record<string, string>;
   /** The plays this Auto's ladders use, by id (see `FirstOfCard.ladder`). */
   plays?: Record<string, Play>;
   cards: AutoCard[];

@@ -215,9 +215,19 @@ interface Guard {
   deadline: number;
   park: PathCard;
   path: PathInfo;
+  /** The guard's own park, for when the robot leaves a spot that had its own (types.ts parkFrom). */
+  ownPark: PathCard;
+  ownPath: PathInfo;
   label: string;
   parked: boolean;
 }
+
+/**
+ * Fork: the commands registered as grabs on the robot (biobuzz AutoRegistry.grab): they drive the
+ * robot off its spot and back, so the endgame guard never cuts one, and does not start one unless
+ * its typical time and the park both fit.
+ */
+export const GRAB_COMMANDS: ReadonlySet<string> = new Set(["PickFlower", "GardenGather"]);
 
 type Signal = { abortTo: Guard } | null;
 
@@ -453,7 +463,14 @@ export function simulateAuto(
             ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
             : null;
         const busy = gather ? gather.seconds : commandSeconds(auto, card, timing);
-        if (deadline && deadline.deadline < t + busy) {
+        if (GRAB_COMMANDS.has(card.name)) {
+          // Never cut, so not started unless its typical time and the park both fit; else the
+          // guard parks now, from the spot the robot is on.
+          if (deadline && deadline.deadline < t + commandSeconds(auto, card, timing)) {
+            note(`${card.name}: not started, it and the park no longer fit`, "guard", card.id);
+            return { abortTo: deadline };
+          }
+        } else if (deadline && deadline.deadline < t + busy) {
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
@@ -478,6 +495,21 @@ export function simulateAuto(
         // The guard never cuts a path short (biobuzz AutoKit.guarded): a path it let start
         // runs to its end, and the check before the next card parks from there.
         drive(card, path);
+        // Fork: arriving at a spot with its own park makes that the guard's park, with its own
+        // time; arriving anywhere else, the guard's own again (types.ts parkFrom).
+        const guard = guards[guards.length - 1];
+        if (guard && !guard.parked) {
+          const parkId = auto.parkFrom?.[card.id];
+          const spotPath = parkId ? catalog.byId.get(parkId) : undefined;
+          if (spotPath) {
+            guard.park = { id: `${card.id}#park`, kind: "path", lineId: spotPath.id, park: true };
+            guard.path = spotPath;
+          } else {
+            guard.park = guard.ownPark;
+            guard.path = guard.ownPath;
+          }
+          guard.deadline = AUTO_LENGTH_S - guardSeconds(guard.path);
+        }
         return null;
       }
       case "firstOf":
@@ -593,6 +625,8 @@ export function simulateAuto(
             deadline: AUTO_LENGTH_S - guardSeconds(parkPath),
             park: parkCard,
             path: parkPath,
+            ownPark: parkCard,
+            ownPath: parkPath,
             label,
             parked: false,
           }

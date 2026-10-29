@@ -325,6 +325,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     if (card.kind !== "path" && card.kind !== "rejoin") continue;
     const info = catalog.byId.get(card.lineId);
     if (info) referenced.add(info.index);
+    // Fork: a drive's park from its spot is written too (types.ts parkFrom).
+    const parkId = card.kind === "path" ? auto.parkFrom?.[card.id] : undefined;
+    const park = parkId ? catalog.byId.get(parkId) : undefined;
+    if (park) referenced.add(park.index);
   }
   const usedIndices = [...referenced].sort((a, b) => a - b);
 
@@ -412,8 +416,16 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         return card.timeoutS
           ? `kit.command(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
           : `kit.command(${javaString(card.name)})`;
-      case "path":
+      case "path": {
+        // Fork: a drive that carries a park from its spot: kit.path(label, path, park, seconds).
+        const parkId = auto.parkFrom?.[card.id];
+        if (parkId && catalog.byId.has(parkId)) {
+          const { info, varName } = pathOf(card.lineId);
+          const park = pathOf(parkId);
+          return `kit.path(${javaString(info.name)}, ${varName}, ${park.varName}, ${javaNumber(parkSeconds(park.info.seconds))})`;
+        }
         return pathNode(card.lineId);
+      }
       case "firstOf":
         return {
           head: "kit.firstOf",

@@ -98,6 +98,11 @@ export function relink(
         if (!line || oldLinks.has(line.id)) continue;
         if (!placed.has(line.id)) place(line, here.at, here.headingDeg);
         here = { at: { ...endOf(line) }, headingDeg: endHeading.get(line.id) ?? here.headingDeg };
+        // Fork: its park from this spot starts here too; the next card's link brings the chain
+        // back (types.ts parkFrom).
+        const parkId = auto.parkFrom?.[card.id];
+        const park = parkId ? byId.get(parkId) : undefined;
+        if (park && !placed.has(park.id)) place(park, here.at, here.headingDeg);
       } else if (card.kind === "rejoin") {
         const line = byId.get(card.lineId);
         if (!line || oldLinks.has(line.id)) continue;

@@ -465,6 +465,7 @@
             ? (id) => auto.toggleMiss(id)
             : undefined}
           missId={auto.miss}
+          focusLine={auto.focusedPark}
           decision={(id) => {
             const step = auto.plan?.branches.find((s) => s.cardId === id);
             if (!step) return null;
@@ -657,7 +658,7 @@
               idPrefix="line"
               opacity={autoActive ? 0 : settings.pathOpacity || 1}
               selectedId={editor.selectedLineId}
-              hidden={auto.linkIds}
+              hidden={auto.hiddenIds}
               {onSegmentDown}
             />
             {#each collisionMarks as mark, index (index)}
@@ -689,7 +690,7 @@
               }}
               showAll={settings.showAllPoints}
               handlesFor={autoActive ? auto.handleSegments : undefined}
-              hidden={auto.linkIds}
+              hidden={auto.hiddenIds}
               onPointDown={onProjectPointDown}
             />
           {/if}

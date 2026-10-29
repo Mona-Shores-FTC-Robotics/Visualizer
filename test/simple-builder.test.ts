@@ -9,9 +9,11 @@ import {
   serializeProject,
 } from "../src/io";
 import type { ProjectDoc } from "../src/io/project";
+import type { AutoCard } from "../src/lib/auto/types";
 import { TEAM_ROBOT } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
-import { relink } from "../src/lib/auto/links";
+import { layOutDoc, relink } from "../src/lib/auto/links";
+import { withSpotParks } from "../src/lib/simple/parkFrom";
 import { motionPoseAt, simulateAuto } from "../src/lib/auto/simulate";
 import { generateAutoJava } from "../src/lib/codegen/auto/javaAuto";
 import {
@@ -301,5 +303,132 @@ describe("the simple builder", () => {
     // A click on a FLOWER's line is put on its pick spot; one off it is not.
     expect(flowerLinedUp(30, 50)?.name).toBe("WALL FLOWER");
     expect(flowerLinedUp(30, 60)).toBeNull();
+  });
+});
+
+// --- the park from a late spot (src/lib/simple/parkFrom.ts) -----------------------------------------
+
+/** What the editor does after every edit: lay the paths out, then give late spots their parks. */
+function settled(doc: ProjectDoc): ProjectDoc {
+  for (let i = 0; i < 5; i++) {
+    const laid = layOutDoc(doc, settings);
+    const catalog = buildPathCatalog(laid.startPoint, laid.lines, settings);
+    const next = withSpotParks(laid, catalog);
+    if (next === laid && laid === doc) return doc;
+    doc = next;
+  }
+  throw new Error("the spot parks never settle");
+}
+
+const EXTRA_LAUNCHES = 6;
+
+/** R-Quals v2 with long launches at FAR_PICK, so the guard fires while the robot is there. */
+function lateFarPick(): ProjectDoc {
+  let doc = rQualsV2();
+  const at = doc.auto!.cards.findIndex(
+    (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "FAR_PICK",
+  );
+  for (let i = 0; i < EXTRA_LAUNCHES; i++)
+    doc = addStep(doc, "launch", at + 1).doc;
+  return settled(doc);
+}
+
+describe("the park from a late spot", () => {
+  it("gives none to an Auto that parks with time to spare", () => {
+    const doc = settled(rQualsV2());
+    expect(doc.auto!.parkFrom).toBeUndefined();
+  });
+
+  it("gives a late spot a straight park to the park spot, starting on the spot", () => {
+    const doc = lateFarPick();
+    const auto = doc.auto!;
+    const farCard = auto.cards.find(
+      (c) => c.kind === "path" && auto.pathEnds[c.lineId] === "FAR_PICK",
+    )!;
+    const parkLine = auto.parkFrom?.[farCard.id];
+    expect(parkLine).toBeDefined();
+    expect(auto.pathEnds[parkLine!]).toBe("PARK");
+    const catalog = buildPathCatalog(doc.startPoint, doc.lines, settings);
+    const info = catalog.byId.get(parkLine!)!;
+    expect(info.start.x).toBeCloseTo(47.36, 1);
+    expect(info.start.y).toBeCloseTo(114.79, 1);
+    expect(info.end).toMatchObject({ x: 14, y: 100 });
+    // The drive after FAR_PICK still starts on FAR_PICK, not at the park.
+    const after: AutoCard[] = auto.cards.filter((c) => c.kind === "path");
+    const next = after[after.indexOf(farCard) + 1];
+    const nextInfo =
+      next.kind === "path" ? catalog.byId.get(next.lineId)! : null;
+    expect(nextInfo!.start.x).toBeCloseTo(47.36, 1);
+    expect(nextInfo!.start.y).toBeCloseTo(114.79, 1);
+    // The drive just before Park needs none.
+    expect(Object.keys(auto.parkFrom!)).toEqual([farCard.id]);
+    // Settled means settled.
+    expect(settled(doc)).toBe(doc);
+  });
+
+  it("parks from the spot in the preview, and never starts a pick that leaves no time", () => {
+    const doc = lateFarPick();
+    const result = preview(doc);
+    expect(result.guard).not.toBeNull();
+    const farCard = doc.auto!.cards.find(
+      (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "FAR_PICK",
+    )!;
+    const drove = result.drives.find((d) => d.cardId === `${farCard.id}#park`);
+    expect(drove, JSON.stringify(result.log.slice(-6))).toBeDefined();
+    expect(drove!.t1).toBeLessThanOrEqual(30 + 1e-6);
+    // No pick was cut part-way: each pick that started ran its full time.
+    expect(result.log.some((e) => /PickFlower.*cut/.test(e.text ?? ""))).toBe(
+      false,
+    );
+  });
+
+  it("exports the spot's park with the drive to it", () => {
+    const doc = lateFarPick();
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "late.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok)
+      expect(java.source).toMatch(/kit\.path\("[^"]*", \w+, \w+, [\d.]+\)/);
+  });
+
+  it("drops a spot's park when the spot is no longer late, and keeps a bent one", () => {
+    const doc = lateFarPick();
+    const farCard = doc.auto!.cards.find(
+      (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "FAR_PICK",
+    )!;
+    const lineId = doc.auto!.parkFrom![farCard.id];
+    const at = doc.auto!.cards.indexOf(farCard);
+    const launches = doc.auto!.cards.slice(at + 1, at + 1 + EXTRA_LAUNCHES);
+    let quick = doc;
+    for (const card of launches) quick = removeStep(quick, card.id);
+    quick = settled(quick);
+    expect(quick.auto!.parkFrom).toBeUndefined();
+    expect(quick.lines.some((l) => l.id === lineId)).toBe(false);
+
+    const bent = {
+      ...doc,
+      lines: doc.lines.map((l) =>
+        l.id === lineId && l.kind === "atomic"
+          ? { ...l, controlPoints: [{ x: 30, y: 120 }] }
+          : l,
+      ),
+    };
+    let kept = bent;
+    for (const card of launches) kept = removeStep(kept, card.id);
+    kept = settled(kept);
+    expect(kept.auto!.parkFrom?.[farCard.id]).toBe(lineId);
+  });
+
+  it("saves and opens the spot parks", () => {
+    const doc = lateFarPick();
+    const again = parseProject(serializeProject(doc), robotConfigOf(settings));
+    expect(again.ok).toBe(true);
+    if (again.ok) expect(again.doc.auto!.parkFrom).toEqual(doc.auto!.parkFrom);
   });
 });

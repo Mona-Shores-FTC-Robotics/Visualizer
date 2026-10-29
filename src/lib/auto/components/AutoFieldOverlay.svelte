@@ -25,6 +25,11 @@
     missId?: string | null;
     /** A wait on the plan: its tip's name and how many tries back it up; null for any other. */
     decision?: (cardId: string) => { label: string; backups: number } | null;
+    /**
+     * Fork: a spot's park path to show (AutoSection.parkFrom), with every other path dimmed.
+     * The spots' park paths are not drawn otherwise.
+     */
+    focusLine?: string | null;
   }
 
   let {
@@ -37,6 +42,7 @@
     onDecision,
     missId = null,
     decision,
+    focusLine = null,
   }: Props = $props();
 
   let size = $derived(x(FIELD_SIZE));
@@ -53,6 +59,8 @@
     ),
   );
   let usedLineIds = $derived(new Set(pathCards.map((card) => card.lineId)));
+  let spotParkIds = $derived(new Set(Object.values(auto.parkFrom ?? {})));
+  let focusInfo = $derived(focusLine ? catalog.byId.get(focusLine) : undefined);
   let unit = $derived(size / FIELD_SIZE);
   let uses = $derived(pointUses(auto));
   /** Fork: the spot the selected drive ends on; its name stays shown. */
@@ -108,8 +116,9 @@
   viewBox={`0 0 ${size} ${size}`}
   aria-hidden="true"
 >
+  <g opacity={focusInfo ? 0.2 : 1}>
   <!-- Paths no card drives: faint, so the whole drawing stays visible. -->
-  {#each catalog.paths.filter((path) => !usedLineIds.has(path.id) && !auto.linkPaths?.includes(path.id)) as path (path.id)}
+  {#each catalog.paths.filter((path) => !usedLineIds.has(path.id) && !spotParkIds.has(path.id) && !auto.linkPaths?.includes(path.id)) as path (path.id)}
     <polyline
       points={polyline(path.samples)}
       fill="none"
@@ -167,6 +176,28 @@
       {/if}
     {/each}
   {/each}
+  </g>
+
+  <!-- Fork: the park from a spot, shown by its P in the simple builder. -->
+  {#if focusInfo}
+    <polyline
+      points={polyline(focusInfo.samples)}
+      fill="none"
+      stroke="#ffffff"
+      stroke-width={unit * 1.6}
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.4"
+    />
+    <polyline
+      points={polyline(focusInfo.samples)}
+      fill="none"
+      stroke="#ff8a3d"
+      stroke-width={unit * 0.7}
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  {/if}
 
   {#each onDecision ? [] : decisionSpots as spot (spot.id)}
     <rect

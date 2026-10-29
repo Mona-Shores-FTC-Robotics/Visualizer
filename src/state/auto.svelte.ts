@@ -36,6 +36,7 @@ import {
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { isSimple } from "../lib/simple/steps";
+import { withSpotParks } from "../lib/simple/parkFrom";
 import { compileLadders, ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
@@ -157,8 +158,22 @@ export class AutoState {
   linkIds: ReadonlySet<string> = $derived.by(() =>
     this.auto ? linkSegmentIds(this.auto, this.#project.doc.lines) : NONE,
   );
+  /**
+   * Fork: the spot park the simple builder's P shows (a line id of AutoSection.parkFrom), and
+   * whether its control points are out for editing.
+   */
+  focusedPark = $state<string | null>(null);
+  editingPark = $state(false);
+  /** Paths the field draws no stroke or point for: the links, and the spot parks not shown. */
+  hiddenIds: ReadonlySet<string> = $derived.by(() => {
+    const parks = Object.values(this.auto?.parkFrom ?? {}).filter(
+      (id) => id !== this.focusedPark,
+    );
+    return parks.length ? idSet([...this.linkIds, ...parks]) : this.linkIds;
+  });
   /** The segments of the selected path card: only they show control points. */
   handleSegments = $derived.by(() => {
+    if (this.editingPark && this.focusedPark) return idSet([this.focusedPark]);
     const { cardId } = parseSelection(this.#selection.current);
     const card = this.auto && cardId ? findCard(this.auto.cards, cardId) : null;
     if (card?.kind !== "path") return NONE;
@@ -274,6 +289,16 @@ export class AutoState {
           return;
         }
         const next = this.#settle(doc, settings);
+        if (next !== doc) project.amend(() => next);
+      });
+    });
+
+    // Fork: then each late spot of a simple Auto gets its park path (lib/simple/parkFrom.ts).
+    $effect.pre(() => {
+      const doc = project.doc;
+      const catalog = this.catalog;
+      untrack(() => {
+        const next = withSpotParks(doc, catalog);
         if (next !== doc) project.amend(() => next);
       });
     });
