@@ -15,9 +15,14 @@ async function openSample(page: Page) {
   return errors;
 }
 
-/** The plan view is what opens; the card list is one button away. */
+/** The plan view or the simple builder is what opens; the card list is one button away. */
 async function showCards(page: Page) {
-  await page.getByRole("button", { name: "Edit as cards" }).click();
+  const advanced = page.getByRole("button", { name: "Advanced", exact: true });
+  await expect(
+    advanced.or(page.getByRole("button", { name: "Edit as cards" })),
+  ).toBeVisible();
+  if (await advanced.isVisible()) await advanced.click();
+  else await page.getByRole("button", { name: "Edit as cards" }).click();
   await expect(page.getByText(/\d+ cards?/)).toBeVisible();
 }
 
@@ -190,4 +195,31 @@ test("a miss becomes a ladder of tries: add one, see its outcomes, undo", async 
   await page.getByTitle("Undo").click();
   await expect(page.getByText("1 backup")).toBeHidden();
   expect(errors).toEqual([]);
+});
+
+// The simple builder (lib/simple): a new Auto built from the palette, a spot clicked on the field.
+
+test("a new Auto is built from the palette: Launch all, then Drive to a clicked spot", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^File/ }).first().click();
+  await page.getByRole("menuitem", { name: /^New project/ }).click();
+  const discard = page.getByRole("button", { name: /Discard/ });
+  if (await discard.isVisible().catch(() => false)) await discard.click();
+  const steps = page.getByLabel("Steps");
+  const palette = page.locator("[aria-label='Add a step']");
+  await expect(page.getByRole("button", { name: "Right start" })).toHaveAttribute("aria-pressed", "true");
+  await palette.getByRole("button", { name: "Launch all" }).click();
+  await palette.getByRole("button", { name: "Drive to" }).click();
+  const field = (await page.locator("[role=application]").boundingBox())!;
+  // (26.7, 47.4): lined up with the WALL FLOWER, so the spot faces it.
+  await page.mouse.click(field.x + (26.7 / 141.5) * field.width, field.y + (1 - 47.4 / 141.5) * field.height);
+  await page.fill("#simple-spot-name", "wall pick");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await palette.getByRole("button", { name: "Pick flower" }).click();
+  await expect(steps.getByText("Drive to WALL_PICK")).toBeVisible();
+  await expect(steps.getByText("at the WALL FLOWER")).toBeVisible();
+  await page.getByTitle("Undo").click();
+  await expect(steps.getByText("Pick flower")).toHaveCount(0);
 });

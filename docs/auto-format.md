@@ -432,6 +432,17 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   as the fallback. Upstream's plain box is `public/robot-plain.png`, "Plain" in the robot images.
   `RobotSettingsSection.svelte` — "Use our robot" sets the open file to `TEAM_ROBOT`, and the
   feature list.
+- `src/lib/simple/` — the simple builder, the left panel's first view: a start (right or left),
+  then steps from a palette (Launch all, Drive to a spot, Pick flower, Park), each an ordinary
+  card, so files, preview and export are unchanged. A drive's heading turns from the step before
+  to its spot's; a new spot lined up with a FLOWER faces it. Pick flower finds the FLOWER ahead
+  (`flowers.ts`, biobuzz `FlowerFieldPoints`) and the preview drives in and back during it
+  (`simulate.ts` motions). `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
+  steps, the plan view otherwise; Advanced and ← Simple switch. `src/state/files.svelte.ts` — a new
+  project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
+  goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside
+  the field; spot names show near the mouse (`fieldHover`). An Auto that lists no commands gets
+  our robot's (`teamRegistry`).
 - `src/state/dialogs.svelte.ts` — the fork's dialogs.
 - `src/model/mirror.ts` — a mirrored project mirrors its Auto's named points.
 - `src/view/LayersPanel.svelte` — the card list in place of the path tree.

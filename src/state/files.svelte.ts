@@ -1,5 +1,6 @@
 import { fromStore, get } from "svelte/store";
 import { TEAM_ROBOT } from "../lib/auto/teamRobot";
+import { blankAuto } from "../lib/simple/steps";
 import { debounce } from "lodash";
 import {
   createDefaultProject,
@@ -79,10 +80,13 @@ export class ProjectFiles {
       return;
     }
     this.open(
-      createDefaultProject(
-        // Fork: the current robot's driving, with the team robot's box.
-        { ...this.#project.doc.robot, ...TEAM_ROBOT },
-        this.#prefs.settings.fieldMap,
+      // Fork: a new Auto starts empty at the right start, for the simple builder.
+      blankAuto(
+        createDefaultProject(
+          // The current robot's driving, with the team robot's box.
+          { ...this.#project.doc.robot, ...TEAM_ROBOT },
+          this.#prefs.settings.fieldMap,
+        ),
       ),
     );
     currentFilePath.set(null);

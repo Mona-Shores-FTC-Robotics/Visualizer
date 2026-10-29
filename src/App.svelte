@@ -148,6 +148,7 @@
         {overlays}
         hidden={leftHidden}
         onHide={() => layout.toggle("left")}
+        onSave={() => (dialogs.github = true)}
       />
 
       <PanelDivider

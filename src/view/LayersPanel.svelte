@@ -21,15 +21,18 @@
   import { exportAutoJava } from "../lib/auto/exportAction";
   import AutoCardList from "../lib/auto/components/AutoCardList.svelte";
   import PlanPanel from "../lib/plan/PlanPanel.svelte";
+  import SimpleBuilder from "../lib/simple/SimpleBuilder.svelte";
 
   interface Props {
     settings: Settings;
     overlays: Overlays;
     hidden?: boolean;
     onHide: () => void;
+    /** Fork: opens Save to GitHub, for the simple builder's Save. */
+    onSave: () => void;
   }
 
-  let { settings, overlays, hidden = false, onHide }: Props = $props();
+  let { settings, overlays, hidden = false, onHide, onSave }: Props = $props();
 
   const project = useProject();
   const editor = useEditor();
@@ -79,8 +82,18 @@
   <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
     {#if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
-      <div class="flex min-h-80 flex-1 flex-col">
-        {#if auto.view === "plan" && auto.plan}
+      <div class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}>
+        {#if auto.view !== "simple"}
+          <button
+            type="button"
+            class="mb-1 self-start px-1 text-xs text-body underline"
+            onclick={() => (auto.view = "simple")}
+            title="Back to the simple builder: our robot's steps">← Simple</button
+          >
+        {/if}
+        {#if auto.view === "simple"}
+          <SimpleBuilder {onSave} onExport={exportAuto} />
+        {:else if auto.view === "plan" && auto.plan}
           <PlanPanel
             onExport={exportAuto}
             errorCount={auto.issues.filter((issue) => issue.level === "error")
@@ -146,6 +159,7 @@
       <OverlayList {overlays} />
     </PanelSection>
 
+    {#if auto.view !== "simple"}
     <PanelSection title="Robot">
       {@const pose = playback.robotPose}
       {@const readouts = [
@@ -191,5 +205,6 @@
         </div>
       </div>
     </PanelSection>
+    {/if}
   </div>
 </aside>

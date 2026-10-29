@@ -2,7 +2,7 @@
   import type { BasePoint, Settings } from "../types";
   import { FIELD_SIZE, LINE_WIDTH, type ColorScheme } from "../config/defaults";
   import { gridSize, showGrid, snapToGrid } from "../stores";
-  import { fieldHover } from "../lib/auto/store";
+  import { fieldHover, spotPicker } from "../lib/auto/store";
   import {
     pointAt,
     setShapes,
@@ -346,6 +346,11 @@
     pressedTarget = "field";
     if (event.button !== 0) return;
     const point = fieldPoint(event);
+    // Fork: the simple builder is waiting for a spot.
+    if ($spotPicker) {
+      $spotPicker(snapped(point));
+      return;
+    }
     if (editor.tool === "select") {
       editor.clearSelection();
     } else if (editor.tool === "pen") {
@@ -536,7 +541,7 @@
       <svg
         class={[
           "absolute inset-0 z-30",
-          editor.tool !== "select" && "cursor-crosshair",
+          (editor.tool !== "select" || $spotPicker) && "cursor-crosshair",
           drag && "cursor-grabbing",
         ]}
         viewBox={`0 0 ${FIELD_SIZE} ${FIELD_SIZE}`}

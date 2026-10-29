@@ -24,6 +24,12 @@ export function connectAutoStore(store: ProjectStore): void {
  */
 export const selectedCardId = writable<string | null>(null);
 
+/**
+ * Fork: set while the simple builder waits for a spot to be clicked on the field; the field calls
+ * it with the click, in inches, instead of selecting.
+ */
+export const spotPicker = writable<((at: { x: number; y: number }) => void) | null>(null);
+
 /** Fork: where the mouse is over the field, in inches, or null: spot names show near it. */
 export const fieldHover = writable<{ x: number; y: number } | null>(null);
 

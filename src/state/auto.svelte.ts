@@ -35,6 +35,7 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
+import { isSimple } from "../lib/simple/steps";
 import { compileLadders, ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
@@ -62,7 +63,8 @@ export class AutoState {
   /** Draw the branches the preview does not take, dashed. */
   showUntaken = $state(true);
   /** How the left panel shows the Auto: the plan (good path, chapters, misses) or every card. */
-  view = $state<"plan" | "cards">("plan");
+  /** Fork: "simple" is the builder for our robot's steps (lib/simple); the others are advanced. */
+  view = $state<"simple" | "plan" | "cards">("simple");
   /** The chapter open in the plan view. */
   chapter = $state(0);
   /** The branching wait whose miss is open in the plan view, by card id. */
@@ -228,6 +230,8 @@ export class AutoState {
       void project.loads;
       untrack(() => {
         resetAutoView();
+        // Fork: an Auto of our robot's steps opens in the simple builder, any other in the plan.
+        this.view = isSimple(project.doc) ? "simple" : "plan";
         this.#pinned = null;
         this.chapter = 0;
         this.miss = null;

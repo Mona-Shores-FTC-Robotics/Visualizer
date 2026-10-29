@@ -15,6 +15,7 @@ import {
   rowLabel,
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
+import { flowerAhead, pickMotions } from "../simple/flowers";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -450,6 +451,10 @@ export function simulateAuto(
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
+        // Fork: a PickFlower lined up with a FLOWER drives in and back out while it runs
+        // (lib/simple/flowers.ts); its time is the command's own either way.
+        const flower = card.name === "PickFlower" ? flowerAhead(pos.x, pos.y, heading) : null;
+        if (flower) motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, flower, t, busy));
         stay(busy);
         timing?.commandRan?.(card.name, t - busy, t);
         return null;
@@ -646,7 +651,7 @@ export function simulateAuto(
   };
 }
 
-/** The robot's pose during a preview motion that is not a project path, else null (none today). */
+/** The robot's pose during a preview motion that is not a project path (a PickFlower's), else null. */
 export function motionPoseAt(
   preview: PreviewResult,
   time: number,
