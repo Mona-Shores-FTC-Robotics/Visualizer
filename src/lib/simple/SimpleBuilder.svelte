@@ -383,6 +383,9 @@
               />°
             </label>
           </div>
+          {#if step.problem}
+            <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
+          {/if}
         {:else if step.kind === "gather"}
           <div class="mt-1 pl-6 text-xs">
             {#if step.garden}

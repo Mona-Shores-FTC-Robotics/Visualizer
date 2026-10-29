@@ -19,7 +19,8 @@ import { createSegment } from "../../utils/normalize";
 import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type { AutoCard, AutoSection, NamedPoint } from "../auto/types";
-import { pickFrom, type Flower } from "./flowers";
+import { robotFootprints } from "../../model/collision";
+import { ownHalf, pickFrom, type Flower } from "./flowers";
 import {
   gardenFor,
   MAX_RANGE_IN as GARDEN_RANGE_IN,
@@ -100,7 +101,9 @@ export function stepsOf(doc: ProjectDoc): Step[] {
         kind: "gather",
         label: "Garden gather",
         garden,
-        problem: garden ? null : `No GARDEN within ${GARDEN_RANGE_IN} in`,
+        problem: garden
+          ? null
+          : `No GARDEN on our side of the centre line within ${GARDEN_RANGE_IN} in`,
       };
     }
     if (card.kind === "path") {
@@ -108,8 +111,20 @@ export function stepsOf(doc: ProjectDoc): Step[] {
       const point = spot ? auto.points[spot] : null;
       if (point) here = { x: point[0], y: point[1], h: point[2] ?? here.h };
       const park = card.park;
+      // An Auto may not cross the centre line with any part of the robot.
+      const crosses =
+        !!point &&
+        robotFootprints(
+          { x: here.x, y: here.y, heading: here.h },
+          { ...doc.robot, safetyMargin: 0 },
+        )
+          .flat()
+          .some((corner) => !ownHalf(doc.startPoint.x, corner.x));
       return {
         ...base,
+        problem: crosses
+          ? "The robot reaches across the centre line here, which an Auto may not do"
+          : null,
         kind: park ? "park" : "drive",
         label: spot
           ? `${park ? "Park at" : "Drive to"} ${spot}`

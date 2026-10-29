@@ -9,7 +9,8 @@
  * back to where it started.
  *   red's GARDEN: gather at (9.5, 10.96) facing the audience, lined up at (9.5, 20.56): the Autos'
  *     GARDEN and GARDEN_IN, from their drawings; blue's is red's turned half a turn;
- *   only a GARDEN within 100 in (maxRangeIn);
+ *   only a GARDEN on the robot's own half (an Auto may not cross the centre line), within 160 in
+ *     (maxRangeIn);
  *   in at 0.5 of the robot's top path speed (inSpeed), back at 0.6 (backSpeed), dwell 1.5 s
  *     (dwellMs).
  */
@@ -17,6 +18,7 @@ import { FIELD_SIZE } from "../../config/defaults";
 import type { BasePoint } from "../../types";
 import type { Motion } from "../auto/motion";
 import type { MotionRecord } from "../auto/simulate";
+import { ownHalf } from "./flowers";
 
 export interface Garden {
   name: string;
@@ -44,8 +46,8 @@ export const GARDENS: Garden[] = [
   },
 ];
 
-/** GardenGather.maxRangeIn. */
-export const MAX_RANGE_IN = 100;
+/** GardenGather.maxRangeIn: the whole half, since in an Auto the centre line is the limit. */
+export const MAX_RANGE_IN = 160;
 /** GardenGather.inSpeed and backSpeed: fractions of the robot's top path speed. */
 const IN_SPEED = 0.5;
 const BACK_SPEED = 0.6;
@@ -55,11 +57,12 @@ const DWELL_S = 1.5;
 const TOP_IN_PER_S = 60;
 const RAMP_S = 0.4;
 
-/** The GARDEN a gather from (x, y) goes to: the nearest within range, as the robot chooses. */
+/** The GARDEN an Auto's gather from (x, y) goes to: the nearest on its half, as the robot chooses. */
 export function gardenFor(x: number, y: number): Garden | null {
   let best: Garden | null = null;
   let bestRange = MAX_RANGE_IN;
   for (const garden of GARDENS) {
+    if (!ownHalf(x, garden.gather.x)) continue;
     const range = Math.hypot(garden.gather.x - x, garden.gather.y - y);
     if (range <= bestRange) {
       best = garden;

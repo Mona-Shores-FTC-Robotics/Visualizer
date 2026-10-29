@@ -58,11 +58,21 @@ const DWELL_S = 1.5;
 const angleOff = (a: number, b: number) =>
   Math.abs(((a - b + 540) % 360) - 180);
 
-/** The FLOWER a pick from (x, y) goes to: the nearest within range, as the robot chooses. */
+/**
+ * Whether a target at `targetX` is on the same side of the centre line as a robot at `robotX`
+ * (GrabRoutine.ownHalf): an Auto may not cross it, so its grabs only go to their own half.
+ */
+export function ownHalf(robotX: number, targetX: number): boolean {
+  const c = FIELD_SIZE / 2;
+  return robotX < c === targetX < c;
+}
+
+/** The FLOWER an Auto's pick from (x, y) goes to: the nearest in range on its half, as the robot chooses. */
 export function flowerFor(x: number, y: number): Flower | null {
   let best: Flower | null = null;
   let bestRange = MAX_RANGE_IN;
   for (const flower of FLOWERS) {
+    if (!ownHalf(x, flower.x)) continue;
     const range = Math.hypot(flower.x - x, flower.y - y);
     if (range <= bestRange) {
       best = flower;
@@ -114,7 +124,11 @@ export type PickFrom =
 export function pickFrom(x: number, y: number, headingDeg: number): PickFrom {
   const flower = flowerFor(x, y);
   if (!flower)
-    return { ok: false, flower, why: `No FLOWER within ${MAX_RANGE_IN} in` };
+    return {
+      ok: false,
+      flower,
+      why: `No FLOWER on our side of the centre line within ${MAX_RANGE_IN} in`,
+    };
   const rad = (headingDeg * Math.PI) / 180;
   const dx = flower.x - x;
   const dy = flower.y - y;

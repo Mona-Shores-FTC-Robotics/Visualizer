@@ -238,6 +238,21 @@ describe("the simple builder", () => {
     });
   });
 
+  it("keeps an Auto's grabs and spots on its own half of the field", () => {
+    // From LEFT_FIRE blue's GARDEN is nearer, but an Auto may not cross the centre line.
+    let doc = fresh();
+    doc = addSpot(doc, "LEFT_FIRE", 59.87, 127, 270);
+    doc = add(doc, "drive", "LEFT_FIRE");
+    doc = add(doc, "gather");
+    expect(stepsOf(doc)[0].problem).toBeNull();
+    expect(stepsOf(doc)[1].garden?.name).toBe("red GARDEN");
+    // A spot whose robot reaches across x = 70.75 is marked.
+    let over = fresh();
+    over = addSpot(over, "OVER", 66, 70, 90); // 16 in wide: its right side is at 74
+    over = add(over, "drive", "OVER");
+    expect(stepsOf(over)[0].problem).toMatch(/centre line/);
+  });
+
   it("removes and moves steps, a drive taking its path with it", () => {
     const doc = rQualsV2();
     const drive = doc.auto!.cards[1];
