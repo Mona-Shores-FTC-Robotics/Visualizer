@@ -327,6 +327,17 @@ export function cleanSpotName(text: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
+/**
+ * The document with each drive turning from the heading the step before left the robot at to its
+ * spot's heading, as every edit here leaves it. For a change made elsewhere: a team spot updated
+ * (lib/team/teamSpots.ts).
+ */
+export function layHeadings(doc: ProjectDoc): ProjectDoc {
+  if (!doc.auto) return doc;
+  const lines = withHeadings(doc);
+  return lines === doc.lines ? doc : { ...doc, lines };
+}
+
 // --- inside -------------------------------------------------------------------------------------
 
 /**

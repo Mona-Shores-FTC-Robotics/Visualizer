@@ -172,6 +172,12 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     const links = nameList(raw.linkPaths, "linkPaths", problems);
     if (links.length) auto.linkPaths = links;
   }
+  if (Array.isArray(raw.teamSpots)) {
+    const names = raw.teamSpots.filter(
+      (name: unknown): name is string => typeof name === "string" && !!name,
+    );
+    if (names.length) auto.teamSpots = [...new Set(names)];
+  }
   if (isObject(raw.parkFrom)) {
     const parkFrom: Record<string, string> = {};
     for (const [cardId, lineId] of Object.entries(raw.parkFrom)) {
@@ -482,6 +488,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
   if (auto.linkPaths?.length) out.linkPaths = [...auto.linkPaths];
   if (auto.parkFrom && Object.keys(auto.parkFrom).length)
     out.parkFrom = { ...auto.parkFrom };
+  if (auto.teamSpots?.length) out.teamSpots = [...auto.teamSpots];
   if (auto.exportName) out.exportName = auto.exportName;
   if (auto.plays && Object.keys(auto.plays).length) {
     out.plays = Object.fromEntries(

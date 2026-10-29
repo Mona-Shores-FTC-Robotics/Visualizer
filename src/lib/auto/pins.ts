@@ -39,20 +39,30 @@ export function atomicPaths(lines: Path[]): Map<string, AtomicPath> {
  */
 export function endSegmentId(lines: Path[], lineId: string): string | null {
   let node = lines.find((line) => line.id === lineId);
-  while (node && node.kind === "compound") node = node.segments[node.segments.length - 1];
+  while (node && node.kind === "compound")
+    node = node.segments[node.segments.length - 1];
   return node ? node.id : null;
 }
 
 /** Whether a file's raw `auto` section was saved before pins existed. */
 export function predatesPins(raw: unknown): boolean {
-  return typeof raw === "object" && raw !== null && !("pathEnds" in raw) && !("startAt" in raw);
+  return (
+    typeof raw === "object" &&
+    raw !== null &&
+    !("pathEnds" in raw) &&
+    !("startAt" in raw)
+  );
 }
 
 /**
  * For a file saved before pins existed: every path end and the start that
  * already sit on a named point are pinned to it.
  */
-export function adoptPins(auto: AutoSection, startPoint: BasePoint | null, lines: Path[]): void {
+export function adoptPins(
+  auto: AutoSection,
+  startPoint: BasePoint | null,
+  lines: Path[],
+): void {
   const names = Object.keys(auto.points);
   for (const [id, path] of atomicPaths(lines)) {
     const name = names.find((n) => samePlace(path.endPoint, auto.points[n]));
@@ -75,9 +85,12 @@ export interface PointUse {
 
 export function pointUses(auto: AutoSection): Map<string, PointUse> {
   const uses = new Map<string, PointUse>();
-  for (const name of Object.keys(auto.points)) uses.set(name, { ends: [], start: false, cards: 0 });
-  for (const [id, name] of Object.entries(auto.pathEnds)) uses.get(name)?.ends.push(id);
-  if (auto.startAt && uses.has(auto.startAt)) uses.get(auto.startAt)!.start = true;
+  for (const name of Object.keys(auto.points))
+    uses.set(name, { ends: [], start: false, cards: 0 });
+  for (const [id, name] of Object.entries(auto.pathEnds))
+    uses.get(name)?.ends.push(id);
+  if (auto.startAt && uses.has(auto.startAt))
+    uses.get(auto.startAt)!.start = true;
   return uses;
 }
 
@@ -126,6 +139,8 @@ export function resolvePins(
   startPoint: StartPose,
   lines: Path[],
   before: PinState | null,
+  /** Fork: points an end may not drag (locked team spots, lib/team/teamSpots.ts). */
+  locked?: ReadonlySet<string>,
 ): PinResolution {
   const paths = atomicPaths(lines);
   const points: Record<string, NamedPoint> = { ...auto.points };
@@ -136,24 +151,49 @@ export function resolvePins(
   };
 
   // A pin made since `before` moves its end onto the point, never the reverse.
-  const pins: { segmentId: string | null; at: BasePoint; name: string; isNew: boolean }[] = [];
+  const pins: {
+    segmentId: string | null;
+    at: BasePoint;
+    name: string;
+    isNew: boolean;
+  }[] = [];
   for (const [id, name] of Object.entries(auto.pathEnds)) {
     const path = paths.get(id);
     if (path && points[name]) {
-      pins.push({ segmentId: id, at: path.endPoint, name, isNew: before?.pathEnds[id] !== name });
+      pins.push({
+        segmentId: id,
+        at: path.endPoint,
+        name,
+        isNew: before?.pathEnds[id] !== name,
+      });
     }
   }
   if (auto.startAt && points[auto.startAt]) {
-    pins.push({ segmentId: null, at: startPoint, name: auto.startAt, isNew: before?.startAt !== auto.startAt });
+    pins.push({
+      segmentId: null,
+      at: startPoint,
+      name: auto.startAt,
+      isNew: before?.startAt !== auto.startAt,
+    });
   }
 
   let pointsChanged = false;
   const settled = new Set<string>();
   for (const pin of pins) {
-    if (pin.isNew || settled.has(pin.name) || edited(pin.name)) continue;
+    if (
+      pin.isNew ||
+      settled.has(pin.name) ||
+      edited(pin.name) ||
+      locked?.has(pin.name)
+    )
+      continue;
     const point = points[pin.name];
     if (point[0] === pin.at.x && point[1] === pin.at.y) continue;
-    const moved = [round1(pin.at.x), round1(pin.at.y), ...point.slice(2)] as NamedPoint;
+    const moved = [
+      round1(pin.at.x),
+      round1(pin.at.y),
+      ...point.slice(2),
+    ] as NamedPoint;
     points[pin.name] = moved;
     settled.add(pin.name);
     pointsChanged = true;
@@ -167,4 +207,22 @@ export function resolvePins(
     }
   }
   return { points: pointsChanged ? points : null, moves };
+}
+
+/** `lines` with one segment's end moved, wherever it sits in the tree. */
+export function moveEnd(
+  lines: Path[],
+  segmentId: string,
+  x: number,
+  y: number,
+): Path[] {
+  return lines.map((line) => {
+    if (line.kind === "compound") {
+      const segments = moveEnd(line.segments, segmentId, x, y);
+      return segments === line.segments ? line : { ...line, segments };
+    }
+    return line.id === segmentId
+      ? { ...line, endPoint: { ...line.endPoint, x, y } }
+      : line;
+  });
 }

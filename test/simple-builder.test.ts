@@ -432,6 +432,23 @@ describe("the park from each spot", () => {
     expect(kept.auto!.parkFrom?.[farCard.id]).toBe(lineId);
   });
 
+  it("gives every drive to the same spot one shared park", () => {
+    let doc = rQualsV2();
+    // A last drive to WALL_PICK before Park: both drives to LEFT_FIRE now need a park.
+    const park = doc.auto!.cards.findIndex((c) => c.kind === "path" && c.park);
+    doc = settled(addStep(doc, "drive", park, "WALL_PICK").doc);
+    const auto = doc.auto!;
+    const toFire = auto.cards.filter(
+      (c) => c.kind === "path" && auto.pathEnds[c.lineId] === "LEFT_FIRE",
+    );
+    expect(toFire).toHaveLength(2);
+    expect(auto.parkFrom![toFire[0].id]).toBeDefined();
+    expect(auto.parkFrom![toFire[1].id]).toBe(auto.parkFrom![toFire[0].id]);
+    // One park each for WALL_PICK (its first visit), LEFT_FIRE and FAR_PICK.
+    expect(new Set(Object.values(auto.parkFrom!)).size).toBe(3);
+    expect(settled(doc)).toBe(doc);
+  });
+
   it("saves and opens the spot parks", () => {
     const doc = lateFarPick();
     const again = parseProject(serializeProject(doc), robotConfigOf(settings));

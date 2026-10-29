@@ -6,7 +6,8 @@
  * Every drive before Park gets one: the plan's times say when the robot should reach a spot, but
  * a slow launch or a long pick can put it there seconds later, and the guard parks from wherever
  * it is. The path is a straight line to the park spot, which a student may bend like any other
- * path. The drive just before Park needs none: the Park step's own path already starts there.
+ * path. Every drive to the same spot shares that spot's park. The drive just before Park needs
+ * none: the Park step's own path already starts there.
  */
 import type { ProjectDoc } from "../../io/project";
 import type { AtomicPath } from "../../types";
@@ -41,51 +42,67 @@ export function withSpotParks(
 
   const current = auto.parkFrom ?? {};
   const lines = new Map(doc.lines.map((line) => [line.id, line]));
-  const next: Record<string, string> = {};
-  const removed = new Set<string>();
-  const added: AtomicPath[] = [];
-  const moved = new Map<string, AtomicPath>();
-  const cardIds = new Set(auto.cards.map((c) => c.id));
+  const cards = new Map(auto.cards.map((c) => [c.id, c]));
+  const spotOf = (cardId: string) => {
+    const card = cards.get(cardId);
+    return card?.kind === "path" ? auto.pathEnds[card.lineId] : undefined;
+  };
 
+  // One park per spot: every drive to the same spot parks along the same path. A spot's park
+  // is the one a student bent, if any, else the first kept.
+  const bySpot = new Map<string, string>();
+  const next: Record<string, string> = {};
   for (const [cardId, lineId] of Object.entries(current)) {
     const line = lines.get(lineId);
-    const keep =
-      !!line &&
-      !!parkSpot &&
-      cardIds.has(cardId) &&
-      (wanted.has(cardId) || bent(line));
-    if (!keep) {
-      removed.add(lineId);
+    const spot = spotOf(cardId);
+    if (!line || !parkSpot || !spot || !(wanted.has(cardId) || bent(line)))
       continue;
-    }
     next[cardId] = lineId;
-    // The park spot moved, or Park now goes elsewhere: the line follows.
-    if (
-      line.kind === "atomic" &&
-      parkPoint &&
-      (line.endPoint.x !== parkPoint[0] || line.endPoint.y !== parkPoint[1])
-    ) {
-      moved.set(lineId, {
-        ...line,
-        endPoint: { ...line.endPoint, x: parkPoint[0], y: parkPoint[1] },
-      });
-    }
+    const chosen = bySpot.get(spot);
+    if (!chosen || (!bent(lines.get(chosen)!) && bent(line)))
+      bySpot.set(spot, lineId);
   }
+  for (const cardId of Object.keys(next))
+    next[cardId] = bySpot.get(spotOf(cardId)!)!;
+
+  const added: AtomicPath[] = [];
   if (parkPoint && parkSpot) {
     for (const [cardId, spot] of wanted) {
       if (next[cardId]) continue;
-      const line = createSegment(parkPoint[0], parkPoint[1]);
-      line.name = `${spot} park`;
-      const from = auto.points[spot]?.[2];
-      const to = parkPoint[2];
-      if (from !== undefined && to !== undefined)
-        line.heading =
-          Math.abs(from - to) < 1e-9
-            ? { type: "constant", degrees: to }
-            : { type: "linear", startDeg: from, endDeg: to };
-      added.push(line);
-      next[cardId] = line.id;
+      let lineId = bySpot.get(spot);
+      if (!lineId) {
+        const line = createSegment(parkPoint[0], parkPoint[1]);
+        line.name = `${spot} park`;
+        const from = auto.points[spot]?.[2];
+        const to = parkPoint[2];
+        if (from !== undefined && to !== undefined)
+          line.heading =
+            Math.abs(from - to) < 1e-9
+              ? { type: "constant", degrees: to }
+              : { type: "linear", startDeg: from, endDeg: to };
+        added.push(line);
+        lineId = line.id;
+        bySpot.set(spot, lineId);
+      }
+      next[cardId] = lineId;
     }
+  }
+
+  const kept = new Set(Object.values(next));
+  const removed = new Set(Object.values(current).filter((id) => !kept.has(id)));
+  // The park spot moved, or Park now goes elsewhere: the lines follow.
+  const moved = new Map<string, AtomicPath>();
+  for (const id of kept) {
+    const line = lines.get(id);
+    if (
+      line?.kind === "atomic" &&
+      parkPoint &&
+      (line.endPoint.x !== parkPoint[0] || line.endPoint.y !== parkPoint[1])
+    )
+      moved.set(id, {
+        ...line,
+        endPoint: { ...line.endPoint, x: parkPoint[0], y: parkPoint[1] },
+      });
   }
 
   const ends = new Set(Object.values(next));

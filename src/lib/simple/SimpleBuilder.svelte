@@ -241,15 +241,17 @@
 
   const editor = useEditor();
   /** The drive card whose park is shown. */
-  let focusedCard = $derived(
-    [...parks.values()].find((park) => park.lineId === auto.focusedPark)
-      ?.cardId ?? null,
-  );
+  /** The drive whose P was pressed; every drive to the same spot shares its park. */
+  let focusedCard = $state<string | null>(null);
+  /** Whether a step's park is the one shown (its own P, or another visit to the same spot). */
+  const parkShown = (cardId: string) =>
+    !!auto.focusedPark && parks.get(cardId)?.lineId === auto.focusedPark;
 
   function togglePark(cardId: string) {
     const park = parks.get(cardId);
     if (!park) return;
-    if (auto.focusedPark === park.lineId) return closePark();
+    if (focusedCard === cardId) return closePark();
+    focusedCard = cardId;
     // Shown and out for editing at once: its control point handles show, and the Path panel edits it.
     auto.focusedPark = park.lineId;
     auto.editingPark = true;
@@ -257,6 +259,7 @@
   }
 
   function closePark() {
+    focusedCard = null;
     auto.focusedPark = null;
     auto.editingPark = false;
   }
@@ -267,7 +270,8 @@
     untrack(closePark);
   });
   $effect(() => {
-    if (auto.focusedPark && !focusedCard) untrack(closePark);
+    if (focusedCard && parks.get(focusedCard)?.lineId !== auto.focusedPark)
+      untrack(closePark);
   });
 
   /** The latest the guard sends the robot to park from a spot, along that spot's park. */
@@ -303,14 +307,7 @@
 
   const fmt = (s: number) => s.toFixed(1);
 
-  /**
-   * The latest the endgame guard sends the robot to park (simulate.ts guardSeconds): the park
-   * drive's time plus its margin, before 30 s.
-   */
-  function parkLeaveBy(step: Step): number | null {
-    const path = step.lineId ? auto.catalog?.byId.get(step.lineId) : undefined;
-    return path ? AUTO_LENGTH_S - guardSeconds(path) : null;
-  }
+
 </script>
 
 <div class="simple flex flex-col gap-3 px-1 pb-2 text-sm">
@@ -418,11 +415,11 @@
               type="button"
               class={[
                 "simple-park",
-                focusedCard === step.cardId && "simple-park--on",
+                parkShown(step.cardId) && "simple-park--on",
               ]}
               title="Where the robot parks from this spot if time runs short. Show and edit its park path"
               aria-label={`Park path from ${step.spot ?? "this spot"}`}
-              aria-pressed={focusedCard === step.cardId}
+              aria-pressed={parkShown(step.cardId)}
               onclick={() => togglePark(step.cardId)}>P</button
             >
           {/if}
@@ -470,14 +467,19 @@
           {#if focusedCard === step.cardId}
             {@const park = parks.get(step.cardId)!}
             {@const by = spotLeaveBy(park.lineId)}
+            {@const visits = [...parks.values()].filter(
+              (p) => p.lineId === park.lineId,
+            ).length}
             <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
               <span class="flex-1"
                 >Planned to leave here at {fmt(park.leaveS)} s. If the robot runs
                 behind and time runs short here, it parks along this path{by !==
                 null
                   ? `, leaving by ${fmt(by)} s at the latest`
-                  : ""}. To bend it, add a control point in the Path panel and
-                drag it on the field.</span
+                  : ""}.{visits > 1
+                  ? ` All ${visits} drives to ${step.spot} share this park.`
+                  : ""} To bend it, add a control point in the Path panel and drag
+                it on the field.</span
               >
               <button type="button" class="simple-tile" onclick={closePark}
                 >Done</button
@@ -486,14 +488,6 @@
           {/if}
           {#if step.problem}
             <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
-          {:else if step.kind === "park" && parkLeaveBy(step) !== null}
-            <p class="mt-1 pl-6 text-xs text-body">
-              If time runs short, the robot stops what it's doing (never a
-              drive, pick or gather) and parks here. It leaves for {step.spot}
-              by {fmt(parkLeaveBy(step)!)} s at the latest.{parks.size
-                ? " Before that, it parks from the spot it is on, along that spot's P path."
-                : ""}
-            </p>
           {/if}
         {:else if step.kind === "gather"}
           <div class="mt-1 pl-6 text-xs">

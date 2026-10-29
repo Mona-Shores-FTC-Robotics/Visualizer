@@ -185,6 +185,13 @@ export interface AutoSection {
    * unless shown.
    */
   parkFrom?: Record<string, string>;
+  /**
+   * Fork: the named points that are the team's spots (biobuzz TeamCode/autos/spots.json), linked
+   * the way PathPlanner links waypoints: the point here is a copy, which the editor keeps equal to
+   * the team's list, and saving a change to a team spot re-exports every Auto linked to it
+   * (lib/team/teamSpots.ts).
+   */
+  teamSpots?: string[];
   /** The plays this Auto's ladders use, by id (see `FirstOfCard.ladder`). */
   plays?: Record<string, Play>;
   cards: AutoCard[];

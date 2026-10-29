@@ -1,6 +1,6 @@
 import { getContext, setContext, untrack } from "svelte";
 import { fromStore } from "svelte/store";
-import type { Path, Settings } from "../types";
+import type { Settings } from "../types";
 import type { ProjectDoc } from "../io";
 import { FIELD_SIZE } from "../config";
 import type { Command } from "../model/commands";
@@ -19,13 +19,9 @@ import {
 } from "../lib/auto/store";
 import { allCards, findCard } from "../lib/auto/tree";
 import { autoFromPaths, insertPathCard, newPathStart } from "../lib/auto/edit";
-import {
-  atomicPaths,
-  pinState,
-  resolvePins,
-  type PinState,
-} from "../lib/auto/pins";
-import { linkSegmentIds, relink } from "../lib/auto/links";
+import type { PinState } from "../lib/auto/pins";
+import { linkSegmentIds } from "../lib/auto/links";
+import { settleDoc } from "../lib/auto/settle";
 import { buildPathCatalog } from "../lib/auto/geometry";
 import { validateAuto } from "../lib/auto/validate";
 import {
@@ -37,7 +33,7 @@ import {
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
-import { compileLadders, ladderInfo } from "../lib/ladder/compile";
+import { ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
 import {
@@ -325,62 +321,9 @@ export class AutoState {
 
   /** The document with its pins holding and its link paths laid out. */
   #settle(doc: ProjectDoc, settings: Settings): ProjectDoc {
-    let auto = doc.auto!;
-    let { startPoint, lines } = doc;
-
-    // Ladders first: they write cards, paths and pins of their own (lib/ladder).
-    const built = compileLadders(auto, lines);
-    if (built.changed) {
-      auto = built.auto;
-      lines = built.lines;
-    }
-
-    const segments = atomicPaths(lines);
-    const stale = Object.keys(auto.pathEnds).filter((id) => !segments.has(id));
-    if (stale.length) {
-      const pathEnds = { ...auto.pathEnds };
-      stale.forEach((id) => delete pathEnds[id]);
-      auto = { ...auto, pathEnds };
-    }
-
-    const { points, moves } = resolvePins(
-      auto,
-      startPoint,
-      lines,
-      this.#pinned,
-    );
-    for (const move of moves) {
-      if (move.segmentId === null) {
-        startPoint = { ...startPoint, x: move.x, y: move.y };
-      } else {
-        lines = moveEnd(lines, move.segmentId, move.x, move.y);
-      }
-    }
-    if (points) auto = { ...auto, points };
-    this.#pinned = { ...pinState(auto), points: auto.points };
-
-    let sequence = doc.sequence;
-    const result = relink(startPoint, lines, auto, settings);
-    if (result.changed) {
-      lines = result.lines;
-      auto = { ...auto };
-      if (result.linkIds.length) auto.linkPaths = result.linkIds;
-      else delete auto.linkPaths;
-    }
-    if (result.changed || built.changed) {
-      sequence = atomicSegments(lines).map((line) => ({
-        kind: "path" as const,
-        lineId: line.id,
-      }));
-    }
-
-    if (
-      auto === doc.auto &&
-      startPoint === doc.startPoint &&
-      lines === doc.lines
-    )
-      return doc;
-    return { ...doc, auto, startPoint, lines, sequence };
+    const result = settleDoc(doc, settings, this.#pinned);
+    this.#pinned = result.pinned;
+    return result.doc;
   }
 
   #entry(
@@ -573,24 +516,6 @@ export function previewPose(
     doc.lines,
     settings,
   );
-}
-
-/** `lines` with one segment's end moved, wherever it sits in the tree. */
-function moveEnd(
-  lines: Path[],
-  segmentId: string,
-  x: number,
-  y: number,
-): Path[] {
-  return lines.map((line) => {
-    if (line.kind === "compound") {
-      const segments = moveEnd(line.segments, segmentId, x, y);
-      return segments === line.segments ? line : { ...line, segments };
-    }
-    return line.id === segmentId
-      ? { ...line, endPoint: { ...line.endPoint, x, y } }
-      : line;
-  });
 }
 
 const CONTEXT_KEY = Symbol("auto");
