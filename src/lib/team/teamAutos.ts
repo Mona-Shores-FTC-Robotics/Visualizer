@@ -16,8 +16,8 @@
 export const TEAM_HASH_PREFIX = "#team=";
 export const TEAM_REPO = "Mona-Shores-FTC-Robotics/biobuzz";
 export const TEAM_DIR = "TeamCode/autos";
-/** The branch the team's Autos are on; master stays robot code only. */
-export const DEFAULT_REF = "claude/simulator";
+/** The branch the team's Autos are on: master, where each Auto's .pp sits next to its Java. */
+export const DEFAULT_REF = "master";
 export const PAIRS_FILE = "pairs.json";
 /** Multi-path mode shows at most this many files. */
 export const MAX_FILES = 4;

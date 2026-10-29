@@ -12,6 +12,7 @@ import {
   type Source,
 } from "./types";
 import { makeCardId } from "./tree";
+import { teamRegistry } from "./teamRobot";
 
 /**
  * Reading the `auto` section of a file.
@@ -30,7 +31,7 @@ export function createEmptyAuto(drawnFor: Alliance = "RED"): AutoSection {
   return {
     version: AUTO_FORMAT_VERSION,
     drawnFor,
-    registry: { actions: [], conditions: [] },
+    registry: teamRegistry(),
     points: {},
     pathEnds: {},
     cards: [],
@@ -111,6 +112,11 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
       if (finite(seconds) && seconds >= 0) typicalS[name] = seconds;
     }
     if (Object.keys(typicalS).length) registry.typicalS = typicalS;
+  }
+  // Fork: an Auto that lists nothing the robot can do gets our robot's list, so its dropdowns
+  // are never empty (see teamRegistry).
+  if (!registry.actions.length && !registry.conditions.length) {
+    Object.assign(registry, teamRegistry());
   }
 
   const points: Record<string, NamedPoint> = {};

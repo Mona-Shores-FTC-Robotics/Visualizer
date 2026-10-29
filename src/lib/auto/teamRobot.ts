@@ -1,4 +1,5 @@
 import type { RobotConfig } from "../../types";
+import type { AutoRegistry } from "./types";
 
 /**
  * Mona Shores' robot (20245 and 19429 are the same), the robot a new project starts with. The drive
@@ -27,6 +28,28 @@ export const TEAM_ROBOT: Pick<
     },
   ],
 };
+
+/**
+ * What our robot can do in an Auto: biobuzz `TeamCode/auto-registry.json` on master, plus
+ * PickFlower, a placeholder there until the FLOWER picker is built. The two we use most come first,
+ * since they head the command list. An Auto with no list of its own starts with this one, so the
+ * dropdowns are never empty; "Load the robot's commands and triggers…" in Setup still replaces it.
+ */
+export function teamRegistry(): AutoRegistry {
+  return {
+    actions: ["LaunchAll", "PickFlower", "LaunchOne", "SpinUp"],
+    conditions: [
+      "Empty",
+      "IntakeFull",
+      "LeftCellUp",
+      "RightCellUp",
+      "Tip",
+      "CameraBlind",
+    ],
+    events: ["Tip"],
+    typicalS: { LaunchAll: 2, PickFlower: 4, LaunchOne: 0.5, SpinUp: 0.1 },
+  };
+}
 
 /** Whether `robot` has our robot's drive base and features. */
 export function isTeamRobot(
