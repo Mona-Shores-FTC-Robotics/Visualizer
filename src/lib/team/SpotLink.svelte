@@ -13,6 +13,7 @@
   import { linkSpot, unlinkSpot } from "./teamSpots";
   import {
     editSpot,
+    saveSpotsOpen,
     setSpotUnlocked,
     spotEdits,
     teamSpots,
@@ -94,6 +95,13 @@
               ? " · changed, not saved"
               : ""}</span
           >
+          {#if changed}
+            <button
+              type="button"
+              class="self-start text-xs text-primary underline"
+              onclick={() => saveSpotsOpen.set(true)}>Save team spots…</button
+            >
+          {/if}
         </span>
         <IconButton
           label={unlocked

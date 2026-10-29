@@ -28,6 +28,10 @@
   let { isOpen, onClose }: Props = $props();
 
   let token = $state<string | null>(savedToken());
+  // The token "GitHub…" saved, read each time this opens: it may have been set up since.
+  $effect(() => {
+    if (isOpen) token = savedToken();
+  });
   let tokenInput = $state("");
   let saving = $state(false);
   let problems = $state<string[]>([]);
