@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { robotFootprints } from "../src/model/collision";
 import {
   TEAM_ROBOT,
   TEAM_ROBOT_IMAGE,
@@ -12,13 +13,24 @@ const svgOf = (url: string) =>
 
 describe("our robot", () => {
   it("is a drive base centred on the wheelbase, plus the poker as a feature that collides", () => {
-    // Body front 8.28 in ahead of the centre; poker tip 9.78 ahead.
-    expect(TEAM_ROBOT.rLength / 2).toBeCloseTo(8.28, 2);
-    const [poker] = TEAM_ROBOT.features!;
+    // Back plate 7.72 in behind the centre, flush with the wheels; body front 8.28 ahead; poker
+    // tip 9.78 ahead.
+    expect(TEAM_ROBOT.rLength / 2).toBeCloseTo(7.72, 2);
+    const [frame, poker] = TEAM_ROBOT.features!;
+    expect(frame.forward - frame.length / 2).toBeCloseTo(7.72, 2);
+    expect(frame.forward + frame.length / 2).toBeCloseTo(8.28, 2);
     expect(poker.forward + poker.length / 2).toBeCloseTo(9.78, 2);
     expect(poker.forward - poker.length / 2).toBeCloseTo(8.28, 2);
     expect(poker.collides).toBe(true);
     expect(isTeamRobot(TEAM_ROBOT)).toBe(true);
+    // Its start (#262's StartPositions.RED_AUDIENCE): back flat on the audience wall.
+    const parts = robotFootprints(
+      { x: 54.06, y: 7.72, heading: 90 },
+      { ...TEAM_ROBOT, safetyMargin: 0 },
+    );
+    const ys = parts.flat().map((p) => p.y);
+    expect(Math.min(...ys)).toBeCloseTo(0, 6);
+    expect(Math.max(...ys)).toBeCloseTo(7.72 + 9.78, 6);
     expect(isTeamRobot({ ...TEAM_ROBOT, features: [] })).toBe(false);
   });
 });
@@ -26,7 +38,7 @@ describe("our robot", () => {
 describe("our chassis, drawn from its box", () => {
   it("fills the box it is given", () => {
     const svg = svgOf(teamRobotImage(TEAM_ROBOT));
-    expect(svg).toContain('viewBox="0 0 16.56 16"');
+    expect(svg).toContain('viewBox="0 0 15.44 16"');
     for (const part of ["#e8743b", "#7fb3ff", "#a9cbe6"])
       expect(svg, part).toContain(part); // turret, Limelight, ramp
     expect(svg, "the poker is a feature, drawn by the field").not.toContain(

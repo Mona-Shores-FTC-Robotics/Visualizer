@@ -178,6 +178,8 @@ export interface RobotFeature {
   left: number;
   /** Counts for collisions, like the drive base. */
   collides: boolean;
+  /** The fill it is drawn with, a "#rrggbb" colour; yellow when unset. */
+  color?: string;
 }
 
 /** The settings that change how a path drives, so they are saved with it. */

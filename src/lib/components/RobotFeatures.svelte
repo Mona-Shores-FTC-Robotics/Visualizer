@@ -17,6 +17,7 @@
   let { pose, robot, pixels, zIndex = 20, opacity = 1 }: Props = $props();
 
   let boxes = $derived(featureBoxes(pose, robot));
+  const FEATURE_COLOR = "#f2c94c";
 </script>
 
 {#if boxes.length}
@@ -32,7 +33,7 @@
       {#each boxes as box, index (index)}
         <path
           d={polylinePath(box.corners, true)}
-          fill="#f2c94c"
+          fill={box.color ?? FEATURE_COLOR}
           stroke="#1d1f23"
           stroke-width="0.12"
           stroke-linejoin="round"

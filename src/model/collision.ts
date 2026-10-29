@@ -91,13 +91,19 @@ export function featureBoxes(
   pose: Pose,
   robot: Pick<RobotConfig, "features">,
   grow = 0,
-): { name: string; collides: boolean; corners: BasePoint[] }[] {
+): {
+  name: string;
+  collides: boolean;
+  color?: string;
+  corners: BasePoint[];
+}[] {
   const rad = (pose.heading * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return (robot.features ?? []).map((feature) => ({
     name: feature.name,
     collides: feature.collides,
+    color: feature.color,
     corners: getRobotCorners(
       pose.x + feature.forward * cos - feature.left * sin,
       pose.y + feature.forward * sin + feature.left * cos,

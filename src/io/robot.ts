@@ -64,6 +64,9 @@ export function normalizeFeatures(value: unknown): RobotFeature[] {
         forward: num(f.forward) ?? 0,
         left: num(f.left) ?? 0,
         collides: f.collides !== false,
+        ...(typeof f.color === "string" && /^#[0-9a-f]{3,8}$/i.test(f.color)
+          ? { color: f.color }
+          : {}),
       },
     ];
   });

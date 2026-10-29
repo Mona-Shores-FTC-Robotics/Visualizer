@@ -2,20 +2,30 @@ import type { RobotConfig } from "../../types";
 
 /**
  * Mona Shores' robot (20245 and 19429 are the same), the robot a new project starts with. The drive
- * base is a box centred on the wheelbase: its front is the body's, 8.28 in ahead of the centre, and
- * its back is drawn as far behind (the back plate is 7.72 in behind, so half an inch generous, the
- * safe way for collisions). The FLOWER poker is a feature: 1.5 in out of the middle of the front,
- * its tip 9.78 in ahead, and it counts for collisions. Upstream's defaults stay as they are; the
- * fork applies this on top.
+ * base is the wheels: 15.44 in over them front to back (#262's CAD), centred on the wheelbase, so
+ * its back is the back plate, flush with the rear wheels 7.72 in behind the centre, and a start
+ * with the back on the wall draws on the wall. What sticks out ahead of the wheels is features,
+ * both counting for collisions: the front of the frame, to 8.28 in ahead (the body is about 16 in
+ * long), and the FLOWER poker, 1.5 in out of the middle of the front, its tip 9.78 in ahead.
+ * Upstream's defaults stay as they are; the fork applies this on top.
  */
 export const TEAM_ROBOT: Pick<
   RobotConfig,
   "rLength" | "rWidth" | "rForward" | "features"
 > = {
-  rLength: 16.56,
+  rLength: 15.44,
   rWidth: 16,
   rForward: 0,
   features: [
+    {
+      name: "Front frame",
+      length: 0.56,
+      width: 15.4,
+      forward: 8,
+      left: 0,
+      collides: true,
+      color: "#2b2f36",
+    },
     {
       name: "FLOWER poker",
       length: 1.5,
@@ -57,7 +67,7 @@ export function robotImageSrc(
  * where they are on the robot, from the wheelbase's centre (`rForward` behind the box's middle, in
  * an older file): the turret 3.33 in behind and 1.87 in right (TurretSubsystem), the Limelight
  * 4.0 in ahead on the centre line (CameraMount). The rest follows the box: wheels at the corners,
- * intake across the front. So a new Length or Width redraws the chassis to fit, and a part that
+ * intake across the front, flush with the wheels. So a new Length or Width redraws the chassis to fit, and a part that
  * would land outside it is left out rather than drawn wrong. Features (the poker) are drawn by
  * the field, on top.
  */
@@ -89,7 +99,7 @@ export function teamRobotImage(
   const wheelLen = Math.min(4.1, (front - back) / 2.5);
   const wheelW = Math.min(1.5, half / 3);
   const wheelSide = half - 1.1 - wheelW / 2;
-  const wheelFwd = [back + 0.06 + wheelLen / 2, front - 0.58 - wheelLen / 2];
+  const wheelFwd = [back + 0.06 + wheelLen / 2, front - 0.06 - wheelLen / 2];
   wheelFwd.forEach((fwd, i) =>
     [-wheelSide, wheelSide].forEach((right, j) => {
       const x = X(fwd - wheelLen / 2);
@@ -128,7 +138,7 @@ export function teamRobotImage(
   // Intake: seven gecko wheels on a shaft across the front, about 7.1 in wide and centred.
   const geckos = Math.max(1, Math.min(7, Math.floor((2 * channel) / 1.08)));
   const geckoHalf = ((geckos - 1) * 1.08) / 2;
-  const shaft = front - 1.3;
+  const shaft = front - 0.75;
   add(
     `<line x1="${X(shaft)}" y1="${Y(-geckoHalf - 0.575)}" x2="${X(shaft)}" y2="${Y(geckoHalf + 0.575)}" stroke="#9aa0a6" stroke-width="0.25" stroke-linecap="round"/>`,
   );

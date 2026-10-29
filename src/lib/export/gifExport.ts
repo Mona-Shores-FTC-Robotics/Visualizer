@@ -126,9 +126,10 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
         );
         drawFeatures(
           context,
-          featureBoxes(pose, path.settings).map((box) =>
-            box.corners.map((c) => ({ x: toX(c.x), y: toY(c.y) })),
-          ),
+          featureBoxes(pose, path.settings).map((box) => ({
+            color: box.color,
+            corners: box.corners.map((c) => ({ x: toX(c.x), y: toY(c.y) })),
+          })),
           path.opacity ?? 1,
         );
       });
@@ -185,15 +186,15 @@ function drawRobot(
 /** Fork: the robot's features, on top of its image (see RobotFeatures.svelte). */
 function drawFeatures(
   context: CanvasRenderingContext2D,
-  boxes: BasePoint[][],
+  boxes: { color?: string; corners: BasePoint[] }[],
   opacity: number,
 ) {
   context.save();
   context.globalAlpha = opacity;
-  context.fillStyle = "#f2c94c";
   context.strokeStyle = "#1d1f23";
   context.lineWidth = 1;
-  for (const corners of boxes) {
+  for (const { color, corners } of boxes) {
+    context.fillStyle = color ?? "#f2c94c";
     context.beginPath();
     corners.forEach((c, i) =>
       i ? context.lineTo(c.x, c.y) : context.moveTo(c.x, c.y),

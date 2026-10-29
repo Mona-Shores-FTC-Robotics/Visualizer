@@ -80,7 +80,7 @@
     <Button
       size="sm"
       disabled={isTeam}
-      title={`Drive base ${TEAM_ROBOT.rLength} x ${TEAM_ROBOT.rWidth}, plus the FLOWER poker`}
+      title={`Drive base ${TEAM_ROBOT.rLength} x ${TEAM_ROBOT.rWidth}, plus the front frame and the FLOWER poker`}
       onclick={() => project.apply(updateRobot({ ...TEAM_ROBOT }))}
     >
       Use our robot

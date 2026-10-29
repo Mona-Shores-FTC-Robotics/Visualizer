@@ -407,7 +407,7 @@ Hook edits to upstream files, each marked "Fork" in a comment:
 - `src/types.ts`, `src/io/robot.ts`, `src/model/collision.ts`,
   `src/view/FieldPanel.svelte`, `src/lib/components/settings/RobotSettingsSection.svelte`
   — `features` in the robot block (as PathPlanner's robot features): boxes placed from the
-  robot's centre (`forward`, `left`, `length`, `width`, `name`), drawn on the robot
+  robot's centre (`forward`, `left`, `length`, `width`, `name`, optional `color`), drawn on the robot
   (`RobotFeatures.svelte`, and in the GIF export); those with `collides` count for collisions
   with the drive base (`robotFootprints`). The drive base stays the plain Length x Width box
   centred on the robot. `rForward` (the box that many inches ahead of the centre) is read and
@@ -423,8 +423,9 @@ Hook edits to upstream files, each marked "Fork" in a comment:
 - `src/state/overlays.svelte.ts` — overlays are laid out as their Auto drives them.
 - `src/state/editor.svelte.ts` — `addPathHook`: adding a path adds its card.
 - `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies; a fresh or
-  new project starts with the team robot (`TEAM_ROBOT` in `src/lib/auto/teamRobot.ts`: drive base
-  16.56 x 16 centred on the wheelbase, plus the FLOWER poker as a feature that collides).
+  new project starts with the team robot (`TEAM_ROBOT` in `src/lib/auto/teamRobot.ts`: the wheels,
+  15.44 x 16, as the drive base, so a start with the back plate on the wall draws on the wall;
+  the front of the frame and the FLOWER poker as features that collide).
 - `src/lib/components/RobotSprite.svelte`, `RobotImagePicker.svelte`, `src/state/gifExport.svelte.ts`
   — the default image ("/robot.png", "Our robot") is our chassis drawn from the drive base's
   numbers (`teamRobotImage`), so a new Length or Width redraws it; `public/robot.png` stays only
