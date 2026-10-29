@@ -102,12 +102,12 @@ export function teamRobotImage(
   const parts: string[] = [];
   const add = (s: string) => parts.push(s);
 
-  // Body: a dark plate with a light rim, so it reads on red, blue and grey. The side plates are the
-  // box's sides (the robot is 16 in across them, 1.1 in outside each wheel's outer face), so the
-  // rim's outer edge is the box's edge: the left side on a seam draws on the seam.
-  const sideIn = 0.15;
+  // Body: a dark plate with a thin dark-grey edge (a light rim read as a white outline). The side
+  // plates are the box's sides (the robot is 16 in across them, 1.1 in outside each wheel's outer
+  // face), so the edge's outside is the box's edge: the left side on a seam draws on the seam.
+  const sideIn = 0.06;
   add(
-    `<rect x="${X(back + 0.15)}" y="${Y(-half + sideIn)}" width="${r(front - back - 0.3)}" height="${r(W - 2 * sideIn)}" rx="0.7" fill="#2b2f36" stroke="#e8eaed" stroke-width="0.3"/>`,
+    `<rect x="${X(back + sideIn)}" y="${Y(-half + sideIn)}" width="${r(front - back - 2 * sideIn)}" height="${r(W - 2 * sideIn)}" rx="0.7" fill="#2b2f36" stroke="#5b616b" stroke-width="0.12"/>`,
   );
 
   // Mecanum wheels at the corners: 4.1 in long, 1.5 wide, outer faces 1.1 in inside the box.
