@@ -425,7 +425,7 @@ Hook edits to upstream files, each marked "Fork" in a comment:
 - `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies; a fresh or
   new project starts with the team robot (`TEAM_ROBOT` in `src/lib/auto/teamRobot.ts`: the wheels,
   15.44 x 16, as the drive base, so a start with the back plate on the wall draws on the wall;
-  the front of the frame and the FLOWER poker as features that collide).
+  the FLOWER poker as a feature that collides).
 - `src/lib/components/RobotSprite.svelte`, `RobotImagePicker.svelte`, `src/state/gifExport.svelte.ts`
   — the default image ("/robot.png", "Our robot") is our chassis drawn from the drive base's
   numbers (`teamRobotImage`), so a new Length or Width redraws it; `public/robot.png` stays only

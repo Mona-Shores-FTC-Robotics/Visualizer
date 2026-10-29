@@ -4,9 +4,9 @@ import type { RobotConfig } from "../../types";
  * Mona Shores' robot (20245 and 19429 are the same), the robot a new project starts with. The drive
  * base is the wheels: 15.44 in over them front to back (#262's CAD), centred on the wheelbase, so
  * its back is the back plate, flush with the rear wheels 7.72 in behind the centre, and a start
- * with the back on the wall draws on the wall. What sticks out ahead of the wheels is features,
- * both counting for collisions: the front of the frame, to 8.28 in ahead (the body is about 16 in
- * long), and the FLOWER poker, 1.5 in out of the middle of the front, its tip 9.78 in ahead.
+ * with the back on the wall draws on the wall. It is 16 in across the side plates. The FLOWER
+ * poker is a feature that counts for collisions: 1.5 in square, out of the middle of the front,
+ * its tip 9.25 in ahead of the centre (the team's setting, 29 Oct 2026; not yet measured).
  * Upstream's defaults stay as they are; the fork applies this on top.
  */
 export const TEAM_ROBOT: Pick<
@@ -18,19 +18,10 @@ export const TEAM_ROBOT: Pick<
   rForward: 0,
   features: [
     {
-      name: "Front frame",
-      length: 0.56,
-      width: 16,
-      forward: 8,
-      left: 0,
-      collides: true,
-      color: "#2b2f36",
-    },
-    {
       name: "FLOWER poker",
       length: 1.5,
       width: 1.5,
-      forward: 9.03,
+      forward: 8.5,
       left: 0,
       collides: true,
     },

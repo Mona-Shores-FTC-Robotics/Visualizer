@@ -13,14 +13,11 @@ const svgOf = (url: string) =>
 
 describe("our robot", () => {
   it("is a drive base centred on the wheelbase, plus the poker as a feature that collides", () => {
-    // Back plate 7.72 in behind the centre, flush with the wheels; body front 8.28 ahead; poker
-    // tip 9.78 ahead.
+    // Back plate 7.72 in behind the centre, flush with the wheels; poker tip 9.25 ahead.
     expect(TEAM_ROBOT.rLength / 2).toBeCloseTo(7.72, 2);
-    const [frame, poker] = TEAM_ROBOT.features!;
-    expect(frame.forward - frame.length / 2).toBeCloseTo(7.72, 2);
-    expect(frame.forward + frame.length / 2).toBeCloseTo(8.28, 2);
-    expect(poker.forward + poker.length / 2).toBeCloseTo(9.78, 2);
-    expect(poker.forward - poker.length / 2).toBeCloseTo(8.28, 2);
+    const [poker] = TEAM_ROBOT.features!;
+    expect(TEAM_ROBOT.features).toHaveLength(1);
+    expect(poker.forward + poker.length / 2).toBeCloseTo(9.25, 2);
     expect(poker.collides).toBe(true);
     expect(isTeamRobot(TEAM_ROBOT)).toBe(true);
     // Its start (#262's StartPositions.RED_AUDIENCE): back flat on the audience wall.
@@ -30,7 +27,7 @@ describe("our robot", () => {
     );
     const ys = parts.flat().map((p) => p.y);
     expect(Math.min(...ys)).toBeCloseTo(0, 6);
-    expect(Math.max(...ys)).toBeCloseTo(7.72 + 9.78, 6);
+    expect(Math.max(...ys)).toBeCloseTo(7.72 + 9.25, 6);
     expect(isTeamRobot({ ...TEAM_ROBOT, features: [] })).toBe(false);
   });
 });
