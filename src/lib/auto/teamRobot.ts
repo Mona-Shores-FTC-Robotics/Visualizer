@@ -20,7 +20,7 @@ export const TEAM_ROBOT: Pick<
     {
       name: "Front frame",
       length: 0.56,
-      width: 15.4,
+      width: 16,
       forward: 8,
       left: 0,
       collides: true,
@@ -88,9 +88,10 @@ export function teamRobotImage(
   const parts: string[] = [];
   const add = (s: string) => parts.push(s);
 
-  // Body: a dark plate with a light rim, so it reads on red, blue and grey. The side plates stand
-  // 0.3 in inside the box on each side.
-  const sideIn = Math.min(0.3, half / 4);
+  // Body: a dark plate with a light rim, so it reads on red, blue and grey. The side plates are the
+  // box's sides (the robot is 16 in across them, 1.1 in outside each wheel's outer face), so the
+  // rim's outer edge is the box's edge: the left side on a seam draws on the seam.
+  const sideIn = 0.15;
   add(
     `<rect x="${X(back + 0.15)}" y="${Y(-half + sideIn)}" width="${r(front - back - 0.3)}" height="${r(W - 2 * sideIn)}" rx="0.7" fill="#2b2f36" stroke="#e8eaed" stroke-width="0.3"/>`,
   );
