@@ -12,6 +12,16 @@ What the fork adds:
   actions, waits, decisions with branches ("wait for the first of these rows"), path cards with
   while-driving actions and events along the path, routines, go-to, "together", and an endgame
   guard. "Preview as" plays any scenario against the 30 s budget.
+- **The plan view** (what opens). The Auto as students read it: the good path (every tip comes)
+  in TIP chapters, one at a time; a ◆ on the field for each wait that branches, which shows what
+  the robot does if that tip doesn't come and where it goes back to the plan; time limits changed
+  with − / +; **All outcomes** lists every way the Auto can go. **Edit as cards** shows the full
+  card list. Waits on a condition the robot registers but cannot sense yet (biobuzz
+  `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
+- **Tested against real data.** `test/real-autos.test.ts` reads the team's six Autos, the
+  simulator's runs of two of them and robot 20245's first match logs (refresh with
+  `node scripts/refresh-biobuzz-fixtures.mjs ../biobuzz`), and fails when the preview drifts out
+  of the ballpark: drive times, card start times, the endgame guard, parking by 30 s.
 - **Export Auto (Java).** Writes a class for the `autokit` library in the robot code. The format of
   the `auto` section of `.pp` files is in [`docs/auto-format.md`](docs/auto-format.md); the stock
   Visualizer still opens these files and ignores that section.

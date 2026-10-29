@@ -22,7 +22,7 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1">
-  {#if auto.auto && !overlays.active}
+  {#if auto.auto && !overlays.active && auto.view === "cards"}
     <AutoPreviewSwitches auto={auto.auto} />
   {/if}
   <TimingControl
@@ -43,7 +43,7 @@
           ]
         : []}
   />
-  {#if !overlays.active}
+  {#if !overlays.active && auto.view === "cards"}
     <label
       class={[labelClass, "flex items-center gap-1.5"]}
       title="Draw the branches this preview does not take, dashed"

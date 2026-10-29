@@ -1,0 +1,5 @@
+TIP 1
+  command SpinUp
+  shoot   Fire the preloads at the right CELL (TIP 1) (up to 4 s, empty)
+Park
+  park    START to PARK

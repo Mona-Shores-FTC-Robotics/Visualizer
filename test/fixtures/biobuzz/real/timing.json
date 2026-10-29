@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "facts": {
+    "spinUpS": {"value": 0.1, "source": "sim", "note": "SpinUp only starts the launcher; the catapult's 0.8 s re-cock is in volleyS"},
+    "volleyS": {"value": 0.8, "source": "sim", "note": "catapult: 0.8 s re-cock, then all 4 at once (spring hood: about 2.0 + 1.35 s)"},
+    "tipStartS": {"value": 0.6, "source": "sim", "note": "flight about 0.5-0.7 s at 31-44 in, then the rocker starts to move"},
+    "tipSwingS": {"value": 0.7, "source": "sim", "note": "sim fitted to a 1.0 s TIP on the 3rd POLLEN; 4 POLLEN swing faster. Film one"},
+    "intakeFullS": {"value": 1.5, "source": "estimate", "note": "FLOWER about 1.5-2.0 s (0.5 s a piece); a spill trickles in, full by 2-5 s or not at all"},
+    "collectSeenS": {"value": 2.0, "source": "sim", "note": "the robot list's typical time"},
+    "setDownS": {"value": 1.0, "source": "sim", "note": "0.25 s a piece, a guess: time one"},
+    "tipLoad": {"value": 8, "source": "measured", "note": "FIRST Event Field Setup Guide 12.3: tips on 8 POLLEN"},
+    "startLoad": {"value": 5, "source": "measured", "note": "3 NECTAR in the raised CELL at the start: the 3rd POLLEN tips it"},
+    "volleyLoad": {"value": 4, "source": "estimate", "note": "4 POLLEN if every shot lands; lower it for misses"},
+    "driveSpeed": {"value": 1.5, "source": "measured, light chassis 25 Oct 2026", "note": "20245 on 25 Oct 2026 (no turret, launchers, transfer or extractor; Foresight tuned 17 Oct; 11.95 V at the end): R-Quals' 106.6 in straight S_CATCH to FAR_FLOWER_TURN took 2.14 s on two runs (13.65-15.79 s in the 19:53 log) where the preview's trapezoid at the drawing's 50 in/s and 45 in/s^2 takes 3.24 s, so 1.5x; R-Simple's 95 in curve START to PARK arrived in 2.5 s against 3.0 s, so 1.2x on a curve. From /Odometry/PedroInches (about 43 Hz), 300 ms centred windows: peak 76 to 78 in/s on the straight (Foresight measured 77 on 17 Oct), about 63 to 71 in/s^2 from rest, 48 to 76 in/s^2 braking; the curve peaked at 56 to 57 in/s (part strafe, 43 in/s max), about 30 up, 100 to 120 down. An earlier 100 ms-window reading (93 / 100 / 60) was noise. The value itself is from the card durations, not the peaks. The Visualizer scales every path by one factor, so 1.5 fits the straights and over-states the curves. Expect a re-measurement once the full mass goes on: doc/real-vs-sim-25-oct.md"},
+    "launcherReadyS": {"value": 0.8, "source": "sim", "note": "catapult re-cock"}
+  }
+}

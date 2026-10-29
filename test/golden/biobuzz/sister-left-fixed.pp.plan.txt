@@ -1,0 +1,26 @@
+TIP 1
+  command SpinUp
+  drive   START to FAR_FLOWER_TURN
+  wait    TIP 1 (R): the left CELL up (up to 15 s, tip)
+TIP 2
+  shoot   Preloads at the left CELL (up to 3 s, empty)
+  drive   FAR_FLOWER_TURN to FAR_FLOWER
+  collect The far FLOWER's 4 (up to 3 s, full)
+  drive   FAR_FLOWER to L_N
+  shoot   The far FLOWER's 4 (TIP 2) (up to 4 s, tip)
+  wait    TIP 2 started (up to 4.5 s, tip)  ◆ miss: 0 steps, then back to L_N to PARK_L
+TIP 3
+  collect TIP 2's spill lands (up to 0.5 s, full)
+  drive   L_N to L_TURN
+  drive   L_TURN to L_S
+  command LaunchOne
+  command LaunchOne
+  command LaunchOne
+  wait    TIP 3 (up to 6 s, tip)
+Park
+  collect TIP 3's spill lands (up to 0.8 s, full)
+  drive   L_S to L_C
+  collect Catch TIP 3's spill (up to 2 s, full)
+  drive   L_C to L_N
+  shoot   TIP 3's catch at the left CELL (TIP 4, with R) (up to 2 s, empty)
+  park    L_N to PARK_L

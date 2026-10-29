@@ -1,0 +1,12 @@
+TIP 1
+  command SpinUp
+  drive   START to FAR_FLOWER_TURN
+  wait    TIP 1 (the partner's preloads) (up to 7 s, tip)
+TIP 2
+  shoot   Fire our preloads at the left CELL (up to 3 s, empty)
+  drive   FAR_FLOWER_TURN to FAR_FLOWER
+  collect The far FLOWER's 4 (up to 3 s, full)
+  drive   FAR_FLOWER to N_FIRE
+  shoot   Fire the far FLOWER's 4 (TIP 2) (up to 2 s, empty)
+Park
+  park    N_FIRE to PARK_L

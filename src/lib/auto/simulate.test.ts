@@ -3,6 +3,9 @@ import { loadSample } from "./fixtures/load";
 import { buildPathCatalog } from "./geometry";
 import {
   AUTO_LENGTH_S,
+  GUARD_MARGIN_S,
+  guardSeconds,
+  parkSeconds,
   previewQuestions,
   setTrigger,
   simulateAuto,
@@ -17,8 +20,15 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 function run(auto: AutoSection, scenario: Scenario = {}) {
   const sample = loadSample();
-  const catalog = buildPathCatalog(sample.startPoint, sample.lines, sample.settings);
-  return { result: simulateAuto(auto, catalog, sample.startPoint, scenario), catalog };
+  const catalog = buildPathCatalog(
+    sample.startPoint,
+    sample.lines,
+    sample.settings,
+  );
+  return {
+    result: simulateAuto(auto, catalog, sample.startPoint, scenario),
+    catalog,
+  };
 }
 
 /** `cardId` times out: its own switch for a branching wait, its triggers for a plain one. */
@@ -32,7 +42,10 @@ function no(cardId: string, ...conditions: string[]): Scenario {
 /** Every question in the Auto answered false. */
 function allNo(auto: AutoSection): Scenario {
   return Object.fromEntries(
-    previewQuestions(auto).map((q) => [q.branching ? switchKey(q.cardId) : q.condition, false]),
+    previewQuestions(auto).map((q) => [
+      q.branching ? switchKey(q.cardId) : q.condition,
+      false,
+    ]),
   );
 }
 
@@ -41,7 +54,10 @@ test("unanswered questions are true: the happy path, at the moment they are aske
   assertEqual(result.taken.get("did-tip"), 0);
   assert(result.ran.has("tip-1") && !result.ran.has("near-1"));
   const row = result.log.find((entry) => entry.cardId === "did-tip")!;
-  assert(row.text.includes("If tipped") && row.text.includes("HiveTipped true"), row.text);
+  assert(
+    row.text.includes("If tipped") && row.text.includes("HiveTipped true"),
+    row.text,
+  );
   // "Wait for LauncherReady" passes at once: no timing to set.
   const wait = result.log.find((entry) => entry.cardId === "wait-ready")!;
   const shot = result.log.find((entry) => entry.cardId === "shoot-preload")!;
@@ -49,13 +65,20 @@ test("unanswered questions are true: the happy path, at the moment they are aske
 });
 
 test("answered false, the time row fires at its time", () => {
-  const { result } = run(loadSample().auto, no("did-tip", "HiveTipped", "CameraBlind"));
+  const { result } = run(
+    loadSample().auto,
+    no("did-tip", "HiveTipped", "CameraBlind"),
+  );
   assertEqual(result.taken.get("did-tip"), 1);
   assert(result.ran.has("near-1") && !result.ran.has("tip-1"));
   // Answered true, the row fires the moment it is asked; false, 1500 ms later.
-  const firedAt = (r: typeof result) => r.log.find((e) => e.cardId === "did-tip" && e.kind === "row")!.t;
+  const firedAt = (r: typeof result) =>
+    r.log.find((e) => e.cardId === "did-tip" && e.kind === "row")!.t;
   const happy = run(loadSample().auto).result;
-  assert(Math.abs(firedAt(result) - firedAt(happy) - 1.5) < 1e-9, `${firedAt(happy)} → ${firedAt(result)}`);
+  assert(
+    Math.abs(firedAt(result) - firedAt(happy) - 1.5) < 1e-9,
+    `${firedAt(happy)} → ${firedAt(result)}`,
+  );
 });
 
 test("each branching wait has its own switch; a trigger's answer sets every wait on it", () => {
@@ -64,12 +87,17 @@ test("each branching wait has its own switch; a trigger's answer sets every wait
   assertEqual(own.taken.get("did-tip"), 1);
   assertEqual(own.taken.get("near-5"), 0);
   // The trigger's answer: both waits time out.
-  const all = run(loadSample().auto, setTrigger({}, loadSample().auto, "HiveTipped", false)).result;
+  const all = run(
+    loadSample().auto,
+    setTrigger({}, loadSample().auto, "HiveTipped", false),
+  ).result;
   assertEqual(all.taken.get("did-tip"), 1);
   assertEqual(all.taken.get("near-5"), 1);
 });
 test("the questions are listed per card, in the order the Auto asks them", () => {
-  const questions = previewQuestions(loadSample().auto).map((q) => `${q.cardId}:${q.condition}`);
+  const questions = previewQuestions(loadSample().auto).map(
+    (q) => `${q.cardId}:${q.condition}`,
+  );
   assertEqual(questions, [
     "wait-ready:LauncherReady",
     "did-tip:HiveTipped",
@@ -89,29 +117,56 @@ test("the preview timeline is contiguous and ends with the Auto", () => {
   const { result } = run(loadSample().auto);
   let previous = 0;
   for (const event of result.timeline) {
-    assert(Math.abs(event.startTime - previous) < 1e-6, `gap at ${previous} → ${event.startTime}`);
+    assert(
+      Math.abs(event.startTime - previous) < 1e-6,
+      `gap at ${previous} → ${event.startTime}`,
+    );
     assert(event.duration > 0);
     previous = event.endTime;
   }
   assert(Math.abs(previous - result.endTime) < 1e-6);
 });
 
-test("the endgame guard parks when the time left is down to the park path", () => {
+test("the endgame guard parks when the time left is down to the park path and its margin", () => {
   const auto = clone(loadSample().auto);
   const branch = (findCard(auto.cards, "did-tip") as FirstOfCard).rows[0].cards;
   // A slow shot before the far pickups leaves too little time for them.
-  branch.unshift({ id: "slow", kind: "action", name: "ShootAll", previewMs: 22000, timeoutS: 25 });
+  branch.unshift({
+    id: "slow",
+    kind: "action",
+    name: "ShootAll",
+    previewMs: 22000,
+    timeoutS: 25,
+  });
   const { result, catalog } = run(auto);
   assert(result.guard, "guard expected");
   const park = catalog.byId.get("far-park")!;
-  assert(Math.abs(result.guard.t - (AUTO_LENGTH_S - park.seconds)) < 1e-6, `guard at ${result.guard.t}`);
-  // The path under way at the deadline is cut short there, and the cards
-  // after it are skipped.
-  const cut = result.log.find((entry) => entry.text.includes("stopped by the endgame guard"));
-  assert(cut && Math.abs(cut.t - result.guard.t) < 1e-6, JSON.stringify(result.log));
+  // As on the robot: the export's park seconds (rounded up to 0.1 s) plus AutoKit's margin.
+  const reserve = parkSeconds(park.seconds) + GUARD_MARGIN_S;
+  assert(
+    Math.abs(guardSeconds(park) - reserve) < 1e-9,
+    `reserve ${guardSeconds(park)}`,
+  );
+  // A path under way at the deadline is never cut short (AutoKit.guarded): it runs to its end
+  // and the robot parks from there, so the guard fires at or after the deadline, never before.
+  assert(
+    result.guard.t >= AUTO_LENGTH_S - reserve - 1e-6,
+    `guard at ${result.guard.t}`,
+  );
+  assert(
+    !result.log.some((entry) =>
+      entry.text.includes("stopped by the endgame guard"),
+    ),
+  );
+  for (const drive of result.drives) {
+    const path = catalog.byId.get(drive.pathId)!;
+    assert(
+      Math.abs(drive.t1 - drive.t0 - path.seconds) < 1e-6,
+      `${path.name} driven whole`,
+    );
+  }
   assert(!result.ran.has("tip-5"), "the rest of the branch is skipped");
   assert(result.ran.has("tip-6"), "the park path is driven");
-  assert(Math.abs(result.endTime - AUTO_LENGTH_S) < 1e-6, `ends at ${result.endTime}`);
   assert(result.log.some((entry) => entry.kind === "guard"));
 });
 
@@ -133,5 +188,8 @@ test("worst case: every wait runs to its time row", () => {
   assertEqual(worst.total, rows[1]);
   // The worst case is at least as long as any preview.
   const { result } = run(auto, allNo(auto));
-  assert(result.endTime <= worst.total + 1e-9, `${result.endTime} > ${worst.total}`);
+  assert(
+    result.endTime <= worst.total + 1e-9,
+    `${result.endTime} > ${worst.total}`,
+  );
 });
