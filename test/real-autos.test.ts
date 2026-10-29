@@ -50,6 +50,16 @@ function load(path: string, values: TimingValues = fallbackValues()) {
   return { doc, settings, catalog, plan, preview };
 }
 
+/** The team's timing facts, measured on robot 20245 (driveSpeed 1.5): `real/timing.json`. */
+const MEASURED: TimingValues = {
+  ...fallbackValues(),
+  ...Object.fromEntries(
+    Object.entries(
+      parseTimingFile(readFileSync(`${DIR}/real/timing.json`, "utf8")).facts,
+    ).map(([id, fact]) => [id, fact.value]),
+  ),
+};
+
 /** Autos built before we decided to branch only on what the robot can sense; to be rebuilt. */
 const REBUILD = new Set(["sister-right-fixed.pp"]);
 
@@ -94,9 +104,13 @@ describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
       expect(tips).toEqual([...tips].sort((a, b) => a - b));
     });
 
-    it("parks by 30 s whatever tip is missed (the endgame guard may cut it short)", () => {
+    it("parks by 30 s whatever tip is missed, at the robot's measured speed", () => {
+      // At the simulator's speed, about 25% slower on drives than the robot on 25 Oct,
+      // L-Quals' TIP 1 miss runs to 30.8 s: the guard never cuts a path, so a long miss
+      // can overrun.
+      const measured = load(`${DIR}/autos/${file}`, MEASURED).preview;
       for (const branch of plan.branches) {
-        const miss = preview(missScenario(branch));
+        const miss = measured(missScenario(branch));
         expect(
           miss.endTime,
           `${branch.tip ?? branch.label} missed`,
@@ -267,6 +281,14 @@ describe("the robot's first match logs (25 Oct 2026)", () => {
       }
     },
   );
+
+  it("r-quals: times the drive that turns 180° within 15% of the robot", () => {
+    // FAR_FLOWER to N_FIRE turns half a circle in 15.5 in: turning, not driving, sets its time.
+    const { drives } = asRan("r-quals");
+    const drive = drives.get("FAR_FLOWER to N_FIRE")!;
+    const measured = real["r-quals"].drives["FAR_FLOWER to N_FIRE"].seconds;
+    expect(Math.abs(drive.t1 - drive.t0 - measured) / measured).toBeLessThan(0.15);
+  });
 
   it("r-quals: the endgame guard parks when the robot's did, and the park ends by 30 s", () => {
     const { run } = asRan("r-quals");

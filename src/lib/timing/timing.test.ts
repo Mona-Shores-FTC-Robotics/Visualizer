@@ -140,7 +140,8 @@ test("recycle5 together: the left robot's first volley waits on the right robot'
   );
 });
 
-test("breakpoints: driving slower eventually costs a TIP", () => {
+// A search over many previews of two Autos: seconds, not milliseconds, when every test runs at once.
+test("breakpoints: driving slower eventually costs a TIP", { timeout: 20_000 }, () => {
   const found = breakpoints([entry(rightText), entry(leftText)], values);
   const speed = found.find((b) => b.id === "driveSpeed")!;
   assert(

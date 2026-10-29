@@ -7,7 +7,11 @@ import type {
   TimelineEvent,
   SequenceItem,
 } from "../types";
-import { motionProfile, timeAtDistance } from "../sim/motionProfile";
+import {
+  motionProfile,
+  timeAtDistance,
+  turnLimitedTimes,
+} from "../sim/motionProfile";
 import { getAngularDifference } from "./math";
 import { segmentHeadingAt } from "./headingInterpolation";
 import {
@@ -139,12 +143,34 @@ export function calculatePathTime(
       0,
     );
     const profile = motionProfile(totalLength, settings);
+    // Fork: the run slows where the heading turns faster than the robot can.
+    const starts: number[] = [];
+    step.segments.reduce(
+      (at, segment) => (starts.push(at), at + segment.curve.length),
+      0,
+    );
+    const turn = turnLimitedTimes(
+      profile,
+      totalLength,
+      (d) => {
+        let k = step.segments.length - 1;
+        while (k > 0 && starts[k] > d) k--;
+        const length = step.segments[k].curve.length;
+        const s =
+          length > 0 ? Math.min(1, Math.max(0, (d - starts[k]) / length)) : 1;
+        return segmentHeadingAt(pathSegments, step.segments[k].index, s);
+      },
+      settings.aVelocity,
+    );
+    const timeAt = (d: number) =>
+      turn ? timeInTable(turn, d) : timeAtDistance(profile, d);
+    const runTime = turn ? turn.times[turn.times.length - 1] : profile.duration;
     const runStart = currentTime;
     let distance = 0;
     step.segments.forEach((segment) => {
       const length = segment.curve.length;
-      const segmentStart = timeAtDistance(profile, distance);
-      const segmentEnd = timeAtDistance(profile, distance + length);
+      const segmentStart = timeAt(distance);
+      const segmentEnd = timeAt(distance + length);
       segmentLengths.push(length);
       segmentTimes.push(segmentEnd - segmentStart);
       timeline.push({
@@ -155,16 +181,17 @@ export function calculatePathTime(
         lineId: segment.line.id,
         run: {
           totalLength,
-          totalTime: profile.duration,
+          totalTime: runTime,
           startDistance: distance,
           startTime: segmentStart,
+          ...(turn ? { turn } : {}),
         },
       });
       distance += length;
       currentHeading = segmentHeadingAt(pathSegments, segment.index, 1);
       robotPoint = segment.line.endPoint;
     });
-    currentTime = runStart + profile.duration;
+    currentTime = runStart + runTime;
   });
 
   const totalTime = currentTime;
@@ -237,4 +264,25 @@ export function getAnimationDuration(
   speedFactor: number = 1.0,
 ): number {
   return (totalTime * 1000) / speedFactor;
+}
+
+/** Seconds into a turn table at which `distance` inches are covered. */
+function timeInTable(
+  table: { distances: number[]; times: number[] },
+  distance: number,
+): number {
+  const { distances, times } = table;
+  const last = distances.length - 1;
+  if (distance <= 0) return 0;
+  if (distance >= distances[last]) return times[last];
+  let low = 0;
+  let high = last;
+  while (high - low > 1) {
+    const mid = (low + high) >> 1;
+    if (distances[mid] <= distance) low = mid;
+    else high = mid;
+  }
+  const span = distances[high] - distances[low];
+  const f = span > 0 ? (distance - distances[low]) / span : 1;
+  return times[low] + f * (times[high] - times[low]);
 }

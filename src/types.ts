@@ -208,6 +208,11 @@ export interface TravelRun {
   startDistance: number;
   /** Time into the exported path's profile where this segment starts. */
   startTime: number;
+  /**
+   * Fork: when the robot cannot turn as fast as the path's heading asks, the time (s) at each
+   * distance (in) along the run; the trapezoid alone otherwise.
+   */
+  turn?: { distances: number[]; times: number[] };
 }
 
 export interface TimePrediction {

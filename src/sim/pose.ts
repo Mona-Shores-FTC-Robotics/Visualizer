@@ -2,7 +2,7 @@ import type { Path, Settings, StartPose, TimelineEvent } from "../types";
 import { segmentHeadingAt } from "../utils/headingInterpolation";
 import { shortestRotation } from "../utils/math";
 import { flattenToAtomicSegments } from "../utils/pathTraversal";
-import { motionProfile } from "./motionProfile";
+import { motionProfile, runDistanceAt } from "./motionProfile";
 
 export interface RobotPose {
   /** Field inches. */
@@ -65,11 +65,8 @@ export function robotPoseAt(
   // built at another drive speed (the fork's timing model) stays in step.
   let travelled: number;
   if (event.run) {
-    const profile = motionProfile(event.run.totalLength, settings);
-    const scale =
-      event.run.totalTime > 0 ? profile.duration / event.run.totalTime : 1;
     travelled =
-      profile.distanceAt((event.run.startTime + into) * scale) -
+      runDistanceAt(event.run, settings, event.run.startTime + into) -
       event.run.startDistance;
   } else {
     travelled = motionProfile(curve.length, settings).distanceAt(into);

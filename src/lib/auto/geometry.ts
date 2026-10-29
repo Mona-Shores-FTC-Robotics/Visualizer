@@ -12,7 +12,7 @@ import {
   type FlatSegment,
 } from "../../utils/pathTraversal";
 import { segmentHeadingAt } from "../../utils/headingInterpolation";
-import { motionProfile } from "../../sim/motionProfile";
+import { motionProfile, runDistanceAt } from "../../sim/motionProfile";
 
 /**
  * What the Auto needs to know about one of the project's paths.
@@ -161,9 +161,7 @@ export function buildPathCatalog(
       distanceAt: (time: number) => {
         const run = prediction.timeline.find((event) => event.run)?.run;
         if (!run) return 0;
-        return motionProfile(run.totalLength, settings).distanceAt(
-          Math.min(time, run.totalTime),
-        );
+        return runDistanceAt(run, settings, Math.min(time, run.totalTime));
       },
     });
   });
