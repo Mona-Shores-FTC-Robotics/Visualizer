@@ -506,18 +506,18 @@
   panelClass="console-panel p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto"
   onClose={close}
 >
-  <h2 id="github-save-title" class="text-xl font-semibold text-[#e8e8e8] mb-1">
+  <h2 id="github-save-title" class="text-xl font-semibold text-heading mb-1">
     Save to GitHub and simulate
   </h2>
 
   {#if draft && source}
     <div class="flex items-center justify-between gap-3 text-sm my-3">
-      <p class="text-gray-300">
+      <p class="text-heading">
         <code>{source.path}</code> on {source.ref ?? "the default branch"}:
         <span
-          class={draft.status === "same" ? "text-gray-400" : "text-amber-300"}
+          class={draft.status === "same" ? "text-body" : "text-warning"}
           >{draft.label}</span
-        >{#if draft.from && draft.status !== "same"}<span class="text-gray-400"
+        >{#if draft.from && draft.status !== "same"}<span class="text-body"
             >&nbsp;(edits from {new Date(draft.from).toLocaleString()})</span
           >{/if}. Edits are kept in this browser until you save them here.
       </p>
@@ -538,7 +538,7 @@
 
   {#if $teamView && !source}
     <div
-      class="text-sm text-amber-200 border border-amber-300/40 rounded p-3 my-3"
+      class="text-sm text-warning border border-warning/40 rounded p-3 my-3"
     >
       <p>
         Team Autos is showing {$teamView.files.join(", ")} to watch. Those are not
@@ -557,17 +557,17 @@
   {/if}
 
   {#if token && login}
-    <p class="text-xs text-gray-400 mb-4">
+    <p class="text-xs text-body mb-4">
       Signed in to GitHub as <b>{login}</b> ·
       <button class="underline" onclick={forgetToken}>forget the token</button>
     </p>
   {:else}
-    <p class="text-xs text-gray-400 mb-4">
+    <p class="text-xs text-body mb-4">
       Anyone can see the last simulation; saving needs a GitHub token.
     </p>
   {/if}
   <div
-    class="grid grid-cols-[8rem_1fr_auto] gap-x-3 gap-y-2 items-center text-sm text-gray-300"
+    class="grid grid-cols-[8rem_1fr_auto] gap-x-3 gap-y-2 items-center text-sm text-heading"
   >
     <label for="gh-branch">Branch</label>
     <input
@@ -659,12 +659,12 @@
 
   {#if token && login}
     <div class="flex items-center justify-between gap-3 mt-4">
-      <p class="text-xs {pathProblem ? 'text-amber-300' : 'text-gray-400'}">
+      <p class="text-xs {pathProblem ? 'text-warning' : 'text-body'}">
         {#if pathProblem}
           {pathProblem}.
         {:else}
           One commit on <code>{branch}</code>: <code>{path}</code>
-          {#if isNew}<strong class="text-amber-300">(a new file)</strong
+          {#if isNew}<strong class="text-warning">(a new file)</strong
             >{:else}(updated){/if}, its Java, and the simulation request. GitHub
           then runs
           {seeds} seed{seeds === 1 ? "" : "s"}, usually in 1–6 minutes; you can
@@ -680,7 +680,7 @@
       </button>
     </div>
   {:else}
-    <div class="text-sm text-gray-300 flex flex-col gap-2 mt-3">
+    <div class="text-sm text-heading flex flex-col gap-2 mt-3">
       <p>
         Saving to GitHub needs a token that lets this page write to biobuzz. You
         make it once; it stays in this browser only.
@@ -705,7 +705,7 @@
         </li>
         <li>Generate it, copy it, and paste it here.</li>
       </ol>
-      <p class="text-xs text-gray-400">
+      <p class="text-xs text-body">
         If GitHub says the token needs approval, an organization owner approves
         it once under the organization's Settings → Personal access tokens.
       </p>
@@ -729,7 +729,7 @@
   {/if}
 
   {#if blocked.length}
-    <div class="mt-4 text-sm text-red-300">
+    <div class="mt-4 text-sm text-danger">
       <p class="font-semibold">Not saved:</p>
       <ul class="list-disc ml-5">
         {#each blocked as message, i (i)}<li>{message}</li>{/each}
@@ -738,7 +738,7 @@
   {/if}
 
   {#if waiting && commit}
-    <div class="mt-5 border-t border-neutral-700 pt-4 text-sm text-gray-300">
+    <div class="mt-5 border-t border-border pt-4 text-sm text-heading">
       <p>
         Saved as <a
           class="underline"
@@ -764,7 +764,7 @@
   {/if}
 
   {#if shown}
-    <div class="mt-5 border-t border-neutral-700 pt-4 text-sm text-gray-300">
+    <div class="mt-5 border-t border-border pt-4 text-sm text-heading">
       <p class="mb-2">
         {result ? "Simulated" : "Last simulated"}
         <code>{shown.spec ?? shown.auto}</code>
@@ -786,14 +786,14 @@
         <button class="underline" onclick={() => copyVersionLink(shown!)}
           >copy a link to this version</button
         >
-        {#if !result && latest}<br /><span class="text-xs text-gray-400"
+        {#if !result && latest}<br /><span class="text-xs text-body"
             >From before your changes on screen: Save to GitHub to simulate
             them.</span
           >{/if}
       </p>
 
       {#if shown.error}
-        <p class="text-red-300 mb-2">{shown.error}</p>
+        <p class="text-danger mb-2">{shown.error}</p>
       {/if}
 
       {#if runs.length}
@@ -811,7 +811,7 @@
               .join(" · ")}.
           </p>
         {/if}
-        <p class="mb-3 text-gray-400">
+        <p class="mb-3 text-body">
           Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on average.
           {summary.tips
             .map(
@@ -820,7 +820,7 @@
             )
             .join(" ")}
           LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
-          {#if summary.withProblems}<span class="text-amber-300"
+          {#if summary.withProblems}<span class="text-warning"
               >Problems in {summary.withProblems} of {summary.runs} seeds.</span
             >{/if}
         </p>
@@ -837,7 +837,7 @@
           {/each}
         </div>
         <table class="w-full text-xs">
-          <thead class="text-gray-400 text-left">
+          <thead class="text-body text-left">
             <tr>
               <th class="py-1">Seed</th>
               <th>Points</th>
@@ -849,7 +849,7 @@
           <tbody>
             {#each runs as r (r.seed)}
               <tr
-                class="border-t border-neutral-800 cursor-pointer hover:bg-white/5"
+                class="border-t border-border cursor-pointer hover:bg-white/5"
                 onclick={() => (expanded = expanded === r.seed ? null : r.seed)}
               >
                 <td class="py-1"
@@ -868,7 +868,7 @@
                     .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
                     .join(" · ")}</td
                 >
-                <td class="text-amber-300">{runProblems(r).join("; ")}</td>
+                <td class="text-warning">{runProblems(r).join("; ")}</td>
               </tr>
               {#if expanded === r.seed}
                 <tr>
@@ -880,11 +880,11 @@
                           ? "still running at 30 s"
                           : `finished at ${secs(robot.finishedAt)} s`}
                         {#each robotProblems(robot) as p, i (i)}<span
-                            class="text-amber-300">; {p}</span
+                            class="text-warning">; {p}</span
                           >{/each}
                       </p>
                       <pre
-                        class="whitespace-pre-wrap text-gray-400">{robot.timeline.join(
+                        class="whitespace-pre-wrap text-body">{robot.timeline.join(
                           "\n",
                         )}</pre>
                     {/each}
@@ -894,7 +894,7 @@
             {/each}
           </tbody>
         </table>
-        <p class="text-xs text-gray-400 mt-3">
+        <p class="text-xs text-body mt-3">
           ▲ the best seed, ★ the median one: both logs are published. In
           AdvantageScope open one, then File → Import Layout with biobuzz's <code
             >sim-review/advantagescope-layout.json</code

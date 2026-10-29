@@ -1,0 +1,22 @@
+{
+  "totalTime": 3.6621510024430535,
+  "segmentTimes": [
+    3.6621510024430535
+  ],
+  "totalDistance": 97.39326440786695,
+  "timeline": [
+    {
+      "type": "travel",
+      "duration": 3.6621510024430535,
+      "startTime": 0,
+      "endTime": 3.6621510024430535,
+      "lineId": "line-1",
+      "run": {
+        "totalLength": 97.39326440786695,
+        "totalTime": 3.6621510024430535,
+        "startDistance": 0,
+        "startTime": 0
+      }
+    }
+  ]
+}

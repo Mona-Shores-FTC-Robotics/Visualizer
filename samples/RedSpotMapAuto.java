@@ -41,40 +41,40 @@ public final class RedSpotMapAuto {
         PoseFactory p = poses(rotated);
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
-        Pose rIGHTSTART = p.of(59, 9.5, 90);
-        Pose rIGHTHIVEENTRANCE = p.of(59, 47, 90);
-        Pose lEFTHIVEENTRANCE = p.of(59, 94.7, 90);
-        Pose lEFTDUMP = p.of(59, 117.8, 308);
-        Pose lEFTFLOWER = p.of(47.5, 129, 90);
-        Pose lEFTSTART = p.of(59, 132, 270);
-        Pose lEFTLOADINGZONE = p.of(16, 115.7, 90);
-        Pose rIGHTLOADINGZONE = p.of(16, 96.6, 90);
-        Pose yOURWALLFLOWER = p.of(15.2, 47.8, 180);
-        Pose rIGHTDUMP = p.of(59, 23.7, 52);
-        Pose gARDEN = p.of(10.5, 11.8, 180);
+        Pose rightStart = p.of(59, 9.5, 90);
+        Pose rightHiveEntrance = p.of(59, 47, 90);
+        Pose leftHiveEntrance = p.of(59, 94.7, 90);
+        Pose leftDump = p.of(59, 117.8, 308);
+        Pose leftFlower = p.of(47.5, 129, 90);
+        Pose leftStart = p.of(59, 132, 270);
+        Pose leftLoadingZone = p.of(16, 115.7, 90);
+        Pose rightLoadingZone = p.of(16, 96.6, 90);
+        Pose yourWallFlower = p.of(15.2, 47.8, 180);
+        Pose rightDump = p.of(59, 23.7, 52);
+        Pose garden = p.of(10.5, 11.8, 180);
 
         // Paths, written as the stock Visualizer export writes them.
-        Path toRIGHTHIVEENTRANCE = Paths.line(rIGHTSTART, rIGHTHIVEENTRANCE).linear(rIGHTSTART, rIGHTHIVEENTRANCE);
-        Path toLEFTHIVEENTRANCE = Paths.line(rIGHTHIVEENTRANCE, lEFTHIVEENTRANCE).linear(rIGHTHIVEENTRANCE, lEFTHIVEENTRANCE);
-        Path toLEFTDUMP = Paths.line(lEFTHIVEENTRANCE, lEFTDUMP).linear(lEFTHIVEENTRANCE, lEFTDUMP);
-        Path toLEFTFLOWER = Paths.line(lEFTDUMP, lEFTFLOWER).linear(lEFTDUMP, lEFTFLOWER);
-        Path toLEFTSTART = Paths.line(lEFTFLOWER, lEFTSTART).linear(lEFTFLOWER, lEFTSTART);
-        Path toLEFTLOADINGZONE = Paths.line(lEFTSTART, lEFTLOADINGZONE).linear(lEFTSTART, lEFTLOADINGZONE);
-        Path toRIGHTLOADINGZONE = Paths.line(lEFTLOADINGZONE, rIGHTLOADINGZONE).linear(lEFTLOADINGZONE, rIGHTLOADINGZONE);
-        Path toYOURWALLFLOWER = Paths.line(rIGHTLOADINGZONE, yOURWALLFLOWER).linear(rIGHTLOADINGZONE, yOURWALLFLOWER);
-        Path toRIGHTDUMP = Paths.line(yOURWALLFLOWER, rIGHTDUMP).linear(yOURWALLFLOWER, rIGHTDUMP);
-        Path toGARDEN = Paths.line(rIGHTDUMP, gARDEN).linear(rIGHTDUMP, gARDEN);
+        Path toRightHiveEntrance = Paths.line(rightStart, rightHiveEntrance).linear(rightStart, rightHiveEntrance);
+        Path toLeftHiveEntrance = Paths.line(rightHiveEntrance, leftHiveEntrance).linear(rightHiveEntrance, leftHiveEntrance);
+        Path toLeftDump = Paths.line(leftHiveEntrance, leftDump).linear(leftHiveEntrance, leftDump);
+        Path toLeftFlower = Paths.line(leftDump, leftFlower).linear(leftDump, leftFlower);
+        Path toLeftStart = Paths.line(leftFlower, leftStart).linear(leftFlower, leftStart);
+        Path toLeftLoadingZone = Paths.line(leftStart, leftLoadingZone).linear(leftStart, leftLoadingZone);
+        Path toRightLoadingZone = Paths.line(leftLoadingZone, rightLoadingZone).linear(leftLoadingZone, rightLoadingZone);
+        Path toYourWallFlower = Paths.line(rightLoadingZone, yourWallFlower).linear(rightLoadingZone, yourWallFlower);
+        Path toRightDump = Paths.line(yourWallFlower, rightDump).linear(yourWallFlower, rightDump);
+        Path toGarden = Paths.line(rightDump, garden).linear(rightDump, garden);
 
         return kit.sequence(
-                kit.path("to RIGHT_HIVE_ENTRANCE", toRIGHTHIVEENTRANCE),
-                kit.path("to LEFT_HIVE_ENTRANCE", toLEFTHIVEENTRANCE),
-                kit.path("to LEFT_DUMP", toLEFTDUMP),
-                kit.path("to LEFT_FLOWER", toLEFTFLOWER),
-                kit.path("to LEFT_START", toLEFTSTART),
-                kit.path("to LEFT_LOADING_ZONE", toLEFTLOADINGZONE),
-                kit.path("to RIGHT_LOADING_ZONE", toRIGHTLOADINGZONE),
-                kit.path("to YOUR_WALL_FLOWER", toYOURWALLFLOWER),
-                kit.path("to RIGHT_DUMP", toRIGHTDUMP),
-                kit.path("to GARDEN", toGARDEN));
+                kit.path("to RIGHT_HIVE_ENTRANCE", toRightHiveEntrance),
+                kit.path("to LEFT_HIVE_ENTRANCE", toLeftHiveEntrance),
+                kit.path("to LEFT_DUMP", toLeftDump),
+                kit.path("to LEFT_FLOWER", toLeftFlower),
+                kit.path("to LEFT_START", toLeftStart),
+                kit.path("to LEFT_LOADING_ZONE", toLeftLoadingZone),
+                kit.path("to RIGHT_LOADING_ZONE", toRightLoadingZone),
+                kit.path("to YOUR_WALL_FLOWER", toYourWallFlower),
+                kit.path("to RIGHT_DUMP", toRightDump),
+                kit.path("to GARDEN", toGarden));
     }
 }

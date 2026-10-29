@@ -159,14 +159,14 @@
     {#each names as name, index (name)}
       <span
         class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]"
-        class:border-[#444444]={options.includes(name)}
-        class:bg-[#141414]={options.includes(name)}
+        class:border-border={options.includes(name)}
+        class:bg-base={options.includes(name)}
         class:border-red-600={!options.includes(name)}
-        class:text-red-400={!options.includes(name)}
+        class:text-danger={!options.includes(name)}
         title={options.includes(name) ? name : `${name} is not registered`}
       >
         {name}
-        <button type="button" class="text-gray-500 hover:text-gray-200" aria-label={`Remove ${name}`} onclick={() => onRemove(index)}>✕</button>
+        <button type="button" class="text-body hover:text-heading" aria-label={`Remove ${name}`} onclick={() => onRemove(index)}>✕</button>
       </span>
     {/each}
     <select
@@ -216,7 +216,7 @@
   {/each}
 
   {#if card?.kind === "action"}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-heading">
       <div class={CELL_CLASS}>
         <span class={LABEL_CLASS}>Command</span>
         {@render nameSelect(card.name, actions, "a command", (name) => edit((c) => { if (c.kind === "action") c.name = name; }))}
@@ -234,7 +234,7 @@
           oninput={(e) => edit((c) => { if (c.kind === "action") { const s = numberOr(e.currentTarget.value, DEFAULT_TIMEOUT_S); if (s > 0 && s !== DEFAULT_TIMEOUT_S) c.timeoutS = s; else delete c.timeoutS; } }, false)}
           onchange={commitAuto}
         />
-        <span class="text-[10px] text-gray-500">
+        <span class="text-[10px] text-body">
           {auto.registry.typicalS?.[card.name] !== undefined
             ? `typically ${auto.registry.typicalS[card.name]} s`
             : "typical time not in the robot's list"}
@@ -245,7 +245,7 @@
     {@const info = catalog.byId.get(card.lineId)}
     {#if info}
       {@const pinned = auto.pathEnds[info.endSegmentId]}
-      <div class="{CELL_CLASS} text-[11px] text-gray-300">
+      <div class="{CELL_CLASS} text-[11px] text-heading">
         <label class={LABEL_CLASS} for="auto-path-ends-at">Ends at</label>
         <select
           id="auto-path-ends-at"
@@ -266,25 +266,25 @@
         {/if}
       </div>
     {/if}
-      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-gray-300">
+      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-heading">
         <input
           type="checkbox"
           checked={card.park}
           onchange={(e) => edit((c) => { if (c.kind === "path") c.park = e.currentTarget.checked; })}
         />
-        <span class="font-semibold text-gray-100" title="The endgame guard drives this path when time is short.">Park path</span>
+        <span class="font-semibold text-heading" title="The endgame guard drives this path when time is short.">Park path</span>
       </label>
-      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-gray-300">
+      <label class="flex cursor-pointer items-center gap-2 px-1 text-[11px] text-heading">
         <input
           type="checkbox"
           checked={!!card.through}
           onchange={(e) => edit((c) => { if (c.kind === "path") { if (e.currentTarget.checked) c.through = true; else delete c.through; } })}
         />
-        <span class="font-semibold text-gray-100" title="The robot passes this spot without stopping: this path and the next are one drive.">Drive through (don't stop here)</span>
+        <span class="font-semibold text-heading" title="The robot passes this spot without stopping: this path and the next are one drive.">Drive through (don't stop here)</span>
       </label>
-    <button type="button" class="self-start text-[11px] text-gray-500 hover:text-gray-200" onclick={() => (showMore = !showMore)}>{showMore ? "less ▴" : "more ▾"}</button>
+    <button type="button" class="self-start text-[11px] text-body hover:text-heading" onclick={() => (showMore = !showMore)}>{showMore ? "less ▴" : "more ▾"}</button>
     {#if showMore}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-heading">
       <div class="{CELL_CLASS} col-span-2">
         <span class={LABEL_CLASS}>Path</span>
         <select
@@ -304,13 +304,13 @@
       </div>
       <div class="{CELL_CLASS} col-span-2">
         <span class={LABEL_CLASS}>Length · time</span>
-        <span class="font-mono text-gray-100">{info ? `${info.length.toFixed(0)} in · ${seconds(info.seconds)}` : "—"}</span>
+        <span class="font-mono text-heading">{info ? `${info.length.toFixed(0)} in · ${seconds(info.seconds)}` : "—"}</span>
       </div>
     </div>
     {/if}
   {:else if card?.kind === "rejoin"}
     {@const stops = allCards(auto.cards).filter((c) => c.kind === "path" && !c.through && c.id !== card.id)}
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-heading">
       <div class="{CELL_CLASS} col-span-2">
         <span class={LABEL_CLASS}>Rejoin at the stop</span>
         <select class={FIELD_CLASS} value={card.target}
@@ -331,7 +331,7 @@
         </select>
       </div>
     </div>
-    <div class="text-[11px] text-gray-500">After it, this route runs the steps after that stop, shared with the route it joins.</div>
+    <div class="text-[11px] text-body">After it, this route runs the steps after that stop, shared with the route it joins.</div>
   {:else if card?.kind === "firstOf"}
     <div class={CELL_CLASS}>
       <label class={LABEL_CLASS} for="auto-firstof-label">{isPlainWait(card) ? "Wait name" : "Question"}</label>
@@ -371,15 +371,15 @@
         {@const rowSelected = selection.rowIndex === rowIndex}
         {@const worstEnd = worst?.rows.get(card.id)?.[rowIndex]}
         <div
-          class="space-y-2 border bg-[#1a1a1a] px-2 py-2 text-[11px] text-gray-300"
-          class:border-[#333333]={!rowSelected}
-          class:border-[#8d68bd]={rowSelected}
+          class="space-y-2 border bg-base px-2 py-2 text-[11px] text-heading"
+          class:border-border={!rowSelected}
+          class:border-primary={rowSelected}
           style={`border-left: 3px solid ${branchColor(rowIndex)}`}
         >
           <div class="flex items-center justify-between gap-2">
             <div class="font-semibold" style={`color: ${branchColor(rowIndex)}`}>
               Row {rowIndex + 1}
-              {#if preview?.taken.get(card.id) === rowIndex}<span class="ml-1 text-gray-400">· fired in this preview</span>{/if}
+              {#if preview?.taken.get(card.id) === rowIndex}<span class="ml-1 text-body">· fired in this preview</span>{/if}
             </div>
             <div class="flex items-center gap-1 text-[10px]">
               <button type="button" class={ACTION_CLASS} disabled={rowIndex === 0} onclick={() => moveRow(rowIndex, -1)} aria-label="Move row up">↑</button>
@@ -394,7 +394,7 @@
           </div>
           <div class="grid grid-cols-2 gap-2">
             <label class="space-y-1">
-              <span class="text-gray-500">Becomes true when</span>
+              <span class="text-body">Becomes true when</span>
               <select class={FIELD_CLASS} value={kind} onchange={(e) => replaceRow(rowIndex, e.currentTarget.value as RowKind)}>
                 {#each ROW_KINDS as option (option.value)}
                   <option value={option.value}>{option.label}</option>
@@ -403,7 +403,7 @@
             </label>
             {#if kind === "afterMs"}
               <label class="space-y-1">
-                <span class="text-gray-500">Milliseconds</span>
+                <span class="text-body">Milliseconds</span>
                 <input class={FIELD_CLASS} type="number" min="0" step="100" value={(row as { afterMs: number }).afterMs}
                   oninput={(e) => editRow(rowIndex, (r) => { if ("afterMs" in r) r.afterMs = numberOr(e.currentTarget.value, r.afterMs); }, false)}
                   onchange={commitAuto} />
@@ -412,7 +412,7 @@
           </div>
           {#if kind === "when"}
             <div class="space-y-1">
-              <span class="text-gray-500">Trigger</span>
+              <span class="text-body">Trigger</span>
               {@render chips(
                 (row as { when: string[] }).when,
                 conditions,
@@ -424,7 +424,7 @@
           {/if}
           <div class="grid grid-cols-[1fr_auto] items-end gap-2">
             <label class="space-y-1">
-              <span class="text-gray-500">Branch name</span>
+              <span class="text-body">Branch name</span>
               <input class={FIELD_CLASS} value={row.label ?? ""} placeholder={rowLabel({ ...row, label: undefined })}
                 oninput={(e) => editRow(rowIndex, (r) => { const v = e.currentTarget.value; if (v.trim()) r.label = v; else delete r.label; }, false)}
                 onchange={commitAuto} />
@@ -439,7 +439,7 @@
             </button>
           </div>
           {#if row.cards.length > 0 && worstEnd !== undefined}
-            <div class="text-[10px]" class:text-red-400={worstEnd !== null && worstEnd > AUTO_LENGTH_S} class:text-gray-500={worstEnd === null || worstEnd <= AUTO_LENGTH_S}>
+            <div class="text-[10px]" class:text-danger={worstEnd !== null && worstEnd > AUTO_LENGTH_S} class:text-body={worstEnd === null || worstEnd <= AUTO_LENGTH_S}>
               {worstEnd === null
                 ? "Worst case: this row never wins when every wait runs to its time row."
                 : `Worst case with this branch: the Auto ends by ${seconds(worstEnd)}${worstEnd > AUTO_LENGTH_S ? " — over 30 s" : ""}.`}

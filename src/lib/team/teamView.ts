@@ -5,7 +5,6 @@
  */
 import { get, writable } from "svelte/store";
 import { activePaths } from "../../stores";
-import { autoMode } from "../auto/store";
 import * as browserFileStore from "../../utils/browserFileStore";
 import { showToast } from "../toast";
 import {
@@ -47,8 +46,6 @@ export async function showTeamView(
   for (const { file, text } of fetched) {
     await browserFileStore.writeFile(copyName(file), text);
   }
-  // Auto mode shows one Auto; multi-path mode is for several.
-  autoMode.set(false);
   activePaths.set(fetched.map(({ file }) => copyName(file)));
   teamView.set({ ref, files, pair, fetchedAt: Date.now() });
   showToast(`Showing ${files.join(" + ")} from biobuzz ${ref}`, "success");

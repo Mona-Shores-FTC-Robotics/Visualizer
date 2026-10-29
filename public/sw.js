@@ -24,14 +24,11 @@ const APP_STATIC_RESOURCES = [
   "./fields/centerstage.webp",
   "./fields/intothedeep.webp",
   "./fields/decode.webp",
-  "./fields/biobuzz.webp",
+  "./fields/biobuzz-dark.webp",
+  "./fields/biobuzz-light.webp",
   "./robot.png",
-  "./assets/index.js",
-  "./assets/index.css",
-  "./fonts/Poppins-Regular.ttf",
-  "./fonts/Poppins-SemiBold.ttf",
-  "./fonts/Poppins-Light.ttf",
-  "./fonts/Poppins-ExtraLight.ttf",
+  "./logo-duck.svg",
+  "./loading.svg",
 ];
 
 /** The app's own code and pages: these must never be served stale when online. */

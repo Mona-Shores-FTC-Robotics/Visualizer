@@ -1,12 +1,6 @@
-import type { Settings } from "../../types";
-import { normalizeFieldPoints } from "../../utils/fieldPoints";
+import type { RobotConfig } from "../../types";
+import { projectFromJson, type LoadResult } from "../../io";
 import { pathStem } from "../../utils/filename";
-import {
-  deriveSequence,
-  normalizePaths,
-  normalizeStartPose,
-} from "../../utils/normalize";
-import { settingsForFile } from "../../utils/project";
 
 /**
  * A project opened from a share link. It is shown instead of the person's own
@@ -23,22 +17,15 @@ export interface SharedCopyView {
   from?: string | null;
 }
 
-/** The on-screen state for a shared project, read the way a file is read. */
+/**
+ * The document for a shared project, read the way a file is read: its own
+ * robot, and `ownRobot` for anything it does not record.
+ */
 export function sharedCopyState(
   project: Record<string, unknown>,
-  ownSettings: Settings,
-) {
-  const lines = normalizePaths((project.lines as never) ?? []);
-  return {
-    startPoint: normalizeStartPose(project.startPoint as never),
-    lines,
-    sequence: deriveSequence(project, lines),
-    shapes: Array.isArray(project.shapes) ? project.shapes : [],
-    fieldPoints: normalizeFieldPoints(project),
-    // Robot size and motion model come with the Auto; display
-    // preferences stay the viewer's own.
-    settings: settingsForFile(ownSettings, project.settings),
-  };
+  ownRobot: RobotConfig,
+): LoadResult {
+  return projectFromJson(project, ownRobot);
 }
 
 export function sharedCopyTitle(view: SharedCopyView): string {

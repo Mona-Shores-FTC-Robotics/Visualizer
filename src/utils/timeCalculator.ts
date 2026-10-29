@@ -5,135 +5,16 @@ import type {
   StartPose,
   TimePrediction,
   TimelineEvent,
-  TravelRun,
   SequenceItem,
 } from "../types";
+import { motionProfile, timeAtDistance } from "../sim/motionProfile";
 import { getAngularDifference } from "./math";
-import { getLineStartHeading, getLineEndHeading } from "./headingInterpolation";
+import { segmentHeadingAt } from "./headingInterpolation";
 import {
   atomicSegments,
-  effectiveHeadingAt,
   flattenToAtomicSegments,
   type FlatSegment,
 } from "./pathTraversal";
-
-/**
- * Calculate time for a motion profile (trapezoidal or triangular)
- */
-export function calculateMotionProfileTime(
-  distance: number,
-  maxVel: number,
-  maxAcc: number,
-  maxDec?: number,
-): number {
-  const deceleration = maxDec || maxAcc;
-
-  const accDist = (maxVel * maxVel) / (2 * maxAcc);
-  const decDist = (maxVel * maxVel) / (2 * deceleration);
-
-  if (distance >= accDist + decDist) {
-    const accTime = maxVel / maxAcc;
-    const decTime = maxVel / deceleration;
-    const constDist = distance - accDist - decDist;
-    const constTime = constDist / maxVel;
-
-    return accTime + constTime + decTime;
-  } else {
-    const vPeak = Math.sqrt(
-      (2 * distance * maxAcc * deceleration) / (maxAcc + deceleration),
-    );
-    const accTime = vPeak / maxAcc;
-    const decTime = vPeak / deceleration;
-
-    return accTime + decTime;
-  }
-}
-
-/**
- * Distance covered `time` seconds into a rest-to-rest profile over `length`.
- * The same trapezoid (or triangle, when too short to reach full speed) that
- * calculateMotionProfileTime times.
- */
-export function motionProfileDistanceAt(
-  time: number,
-  length: number,
-  maxVel: number,
-  maxAcc: number,
-  maxDec?: number,
-): number {
-  if (length <= 0) return 0;
-  const deceleration = maxDec || maxAcc;
-  const accDist = (maxVel * maxVel) / (2 * maxAcc);
-  const decDist = (maxVel * maxVel) / (2 * deceleration);
-  const peak =
-    length >= accDist + decDist
-      ? maxVel
-      : Math.sqrt(
-          (2 * length * maxAcc * deceleration) / (maxAcc + deceleration),
-        );
-  const accTime = peak / maxAcc;
-  const accLength = (peak * peak) / (2 * maxAcc);
-  const cruiseTime =
-    (length - accLength - (peak * peak) / (2 * deceleration)) / peak;
-  const t = Math.max(0, time);
-  if (t <= accTime) return 0.5 * maxAcc * t * t;
-  if (t <= accTime + cruiseTime) return accLength + peak * (t - accTime);
-  const dec = Math.min(t - accTime - cruiseTime, peak / deceleration);
-  return Math.min(
-    length,
-    accLength + peak * cruiseTime + peak * dec - 0.5 * deceleration * dec * dec,
-  );
-}
-
-/** The inverse of motionProfileDistanceAt: seconds to cover `distance`. */
-function motionProfileTimeAtDistance(
-  distance: number,
-  length: number,
-  maxVel: number,
-  maxAcc: number,
-  maxDec?: number,
-): number {
-  const total = calculateMotionProfileTime(length, maxVel, maxAcc, maxDec);
-  if (distance <= 0) return 0;
-  if (distance >= length) return total;
-  // Distance only grows with time, so bisect.
-  let low = 0;
-  let high = total;
-  for (let i = 0; i < 60; i++) {
-    const mid = (low + high) / 2;
-    if (motionProfileDistanceAt(mid, length, maxVel, maxAcc, maxDec) < distance)
-      low = mid;
-    else high = mid;
-  }
-  return (low + high) / 2;
-}
-
-/**
- * How far along its exported path the robot is, `time` seconds into it.
- * Without a motion profile this eases over the whole path, as each segment
- * used to on its own.
- */
-export function runDistanceAt(
-  run: TravelRun,
-  time: number,
-  settings: Settings,
-  ease: (fraction: number) => number,
-): number {
-  if (
-    settings.maxVelocity !== undefined &&
-    settings.maxAcceleration !== undefined
-  ) {
-    return motionProfileDistanceAt(
-      time,
-      run.totalLength,
-      settings.maxVelocity,
-      settings.maxAcceleration,
-      settings.maxDeceleration,
-    );
-  }
-  const fraction = run.totalTime > 0 ? time / run.totalTime : 1;
-  return run.totalLength * ease(Math.max(0, Math.min(1, fraction)));
-}
 
 export function calculatePathTime(
   startPoint: StartPose,
@@ -146,32 +27,6 @@ export function calculatePathTime(
     if (!Number.isFinite(numeric) || numeric <= 0) return 0;
     return numeric / 1000;
   };
-
-  const useMotionProfile =
-    settings.maxVelocity !== undefined &&
-    settings.maxAcceleration !== undefined;
-  const avgVelocity = (settings.xVelocity + settings.yVelocity) / 2;
-  const pathTime = (length: number) =>
-    useMotionProfile
-      ? calculateMotionProfileTime(
-          length,
-          settings.maxVelocity!,
-          settings.maxAcceleration!,
-          settings.maxDeceleration,
-        )
-      : length / avgVelocity;
-  const timeAtDistance = (distance: number, length: number) =>
-    useMotionProfile
-      ? motionProfileTimeAtDistance(
-          distance,
-          length,
-          settings.maxVelocity!,
-          settings.maxAcceleration!,
-          settings.maxDeceleration,
-        )
-      : length > 0
-        ? (pathTime(length) * distance) / length
-        : 0;
 
   const segmentLengths: number[] = [];
   const segmentTimes: number[] = [];
@@ -253,16 +108,9 @@ export function calculatePathTime(
 
     // --- ROTATION CHECK ---
     // Only where the robot starts from rest. Inside a path it turns while it
-    // drives. Read the heading the same way the animation does, so a group
-    // override does not leave the timeline turning to an angle never shown.
+    // drives.
     const first = step.segments[0];
-    const startHeading = effectiveHeadingAt(pathSegments, first.index, 0);
-    const requiredStartHeading = getLineStartHeading(
-      first.line,
-      first.start,
-      startHeading.heading,
-      startHeading.t,
-    );
+    const requiredStartHeading = segmentHeadingAt(pathSegments, first.index, 0);
     if (firstTravel) currentHeading = requiredStartHeading;
     firstTravel = false;
     const diff = Math.abs(
@@ -287,16 +135,16 @@ export function calculatePathTime(
     // --- TRAVEL ---
     // One profile over the whole path, cut at each segment's start and end.
     const totalLength = step.segments.reduce(
-      (sum, segment) => sum + segment.arcLength,
+      (sum, segment) => sum + segment.curve.length,
       0,
     );
-    const totalTime = pathTime(totalLength);
+    const profile = motionProfile(totalLength, settings);
     const runStart = currentTime;
     let distance = 0;
     step.segments.forEach((segment) => {
-      const length = segment.arcLength;
-      const segmentStart = timeAtDistance(distance, totalLength);
-      const segmentEnd = timeAtDistance(distance + length, totalLength);
+      const length = segment.curve.length;
+      const segmentStart = timeAtDistance(profile, distance);
+      const segmentEnd = timeAtDistance(profile, distance + length);
       segmentLengths.push(length);
       segmentTimes.push(segmentEnd - segmentStart);
       timeline.push({
@@ -307,23 +155,16 @@ export function calculatePathTime(
         lineId: segment.line.id,
         run: {
           totalLength,
-          totalTime,
+          totalTime: profile.duration,
           startDistance: distance,
           startTime: segmentStart,
         },
       });
       distance += length;
-
-      const endHeading = effectiveHeadingAt(pathSegments, segment.index, 1);
-      currentHeading = getLineEndHeading(
-        segment.line,
-        segment.start,
-        endHeading.heading,
-        endHeading.t,
-      );
+      currentHeading = segmentHeadingAt(pathSegments, segment.index, 1);
       robotPoint = segment.line.endPoint;
     });
-    currentTime = runStart + totalTime;
+    currentTime = runStart + profile.duration;
   });
 
   const totalTime = currentTime;
@@ -378,12 +219,7 @@ export function calculateVisualizationPathTime(
     }
   });
 
-  return calculatePathTime(
-    startPoint,
-    lines,
-    settings,
-    visualizationSequence,
-  );
+  return calculatePathTime(startPoint, lines, settings, visualizationSequence);
 }
 
 export function formatTime(totalSeconds: number): string {

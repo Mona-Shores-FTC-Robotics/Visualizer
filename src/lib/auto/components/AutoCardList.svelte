@@ -15,7 +15,7 @@
   } from "../store";
   import { branchColor, cardColors, seconds, TRUNK_COLOR } from "./ui";
   import { DEFAULT_TIMEOUT_S, rowKind } from "../types";
-  import type { Shape, StartPose } from "../../../types";
+  import type { Shape } from "../../../types";
   import CardEditor from "./CardEditor.svelte";
   import WaitSwitch from "./WaitSwitch.svelte";
   import RegistryPanel from "./RegistryPanel.svelte";
@@ -29,7 +29,6 @@
     shapes: Shape[];
     /** Seconds into the preview the playback is at. */
     now: number;
-    startPoint: StartPose;
     defaultExportName: string;
     /** Where the robot is now, in inches: Setup's "Add at robot" puts a point there. */
     robotAt: { x: number; y: number };
@@ -44,7 +43,6 @@
     worst,
     shapes,
     now,
-    startPoint = $bindable(),
     defaultExportName,
     robotAt,
     onExport,
@@ -334,7 +332,7 @@
   {#if setupOpen}
     <div class="auto-modal" role="presentation" onclick={(e) => { if (e.target === e.currentTarget) setupOpen = false; }}>
       <div class="auto-modal-body" role="dialog" aria-label="Setup">
-        <RegistryPanel {auto} {defaultExportName} {robotAt} pathNames={catalog.names} bind:startPoint
+        <RegistryPanel {auto} {defaultExportName} {robotAt} pathNames={catalog.names} 
           alwaysOpen onClose={() => (setupOpen = false)} />
       </div>
     </div>
@@ -427,7 +425,7 @@
     align-items: center;
     gap: 4px;
     font-size: 0.62rem;
-    color: #888888;
+    color: var(--body);
   }
   .auto-card-tools {
     display: flex;
@@ -445,24 +443,24 @@
     font-weight: 700;
   }
   .auto-icon--action {
-    background: #2b2410;
+    background: color-mix(in srgb, #ffc516 18%, transparent);
     color: #ffc516;
   }
   .auto-icon--path {
-    background: #2b2410;
+    background: color-mix(in srgb, #ffc516 18%, transparent);
     color: #ffc516;
     font-size: 12px;
   }
   .auto-icon--wait {
-    background: #202020;
-    color: #bbbbbb;
+    background: var(--base);
+    color: var(--body);
   }
   .auto-icon--routine {
-    background: #10262a;
+    background: color-mix(in srgb, #5fd4e6 18%, transparent);
     color: #5fd4e6;
   }
   .auto-icon--decision {
-    background: #251f3d;
+    background: color-mix(in srgb, #a594ff 18%, transparent);
     color: #a594ff;
   }
   .auto-tag {
@@ -470,8 +468,8 @@
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #ff9a9a;
-    border: 1px solid #6b3a3a;
+    color: var(--color-danger);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
     border-radius: 4px;
     padding: 0 4px;
   }
@@ -483,15 +481,15 @@
     padding: 0 5px;
   }
   .auto-flag--error {
-    background: #5c1a1a;
-    color: #ff9a9a;
+    background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+    color: var(--color-danger);
   }
   .auto-flag--warning {
-    background: #3d2e0a;
-    color: #f5c451;
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
   }
   .auto-bad {
-    color: #ff7a7a;
+    color: var(--color-danger);
   }
   .auto-minis {
     display: flex;
@@ -501,20 +499,20 @@
   }
   .auto-mini {
     font-size: 0.64rem;
-    border: 1px solid #444444;
+    border: 1px solid var(--border);
     border-radius: 5px;
     padding: 0 5px;
-    color: #cfcfcf;
-    background: #101010;
+    color: var(--heading);
+    background: var(--base);
     white-space: nowrap;
   }
   .auto-mini--event {
-    border-color: #5c4a10;
+    border-color: color-mix(in srgb, #ffc516 45%, transparent);
     color: #ffc516;
   }
   .auto-mini--bad {
     border-color: #e5484d;
-    color: #ff7a7a;
+    color: var(--color-danger);
   }
   .auto-branch {
     display: flex;
@@ -547,20 +545,20 @@
     color: var(--c);
   }
   button.auto-fold:hover {
-    background: #1c1c1c;
+    background: color-mix(in srgb, var(--body) 12%, transparent);
   }
   .auto-fold-summary {
     display: flex;
     align-items: center;
     gap: 6px;
     width: 100%;
-    background: #141414;
-    border: 1px dashed #333333;
+    background: var(--base);
+    border: 1px dashed var(--border);
     border-radius: 5px;
     padding: 3px 6px;
     text-align: left;
     font-size: 0.66rem;
-    color: #aaaaaa;
+    color: var(--body);
   }
   .auto-fold-summary:hover {
     border-color: var(--c);
@@ -589,11 +587,11 @@
     color: var(--c);
   }
   .auto-branch-h:hover {
-    background: #1c1c1c;
+    background: color-mix(in srgb, var(--body) 12%, transparent);
   }
   .auto-branch-h--selected {
-    border-color: #8d68bd;
-    background: #1d1727;
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   }
   .auto-branch-name {
     min-width: 0;
@@ -615,10 +613,10 @@
   .auto-worst {
     font-size: 0.62rem;
     font-weight: 600;
-    color: #999999;
+    color: var(--body);
   }
   .auto-worst--over {
-    color: #ff7a7a;
+    color: var(--color-danger);
   }
   .auto-branch-cards {
     display: flex;
@@ -627,7 +625,7 @@
   }
   .auto-guard {
     border-style: dashed;
-    border-color: #6b3a3a;
-    background: #161010;
+    border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+    background: color-mix(in srgb, var(--color-danger) 6%, transparent);
   }
 </style>

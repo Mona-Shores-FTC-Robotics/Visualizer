@@ -18,9 +18,12 @@ What the fork adds:
 - **Share links.** Export → Share Link makes a link that opens a copy of the project, Auto
   included, for GitHub issues and pull requests. It is a snapshot, not the version in git; see
   [`docs/auto-format.md`](docs/auto-format.md#share-links).
-- **Preview fixes**, meant to be offered upstream: each exported path is timed as one motion
-  (the robot no longer stops at every sub-path), the robot is placed by distance travelled, and
-  "through" curves are drawn the way Pedro 3 follows them.
+- **One motion per exported path**, meant to be offered upstream: a group is followed as one
+  Pedro path, so the preview times it as one profile instead of stopping at every joint. (The
+  fork's other two preview fixes, placing the robot by distance and drawing "through" curves the
+  way Pedro 3 follows them, are in upstream since v2.5.)
+- **A robot speed cap.** `maxVelocity` in a file's robot block caps the motion profile; upstream
+  uses the average of the forward and strafe velocities.
 
 - **Save to GitHub and simulate.** The cloud button in the top bar commits the project to biobuzz
   (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). biobuzz's
@@ -29,5 +32,11 @@ What the fork adds:
   by its whole path (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing
   results needs nothing; saving needs a fine-grained GitHub token, kept in the browser.
 
+Built on upstream **v2.5** (merged 2026-10-28). The fork's code sits in its own folders, and the
+hooks it needs in upstream's files are listed in
+[`docs/auto-format.md`](docs/auto-format.md#upstream-files-touched).
+
 `main` is deployed to GitHub Pages on every push (`.github/workflows/pages.yml`). Upstream changes
-are merged in between competitions, not during one. `npm test` runs the tests.
+are merged in between competitions, not during one. With [pnpm](https://pnpm.io):
+`pnpm install`, then `pnpm dev`; `pnpm test` (unit), `pnpm test:e2e` (browser), `pnpm check` and
+`pnpm lint` are what CI runs (`.github/workflows/ci.yml`).

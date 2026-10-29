@@ -12,7 +12,6 @@
   }
 
   let { view, error, onSave, onClose, onDismissError }: Props = $props();
-
 </script>
 
 <div class="shared-stack">
@@ -27,12 +26,17 @@
   {/if}
 
   {#if view}
-    <div class="shared-banner" role="status"
+    <div
+      class="shared-banner"
+      role="status"
       title={view.from
         ? `${view.name ?? "This Auto"}, read from ${view.from}. Not saved here. Your own work is set aside until you close it.`
-        : `${sharedCopyTitle(view)}. A copy, not the version in git, and not saved. Your own work is set aside until you close it.`}>
+        : `${sharedCopyTitle(view)}. A copy, not the version in git, and not saved. Your own work is set aside until you close it.`}
+    >
       <span class="shared-banner__text">
-        <strong>{view.from ? `From ${view.from}` : "Shared copy"}</strong>{#if view.savedAs} · saved as {view.savedAs}{/if}
+        <strong>{view.from ? `From ${view.from}` : "Shared copy"}</strong
+        >{#if view.savedAs}
+          · saved as {view.savedAs}{/if}
       </span>
       <button class="console-action" onclick={onSave}>Save as new file</button>
       <button class="console-action" onclick={onClose}>Close</button>
@@ -64,13 +68,13 @@
     gap: 0.75rem;
     padding: 0.35rem 0.5rem 0.35rem 0.9rem;
     font-size: 0.75rem;
-    color: #e8e8e8;
-    background: #2a2414;
-    border: 1px solid #6b5a1e;
+    color: var(--heading);
+    background: color-mix(in srgb, var(--color-warning) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent);
   }
   .shared-banner--error {
-    background: #2a1616;
-    border-color: #7a2e2e;
+    background: color-mix(in srgb, var(--color-danger) 12%, var(--surface));
+    border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
   }
   .shared-banner__text {
     flex: 1;

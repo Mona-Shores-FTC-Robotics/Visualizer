@@ -1,8 +1,5 @@
 import type { BasePoint, Settings } from "../../types";
-import {
-  calculateMotionProfileTime,
-  motionProfileDistanceAt,
-} from "../../utils/timeCalculator";
+import { motionProfile } from "../../sim/motionProfile";
 
 /**
  * A drive that is not one of the project's paths (a routine's pattern, a
@@ -32,20 +29,8 @@ export function motionAlong(
     );
   }
   const length = distances[distances.length - 1] ?? 0;
-  const profiled =
-    settings.maxVelocity !== undefined && settings.maxAcceleration !== undefined;
-  const speed = Math.max(1e-6, (settings.xVelocity + settings.yVelocity) / 2);
-  const seconds =
-    length <= 1e-9
-      ? 0
-      : profiled
-        ? calculateMotionProfileTime(
-            length,
-            settings.maxVelocity,
-            settings.maxAcceleration,
-            settings.maxDeceleration,
-          )
-        : length / speed;
+  const profile = motionProfile(length, settings);
+  const seconds = length <= 1e-9 ? 0 : profile.duration;
   return {
     samples,
     distances,
@@ -54,16 +39,7 @@ export function motionAlong(
     headingDeg,
     distanceAt: (time: number) => {
       if (seconds <= 0) return length;
-      const t = Math.max(0, Math.min(time, seconds));
-      return profiled
-        ? motionProfileDistanceAt(
-            t,
-            length,
-            settings.maxVelocity,
-            settings.maxAcceleration,
-            settings.maxDeceleration,
-          )
-        : (length * t) / seconds;
+      return profile.distanceAt(Math.max(0, Math.min(time, seconds)));
     },
   };
 }

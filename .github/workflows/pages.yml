@@ -21,13 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npx vite build
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
       # The service worker names its cache after VERSION; a new name per build drops
       # the previous deploy's saved copy (see public/sw.js).
       - name: Stamp the service worker with this commit

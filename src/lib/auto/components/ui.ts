@@ -1,18 +1,18 @@
 /**
- * Class strings shared by the Auto panels. They are the stock inspector's
- * (SelectedPathInspector, PiecewiseHeadingEditor), so Auto mode looks like
- * the rest of the Visualizer.
+ * Class strings shared by the Auto panels, on the same theme tokens as
+ * upstream's inspector (lib/components/ui/styles.ts), so Auto mode looks like
+ * the rest of the Visualizer in both themes.
  */
 export const FIELD_CLASS =
-  "w-full rounded border border-[#444444] bg-[#111111] px-2 py-1 text-gray-100 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full min-w-0 rounded-lg border border-border bg-base px-2 py-1 text-heading tabular-nums outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50";
 export const ACTION_CLASS =
-  "rounded border border-[#444444] px-2 py-1 font-semibold text-gray-100 hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-lg border border-border bg-base px-2 py-1 font-medium text-heading transition hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50";
 export const DANGER_CLASS =
-  "rounded border border-red-700 bg-red-600 px-2 py-1 font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50";
-export const LABEL_CLASS = "mb-1 block font-semibold uppercase tracking-wide text-gray-500";
-export const CELL_CLASS = "border border-[#333333] bg-[#1f1f1f] px-2 py-1.5";
+  "rounded-lg border border-danger bg-danger px-2 py-1 font-medium text-white transition hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50";
+export const LABEL_CLASS = "mb-1 block font-medium text-body";
+export const CELL_CLASS = "rounded-lg border border-border bg-base/60 px-2 py-1.5";
 export const SECTION_CLASS =
-  "w-full border border-[#333333] bg-[#222222] p-3 text-xs text-gray-400 space-y-3";
+  "w-full rounded-xl border border-border bg-base/60 p-3 text-xs text-body space-y-3";
 
 /** The trunk is drawn in the Visualizer's path yellow. */
 export const TRUNK_COLOR = "#ffc516";

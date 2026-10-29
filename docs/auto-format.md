@@ -6,11 +6,18 @@ for a trigger with a time limit, which is the one way to branch; plus an endgame
 guard), previewed on the field and exported as Java for the robot's `autokit`
 library.
 
-A `.pp` file stays a normal Visualizer 1.5.0 file plus **one** new top-level
-key, `auto`. Everything the Auto builder adds lives under it, so:
+A `.pp` file stays a normal Visualizer project file (format 2.0.0 since the
+merge of upstream's v2.5; 1.5.0 files still open and are migrated on load) plus
+**one** new top-level key, `auto`. Everything the Auto builder adds lives under
+it, so:
 
-- the stock Visualizer opens our files (it ignores `auto`), and
-- a project without an Auto is written exactly as before (no `auto` key).
+- the stock Visualizer opens our files, but it **drops `auto` when it saves
+  one**: edit and save Autos only in this fork, and
+- a project without an Auto is written exactly as upstream writes it (no
+  `auto` key).
+
+The fork saves files as `.pp`, the name biobuzz's Autos, links and generated
+class names use; upstream saves `.pp.json`, which also opens here.
 
 ## Using the editor
 
@@ -192,17 +199,21 @@ contract with the robot's `autokit` library:
 ### Robot settings belong to the file
 
 The preview's timing and the park guard's `seconds` come from the robot size
-and motion model (`xVelocity`, `yVelocity`, `aVelocity`, `kFriction`,
-`rWidth`, `rHeight`, `safetyMargin`, `maxVelocity`, `maxAcceleration`,
-`maxDeceleration`), so every file carries its own under `settings`:
+and motion model, which every file carries in its `robot` block (upstream's
+format 2.0.0: `forwardVelocity`, `strafeVelocity`, `aVelocity`, `kFriction`,
+`rLength`, `rWidth`, `safetyMargin`, `maxAcceleration`, `maxDeceleration`,
+plus the fork's `maxVelocity`). A 1.5.0 file's `settings` block is migrated
+into it on load (`xVelocity` → `forwardVelocity`, the old `rWidth`/`rHeight`
+→ `rLength`/`rWidth`).
 
-- opening a file applies its values, and the **defaults** for any it lacks;
-  the viewer's own values are never used for a file, so the same file exports
-  the same Java whoever opens it, in the app or with `export-auto.mjs`
-  (`settingsForFile` in `src/utils/project.ts`; a test checks the two agree);
-- editing them in Settings changes the open file, and every save writes them;
-- a new file starts with the values in use when it is made;
-- display preferences (panels, colours, images, the field image) stay the
+- **`maxVelocity` is the fork's.** It caps the trapezoidal profile; without
+  it, as upstream does, the cap is the average of the forward and strafe
+  velocities. Our Autos record a measured cap, so it is kept
+  (`src/sim/motionProfile.ts`).
+- Opening a file applies its robot; anything it lacks comes from the robot
+  in use. `export-auto.mjs` uses the defaults for what a file lacks, and a
+  test checks the app and the command line export the same Java.
+- Display preferences (panels, colours, images, the field image) stay the
   viewer's and do not change when a file is opened.
 
 From the command line, without opening the app:
@@ -211,7 +222,7 @@ From the command line, without opening the app:
 node scripts/export-auto.mjs path/to/hive-rush.pp [outDir]
 ```
 
-`npm test` runs the unit tests, including a golden test that exports the
+`pnpm test` runs the unit tests, including a golden test that exports the
 sample and compares it with `HiveRushAuto.java` line by line. That golden file
 compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 `autokit` signatures, and its `build()` runs for both alliances.
@@ -255,9 +266,8 @@ pull requests, so reviewers see the paths next to the Java. It is a
 snapshot: git holds the Auto that runs.
 
 - **What it carries.** The `.pp` document exactly as a save writes it (paths,
-  shapes, sequence, field points, `auto`), the file name, and only the
-  settings that change what the Auto means: robot size and the motion model
-  (they time the preview and the park guard's seconds).
+  shapes, sequence, field points, `robot`, `auto`) and the file name; the
+  robot block is what times the preview and the park guard's seconds.
   Display preferences stay the viewer's. Nothing is converted: coordinates
   stay in Pedro's field frame, as in the file.
 - **Encoding.** The payload `{name, project}` as JSON, zlib-deflated with
@@ -267,10 +277,10 @@ snapshot: git holds the Auto that runs.
 - **Length.** The `hive-rush` sample is about 2,100 characters, over a
   Discord message (2,000), so send the `.pp` file there; an 18-path Auto is
   3,000 to 5,000. GitHub comments take 65,536. The dialog shows the length.
-- **Opening one.** The copy is shown with a banner and no file open. The
-  viewer's own work, recovered session and saved settings are set aside, not
-  saved over, until **Close and return to my work**. Save (the button,
-  Ctrl+S, Save As) writes a new file, never the one that was open. Opening
+- **Opening one.** The copy is shown with no file open, and the top bar says
+  so ("Shared copy" · Save as new file · Close). The viewer's own work and
+  recovered session are set aside, not saved over, until **Close**. Save
+  (the button, Ctrl+S) asks for a new name, never the open file's. Opening
   another file ends the copy like any file load.
 - **Old and broken links.** Format 1 links keep loading; the project inside
   goes through the same normalizers as an old file, and a project from a
@@ -281,8 +291,8 @@ snapshot: git holds the Auto that runs.
 - Phones cannot open links: the app shows its phone block page.
 
 Code: `src/utils/shareLink.ts` (encode/decode, no DOM),
-`src/lib/session/sharedCopy.ts`, `ShareLinkDialog.svelte`,
-`SharedCopyBanner.svelte`.
+`src/lib/session/sharedCopy.ts`, `src/state/links.svelte.ts`,
+`ShareLinkDialog.svelte`.
 
 ## Sample links
 
@@ -305,7 +315,8 @@ is in git:
 | `…/Visualizer/#gh=a1b2c3d/red-simple.pp` | exactly that commit, forever |
 | `…/Visualizer/#gh=claude/some-branch/red-simple.pp` | a branch, e.g. a pull request's |
 
-The corner bar says where it came from ("From biobuzz master"). The file is
+The top bar says which file it is and where its draft stands ("l-quals.pp ·
+same as GitHub"). The file is
 read from raw.githubusercontent.com: no login while biobuzz is public, and a
 branch can be up to 5 minutes stale after a push (a commit never is). A file
 that is not there, or GitHub out of reach, is refused with a message saying
@@ -313,28 +324,53 @@ which. Code: `src/utils/gitLink.ts`.
 
 ## Upstream files touched
 
-New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`,
-`src/lib/testing/` and `scripts/run-tests.mjs`. Hook edits to upstream files:
+New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`, `src/lib/timing/`,
+`src/lib/team/`, `src/lib/sim/`, `src/lib/github/`, `src/lib/session/`
+(`drafts.ts`, `sharedCopy.ts`), the link helpers in `src/utils/`, and three
+fork modules in upstream's layout:
 
-- `src/utils/project.ts` — `ProjectDoc.auto`; `buildProject` writes it only when present.
-- `src/utils/history.ts` — `AppState.auto`, so undo/redo cover the Auto; `reset()`
-  for opening and closing a shared copy.
-- `src/lib/session/sessionSnapshot.ts` — the recovery snapshot carries `auto`.
-- `src/App.svelte` — load, save, undo/redo, session recovery; the pins effect; opening a share
-  link as a shared copy (session and settings are not persisted while it is shown,
-  and saves go to a new file).
-- `src/lib/FileManager.svelte` — load, save, new file, mirror.
-- `src/lib/codegen/identifiers.ts` — exports `isReservedWord`.
-- `src/utils/timeCalculator.ts` — exports `calculateMotionProfileTime`, so straight
-  patterns and straight drives are timed on the same profile as paths.
-- `src/lib/Navbar.svelte` — the Auto toggle; "Export Auto (Java)" in the export menu;
-  the time readout shows the preview's length in Auto mode; reset clears the Auto;
-  "Share Link" in the export menu.
-- `src/lib/components/LeftRail.svelte` — optional `listOverride` snippet, shown in
-  place of the Path List (Auto mode's card list).
-- `src/App.svelte` also: in Auto mode the playback bar and robot follow the preview's
-  timeline, the stock path strokes are hidden (the
-  overlay draws them by branch), and the Controls panel shows the Auto panel instead
-  of `ControlTab`.
-- `package.json` — `test` script.
-- `vite.config.ts` — publishes `samples/*.pp` for sample links.
+- `src/state/auto.svelte.ts` — the open project's Auto, its preview, worst
+  case and validation; the pins and link paths that keep it consistent with
+  the paths; card ↔ path selection; adding a path with its card.
+- `src/state/links.svelte.ts` — share, sample and `#gh=` links, the shared copy,
+  and drafts of files from biobuzz.
+- `src/view/ForkDialogs.svelte`, `src/view/forkActions.ts`,
+  `src/view/AutoFieldBar.svelte` — the fork's dialogs, menu actions, and the bar
+  above the field.
+
+Hook edits to upstream files, each marked "Fork" in a comment:
+
+- `src/io/project.ts` — `ProjectDoc.auto`: read and normalized on load (pins
+  adopted for files from before them), written only when present. Undo,
+  autosave, overlays and saves carry it from there.
+- `src/types.ts`, `src/io/robot.ts`, `src/sim/motionProfile.ts` — `maxVelocity`
+  in the robot block, and the profile's cap.
+- `src/utils/timeCalculator.ts`, `src/sim/pose.ts`, `src/types.ts` (`TravelRun`)
+  — one motion profile per exported path (see `test/chained-timing.test.ts`).
+- `src/state/project.svelte.ts` — `amend()` (pins and link paths adjust the
+  document without an undo step) and a `loads` counter.
+- `src/state/playback.svelte.ts` — with an Auto the clock and robots follow its
+  preview; overlays with an Auto play theirs.
+- `src/state/overlays.svelte.ts` — overlays are laid out as their Auto drives them.
+- `src/state/editor.svelte.ts` — `addPathHook`: adding a path adds its card.
+- `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies.
+- `src/state/dialogs.svelte.ts` — the fork's dialogs.
+- `src/model/mirror.ts` — a mirrored project mirrors its Auto's named points.
+- `src/view/LayersPanel.svelte` — the card list in place of the path tree.
+- `src/view/FieldPanel.svelte`, `src/view/scene/PathMarkers.svelte`,
+  `src/view/scene/PathStrokes.svelte` — the Auto overlay and field axes; path
+  strokes stay clickable but hidden (the overlay draws them by branch); link
+  paths hidden; control points only for the selected card's path; Shift-drag.
+- `src/view/PlaybackBar.svelte` — the preview's decisions and events, and the 30 s budget.
+- `src/view/TopBar.svelte`, `src/view/actions.ts`, `src/view/AppDialogs.svelte`,
+  `src/App.svelte` — the fork's name, menus, status and wiring.
+- `src/view/snap.ts` — `lockToAxis` for Shift-drag.
+- `src/utils/filename.ts` — saves `.pp`.
+- `src/lib/panels/panelLayout.ts` — the left panel's minimum width.
+- Asset paths go through `publicAsset()` (the site is served from `/Visualizer/`):
+  `FieldMapImage`, `FieldLoadingOverlay`, `RobotImagePicker`, `TopBar`, `gifExport`.
+- `public/sw.js`, `src/main.ts`, `index.html` — network-first offline copy,
+  relative paths, the fork's title.
+- `vite.config.ts` — publishes `samples/*.pp` for sample links; vitest also runs
+  `src/**/*.test.ts`.
+- `test/io.test.ts` — expects `maxVelocity` in the robot block.

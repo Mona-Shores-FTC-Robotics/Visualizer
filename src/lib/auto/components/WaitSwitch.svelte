@@ -26,7 +26,7 @@
 <style>
   .wait-switch {
     display: inline-flex;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
     margin: 2px 0 4px 10px;
@@ -34,13 +34,13 @@
   }
   .wait-switch button {
     padding: 2px 10px;
-    background: #1a1a1a;
-    color: #8a8a8a;
+    background: var(--base);
+    color: var(--body);
     font-family: ui-monospace, monospace;
   }
   .wait-switch button.on {
-    background: #2a2140;
-    color: #d8c8ff;
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    color: var(--heading);
     font-weight: 700;
   }
 </style>

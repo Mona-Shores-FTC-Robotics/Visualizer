@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { AutoSection, NamedPoint } from "../types";
-  import type { StartPose } from "../../../types";
   import StartingPointSection from "../../components/StartingPointSection.svelte";
   import { usedNames } from "../tree";
   import { commitAuto, updateAuto } from "../store";
@@ -15,13 +14,12 @@
     robotAt: { x: number; y: number };
     /** Display name of every path, by id, for "used by". */
     pathNames: Map<string, string>;
-    startPoint: StartPose;
     /** Shown as a dialog: always open, with a Close button instead of Hide. */
     alwaysOpen?: boolean;
     onClose?: () => void;
   }
 
-  let { auto, defaultExportName, robotAt, pathNames, startPoint = $bindable(), alwaysOpen = false, onClose }: Props = $props();
+  let { auto, defaultExportName, robotAt, pathNames, alwaysOpen = false, onClose }: Props = $props();
   let uses = $derived(pointUses(auto));
 
   function describeUse(name: string): string {
@@ -92,10 +90,9 @@
   /** Switches a condition between event (stays true) and state (can change back). */
   function toggleEvent(name: string) {
     updateAuto((draft) => {
-      const events = new Set(draft.registry.events ?? []);
-      if (events.has(name)) events.delete(name);
-      else events.add(name);
-      if (events.size) draft.registry.events = draft.registry.conditions.filter((c) => events.has(c));
+      const was = draft.registry.events ?? [];
+      const events = was.includes(name) ? was.filter((e) => e !== name) : [...was, name];
+      if (events.length) draft.registry.events = draft.registry.conditions.filter((c) => events.includes(c));
       else delete draft.registry.events;
     });
   }
@@ -134,23 +131,23 @@
     <div class="space-y-0.5">
       {#each auto.registry[list] as name (name)}
         <div class="flex items-center justify-between gap-2">
-          <span class="font-mono text-gray-100">{name}</span>
+          <span class="font-mono text-heading">{name}</span>
           <span class="flex items-center gap-2">
             {#if list === "conditions"}
-              <button type="button" class="rounded border border-gray-600 px-1 text-[10px] hover:border-gray-400"
-                class:text-sky-300={isEvent(name)} class:text-gray-400={!isEvent(name)}
+              <button type="button" class="rounded border border-border px-1 text-[10px] hover:border-primary"
+                class:text-sky-300={isEvent(name)} class:text-body={!isEvent(name)}
                 title={isEvent(name)
                   ? "Event: once true, stays true for the rest of the match. Click to make it a state."
                   : "State: true or false right now, and can change back. Click to make it an event."}
                 onclick={() => toggleEvent(name)}>{isEvent(name) ? "event" : "state"}</button>
             {/if}
-            <span class="text-gray-500">{counts.get(name) ? `used ${counts.get(name)}×` : "unused"}</span>
-            <button type="button" class="text-gray-500 hover:text-red-400" aria-label={`Remove ${name}`} title="Remove from the registry" onclick={() => unregister(list, name)}>✕</button>
+            <span class="text-body">{counts.get(name) ? `used ${counts.get(name)}×` : "unused"}</span>
+            <button type="button" class="text-body hover:text-red-400" aria-label={`Remove ${name}`} title="Remove from the registry" onclick={() => unregister(list, name)}>✕</button>
           </span>
         </div>
       {/each}
       {#if auto.registry[list].length === 0}
-        <div class="text-gray-500">None yet.</div>
+        <div class="text-body">None yet.</div>
       {/if}
     </div>
     <form
@@ -178,12 +175,12 @@
 
 <div class={SECTION_CLASS}>
   <button type="button" class="flex w-full items-center justify-between gap-2 text-left" onclick={() => (alwaysOpen ? onClose?.() : (expanded = !expanded))} aria-expanded={open}>
-    <span class="font-semibold text-gray-100" title="Start pose, actions and conditions, named points, alliance, export name">Setup</span>
-    <span class="text-[11px] text-gray-400">{alwaysOpen ? "Close" : open ? "Hide" : "Show"}</span>
+    <span class="font-semibold text-heading" title="Start pose, actions and conditions, named points, alliance, export name">Setup</span>
+    <span class="text-[11px] text-body">{alwaysOpen ? "Close" : open ? "Hide" : "Show"}</span>
   </button>
 
   {#if unregistered.actions.length || unregistered.conditions.length}
-      <div class="border border-red-700 bg-red-950 px-2 py-1.5 text-[11px] text-red-300">
+      <div class="border border-danger/60 bg-danger/10 px-2 py-1.5 text-[11px] text-danger">
         <div class="font-semibold">Not in the robot's list (blocks the Java export)</div>
         <div class="mt-1 flex flex-wrap gap-1.5">
           {#each unregistered.actions as name (name)}
@@ -197,8 +194,8 @@
   {/if}
 
   {#if open}
-    <div class="border border-[#333333] bg-[#222222] p-3">
-      <StartingPointSection bind:startPoint />
+    <div class="border border-border bg-base p-3">
+      <StartingPointSection />
     </div>
     <label class="{ACTION_CLASS} w-fit cursor-pointer text-[11px]"
       title="TeamCode/auto-registry.json, written by the robot code's AutoRegistrationTest">
@@ -206,13 +203,13 @@
       <input type="file" accept=".json,application/json" class="hidden"
         onchange={(e) => { loadRobotList(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }} />
     </label>
-    {#if listProblem}<div class="text-[11px] text-red-400">{listProblem}</div>{/if}
-    <div class="grid gap-2 text-[11px] text-gray-300 lg:grid-cols-2">
+    {#if listProblem}<div class="text-[11px] text-danger">{listProblem}</div>{/if}
+    <div class="grid gap-2 text-[11px] text-heading lg:grid-cols-2">
       {@render nameList("actions", "Commands")}
       {@render nameList("conditions", "Triggers")}
     </div>
 
-    <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+    <div class="grid grid-cols-2 gap-2 text-[11px] text-heading">
       <div class={CELL_CLASS}>
         <label class={LABEL_CLASS} for="auto-drawn-for">Drawn for</label>
         <select id="auto-drawn-for" class={FIELD_CLASS} value={auto.drawnFor}
@@ -229,29 +226,29 @@
       </div>
     </div>
 
-    <div class="{CELL_CLASS} text-[11px] text-gray-300">
+    <div class="{CELL_CLASS} text-[11px] text-heading">
       <span class={LABEL_CLASS}>Named points</span>
       <div class="space-y-1">
         {#each Object.entries(auto.points) as [name, point] (name)}
           {@const use = describeUse(name)}
           <div class="flex items-baseline justify-between gap-2 pt-0.5" title={`${name}: ${use}`}>
-            <span class="truncate font-mono text-gray-100">{name}</span>
-            <span class="truncate text-[10px]" class:text-amber-400={use === "unused"} class:text-gray-500={use !== "unused"}>{use}</span>
+            <span class="truncate font-mono text-heading">{name}</span>
+            <span class="truncate text-[10px]" class:text-warning={use === "unused"} class:text-body={use !== "unused"}>{use}</span>
           </div>
           <div class="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-1">
             <input class={FIELD_CLASS} type="number" step="0.5" value={point[0]} aria-label={`${name} x`} oninput={(e) => setPoint(name, 0, e.currentTarget.value)} onchange={commitAuto} />
             <input class={FIELD_CLASS} type="number" step="0.5" value={point[1]} aria-label={`${name} y`} oninput={(e) => setPoint(name, 1, e.currentTarget.value)} onchange={commitAuto} />
             <input class={FIELD_CLASS} type="number" step="5" value={point[2] ?? ""} placeholder="0°" aria-label={`${name} heading`} oninput={(e) => setPoint(name, 2, e.currentTarget.value)} onchange={commitAuto} />
-            <button type="button" class="text-gray-500 hover:text-red-400" aria-label={`Remove point ${name}`}
+            <button type="button" class="text-body hover:text-red-400" aria-label={`Remove point ${name}`}
               onclick={() => removePoint(name)}>✕</button>
           </div>
         {/each}
         {#if Object.keys(auto.points).length === 0}
-          <div class="text-gray-500">None yet.</div>
+          <div class="text-body">None yet.</div>
         {/if}
       </div>
       <div class="mt-1.5 flex items-center gap-1.5">
-        <label class="shrink-0 text-gray-400" for="auto-start-at">Start is</label>
+        <label class="shrink-0 text-body" for="auto-start-at">Start is</label>
         <select id="auto-start-at" class={FIELD_CLASS} value={auto.startAt ?? ""}
           onchange={(e) => { const v = e.currentTarget.value; updateAuto((draft) => { if (v && draft.points[v]) draft.startAt = v; else delete draft.startAt; }); }}>
           <option value="">a spot of its own</option>
