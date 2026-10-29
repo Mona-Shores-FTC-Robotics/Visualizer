@@ -19,7 +19,7 @@ import { createSegment } from "../../utils/normalize";
 import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type { AutoCard, AutoSection, NamedPoint } from "../auto/types";
-import { flowerAhead, type Flower } from "./flowers";
+import { atPickSpot, flowerFor, pickSpot, type Flower } from "./flowers";
 
 export type StepKind = "launch" | "pick" | "drive" | "park" | "other";
 
@@ -32,8 +32,10 @@ export interface Step {
   spot: string | null;
   /** The path a drive or park drives. */
   lineId: string | null;
-  /** Pick flower: the FLOWER the robot is lined up with, or null when none is. */
+  /** Pick flower: the FLOWER the robot will pick (the nearest within range), or null for none. */
   flower?: Flower | null;
+  /** Pick flower: the robot is on that FLOWER's pick spot, so the pick needs no approach. */
+  atSpot?: boolean;
 }
 
 /** The two places our Autos start, drawn for RED (the robot turns them for BLUE). */
@@ -50,6 +52,11 @@ export const START_SPOT = "START";
 
 export const LAUNCH_ALL = "LaunchAll";
 export const PICK_FLOWER = "PickFlower";
+/**
+ * A pick's card timeout, seconds: longer than a pick, as the robot code asks (a card's default
+ * 5 s can cut it short).
+ */
+export const PICK_TIMEOUT_S = 8;
 
 /** The steps of the Auto's main list, in order. */
 export function stepsOf(doc: ProjectDoc): Step[] {
@@ -66,12 +73,14 @@ export function stepsOf(doc: ProjectDoc): Step[] {
       return { ...base, kind: "launch", label: "Launch all" };
     }
     if (card.kind === "action" && card.name === PICK_FLOWER) {
-      return {
-        ...base,
-        kind: "pick",
-        label: "Pick flower",
-        flower: flowerAhead(here.x, here.y, here.h),
-      };
+      const flower = flowerFor(here.x, here.y);
+      const atSpot = !!flower && atPickSpot(here.x, here.y, here.h, flower);
+      // A pick ends on its FLOWER's pick spot (FlowerPicker's contract).
+      if (flower) {
+        const spot = pickSpot(flower);
+        here = { x: spot.x, y: spot.y, h: spot.headingDeg };
+      }
+      return { ...base, kind: "pick", label: "Pick flower", flower, atSpot };
     }
     if (card.kind === "path") {
       const spot = spotOf(auto, doc.lines, card.lineId);
@@ -182,11 +191,15 @@ export function addStep(
   const next = edit(doc, (draft, auto) => {
     let card: AutoCard;
     if (kind === "launch" || kind === "pick") {
-      card = {
-        id: makeCardId(),
-        kind: "action",
-        name: kind === "launch" ? LAUNCH_ALL : PICK_FLOWER,
-      };
+      card =
+        kind === "launch"
+          ? { id: makeCardId(), kind: "action", name: LAUNCH_ALL }
+          : {
+              id: makeCardId(),
+              kind: "action",
+              name: PICK_FLOWER,
+              timeoutS: PICK_TIMEOUT_S,
+            };
     } else {
       const point = spot ? auto.points[spot] : undefined;
       if (!spot || !point) throw new Error(`No spot named ${spot ?? "(none)"}`);

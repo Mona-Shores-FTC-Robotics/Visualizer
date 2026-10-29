@@ -15,7 +15,12 @@ import {
   rowLabel,
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
-import { flowerAhead, pickMotions } from "../simple/flowers";
+import {
+  approachSeconds,
+  flowerFor,
+  pickMotions,
+  pickSpot,
+} from "../simple/flowers";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -451,10 +456,21 @@ export function simulateAuto(
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
-        // Fork: a PickFlower lined up with a FLOWER drives in and back out while it runs
-        // (lib/simple/flowers.ts); its time is the command's own either way.
-        const flower = card.name === "PickFlower" ? flowerAhead(pos.x, pos.y, heading) : null;
-        if (flower) motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, flower, t, busy));
+        // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): it drives to the
+        // pick spot first if the robot is not there (that time on top of its own), picks, and
+        // ends at the pick spot.
+        const flower = card.name === "PickFlower" ? flowerFor(pos.x, pos.y) : null;
+        if (flower) {
+          const from = { ...pos, headingDeg: heading };
+          const total = busy + approachSeconds(from, flower);
+          motions.push(...pickMotions(card.id, from, flower, t, total));
+          stay(total);
+          const spot = pickSpot(flower);
+          pos = { x: spot.x, y: spot.y };
+          heading = spot.headingDeg;
+          timing?.commandRan?.(card.name, t - total, t);
+          return null;
+        }
         stay(busy);
         timing?.commandRan?.(card.name, t - busy, t);
         return null;

@@ -17,7 +17,7 @@
   import { parseSelection, selectedCardId, spotPicker } from "../auto/store";
   import { AUTO_LENGTH_S } from "../auto/simulate";
   import { fieldClass } from "../components/ui/styles";
-  import { flowerLinedUp } from "./flowers";
+  import { flowerLinedUp, pickSpot } from "./flowers";
   import {
     addSpot,
     addStep,
@@ -72,7 +72,7 @@
       kind: "pick",
       label: "Pick flower",
       icon: Flower2,
-      hint: "Take the POLLEN from the FLOWER in front of the robot",
+      hint: "Pick the nearest FLOWER (the robot's D-pad up pick) and come back to this spot",
     },
     {
       kind: "park",
@@ -177,11 +177,21 @@
     spotPicker.set(null);
   }
 
-  /** The heading a new spot faces: its FLOWER's wall when lined up with one, else as the robot is. */
-  function newSpotHeading(at: { x: number; y: number }): number {
+  /**
+   * Where a new spot goes: a click on a FLOWER's approach line is put on its pick spot, square to
+   * it (where the robot's pick starts and ends); any other click stays, facing as the robot is.
+   */
+  function newSpotPose(at: { x: number; y: number }): {
+    x: number;
+    y: number;
+    h: number;
+  } {
     const flower = flowerLinedUp(at.x, at.y);
-    if (flower) return flower.facingDeg;
-    return headingBefore(pending?.index ?? steps.length);
+    if (flower) {
+      const spot = pickSpot(flower);
+      return { x: spot.x, y: spot.y, h: spot.headingDeg };
+    }
+    return { ...at, h: headingBefore(pending?.index ?? steps.length) };
   }
 
   function headingBefore(index: number): number {
@@ -197,9 +207,10 @@
     if (!pending?.at || !doc.auto) return;
     const name = cleanSpotName(pending.name) || freeSpotName(doc.auto);
     const { kind, index, at } = pending;
+    const pose = newSpotPose(at);
     const withSpot = doc.auto.points[name]
       ? doc
-      : addSpot(doc, name, at.x, at.y, newSpotHeading(at));
+      : addSpot(doc, name, pose.x, pose.y, pose.h);
     const result = addStep(withSpot, kind, index, name);
     apply(result.doc);
     selectedCardId.set(result.cardId);
@@ -366,12 +377,20 @@
           </div>
         {:else if step.kind === "pick"}
           <div class="mt-1 pl-6 text-xs">
-            {#if step.flower}
-              <span class="text-body">at the {step.flower.name}</span>
+            {#if step.flower && step.atSpot}
+              <span class="text-body"
+                >at the {step.flower.name}, comes back to this spot</span
+              >
+            {:else if step.flower}
+              <span class="text-warning"
+                >Not on the {step.flower.name}'s pick spot: the robot drives to
+                it first, and ends there. Drive to a spot on its line to save
+                the time.</span
+              >
             {:else}
               <span class="text-danger"
-                >No FLOWER in front of the robot here. Drive to a spot facing
-                one first.</span
+                >No FLOWER within 48 in: the robot won't pick here. Drive to a
+                FLOWER's pick spot first.</span
               >
             {/if}
           </div>

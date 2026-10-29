@@ -14,7 +14,14 @@ import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { relink } from "../src/lib/auto/links";
 import { motionPoseAt, simulateAuto } from "../src/lib/auto/simulate";
 import { generateAutoJava } from "../src/lib/codegen/auto/javaAuto";
-import { flowerAhead, FLOWERS, pickPose } from "../src/lib/simple/flowers";
+import {
+  atPickSpot,
+  contactPose,
+  flowerFor,
+  FLOWERS,
+  flowerLinedUp,
+  pickSpot,
+} from "../src/lib/simple/flowers";
 import {
   addSpot,
   addStep,
@@ -96,7 +103,9 @@ describe("the simple builder", () => {
       "Park at PARK",
     ]);
     expect(steps[2].flower?.name).toBe("WALL FLOWER");
+    expect(steps[2].atSpot).toBe(true);
     expect(steps[6].flower?.name).toBe("FAR FLOWER");
+    expect(steps[6].atSpot).toBe(true);
   });
 
   it("turns each drive from the heading the step before left the robot at", () => {
@@ -142,18 +151,41 @@ describe("the simple builder", () => {
     expect(ends).toEqual([180, 270, 90, 270, 270]);
   });
 
-  it("parks by 30 s, and shows each Pick flower driving in to its FLOWER and back", () => {
+  it("parks by 30 s, and shows each pick as the robot's FlowerPicker does it", () => {
     const run = preview(rQualsV2());
     expect(run.endTime).toBeLessThan(30);
-    const picks = run.motions;
-    expect(picks).toHaveLength(6);
-    const wall = pickPose(FLOWERS[0]);
-    const mid = (picks[1].t0 + picks[1].t1) / 2;
-    const at = motionPoseAt(run, mid)!;
-    expect(at.x).toBeCloseTo(wall.x, 6);
-    expect(at.y).toBeCloseTo(wall.y, 6);
-    const back = motionPoseAt(run, picks[2].t1)!;
-    expect(back.x).toBeCloseTo(26.7, 6); // spots are kept to 0.1 in
+    // Both picks start on their pick spots: stick, push, dwell, back; no approach.
+    expect(run.motions).toHaveLength(8);
+    const [stick, push, dwell, back] = run.motions;
+    const wall = FLOWERS[0];
+    const mid = (dwell.t0 + dwell.t1) / 2;
+    expect(motionPoseAt(run, mid)!.x).toBeCloseTo(contactPose(wall).x, 6);
+    expect(motionPoseAt(run, (stick.t0 + stick.t1) / 2)!.x).toBeCloseTo(
+      26.7,
+      1,
+    );
+    // It ends back on the pick spot, 24 in out, facing the FLOWER.
+    const end = motionPoseAt(run, back.t1)!;
+    expect(end.x).toBeCloseTo(pickSpot(wall).x, 6);
+    expect(end.headingDeg).toBe(180);
+    // The stick and the dwell are FlowerPicker's 0.7 s and 1.5 s; the card's 4 s in all.
+    expect(stick.t1 - stick.t0).toBeCloseTo(0.7, 6);
+    expect(dwell.t1 - dwell.t0).toBeCloseTo(1.5, 6);
+    expect(back.t1 - stick.t0).toBeCloseTo(4, 6);
+    expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
+  });
+
+  it("drives to the pick spot first when the step before left the robot elsewhere", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "NEAR", 30, 52, 180); // 5 in off the WALL FLOWER's line
+    doc = add(doc, "drive", "NEAR");
+    doc = add(doc, "pick");
+    const steps = stepsOf(doc);
+    expect(steps[1].flower?.name).toBe("WALL FLOWER");
+    expect(steps[1].atSpot).toBe(false);
+    const run = preview(doc);
+    expect(run.motions).toHaveLength(5); // approach, stick, push, dwell, back
+    expect(run.motions[4].t1 - run.motions[0].t0).toBeGreaterThan(4);
   });
 
   it("removes and moves steps, a drive taking its path with it", () => {
@@ -190,9 +222,18 @@ describe("the simple builder", () => {
     if (java.ok) expect(java.source).toContain("PickFlower");
   });
 
-  it("finds no FLOWER for a robot not lined up with one", () => {
-    expect(flowerAhead(55.17, 7.72, 90)).toBeNull();
-    expect(flowerAhead(26.71, 47.36, 90)).toBeNull();
-    expect(flowerAhead(26.71, 47.36, 180)?.name).toBe("WALL FLOWER");
+  it("picks the nearest FLOWER within 48 in, as the robot does, and knows its pick spot", () => {
+    expect(flowerFor(70, 70)).toBeNull();
+    expect(flowerFor(26.7, 47.4)?.name).toBe("WALL FLOWER");
+    expect(atPickSpot(26.7, 47.4, 180, FLOWERS[0])).toBe(true);
+    expect(atPickSpot(26.7, 47.4, 170, FLOWERS[0])).toBe(false);
+    expect(pickSpot(FLOWERS[1])).toEqual({
+      x: 47.36,
+      y: 141.5 - 2.71 - 24,
+      headingDeg: 90,
+    });
+    // A click on a FLOWER's line is put on its pick spot; one off it is not.
+    expect(flowerLinedUp(30, 50)?.name).toBe("WALL FLOWER");
+    expect(flowerLinedUp(30, 60)).toBeNull();
   });
 });

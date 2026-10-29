@@ -435,9 +435,11 @@ Hook edits to upstream files, each marked "Fork" in a comment:
 - `src/lib/simple/` — the simple builder, the left panel's first view: a start (right or left),
   then steps from a palette (Launch all, Drive to a spot, Pick flower, Park), each an ordinary
   card, so files, preview and export are unchanged. A drive's heading turns from the step before
-  to its spot's; a new spot lined up with a FLOWER faces it. Pick flower finds the FLOWER ahead
-  (`flowers.ts`, biobuzz `FlowerFieldPoints`) and the preview drives in and back during it
-  (`simulate.ts` motions). `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
+  to its spot's; a click on a FLOWER's line makes a spot on its pick spot (24 in out, square).
+  Pick flower is biobuzz's `FlowerPicker`, the robot's one pick routine (D-pad up and the
+  PickFlower card): `flowers.ts` holds its numbers, and the preview (`simulate.ts` motions) draws
+  its approach when the robot is off the pick spot, the stick, the push in to 12 in, the dwell and
+  the back-out to the pick spot, where it ends. Its card gets an 8 s timeout. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
   steps, the plan view otherwise; Advanced and ← Simple switch. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
   goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside
