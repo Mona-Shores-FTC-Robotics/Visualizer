@@ -1,4 +1,4 @@
-import type { RobotConfig, Settings } from "../types";
+import type { RobotConfig, RobotFeature, Settings } from "../types";
 
 export const ROBOT_CONFIG_KEYS = [
   "forwardVelocity",
@@ -36,5 +36,35 @@ export function normalizeRobotConfig(
           : fallback[key];
     if (chosen !== undefined) config[key] = chosen;
   }
+  // Fork: a file that records no features has none, whatever the default.
+  const features =
+    source.features !== undefined || input === fallback
+      ? normalizeFeatures(source.features)
+      : [];
+  if (features.length) config.features = features;
   return config as RobotConfig;
+}
+
+/** Fork: the well-formed features in `value`, sizes positive, numbers finite. */
+export function normalizeFeatures(value: unknown): RobotFeature[] {
+  if (!Array.isArray(value)) return [];
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  return value.flatMap((raw): RobotFeature[] => {
+    if (typeof raw !== "object" || raw === null) return [];
+    const f = raw as Record<string, unknown>;
+    const length = num(f.length);
+    const width = num(f.width);
+    if (!length || !width || length <= 0 || width <= 0) return [];
+    return [
+      {
+        name: typeof f.name === "string" ? f.name : "Feature",
+        length,
+        width,
+        forward: num(f.forward) ?? 0,
+        left: num(f.left) ?? 0,
+        collides: f.collides !== false,
+      },
+    ];
+  });
 }

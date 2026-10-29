@@ -19,6 +19,9 @@ export class Prefs {
 
   settings: Settings = $derived.by(() => ({
     ...this.value,
+    // Fork: the robot's shape is the file's alone, never left over from another file.
+    rForward: undefined,
+    features: undefined,
     ...this.#project.doc.robot,
   }));
 

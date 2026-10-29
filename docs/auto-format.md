@@ -406,8 +406,14 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   in the robot block, and the profile's cap.
 - `src/types.ts`, `src/io/robot.ts`, `src/model/collision.ts`,
   `src/view/FieldPanel.svelte`, `src/lib/components/settings/RobotSettingsSection.svelte`
-  — `rForward` in the robot block: the box (drawing and collision footprint) sits that many
-  inches ahead of the robot's centre, for a robot that reaches further forward than back.
+  — `features` in the robot block (as PathPlanner's robot features): boxes placed from the
+  robot's centre (`forward`, `left`, `length`, `width`, `name`), drawn on the robot
+  (`RobotFeatures.svelte`, and in the GIF export); those with `collides` count for collisions
+  with the drive base (`robotFootprints`). The drive base stays the plain Length x Width box
+  centred on the robot. `rForward` (the box that many inches ahead of the centre) is read and
+  honoured for older files, and its field shows only when it is set. A file that records no
+  features or no `rForward` has none; `prefs` and overlays never carry them from another file.
+  Before 2.0.0, `features` sits in the settings block like the rest of the robot.
 - `src/utils/timeCalculator.ts`, `src/sim/pose.ts`, `src/types.ts` (`TravelRun`)
   — one motion profile per exported path (see `test/chained-timing.test.ts`).
 - `src/state/project.svelte.ts` — `amend()` (pins and link paths adjust the
@@ -417,14 +423,14 @@ Hook edits to upstream files, each marked "Fork" in a comment:
 - `src/state/overlays.svelte.ts` — overlays are laid out as their Auto drives them.
 - `src/state/editor.svelte.ts` — `addPathHook`: adding a path adds its card.
 - `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies; a fresh or
-  new project starts with the team robot's box (`src/lib/auto/teamRobot.ts`).
+  new project starts with the team robot (`TEAM_ROBOT` in `src/lib/auto/teamRobot.ts`: drive base
+  16.56 x 16 centred on the wheelbase, plus the FLOWER poker as a feature that collides).
 - `src/lib/components/RobotSprite.svelte`, `RobotImagePicker.svelte`, `src/state/gifExport.svelte.ts`
-  — the default image ("/robot.png", "Our robot") is drawn from the box's numbers
-  (`teamRobotImage`), so a new Length, Width or "Box ahead of centre" redraws it;
-  `public/robot.png` stays only as the fallback. Upstream's plain box is `public/robot-plain.png`,
-  "Plain" in the robot images. `RobotSettingsSection.svelte` — "Use our robot" sets the open
-  file to `TEAM_ROBOT_BOX`. `src/io/robot.ts` — a file that records no `rForward` keeps a centred
-  box.
+  — the default image ("/robot.png", "Our robot") is our chassis drawn from the drive base's
+  numbers (`teamRobotImage`), so a new Length or Width redraws it; `public/robot.png` stays only
+  as the fallback. Upstream's plain box is `public/robot-plain.png`, "Plain" in the robot images.
+  `RobotSettingsSection.svelte` — "Use our robot" sets the open file to `TEAM_ROBOT`, and the
+  feature list.
 - `src/state/dialogs.svelte.ts` — the fork's dialogs.
 - `src/model/mirror.ts` — a mirrored project mirrors its Auto's named points.
 - `src/view/LayersPanel.svelte` — the card list in place of the path tree.

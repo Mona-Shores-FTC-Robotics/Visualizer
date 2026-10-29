@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/config/defaults";
 import type { ProjectDoc } from "../src/io";
 import {
+  featureBoxes,
   findCollisions,
   robotFootprint,
   type Collision,
@@ -432,5 +433,50 @@ describe("a box ahead of the robot's centre (fork: rForward)", () => {
     expect(robotFootprint(pose, { ...robot, rForward: 0 })).toEqual(
       robotFootprint(pose, robot),
     );
+  });
+});
+
+describe("robot features (fork)", () => {
+  const nose = {
+    name: "nose",
+    length: 2,
+    width: 2,
+    forward: 10,
+    left: 0,
+    collides: true,
+  };
+
+  it("places a feature from the robot's centre, ahead and to the left of its heading", () => {
+    const [{ corners }] = featureBoxes(
+      { x: 50, y: 50, heading: 90 },
+      { features: [{ ...nose, left: 3 }] },
+    );
+    // Facing +y, ahead is +y and left is -x.
+    expect(extent(corners).minY).toBeCloseTo(59, 6);
+    expect(extent(corners).maxY).toBeCloseTo(61, 6);
+    expect(extent(corners).minX).toBeCloseTo(46, 6);
+    expect(extent(corners).maxX).toBeCloseTo(48, 6);
+  });
+
+  // The base reaches 9 + 1 in (margin) ahead of the centre, the nose 11 + 1: driving to x = 50
+  // brings the base to 60 and the nose to 62, into a post at x 61-64.
+  const post = box("post", 61, 68, 64, 72);
+  const drive = (features: (typeof nose)[]) =>
+    collide(
+      project({ x: 20, y: 70 }, [line("a", { x: 50, y: 70 })], [post], {
+        ...ROBOT,
+        features,
+      }),
+    ).collisions;
+
+  it("counts a feature that collides", () => {
+    expect(drive([])).toHaveLength(0);
+    const hits = drive([nose]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].obstacle).toEqual({ kind: "shape", shapeId: "post" });
+  });
+
+  it("only draws a feature that doesn't", () => {
+    expect(drive([{ ...nose, collides: false }])).toHaveLength(0);
   });
 });

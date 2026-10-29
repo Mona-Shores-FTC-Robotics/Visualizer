@@ -45,7 +45,7 @@ export interface CollisionOptions {
 
 type Footprint = Pick<
   RobotConfig,
-  "rLength" | "rWidth" | "rForward" | "safetyMargin"
+  "rLength" | "rWidth" | "rForward" | "features" | "safetyMargin"
 >;
 
 const DEFAULT_ANGLE_STEP = 5;
@@ -83,6 +83,42 @@ export function robotFootprint(pose: Pose, robot: Footprint): BasePoint[] {
   );
 }
 
+/**
+ * Fork: each feature's box at `pose`, grown by `grow` on every side. Features are placed from the
+ * robot's centre (not the box's), `left` to the left of its heading.
+ */
+export function featureBoxes(
+  pose: Pose,
+  robot: Pick<RobotConfig, "features">,
+  grow = 0,
+): { name: string; collides: boolean; corners: BasePoint[] }[] {
+  const rad = (pose.heading * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return (robot.features ?? []).map((feature) => ({
+    name: feature.name,
+    collides: feature.collides,
+    corners: getRobotCorners(
+      pose.x + feature.forward * cos - feature.left * sin,
+      pose.y + feature.forward * sin + feature.left * cos,
+      pose.heading,
+      feature.length + 2 * grow,
+      feature.width + 2 * grow,
+    ),
+  }));
+}
+
+/** Fork: what can hit something at `pose`: the drive base and the features that collide. */
+export function robotFootprints(pose: Pose, robot: Footprint): BasePoint[][] {
+  const margin = Math.max(0, robot.safetyMargin || 0);
+  return [
+    robotFootprint(pose, robot),
+    ...featureBoxes(pose, robot, margin)
+      .filter((box) => box.collides)
+      .map((box) => box.corners),
+  ];
+}
+
 /** Every interval of `timeline` where the robot touches an obstacle or leaves the field. */
 export function findCollisions(
   doc: ProjectDoc,
@@ -108,11 +144,11 @@ export function findCollisions(
     if (!motion) continue;
 
     for (const sample of samplesOf(motion, angleStep)) {
-      const footprint = robotFootprint(sample.pose, doc.robot);
+      const footprint = robotFootprints(sample.pose, doc.robot);
       const before = previous?.motion === motion ? previous.sample : null;
 
       for (const target of targets) {
-        const hit = target.hits(footprint);
+        const hit = footprint.some((part) => target.hits(part));
         let current = open.get(target);
 
         if (current && (!hit || current.lineId !== motion.lineId)) {
@@ -278,7 +314,11 @@ function boundary(
 ): number {
   for (let round = 0; round < BOUNDARY_ROUNDS; round++) {
     const middle = (inside + outside) / 2;
-    if (target.hits(robotFootprint(motion.poseAt(middle), robot))) {
+    if (
+      robotFootprints(motion.poseAt(middle), robot).some((part) =>
+        target.hits(part),
+      )
+    ) {
       inside = middle;
     } else {
       outside = middle;

@@ -26,6 +26,7 @@
   import FieldMapImage from "../lib/components/FieldMapImage.svelte";
   import FieldLoadingOverlay from "../lib/components/FieldLoadingOverlay.svelte";
   import RobotSprite from "../lib/components/RobotSprite.svelte";
+  import RobotFeatures from "../lib/components/RobotFeatures.svelte";
   import MathTools from "../lib/MathTools.svelte";
   import PathStrokes from "./scene/PathStrokes.svelte";
   import PathMarkers from "./scene/PathMarkers.svelte";
@@ -503,6 +504,13 @@
             arrowId="arrowhead-{index}"
             onImageSettled={() => (loadedRobotImage = robotImageSrc)}
           />
+          <RobotFeatures
+            {pose}
+            robot={settings}
+            {pixels}
+            zIndex={20 - index}
+            opacity={1 - index * 0.15}
+          />
         {/each}
       {:else}
         {@const { xy, heading } = boxSprite(playback.robotPose)}
@@ -518,6 +526,7 @@
           arrowId="arrowhead-main"
           onImageSettled={() => (loadedRobotImage = robotImageSrc)}
         />
+        <RobotFeatures pose={playback.robotPose} robot={settings} {pixels} />
       {/if}
 
       <svg

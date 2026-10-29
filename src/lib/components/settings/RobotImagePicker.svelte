@@ -25,7 +25,7 @@
     {
       src: DEFAULT_ROBOT_IMAGE,
       label: "Our robot",
-      hint: "Mona Shores' robot, drawn to fit the Length, Width and Box ahead of centre",
+      hint: "Mona Shores' chassis, drawn to fit the drive base",
     },
     {
       src: PLAIN_IMAGE,
@@ -126,7 +126,7 @@
           {customImage.substring(0, 30)}...
         </p>
       {:else}
-        <p class="text-body">Our robot, drawn to fit its box</p>
+        <p class="text-body">Our chassis, drawn to fit the drive base</p>
       {/if}
     </div>
   </div>

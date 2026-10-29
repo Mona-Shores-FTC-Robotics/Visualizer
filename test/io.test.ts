@@ -138,3 +138,41 @@ describe("createDefaultProject", () => {
     expect(names("custom")).toEqual([]);
   });
 });
+
+describe("robot features (fork)", () => {
+  const poker = {
+    name: "FLOWER poker",
+    length: 1.5,
+    width: 1.5,
+    forward: 9.03,
+    left: 0,
+    collides: true,
+  };
+
+  it("come from the settings block of files before 2.0.0", () => {
+    const result = parse({
+      ...minimal,
+      settings: { rWidth: 16.56, rHeight: 16, features: [poker] },
+    });
+    expect(result.ok && result.doc.robot.features).toEqual([poker]);
+  });
+
+  it("are none for a file that records none, whatever the default", () => {
+    const result = parseProject(JSON.stringify({ ...minimal, robot: {} }), {
+      ...DEFAULT_ROBOT,
+      features: [poker],
+    });
+    expect(result.ok && result.doc.robot.features).toBeUndefined();
+  });
+
+  it("drop what isn't a box, and survive a save", () => {
+    const result = parse({
+      ...minimal,
+      robot: { features: [poker, { name: "bad", length: -1, width: 2 }, 7] },
+    });
+    expect(result.ok && result.doc.robot.features).toEqual([poker]);
+    if (!result.ok) return;
+    const again = parseProject(serializeProject(result.doc), DEFAULT_ROBOT);
+    expect(again.ok && again.doc.robot.features).toEqual([poker]);
+  });
+});

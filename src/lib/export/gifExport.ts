@@ -12,6 +12,7 @@ import {
   LINE_WIDTH,
 } from "../../config/defaults";
 import { robotPoseAt } from "../../sim/pose";
+import { boxCentre, featureBoxes } from "../../model/collision";
 import { exportAsGif } from "../../utils/gifExporter";
 import { pathStem } from "../../utils/filename";
 import { flattenToAtomicSegments } from "../../utils/pathTraversal";
@@ -113,13 +114,21 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
           path.lines,
           path.settings,
         );
+        const centre = boxCentre(pose, path.settings);
         drawRobot(
           context,
           robotImage,
-          { x: toX(pose.x), y: toY(pose.y) },
+          { x: toX(centre.x), y: toY(centre.y) },
           -pose.heading,
           path.settings.rLength * pixelsPerInch,
           path.settings.rWidth * pixelsPerInch,
+          path.opacity ?? 1,
+        );
+        drawFeatures(
+          context,
+          featureBoxes(pose, path.settings).map((box) =>
+            box.corners.map((c) => ({ x: toX(c.x), y: toY(c.y) })),
+          ),
           path.opacity ?? 1,
         );
       });
@@ -170,6 +179,29 @@ function drawRobot(
   context.translate(center.x, center.y);
   context.rotate((screenHeading * Math.PI) / 180);
   context.drawImage(image, -width / 2, -height / 2, width, height);
+  context.restore();
+}
+
+/** Fork: the robot's features, on top of its image (see RobotFeatures.svelte). */
+function drawFeatures(
+  context: CanvasRenderingContext2D,
+  boxes: BasePoint[][],
+  opacity: number,
+) {
+  context.save();
+  context.globalAlpha = opacity;
+  context.fillStyle = "#f2c94c";
+  context.strokeStyle = "#1d1f23";
+  context.lineWidth = 1;
+  for (const corners of boxes) {
+    context.beginPath();
+    corners.forEach((c, i) =>
+      i ? context.lineTo(c.x, c.y) : context.moveTo(c.x, c.y),
+    );
+    context.closePath();
+    context.fill();
+    context.stroke();
+  }
   context.restore();
 }
 

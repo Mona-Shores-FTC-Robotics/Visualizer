@@ -28,7 +28,7 @@ const MIGRATIONS: Migration[] = [
     up({ settings, ...rest }) {
       if (!isRecord(settings)) return rest;
       const robot = Object.fromEntries(
-        [...ROBOT_CONFIG_KEYS, ...Object.keys(RENAMED_ROBOT_KEYS)]
+        [...ROBOT_CONFIG_KEYS, "features", ...Object.keys(RENAMED_ROBOT_KEYS)]
           .filter((key) => key in settings)
           .map((key) => [RENAMED_ROBOT_KEYS[key] ?? key, settings[key]]),
       );

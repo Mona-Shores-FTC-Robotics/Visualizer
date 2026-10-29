@@ -45,7 +45,12 @@ export class Overlays {
 
   /** The current settings with an overlay's own robot applied. */
   settingsFor(overlay: Overlay): Settings {
-    return { ...this.#getSettings(), ...overlay.doc.robot };
+    return {
+      ...this.#getSettings(),
+      rForward: undefined,
+      features: undefined,
+      ...overlay.doc.robot,
+    };
   }
 
   async load(filePaths: string[]) {

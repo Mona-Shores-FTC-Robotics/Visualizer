@@ -125,6 +125,11 @@ export interface Settings {
    * collisions as a box that starts at its back and ends at its front. 0 when unset.
    */
   rForward?: number;
+  /**
+   * Fork: parts that stick out of the drive base (a nose, an intake), each a box placed from the
+   * robot's centre. Drawn on the robot; those that `collide` count for collisions too.
+   */
+  features?: RobotFeature[];
   safetyMargin: number;
   /**
    * Fork: the speed the robot's profile tops out at, inches/sec. Without it
@@ -161,6 +166,20 @@ export interface Settings {
   };
 }
 
+/**
+ * Fork: a box on the robot, in inches from the robot's centre: `forward` along its heading, `left`
+ * to its left; `length` along the heading, `width` across it.
+ */
+export interface RobotFeature {
+  name: string;
+  length: number;
+  width: number;
+  forward: number;
+  left: number;
+  /** Counts for collisions, like the drive base. */
+  collides: boolean;
+}
+
 /** The settings that change how a path drives, so they are saved with it. */
 export type RobotConfig = Pick<
   Settings,
@@ -171,6 +190,7 @@ export type RobotConfig = Pick<
   | "rLength"
   | "rWidth"
   | "rForward"
+  | "features"
   | "safetyMargin"
   | "maxVelocity"
   | "maxAcceleration"

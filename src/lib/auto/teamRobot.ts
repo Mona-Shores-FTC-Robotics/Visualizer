@@ -1,19 +1,43 @@
 import type { RobotConfig } from "../../types";
 
 /**
- * Mona Shores' robot (20245 and 19429 are the same), the box a new project starts with: 17.5 in
- * from its back plate to the tip of the FLOWER poker, 16 in wide, and the box's middle 1.03 in
- * ahead of the drive base's centre (the back plate is 7.72 in behind it). Upstream's defaults
- * stay as they are; the fork applies this on top.
+ * Mona Shores' robot (20245 and 19429 are the same), the robot a new project starts with. The drive
+ * base is a box centred on the wheelbase: its front is the body's, 8.28 in ahead of the centre, and
+ * its back is drawn as far behind (the back plate is 7.72 in behind, so half an inch generous, the
+ * safe way for collisions). The FLOWER poker is a feature: 1.5 in out of the middle of the front,
+ * its tip 9.78 in ahead, and it counts for collisions. Upstream's defaults stay as they are; the
+ * fork applies this on top.
  */
-export const TEAM_ROBOT_BOX: Pick<
+export const TEAM_ROBOT: Pick<
   RobotConfig,
-  "rLength" | "rWidth" | "rForward"
+  "rLength" | "rWidth" | "rForward" | "features"
 > = {
-  rLength: 17.5,
+  rLength: 16.56,
   rWidth: 16,
-  rForward: 1.03,
+  rForward: 0,
+  features: [
+    {
+      name: "FLOWER poker",
+      length: 1.5,
+      width: 1.5,
+      forward: 9.03,
+      left: 0,
+      collides: true,
+    },
+  ],
 };
+
+/** Whether `robot` has our robot's drive base and features. */
+export function isTeamRobot(
+  robot: Pick<RobotConfig, "rLength" | "rWidth" | "rForward" | "features">,
+): boolean {
+  return (
+    robot.rLength === TEAM_ROBOT.rLength &&
+    robot.rWidth === TEAM_ROBOT.rWidth &&
+    (robot.rForward ?? 0) === TEAM_ROBOT.rForward &&
+    JSON.stringify(robot.features ?? []) === JSON.stringify(TEAM_ROBOT.features)
+  );
+}
 
 /** The "Our robot" image: drawn from the box's numbers (`teamRobotImage`), not a fixed picture. */
 export const TEAM_ROBOT_IMAGE = "/robot.png";
@@ -27,17 +51,15 @@ export function robotImageSrc(
   return image === TEAM_ROBOT_IMAGE ? teamRobotImage(settings) : image;
 }
 
-/** Inches the FLOWER poker sticks out of the front of the body. */
-const POKER_OUT = 1.5;
-
 /**
- * A top view of our robot filling a `rLength` x `rWidth` box, front to the right (the field draws
- * the image facing right), as an SVG data URL. The parts the team measured sit where they are on
- * the robot, from the drive base's centre, which is `rForward` behind the box's middle: the turret
- * 3.33 in behind and 1.87 in right (TurretSubsystem), the Limelight 4.0 in ahead on the centre
- * line (CameraMount). The rest follows the box: wheels at the corners, intake across the front,
- * the poker out of its middle. So a new Length, Width or "Box ahead of centre" redraws the robot
- * to fit, and a part that would land outside the box is left out rather than drawn wrong.
+ * A top view of our robot's chassis filling a `rLength` x `rWidth` drive base, front to the right
+ * (the field draws the image facing right), as an SVG data URL. The parts the team measured sit
+ * where they are on the robot, from the wheelbase's centre (`rForward` behind the box's middle, in
+ * an older file): the turret 3.33 in behind and 1.87 in right (TurretSubsystem), the Limelight
+ * 4.0 in ahead on the centre line (CameraMount). The rest follows the box: wheels at the corners,
+ * intake across the front. So a new Length or Width redraws the chassis to fit, and a part that
+ * would land outside it is left out rather than drawn wrong. Features (the poker) are drawn by
+ * the field, on top.
  */
 export function teamRobotImage(
   robot: Pick<RobotConfig, "rLength" | "rWidth"> &
@@ -46,8 +68,7 @@ export function teamRobotImage(
   const L = Math.max(4, robot.rLength);
   const W = Math.max(4, robot.rWidth);
   const back = (robot.rForward ?? 0) - L / 2; // drive-base frame: +fwd ahead, +right to its right
-  const poker = back + L;
-  const front = poker - Math.min(POKER_OUT, L / 4);
+  const front = back + L;
   const half = W / 2;
   // SVG units are inches, origin at the box's back-left corner.
   const X = (fwd: number) => r(fwd - back);
@@ -95,12 +116,6 @@ export function teamRobotImage(
       add(`<rect ${box} fill="none" stroke="#9aa0a6" stroke-width="0.08"/>`);
     }),
   );
-
-  // FLOWER poker: out of the middle of the front.
-  if (poker > front)
-    add(
-      `<rect x="${X(front - 0.35)}" y="${Y(-0.75)}" width="${r(poker - front + 0.3)}" height="1.5" rx="0.3" fill="#f2c94c" stroke="#1d1f23" stroke-width="0.1"/>`,
-    );
 
   // Frame channels, front to back, just inside the wheels.
   const channel = wheelSide - wheelW / 2 - 0.7;
