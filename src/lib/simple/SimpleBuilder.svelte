@@ -4,6 +4,7 @@
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
     Flower2,
+    Sprout,
     GripVertical,
     Navigation,
     Rocket,
@@ -75,6 +76,12 @@
       hint: "The robot's D-pad up pick, straight ahead from here and back to this spot",
     },
     {
+      kind: "gather",
+      label: "Garden gather",
+      icon: Sprout,
+      hint: "The robot's D-pad down gather: into the nearest GARDEN, intake on, and back to this spot",
+    },
+    {
       kind: "park",
       label: "Park",
       icon: SquareParking,
@@ -85,6 +92,7 @@
     launch: Rocket,
     drive: Navigation,
     pick: Flower2,
+    gather: Sprout,
     park: SquareParking,
     other: null,
   };
@@ -374,6 +382,18 @@
                   )}
               />°
             </label>
+          </div>
+        {:else if step.kind === "gather"}
+          <div class="mt-1 pl-6 text-xs">
+            {#if step.garden}
+              <span class="text-body"
+                >into the {step.garden.name} and back to this spot</span
+              >
+            {:else}
+              <span class="text-danger"
+                >{step.problem}: the robot won't gather from here.</span
+              >
+            {/if}
           </div>
         {:else if step.kind === "pick"}
           <div class="mt-1 pl-6 text-xs">

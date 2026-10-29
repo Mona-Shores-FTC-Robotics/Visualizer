@@ -30,14 +30,15 @@ export const TEAM_ROBOT: Pick<
 };
 
 /**
- * What our robot can do in an Auto: biobuzz `TeamCode/auto-registry.json` on master, plus
- * PickFlower, a placeholder there until the FLOWER picker is built. The two we use most come first,
- * since they head the command list. An Auto with no list of its own starts with this one, so the
- * dropdowns are never empty; "Load the robot's commands and triggers…" in Setup still replaces it.
+ * What our robot can do in an Auto: biobuzz `TeamCode/auto-registry.json` (PickFlower and
+ * GardenGather are its FlowerPicker and GardenGather, the driver's D-pad up and down). The ones the
+ * simple builder offers come first, since they head the command list. An Auto with no list of its
+ * own starts with this one, so the dropdowns are never empty; "Load the robot's commands and
+ * triggers…" in Setup still replaces it.
  */
 export function teamRegistry(): AutoRegistry {
   return {
-    actions: ["LaunchAll", "PickFlower", "LaunchOne", "SpinUp"],
+    actions: ["LaunchAll", "PickFlower", "GardenGather", "LaunchOne", "SpinUp"],
     conditions: [
       "Empty",
       "IntakeFull",
@@ -47,7 +48,13 @@ export function teamRegistry(): AutoRegistry {
       "CameraBlind",
     ],
     events: ["Tip"],
-    typicalS: { LaunchAll: 2, PickFlower: 4, LaunchOne: 0.5, SpinUp: 0.1 },
+    typicalS: {
+      LaunchAll: 2,
+      PickFlower: 4,
+      GardenGather: 4,
+      LaunchOne: 0.5,
+      SpinUp: 0.1,
+    },
   };
 }
 

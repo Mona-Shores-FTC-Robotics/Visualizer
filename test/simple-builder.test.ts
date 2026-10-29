@@ -202,6 +202,42 @@ describe("the simple builder", () => {
     expect(preview(doc).motions).toHaveLength(0);
   });
 
+  it("gathers from the nearest GARDEN and comes back, its time from the distance", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "FIRE_G", 45, 29, 90);
+    doc = add(doc, "drive", "FIRE_G");
+    doc = add(doc, "gather");
+    const steps = stepsOf(doc);
+    expect(steps[1].label).toBe("Garden gather");
+    expect(steps[1].garden?.name).toBe("red GARDEN");
+    expect(steps[1].problem).toBeNull();
+    const run = preview(doc);
+    const gather = run.motions;
+    expect(gather.length).toBeGreaterThan(0);
+    // In to red's GARDEN, facing the audience, mid-dwell; back at FIRE_G at the end.
+    const dwell = gather[8];
+    const there = motionPoseAt(run, (dwell.t0 + dwell.t1) / 2)!;
+    expect([there.x, there.y, there.headingDeg]).toEqual([9.5, 10.96, 270]);
+    const end = motionPoseAt(run, gather[gather.length - 1].t1)!;
+    expect([end.x, end.y]).toEqual([45, 29]);
+    // In and back at the robot's speed caps, plus the 1.5 s dwell: longer from farther away.
+    const seconds = gather[gather.length - 1].t1 - gather[0].t0;
+    expect(seconds).toBeGreaterThan(1.5 + 1);
+    let far = fresh();
+    far = addSpot(far, "FAR", 70, 60, 90);
+    far = add(far, "drive", "FAR");
+    far = add(far, "gather");
+    const farRun = preview(far);
+    expect(
+      farRun.motions[farRun.motions.length - 1].t1 - farRun.motions[0].t0,
+    ).toBeGreaterThan(seconds);
+    // A gather card gets the long timeout too.
+    expect(doc.auto!.cards[1]).toMatchObject({
+      name: "GardenGather",
+      timeoutS: 8,
+    });
+  });
+
   it("removes and moves steps, a drive taking its path with it", () => {
     const doc = rQualsV2();
     const drive = doc.auto!.cards[1];

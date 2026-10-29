@@ -20,8 +20,14 @@ import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type { AutoCard, AutoSection, NamedPoint } from "../auto/types";
 import { pickFrom, type Flower } from "./flowers";
+import {
+  gardenFor,
+  MAX_RANGE_IN as GARDEN_RANGE_IN,
+  type Garden,
+} from "./garden";
 
-export type StepKind = "launch" | "pick" | "drive" | "park" | "other";
+export type StepKind =
+  "launch" | "pick" | "gather" | "drive" | "park" | "other";
 
 export interface Step {
   cardId: string;
@@ -34,7 +40,9 @@ export interface Step {
   lineId: string | null;
   /** Pick flower: the FLOWER the robot will pick (the nearest within range), or null for none. */
   flower?: Flower | null;
-  /** Pick flower: why the robot would refuse this pick, or null when it will pick. */
+  /** Garden gather: the GARDEN it goes to, or null when none is in range. */
+  garden?: Garden | null;
+  /** Pick flower, Garden gather: why the robot would refuse, or null when it will do it. */
   problem?: string | null;
 }
 
@@ -52,6 +60,7 @@ export const START_SPOT = "START";
 
 export const LAUNCH_ALL = "LaunchAll";
 export const PICK_FLOWER = "PickFlower";
+export const GARDEN_GATHER = "GardenGather";
 /**
  * A pick's card timeout, seconds: longer than a pick, as the robot code asks (a card's default
  * 5 s can cut it short).
@@ -81,6 +90,17 @@ export function stepsOf(doc: ProjectDoc): Step[] {
         label: "Pick flower",
         flower: pick.flower,
         problem: pick.ok ? null : pick.why,
+      };
+    }
+    if (card.kind === "action" && card.name === GARDEN_GATHER) {
+      // A gather ends where it started (GardenGather's contract), so `here` stays.
+      const garden = gardenFor(here.x, here.y);
+      return {
+        ...base,
+        kind: "gather",
+        label: "Garden gather",
+        garden,
+        problem: garden ? null : `No GARDEN within ${GARDEN_RANGE_IN} in`,
       };
     }
     if (card.kind === "path") {
@@ -191,14 +211,14 @@ export function addStep(
   let cardId = "";
   const next = edit(doc, (draft, auto) => {
     let card: AutoCard;
-    if (kind === "launch" || kind === "pick") {
+    if (kind === "launch" || kind === "pick" || kind === "gather") {
       card =
         kind === "launch"
           ? { id: makeCardId(), kind: "action", name: LAUNCH_ALL }
           : {
               id: makeCardId(),
               kind: "action",
-              name: PICK_FLOWER,
+              name: kind === "pick" ? PICK_FLOWER : GARDEN_GATHER,
               timeoutS: PICK_TIMEOUT_S,
             };
     } else {

@@ -16,6 +16,7 @@ import {
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import { pickFrom, pickMotions } from "../simple/flowers";
+import { gatherPlan } from "../simple/garden";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -446,7 +447,12 @@ export function simulateAuto(
       case "action": {
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
-        const busy = commandSeconds(auto, card, timing);
+        // Fork: a GardenGather takes as long as its drive in and back (lib/simple/garden.ts).
+        const gather =
+          card.name === "GardenGather"
+            ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
+            : null;
+        const busy = gather ? gather.seconds : commandSeconds(auto, card, timing);
         if (deadline && deadline.deadline < t + busy) {
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
@@ -455,6 +461,7 @@ export function simulateAuto(
         // to its FLOWER and back to where it started, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
         const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
+        if (gather) motions.push(...gather.motions);
         if (pick?.ok) {
           motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, pick.contact, t, busy));
         }
@@ -654,7 +661,7 @@ export function simulateAuto(
   };
 }
 
-/** The robot's pose during a preview motion that is not a project path (a PickFlower's), else null. */
+/** The robot's pose during a preview motion that is not a project path (a pick's or a gather's), else null. */
 export function motionPoseAt(
   preview: PreviewResult,
   time: number,
