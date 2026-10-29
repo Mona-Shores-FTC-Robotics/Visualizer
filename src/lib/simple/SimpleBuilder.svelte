@@ -4,6 +4,7 @@
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
     Flower2,
+    Hourglass,
     Lock,
     LockOpen,
     Sprout,
@@ -49,6 +50,8 @@
     startName,
     startsFrom,
     setStepSpot,
+    setWait,
+    WAIT_FOR,
     stepsOf,
     type Step,
     type StepKind,
@@ -102,6 +105,12 @@
       hint: "The robot's D-pad down gather: into the nearest GARDEN, intake on, and back to this spot",
     },
     {
+      kind: "wait",
+      label: "Wait for TIP",
+      icon: Hourglass,
+      hint: "Wait here until our HIVE tips (or a CELL is up), at most a few seconds",
+    },
+    {
       kind: "park",
       label: "Park",
       icon: SquareParking,
@@ -113,6 +122,7 @@
     drive: Navigation,
     pick: Flower2,
     gather: Sprout,
+    wait: Hourglass,
     park: SquareParking,
     other: null,
   };
@@ -599,6 +609,40 @@
           {#if step.problem}
             <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
           {/if}
+        {:else if step.kind === "wait"}
+          <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
+            <select
+              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+              aria-label="Wait for"
+              value={step.waitFor}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    waitFor: e.currentTarget.value,
+                  }),
+                )}
+            >
+              {#each WAIT_FOR as w (w.trigger)}<option value={w.trigger}
+                  >{w.label}</option
+                >{/each}
+            </select>
+            <label class="flex items-center gap-1">
+              at most
+              <input
+                class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+                type="number"
+                min="0.1"
+                step="0.5"
+                value={step.waitS}
+                onchange={(e) =>
+                  apply(
+                    setWait(doc, step.cardId, {
+                      seconds: Number(e.currentTarget.value) || 0.1,
+                    }),
+                  )}
+              />s
+            </label>
+          </div>
         {:else if step.kind === "gather"}
           <div class="mt-1 pl-6 text-xs">
             {#if step.garden}

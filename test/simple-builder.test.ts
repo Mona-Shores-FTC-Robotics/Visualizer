@@ -32,6 +32,7 @@ import {
   removeStep,
   setSpotHeading,
   setStart,
+  setWait,
   startName,
   DEFAULT_STARTS,
   startLabel,
@@ -484,5 +485,58 @@ describe("the park from each spot", () => {
     const again = parseProject(serializeProject(doc), robotConfigOf(settings));
     expect(again.ok).toBe(true);
     if (again.ok) expect(again.doc.auto!.parkFrom).toEqual(doc.auto!.parkFrom);
+  });
+});
+
+describe("the Wait for TIP step", () => {
+  it("waits for TIP at most 7 s, and can wait for a CELL instead", () => {
+    let doc = fresh();
+    doc = add(doc, "launch");
+    doc = add(doc, "wait");
+    const step = stepsOf(doc)[1];
+    expect(step).toMatchObject({
+      kind: "wait",
+      label: "Wait for TIP",
+      waitFor: "Tip",
+      waitS: 7,
+    });
+    doc = setWait(doc, step.cardId, { waitFor: "LeftCellUp", seconds: 4.5 });
+    expect(stepsOf(doc)[1]).toMatchObject({
+      label: "Wait for Left CELL up",
+      waitFor: "LeftCellUp",
+      waitS: 4.5,
+    });
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "wait.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) {
+      expect(java.source).toContain('kit.when("LeftCellUp")');
+      expect(java.source).toContain("kit.afterMs(4500)");
+    }
+  });
+
+  it("reads L-Simple's TIP wait as a Wait step", () => {
+    const doc = fresh();
+    const auto = structuredClone(doc.auto!);
+    auto.cards.push({
+      id: "tip-1",
+      kind: "firstOf",
+      label: "TIP 1 (the partner's preloads)",
+      rows: [
+        { when: ["LeftCellUp"], cards: [] },
+        { afterMs: 7000, cards: [] },
+      ],
+    });
+    expect(stepsOf({ ...doc, auto })[0]).toMatchObject({
+      kind: "wait",
+      waitFor: "LeftCellUp",
+      waitS: 7,
+    });
   });
 });

@@ -18,7 +18,12 @@ import type { AtomicPath, Path } from "../../types";
 import { createSegment } from "../../utils/normalize";
 import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
-import type { AutoCard, AutoSection, NamedPoint } from "../auto/types";
+import type {
+  AutoCard,
+  AutoSection,
+  FirstOfCard,
+  NamedPoint,
+} from "../auto/types";
 import { robotFootprints } from "../../model/collision";
 import { ownHalf, pickFrom, type Flower } from "./flowers";
 import {
@@ -28,7 +33,7 @@ import {
 } from "./garden";
 
 export type StepKind =
-  "launch" | "pick" | "gather" | "drive" | "park" | "other";
+  "launch" | "pick" | "gather" | "wait" | "drive" | "park" | "other";
 
 export interface Step {
   cardId: string;
@@ -45,7 +50,23 @@ export interface Step {
   garden?: Garden | null;
   /** Pick flower, Garden gather: why the robot would refuse, or null when it will do it. */
   problem?: string | null;
+  /** Wait: the trigger it waits for (WAIT_FOR), and the most it waits, seconds. */
+  waitFor?: string;
+  waitS?: number;
 }
+
+/**
+ * Fork: what a Wait step can wait for, the robot's triggers (biobuzz AutoRegistration). Tip: our
+ * HIVE has tipped since the wait began. LeftCellUp, RightCellUp: that CELL of our HIVE is up, as
+ * our drive team sees it (already up when the wait starts ends it at once).
+ */
+export const WAIT_FOR: readonly { trigger: string; label: string }[] = [
+  { trigger: "Tip", label: "TIP" },
+  { trigger: "LeftCellUp", label: "Left CELL up" },
+  { trigger: "RightCellUp", label: "Right CELL up" },
+];
+/** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
+export const WAIT_DEFAULT_S = 7;
 
 /**
  * Fork: the starts are team spots named START_… (lib/team/teamSpots.ts): the builder's start
@@ -133,6 +154,21 @@ export function stepsOf(doc: ProjectDoc): Step[] {
           ? null
           : `No GARDEN on our side of the centre line within ${GARDEN_RANGE_IN} in`,
       };
+    }
+    if (card.kind === "firstOf") {
+      const wait = waitOf(card);
+      if (wait) {
+        const label =
+          WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ??
+          wait.trigger;
+        return {
+          ...base,
+          kind: "wait",
+          label: `Wait for ${label}`,
+          waitFor: wait.trigger,
+          waitS: wait.seconds,
+        };
+      }
     }
     if (card.kind === "path") {
       const spot = spotOf(auto, doc.lines, card.lineId);
@@ -280,7 +316,17 @@ export function addStep(
   let cardId = "";
   const next = edit(doc, (draft, auto) => {
     let card: AutoCard;
-    if (kind === "launch" || kind === "pick" || kind === "gather") {
+    if (kind === "wait") {
+      card = {
+        id: makeCardId(),
+        kind: "firstOf",
+        label: "Wait for TIP",
+        rows: [
+          { when: ["Tip"], cards: [] },
+          { afterMs: WAIT_DEFAULT_S * 1000, cards: [] },
+        ],
+      };
+    } else if (kind === "launch" || kind === "pick" || kind === "gather") {
       card =
         kind === "launch"
           ? { id: makeCardId(), kind: "action", name: LAUNCH_ALL }
@@ -363,6 +409,25 @@ export function moveStep(
     const [card] = auto.cards.splice(from, 1);
     const to = index > from ? index - 1 : index;
     auto.cards.splice(Math.max(0, Math.min(to, auto.cards.length)), 0, card);
+  });
+}
+
+/** Changes what a Wait step waits for, or the most it waits (seconds, at least 0.1). */
+export function setWait(
+  doc: ProjectDoc,
+  cardId: string,
+  change: { waitFor?: string; seconds?: number },
+): ProjectDoc {
+  return edit(doc, (_draft, auto) => {
+    const card = auto.cards.find((c) => c.id === cardId);
+    if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    for (const row of card.rows) {
+      if ("when" in row && change.waitFor) row.when = [change.waitFor];
+      if ("afterMs" in row && change.seconds !== undefined)
+        row.afterMs = Math.round(Math.max(0.1, change.seconds) * 10) * 100;
+    }
+    const wait = waitOf(card)!;
+    card.label = `Wait for ${WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ?? wait.trigger}`;
   });
 }
 
@@ -455,6 +520,24 @@ function spotOf(
   while (node && node.kind === "compound")
     node = node.segments[node.segments.length - 1];
   return node ? (auto.pathEnds[node.id] ?? null) : null;
+}
+
+/**
+ * A Wait step's trigger and limit, when `card` is one: a trigger row and a time row, nothing run
+ * alongside and nothing after either. Any other wait is an advanced step.
+ */
+function waitOf(
+  card: FirstOfCard,
+): { trigger: string; seconds: number } | null {
+  if (card.alongside || card.ladder || card.rows.length !== 2) return null;
+  if (card.rows.some((row) => row.cards.length)) return null;
+  const when = card.rows.find((row) => "when" in row) as
+    { when: string[] } | undefined;
+  const time = card.rows.find((row) => "afterMs" in row) as
+    { afterMs: number } | undefined;
+  if (!when || !time || when.when.length !== 1) return null;
+  if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
+  return { trigger: when.when[0], seconds: time.afterMs / 1000 };
 }
 
 function clearParks(cards: AutoCard[]): void {
