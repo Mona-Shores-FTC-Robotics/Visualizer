@@ -30,7 +30,10 @@ export function normalizeRobotConfig(
     const chosen =
       typeof value === "number" && Number.isFinite(value)
         ? value
-        : fallback[key];
+        : // Fork: a file that records no box offset has a centred box, whatever the default.
+          key === "rForward" && input !== fallback
+          ? undefined
+          : fallback[key];
     if (chosen !== undefined) config[key] = chosen;
   }
   return config as RobotConfig;

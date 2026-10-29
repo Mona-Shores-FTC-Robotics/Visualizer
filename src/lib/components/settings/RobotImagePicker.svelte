@@ -14,14 +14,20 @@
   let { settings = $bindable() }: Props = $props();
 
   const DEFAULT_ROBOT_IMAGE = "/robot.png";
+  const PLAIN_IMAGE = "/robot-plain.png";
   const POTATO_IMAGE = "/JefferyThePotato.png";
   const DUCK_IMAGE = "/MecanumDuck.png";
 
   const presets = [
     {
       src: DEFAULT_ROBOT_IMAGE,
-      label: "Default",
-      hint: "Use the default robot image",
+      label: "Our robot",
+      hint: "Mona Shores' robot, for Length 17.5, Width 16, Box ahead of centre 1.03",
+    },
+    {
+      src: PLAIN_IMAGE,
+      label: "Plain",
+      hint: "A plain box",
     },
     {
       src: POTATO_IMAGE,

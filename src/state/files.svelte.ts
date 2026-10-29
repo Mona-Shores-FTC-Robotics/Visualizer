@@ -1,4 +1,5 @@
 import { fromStore, get } from "svelte/store";
+import { TEAM_ROBOT_BOX } from "../lib/auto/teamRobot";
 import { debounce } from "lodash";
 import {
   createDefaultProject,
@@ -79,7 +80,8 @@ export class ProjectFiles {
     }
     this.open(
       createDefaultProject(
-        this.#project.doc.robot,
+        // Fork: the current robot's driving, with the team robot's box.
+        { ...this.#project.doc.robot, ...TEAM_ROBOT_BOX },
         this.#prefs.settings.fieldMap,
       ),
     );
@@ -257,7 +259,8 @@ export class ProjectFiles {
     } else {
       this.#project.load({
         ...this.#project.doc,
-        robot: this.#prefs.fallbackRobot,
+        // Fork: a fresh project is drawn for the team's robot.
+        robot: { ...this.#prefs.fallbackRobot, ...TEAM_ROBOT_BOX },
       });
     }
     this.#started = true;

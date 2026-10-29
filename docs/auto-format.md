@@ -416,7 +416,11 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   preview; overlays with an Auto play theirs.
 - `src/state/overlays.svelte.ts` — overlays are laid out as their Auto drives them.
 - `src/state/editor.svelte.ts` — `addPathHook`: adding a path adds its card.
-- `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies.
+- `src/state/files.svelte.ts` — `holdAutosave` and `suggestedName` for shared copies; a fresh or
+  new project starts with the team robot's box (`src/lib/auto/teamRobot.ts`).
+- `public/robot.png` — the team's robot, drawn for that box (upstream's plain box is
+  `public/robot-plain.png`, "Plain" in the robot images); `src/io/robot.ts` — a file that records
+  no `rForward` keeps a centred box.
 - `src/state/dialogs.svelte.ts` — the fork's dialogs.
 - `src/model/mirror.ts` — a mirrored project mirrors its Auto's named points.
 - `src/view/LayersPanel.svelte` — the card list in place of the path tree.
