@@ -13,6 +13,8 @@
   import ShareLinkDialog from "../lib/components/ShareLinkDialog.svelte";
   import SaveToGithubDialog from "../lib/sim/SaveToGithubDialog.svelte";
   import SharedCopyBanner from "../lib/components/SharedCopyBanner.svelte";
+  import SaveSpotsDialog from "../lib/team/SaveSpotsDialog.svelte";
+  import { saveSpotsOpen } from "../lib/team/spotsStore";
 
   interface Props {
     dialogs: Dialogs;
@@ -25,6 +27,11 @@
 </script>
 
 <TeamAutosDialog bind:isOpen={dialogs.teamAutos} />
+
+<SaveSpotsDialog
+  isOpen={$saveSpotsOpen}
+  onClose={() => saveSpotsOpen.set(false)}
+/>
 
 <ShareLinkDialog
   url={dialogs.shareLink}

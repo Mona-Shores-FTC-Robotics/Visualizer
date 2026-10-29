@@ -13,6 +13,7 @@
   import IconButton from "../../lib/components/ui/IconButton.svelte";
   import { fieldClass, labelClass } from "../../lib/components/ui/styles";
   import HeadingControls from "../../lib/components/HeadingControls.svelte";
+  import SpotLink from "../../lib/team/SpotLink.svelte";
 
   interface Props {
     line: AtomicPath;
@@ -212,6 +213,9 @@
       {/each}
     </div>
   </div>
+
+  <!-- Fork: the end's link to the team's spots. -->
+  <SpotLink lineId={line.id} />
 
   <div class="flex flex-col gap-2">
     <span class={labelClass}>Heading</span>

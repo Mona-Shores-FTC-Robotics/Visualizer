@@ -33,6 +33,8 @@ import {
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
+import { applyTeamSpots, samePose, type TeamSpots } from "../lib/team/teamSpots";
+import { editSpot, teamSpots, unlockedSpots } from "../lib/team/spotsStore";
 import { ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
@@ -74,6 +76,9 @@ export class AutoState {
   #timingMode = fromStore(timingMode);
   #timingValues = fromStore(timingValues);
   #selection = fromStore(selectedCardId);
+  /** Fork: the team's spots and which are unlocked (lib/team/spotsStore.ts). */
+  #teamSpots = fromStore(teamSpots);
+  #unlocked = fromStore(unlockedSpots);
   /** The pins as they last held; see `resolvePins`. */
   #pinned: PinState | null = null;
 
@@ -289,6 +294,28 @@ export class AutoState {
       });
     });
 
+    // Fork: an Auto's team spots (lib/team/teamSpots.ts). A locked one is the team's: its copy
+    // here follows the list. An unlocked one is being moved here: the list follows the copy, as
+    // a change to save.
+    $effect.pre(() => {
+      const doc = project.doc;
+      const spots = this.#teamSpots.current;
+      const unlocked = this.#unlocked.current;
+      untrack(() => {
+        const auto = doc.auto;
+        if (!auto?.teamSpots?.length) return;
+        const locked: TeamSpots = {};
+        for (const name of auto.teamSpots) {
+          const copy = auto.points[name];
+          if (unlocked.has(name)) {
+            if (copy && !samePose(copy, spots[name])) editSpot(name, copy);
+          } else if (spots[name]) locked[name] = spots[name];
+        }
+        const next = applyTeamSpots(doc, locked);
+        if (next !== doc) project.amend(() => next);
+      });
+    });
+
     // Fork: then each late spot of a simple Auto gets its park path (lib/simple/parkFrom.ts).
     $effect.pre(() => {
       const doc = project.doc;
@@ -321,7 +348,12 @@ export class AutoState {
 
   /** The document with its pins holding and its link paths laid out. */
   #settle(doc: ProjectDoc, settings: Settings): ProjectDoc {
-    const result = settleDoc(doc, settings, this.#pinned);
+    // A locked team spot never follows a dragged end: the end goes back to it.
+    const unlocked = this.#unlocked.current;
+    const locked = idSet(
+      (doc.auto?.teamSpots ?? []).filter((name) => !unlocked.has(name)),
+    );
+    const result = settleDoc(doc, settings, this.#pinned, locked);
     this.#pinned = result.pinned;
     return result.doc;
   }

@@ -100,6 +100,23 @@ export async function branchHead(
   return ref.object.sha;
 }
 
+/** Fork: makes a new branch at `commit` (team spots save to their own branch, then a PR). */
+export async function createBranch(
+  token: string,
+  branch: string,
+  commit: string,
+): Promise<void> {
+  await json(token, repo("/git/refs"), {
+    method: "POST",
+    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commit }),
+  });
+}
+
+/** Fork: where GitHub opens a pull request from `branch` into master. */
+export function pullRequestUrl(branch: string, title: string): string {
+  return `https://github.com/${GIT_REPO}/compare/master...${encodePath(branch)}?expand=1&title=${encodeURIComponent(title)}`;
+}
+
 /** Every file path in a commit. */
 export async function listFiles(
   token: string | null,

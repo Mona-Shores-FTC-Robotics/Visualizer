@@ -20,6 +20,7 @@ import {
   parseTeamSpots,
   reexportWithSpots,
   serializeTeamSpots,
+  teamSpotSave,
   unlinkSpot,
   type TeamSpots,
 } from "../src/lib/team/teamSpots";
@@ -132,5 +133,46 @@ describe("team spots", () => {
     expect(out.java).toContain("p.of(20, 90, 270)");
     expect(out.java).not.toContain("p.of(14, 100, 270)");
     expect(out.javaFileName).toBe("XAuto.java");
+  });
+});
+
+describe("saving team spots", () => {
+  it("writes spots.json and re-exports only the Autos that use a changed spot", async () => {
+    const uses = serializeProject(linked(), { pretty: true });
+    const other = serializeProject(
+      blankAuto(
+        createDefaultProject(robotConfigOf(settings), settings.fieldMap),
+      ),
+      { pretty: true },
+    );
+    const repo: Record<string, string> = {
+      "TeamCode/autos/spots.json": serializeTeamSpots(TEAM),
+      "TeamCode/autos/uses-park.pp": uses,
+      "TeamCode/autos/other.pp": other,
+      "TeamCode/autos/README.md": "#",
+    };
+    const plan = await teamSpotSave(
+      async (path) => repo[path] ?? null,
+      Object.keys(repo),
+      { PARK: [20, 90, 270] },
+    );
+    expect(plan.ok, JSON.stringify(plan)).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.autos).toEqual(["uses-park.pp"]);
+    expect(Object.keys(plan.files).sort()).toEqual([
+      "TeamCode/autos/spots.json",
+      "TeamCode/autos/uses-park.pp",
+      "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/opmodes/auto/generated/UsesParkAuto.java",
+    ]);
+    const spots = parseTeamSpots(plan.files["TeamCode/autos/spots.json"]);
+    expect(spots.ok && spots.spots.PARK).toEqual([20, 90, 270]);
+    expect(spots.ok && spots.spots.LAUNCH_LEFT).toEqual(TEAM.LAUNCH_LEFT);
+  });
+
+  it("starts the list when biobuzz has none", async () => {
+    const plan = await teamSpotSave(async () => null, [], { PARK: [1, 2, 3] });
+    expect(plan.ok && Object.keys(plan.files)).toEqual([
+      "TeamCode/autos/spots.json",
+    ]);
   });
 });

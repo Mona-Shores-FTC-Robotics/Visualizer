@@ -24,11 +24,14 @@ import type { NamedPoint } from "../auto/types";
 import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { withSpotParks } from "../simple/parkFrom";
 import { isSimple, layHeadings } from "../simple/steps";
+import { GENERATED_DIRS } from "../sim/biobuzz";
 import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
 
 /** The file, in the team's Autos folder (TeamCode/autos). */
 export const SPOTS_FILE = "spots.json";
 export const SPOTS_PATH = `TeamCode/autos/${SPOTS_FILE}`;
+/** Where the robot's generated Autos live (lib/sim/biobuzz.ts GENERATED_DIRS). */
+const GENERATED_DIR = GENERATED_DIRS[0];
 
 /** Spot name → [x, y, heading°]. */
 export type TeamSpots = Record<string, NamedPoint>;
@@ -232,4 +235,52 @@ export function reexportWithSpots(
     java: java.source,
     javaFileName: java.fileName,
   };
+}
+
+/**
+ * Every file saving `edits` writes: spots.json with the changes, and each Auto in TeamCode/autos
+ * that links a changed spot, re-exported (.pp and Java). `read` reads a file at the commit the
+ * save starts from; `files` lists that commit's paths.
+ */
+export async function teamSpotSave(
+  read: (path: string) => Promise<string | null>,
+  files: string[],
+  edits: TeamSpots,
+): Promise<
+  | { ok: true; files: Record<string, string>; autos: string[] }
+  | { ok: false; errors: string[] }
+> {
+  const savedText = await read(SPOTS_PATH);
+  let saved: TeamSpots = {};
+  if (savedText !== null) {
+    const parsed = parseTeamSpots(savedText);
+    if (!parsed.ok) return { ok: false, errors: [parsed.problem] };
+    saved = parsed.spots;
+  }
+  const spots = { ...saved, ...edits };
+  const names = changedSpots(saved, spots);
+  const out: Record<string, string> = {
+    [SPOTS_PATH]: serializeTeamSpots(spots),
+  };
+  const autos: string[] = [];
+  const errors: string[] = [];
+  const ppPaths = files.filter(
+    (path) => path.startsWith("TeamCode/autos/") && path.endsWith(".pp"),
+  );
+  for (const path of ppPaths) {
+    const text = await read(path);
+    if (text === null) continue;
+    const result = reexportWithSpots(text, path, spots, names);
+    if (!result) continue;
+    if ("error" in result) {
+      errors.push(result.error);
+      continue;
+    }
+    out[path] = result.ppText;
+    out[`${GENERATED_DIR}/${result.javaFileName}`] = result.java;
+    autos.push(path.split("/").pop()!);
+  }
+  return errors.length
+    ? { ok: false, errors }
+    : { ok: true, files: out, autos };
 }

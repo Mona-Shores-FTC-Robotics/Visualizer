@@ -4,6 +4,8 @@
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
     Flower2,
+    Lock,
+    LockOpen,
     Sprout,
     GripVertical,
     Navigation,
@@ -21,6 +23,16 @@
   import { flowerLinedUp, pickSpot } from "./flowers";
   import { spotParks } from "./parkFrom";
   import { useEditor } from "../../state/editor.svelte";
+  import { linkSpot } from "../team/teamSpots";
+  import {
+    discardSpotEdits,
+    editSpot,
+    saveSpotsOpen,
+    setSpotUnlocked,
+    spotEdits,
+    teamSpots,
+    unlockedSpots,
+  } from "../team/spotsStore";
   import {
     addSpot,
     addStep,
@@ -108,9 +120,21 @@
   /** Fork: the spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
   let parks = $derived(spotParks(doc, auto.catalog));
   let side = $derived(startSide(doc));
-  let spots = $derived(
-    Object.keys(doc.auto?.points ?? {}).filter((name) => name !== START_SPOT),
+  /** Fork: spots linked to the team's list (lib/team/teamSpots.ts). */
+  let linkedSpots = $derived(new Set(doc.auto?.teamSpots ?? []));
+  /** This Auto's own spots. */
+  let ownSpots = $derived(
+    Object.keys(doc.auto?.points ?? {})
+      .filter((name) => name !== START_SPOT && !linkedSpots.has(name))
+      .sort(),
   );
+  /** The team's spots, and any this Auto links that the list does not have (yet). */
+  let teamNames = $derived(
+    [...new Set([...Object.keys($teamSpots), ...linkedSpots])]
+      .filter((name) => name !== START_SPOT && !ownSpots.includes(name))
+      .sort(),
+  );
+  let spots = $derived([...ownSpots, ...teamNames]);
   let selectedId = $derived(parseSelection($selectedCardId).cardId);
   let end = $derived(auto.preview?.endTime ?? 0);
   let worst = $derived(auto.worst?.total ?? end);
@@ -137,6 +161,9 @@
     at: { x: number; y: number } | null;
     name: string;
   } | null>(null);
+
+  /** Fork: a spot named from a field click is also saved as a team spot. */
+  let asTeamSpot = $state(false);
 
   /** Where new steps go: after the selected step, else at the end. */
   function insertIndex(): number {
@@ -165,8 +192,16 @@
     selectedCardId.set(result.cardId);
   }
 
+  /** The document with the team spot `name` linked in, if it is one and is not yet. */
+  function withTeamSpot(base: typeof doc, name: string): typeof doc {
+    const pose = $teamSpots[name];
+    return pose && !base.auto?.points[name]
+      ? linkSpot(base, name, pose)
+      : base;
+  }
+
   function addAt(kind: AddKind, index: number, spot: string) {
-    const result = addStep(doc, kind, index, spot);
+    const result = addStep(withTeamSpot(doc, spot), kind, index, spot);
     apply(result.doc);
     selectedCardId.set(result.cardId);
     stopPicking();
@@ -224,9 +259,16 @@
     const name = cleanSpotName(pending.name) || freeSpotName(doc.auto);
     const { kind, index, at } = pending;
     const pose = newSpotPose(at);
-    const withSpot = doc.auto.points[name]
-      ? doc
-      : addSpot(doc, name, pose.x, pose.y, pose.h);
+    let withSpot = withTeamSpot(doc, name);
+    if (!withSpot.auto?.points[name]) {
+      withSpot = addSpot(withSpot, name, pose.x, pose.y, pose.h);
+      // Fork: saved as a team spot, for every Auto (lib/team/teamSpots.ts).
+      if (asTeamSpot) {
+        const point = withSpot.auto!.points[name];
+        editSpot(name, point);
+        withSpot = linkSpot(withSpot, name, point);
+      }
+    }
     const result = addStep(withSpot, kind, index, name);
     apply(result.doc);
     selectedCardId.set(result.cardId);
@@ -310,6 +352,19 @@
 
 </script>
 
+{#snippet spotOptions()}
+  {#if ownSpots.length}
+    <optgroup label="This Auto's spots">
+      {#each ownSpots as name (name)}<option value={name}>{name}</option>{/each}
+    </optgroup>
+  {/if}
+  {#if teamNames.length}
+    <optgroup label="Team spots">
+      {#each teamNames as name (name)}<option value={name}>{name}</option>{/each}
+    </optgroup>
+  {/if}
+{/snippet}
+
 <div class="simple flex flex-col gap-3 px-1 pb-2 text-sm">
   <div class="flex items-baseline justify-between">
     <span class="font-semibold text-heading">Auto</span>
@@ -373,6 +428,28 @@
     {/each}
   </div>
 
+  {#if Object.keys($spotEdits).length}
+    <div class="simple-pending flex flex-col gap-1.5" role="status">
+      <p class="text-xs text-heading">
+        Team spots changed here, not saved:
+        <b class="font-mono">{Object.keys($spotEdits).sort().join(", ")}</b>
+      </p>
+      <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          class="simple-tile flex-1 justify-center"
+          onclick={() => saveSpotsOpen.set(true)}>Save team spots…</button
+        >
+        <button
+          type="button"
+          class="text-xs text-body underline"
+          onclick={() =>
+            confirm("Put the changed team spots back as the team has them?") &&
+            discardSpotEdits()}>Undo changes</button
+        >
+      </div>
+    </div>
+  {/if}
   <ol class="flex flex-col gap-1" aria-label="Steps">
     {#each steps as step, index (step.cardId)}
       {@const Icon = ICONS[step.kind]}
@@ -440,12 +517,29 @@
               class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
               aria-label="Spot"
               value={step.spot}
-              onchange={(e) =>
-                apply(setStepSpot(doc, step.cardId, e.currentTarget.value))}
+              onchange={(e) => {
+                const name = e.currentTarget.value;
+                apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
+              }}
             >
-              {#each spots as name (name)}<option value={name}>{name}</option
-                >{/each}
+              {@render spotOptions()}
             </select>
+            {#if linkedSpots.has(step.spot)}
+              {@const open = $unlockedSpots.has(step.spot)}
+              <button
+                type="button"
+                class={["simple-icon", open && "!text-warning"]}
+                title={open
+                  ? "Unlocked: dragging its end on the field moves this team spot. Lock it again"
+                  : "A team spot, locked. Unlock it to move it (every Auto that uses it moves with it once saved)"}
+                aria-label={open ? "Lock team spot" : "Unlock team spot"}
+                onclick={() => setSpotUnlocked(step.spot!, !open)}
+              >
+                {#if open}<LockOpen class="size-3.5" />{:else}<Lock
+                    class="size-3.5"
+                  />{/if}
+              </button>
+            {/if}
             <label class="flex items-center gap-1">
               facing
               <input
@@ -453,6 +547,8 @@
                 type="number"
                 step="5"
                 value={point[2] ?? 0}
+                disabled={linkedSpots.has(step.spot) &&
+                  !$unlockedSpots.has(step.spot)}
                 onchange={(e) =>
                   apply(
                     setSpotHeading(
@@ -553,8 +649,7 @@
               addAt(pending.kind, pending.index, e.currentTarget.value)}
           >
             <option value="">choose a spot…</option>
-            {#each spots as name (name)}<option value={name}>{name}</option
-              >{/each}
+            {@render spotOptions()}
           </select>
         {/if}
       {:else}
@@ -577,6 +672,10 @@
           />
           <button type="submit" class="simple-tile !min-h-0 !py-1">Add</button>
         </form>
+        <label class="mt-1 flex items-center gap-1.5 text-xs text-body">
+          <input type="checkbox" bind:checked={asTeamSpot} />
+          Also a team spot, for every Auto
+        </label>
       {/if}
       <button
         type="button"

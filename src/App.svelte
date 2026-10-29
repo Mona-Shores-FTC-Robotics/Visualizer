@@ -29,6 +29,7 @@
   import { AutoState, provideAuto } from "./state/auto.svelte";
   import { SharedLinks, provideLinks } from "./state/links.svelte";
   import { layOutDoc } from "./lib/auto/links";
+  import { refreshTeamSpots } from "./lib/team/spotsStore";
 
   const project = new ProjectStore(
     createDefaultProject(
@@ -109,6 +110,8 @@
   });
 
   onMount(() => links.start());
+  // Fork: the team's spots, from biobuzz master (lib/team/spotsStore.ts).
+  onMount(() => void refreshTeamSpots());
 
   onMount(() => {
     const updateMobile = () => (isMobileBlocked = isMobileDevice());
