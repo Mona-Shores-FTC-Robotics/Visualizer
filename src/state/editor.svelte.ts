@@ -249,13 +249,27 @@ export class EditorState {
     );
   }
 
-  /** Append a control point at `at`, or somewhere mid-field. */
+  /**
+   * Append a control point at `at`. Fork: else halfway along the path's last stretch (from its
+   * last control point, or its start, to its end), so it lands on the path, ready to drag,
+   * rather than somewhere random on the field.
+   */
   addControlPoint(at?: BasePoint) {
     const target = this.#targetSegment();
     if (!target) return;
+    const { startPoint } = this.#project.doc;
+    const from =
+      target.controlPoints.at(-1) ??
+      segmentStartById(startPoint, this.#lines, target.id);
     const controlPoints = [
       ...target.controlPoints,
-      at ?? { x: randomFieldCoordinate(), y: randomFieldCoordinate() },
+      at ??
+        (from
+          ? {
+              x: Math.round(((from.x + target.endPoint.x) / 2) * 10) / 10,
+              y: Math.round(((from.y + target.endPoint.y) / 2) * 10) / 10,
+            }
+          : { x: randomFieldCoordinate(), y: randomFieldCoordinate() }),
     ];
     this.#project.apply(
       updateSegment(target.id, (segment) => ({ ...segment, controlPoints })),

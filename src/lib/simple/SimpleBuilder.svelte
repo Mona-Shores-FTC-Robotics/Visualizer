@@ -237,7 +237,7 @@
     selectedCardId.set(selectedId === step.cardId ? null : step.cardId);
   }
 
-  // --- a spot's park: its P shows it, a second press (or Edit) puts out its control points --------
+  // --- a spot's park: its P shows it with its control points out; a second press, or Done, puts it back
 
   const editor = useEditor();
   /** The drive card whose park is shown. */
@@ -249,17 +249,11 @@
   function togglePark(cardId: string) {
     const park = parks.get(cardId);
     if (!park) return;
-    if (auto.focusedPark !== park.lineId) {
-      auto.focusedPark = park.lineId;
-      auto.editingPark = false;
-    } else if (!auto.editingPark) editPark();
-    else closePark();
-  }
-
-  function editPark() {
-    if (!auto.focusedPark) return;
+    if (auto.focusedPark === park.lineId) return closePark();
+    // Shown and out for editing at once: its control point handles show, and the Path panel edits it.
+    auto.focusedPark = park.lineId;
     auto.editingPark = true;
-    editor.select([auto.focusedPark]);
+    editor.select([park.lineId]);
   }
 
   function closePark() {
@@ -426,7 +420,7 @@
                 "simple-park",
                 focusedCard === step.cardId && "simple-park--on",
               ]}
-              title="Where the robot parks from this spot if time runs short. Show its park path"
+              title="Where the robot parks from this spot if time runs short. Show and edit its park path"
               aria-label={`Park path from ${step.spot ?? "this spot"}`}
               aria-pressed={focusedCard === step.cardId}
               onclick={() => togglePark(step.cardId)}>P</button
@@ -482,17 +476,12 @@
                 behind and time runs short here, it parks along this path{by !==
                 null
                   ? `, leaving by ${fmt(by)} s at the latest`
-                  : ""}.</span
+                  : ""}. To bend it, add a control point in the Path panel and
+                drag it on the field.</span
               >
-              {#if auto.editingPark}
-                <button type="button" class="simple-tile" onclick={closePark}
-                  >Done</button
-                >
-              {:else}
-                <button type="button" class="simple-tile" onclick={editPark}
-                  >Edit park path</button
-                >
-              {/if}
+              <button type="button" class="simple-tile" onclick={closePark}
+                >Done</button
+              >
             </div>
           {/if}
           {#if step.problem}
