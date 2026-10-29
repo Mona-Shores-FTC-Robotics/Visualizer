@@ -2,6 +2,7 @@
   import type { BasePoint, Settings } from "../types";
   import { FIELD_SIZE, LINE_WIDTH, type ColorScheme } from "../config/defaults";
   import { gridSize, showGrid, snapToGrid } from "../stores";
+  import { fieldHover } from "../lib/auto/store";
   import {
     pointAt,
     setShapes,
@@ -46,7 +47,7 @@
   import { useAuto } from "../state/auto.svelte";
   import AutoFieldOverlay from "../lib/auto/components/AutoFieldOverlay.svelte";
   import { ladderInfo } from "../lib/ladder/compile";
-  import FieldAxes from "../lib/components/FieldAxes.svelte";
+  import FieldRuler from "../lib/components/FieldRuler.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
   import { linkSegmentIds } from "../lib/auto/links";
   import { createViewport } from "./viewport";
@@ -89,7 +90,8 @@
   let stageWidth = $state(FIELD_SIZE);
   let stageHeight = $state(FIELD_SIZE);
   $effect.pre(() => {
-    pixels = Math.max(1, Math.floor(Math.min(stageWidth, stageHeight) - 16));
+    // Fork: room round the field for the ruler (FieldRuler) outside its left and bottom edges.
+    pixels = Math.max(1, Math.floor(Math.min(stageWidth, stageHeight) - 48));
   });
   let viewport = $derived(createViewport(pixels));
   let { x, y } = $derived(viewport);
@@ -360,6 +362,7 @@
 
   function onPointerMove(event: PointerEvent) {
     const point = fieldPoint(event);
+    fieldHover.set(point);
     if (editor.tool === "coordinate") {
       editor.coordinateHover = snapped(point);
     } else if (editor.tool === "pen" && editor.penStroke.length > 0) {
@@ -410,6 +413,8 @@
     <div class="absolute top-2 left-2 z-50"><ToolRail /></div>
     <div class="absolute top-2 right-2 z-50"><FieldViewToggles /></div>
 
+    <div class="relative">
+    <FieldRuler {x} {y} {pixels} />
     <div
       bind:this={element}
       class="relative overflow-clip rounded-lg bg-base select-none"
@@ -443,7 +448,6 @@
         </g>
       </svg>
 
-      <FieldAxes {x} {y} />
       {#if autoActive && auto.auto && auto.catalog}
         <AutoFieldOverlay
           auto={auto.auto}
@@ -543,7 +547,10 @@
         onpointermove={onPointerMove}
         onpointerup={onPointerUp}
         onlostpointercapture={onPointerUp}
-        onpointerleave={() => (editor.coordinateHover = null)}
+        onpointerleave={() => {
+          editor.coordinateHover = null;
+          fieldHover.set(null);
+        }}
         ondblclick={onDoubleClick}
       >
         <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
@@ -687,6 +694,7 @@
       {#if !assetsReady}
         <FieldLoadingOverlay />
       {/if}
+    </div>
     </div>
   </div>
 

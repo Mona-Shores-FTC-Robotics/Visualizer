@@ -5,8 +5,8 @@
   import type { PathCatalog } from "../geometry";
   import type { PreviewResult } from "../simulate";
   import { allCards } from "../tree";
-  import type { AutoCard, AutoSection, PathCard } from "../types";
-  import { parseSelection, selectedCardId } from "../store";
+  import type { AutoCard, AutoSection, NamedPoint, PathCard } from "../types";
+  import { fieldHover, parseSelection, selectedCardId } from "../store";
   import { cardColors } from "./ui";
   import { isUsed, pointUses } from "../pins";
 
@@ -55,6 +55,17 @@
   let usedLineIds = $derived(new Set(pathCards.map((card) => card.lineId)));
   let unit = $derived(size / FIELD_SIZE);
   let uses = $derived(pointUses(auto));
+  /** Fork: the spot the selected drive ends on; its name stays shown. */
+  let selectedSpot = $derived.by(() => {
+    const card = pathCards.find((c) => c.id === selectedId);
+    return card ? (auto.pathEnds[card.lineId] ?? null) : null;
+  });
+  /** Fork: a spot's name shows only near the mouse, or for the selected drive's spot. */
+  const HOVER_IN = 4;
+  const nameShown = (name: string, point: NamedPoint) =>
+    name === selectedSpot ||
+    (!!$fieldHover &&
+      Math.hypot($fieldHover.x - point[0], $fieldHover.y - point[1]) <= HOVER_IN);
 
   const polyline = (points: BasePoint[]) =>
     points.map((p) => `${x(p.x).toFixed(1)},${y(p.y).toFixed(1)}`).join(" ");
@@ -181,7 +192,7 @@
       stroke={used ? "#111" : "#9a9a9a"}
       stroke-width={unit * 0.25}
     />
-    <text
+    {#if nameShown(name, point)}<text
       x={x(point[0])}
       y={y(point[1]) + unit * 3.4}
       font-size={unit * 2.2}
@@ -190,7 +201,7 @@
       stroke="var(--base)"
       stroke-width={unit * 0.4}
       paint-order="stroke">{used ? name : `${name} (unused)`}</text
-    >
+    >{/if}
   {/each}
 </svg>
 

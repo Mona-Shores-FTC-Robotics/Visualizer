@@ -24,6 +24,9 @@ export function connectAutoStore(store: ProjectStore): void {
  */
 export const selectedCardId = writable<string | null>(null);
 
+/** Fork: where the mouse is over the field, in inches, or null: spot names show near it. */
+export const fieldHover = writable<{ x: number; y: number } | null>(null);
+
 /** The preview's answers: whether each card's condition is true when it asks. Not saved. */
 export const previewScenario = writable<Scenario>({});
 
