@@ -492,15 +492,25 @@ export function simulateAuto(
           note("Path card with no path: skipped", "warn", card.id);
           return null;
         }
+        // Fork: before it sets off, a drive asks the guard: can I get there and still park from
+        // there? If not it does not start, and the guard parks now, from the spot the robot is
+        // on (biobuzz AutoKit.path(label, path, seconds, ...)).
+        const guard = guards[guards.length - 1];
+        const parkId = auto.parkFrom?.[card.id];
+        const spotPath = parkId ? catalog.byId.get(parkId) : undefined;
+        if (guard && !guard.parked && !card.park) {
+          const after = spotPath ?? guard.ownPath;
+          if (t + parkSeconds(path.seconds) + guardSeconds(after) > AUTO_LENGTH_S + 1e-9) {
+            note(`${path.name}: not started, it and the park from there no longer fit`, "guard", card.id);
+            return { abortTo: guard };
+          }
+        }
         // The guard never cuts a path short (biobuzz AutoKit.guarded): a path it let start
         // runs to its end, and the check before the next card parks from there.
         drive(card, path);
         // Fork: arriving at a spot with its own park makes that the guard's park, with its own
         // time; arriving anywhere else, the guard's own again (types.ts parkFrom).
-        const guard = guards[guards.length - 1];
         if (guard && !guard.parked) {
-          const parkId = auto.parkFrom?.[card.id];
-          const spotPath = parkId ? catalog.byId.get(parkId) : undefined;
           if (spotPath) {
             guard.park = { id: `${card.id}#park`, kind: "path", lineId: spotPath.id, park: true };
             guard.path = spotPath;

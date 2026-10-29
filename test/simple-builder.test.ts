@@ -402,7 +402,9 @@ describe("the park from each spot", () => {
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (java.ok)
-      expect(java.source).toMatch(/kit\.path\("[^"]*", \w+, \w+, [\d.]+\)/);
+      expect(java.source).toMatch(
+        /kit\.path\("[^"]*", \w+, [\d.]+, \w+, [\d.]+\)/,
+      );
   });
 
   it("drops a spot's park when its drive becomes the last before Park, and keeps a bent one", () => {

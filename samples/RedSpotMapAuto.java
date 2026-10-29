@@ -66,15 +66,15 @@ public final class RedSpotMapAuto {
         Path toGarden = Paths.line(rightDump, garden).linear(rightDump, garden);
 
         return kit.sequence(
-                kit.path("to RIGHT_HIVE_ENTRANCE", toRightHiveEntrance),
-                kit.path("to LEFT_HIVE_ENTRANCE", toLeftHiveEntrance),
-                kit.path("to LEFT_DUMP", toLeftDump),
-                kit.path("to LEFT_FLOWER", toLeftFlower),
-                kit.path("to LEFT_START", toLeftStart),
-                kit.path("to LEFT_LOADING_ZONE", toLeftLoadingZone),
-                kit.path("to RIGHT_LOADING_ZONE", toRightLoadingZone),
-                kit.path("to YOUR_WALL_FLOWER", toYourWallFlower),
-                kit.path("to RIGHT_DUMP", toRightDump),
-                kit.path("to GARDEN", toGarden));
+                kit.path("to RIGHT_HIVE_ENTRANCE", toRightHiveEntrance, 1.7),
+                kit.path("to LEFT_HIVE_ENTRANCE", toLeftHiveEntrance, 1.9),
+                kit.path("to LEFT_DUMP", toLeftDump, 1.4),
+                kit.path("to LEFT_FLOWER", toLeftFlower, 1.2),
+                kit.path("to LEFT_START", toLeftStart, 1.3),
+                kit.path("to LEFT_LOADING_ZONE", toLeftLoadingZone, 1.9),
+                kit.path("to RIGHT_LOADING_ZONE", toRightLoadingZone, 1.2),
+                kit.path("to YOUR_WALL_FLOWER", toYourWallFlower, 1.9),
+                kit.path("to RIGHT_DUMP", toRightDump, 2),
+                kit.path("to GARDEN", toGarden, 2));
     }
 }

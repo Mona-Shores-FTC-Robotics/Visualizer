@@ -62,26 +62,26 @@ public final class RedGardenBasicAuto {
                 kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
                         kit.when("Tip").then(
                                 kit.guarded("If tipped", toPark, 1.7,
-                                        kit.path("Pass1Ahead", pass1Ahead),
-                                        kit.path("Pass1Back", pass1Back),
-                                        kit.path("Pass2Left", pass2Left),
-                                        kit.path("Pass2Back", pass2Back),
-                                        kit.path("ToRearShot", toRearShot),
+                                        kit.path("Pass1Ahead", pass1Ahead, 1.3),
+                                        kit.path("Pass1Back", pass1Back, 1.2),
+                                        kit.path("Pass2Left", pass2Left, 1.3),
+                                        kit.path("Pass2Back", pass2Back, 1.3),
+                                        kit.path("ToRearShot", toRearShot, 3),
                                         kit.command("LaunchAll"),
-                                        kit.path("ToLoadingFlower", toLoadingFlower),
+                                        kit.path("ToLoadingFlower", toLoadingFlower, 1.2),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
                                         kit.command("LaunchAll"),
-                                        kit.path("ToPark", toPark))),
+                                        kit.path("ToPark", toPark, 1.7))),
                         kit.afterMs(8000).then(
                                 kit.guarded("If not tipped", toPark, 1.7,
-                                        kit.path("ToRearShot", toRearShot),
-                                        kit.path("ToLoadingFlower", toLoadingFlower),
+                                        kit.path("ToRearShot", toRearShot, 3),
+                                        kit.path("ToLoadingFlower", toLoadingFlower, 1.2),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
                                         kit.command("LaunchAll"),
-                                        kit.path("ToPark", toPark)))));
+                                        kit.path("ToPark", toPark, 1.7)))));
     }
 }

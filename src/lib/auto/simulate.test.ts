@@ -147,10 +147,14 @@ test("the endgame guard parks when the time left is down to the park path and it
     Math.abs(guardSeconds(park) - reserve) < 1e-9,
     `reserve ${guardSeconds(park)}`,
   );
-  // A path under way at the deadline is never cut short (AutoKit.guarded): it runs to its end
-  // and the robot parks from there, so the guard fires at or after the deadline, never before.
+  // A path under way at the deadline is never cut short (AutoKit.guarded), and one that it and
+  // the park after it no longer fit does not start: the guard parks then, before the deadline.
+  // Either way the robot is parked by the end.
+  const parked = result.drives.find((d) => d.pathId === "far-park")!;
+  assert(parked.t1 <= AUTO_LENGTH_S + 1e-6, `parked at ${parked.t1}`);
   assert(
-    result.guard.t >= AUTO_LENGTH_S - reserve - 1e-6,
+    result.guard.t >= AUTO_LENGTH_S - reserve - 1e-6 ||
+      result.log.some((e) => e.text.includes("not started")),
     `guard at ${result.guard.t}`,
   );
   assert(

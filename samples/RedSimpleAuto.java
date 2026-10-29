@@ -55,9 +55,9 @@ public final class RedSimpleAuto {
         return kit.sequence(
                 kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
                         kit.when("Tip").then(
-                                kit.path("UnderHive", underHive),
+                                kit.path("UnderHive", underHive, 2.8),
                                 kit.command("LaunchAll")),
                         kit.afterMs(6000).then(
-                                kit.path("ToGarden", toGarden))));
+                                kit.path("ToGarden", toGarden, 1.8))));
     }
 }

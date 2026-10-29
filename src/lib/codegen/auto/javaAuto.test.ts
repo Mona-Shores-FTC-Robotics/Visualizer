@@ -106,7 +106,7 @@ test("the trunk is guarded when it holds a park card", () => {
     ),
     source,
   );
-  assert(source.includes('kit.path("CollectNear", collectNear)));'), source);
+  assert(source.includes('kit.path("CollectNear", collectNear, '), source);
 });
 
 test("a wait exports as a trigger row and a time row, each with its route", () => {

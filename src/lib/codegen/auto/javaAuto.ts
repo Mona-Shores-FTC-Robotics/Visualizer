@@ -400,14 +400,17 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const info = catalog.byId.get(lineId)!;
     return { info, varName: pathVars.get(info.index)! };
   };
+  // Fork: each drive carries its time, so the endgame guard does not set off on one that it and
+  // the park after it no longer fit (biobuzz AutoKit.path(label, path, seconds)).
   const pathNode = (lineId: string): JNode => {
     const { info, varName } = pathOf(lineId);
-    return `kit.path(${javaString(info.name)}, ${varName})`;
+    return `kit.path(${javaString(info.name)}, ${varName}, ${javaNumber(parkSeconds(info.seconds))})`;
   };
   /** A drive-through chain: one Pedro path, so the robot does not stop between them. */
   const chainNode = (lineIds: string[]): JNode => {
     const parts = lineIds.map(pathOf);
-    return `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}))`;
+    const seconds = parts.reduce((sum, p) => sum + p.info.seconds, 0);
+    return `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}), ${javaNumber(parkSeconds(seconds))})`;
   };
 
   const cardNode = (card: AutoCard): JNode => {
@@ -417,12 +420,13 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           ? `kit.command(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
           : `kit.command(${javaString(card.name)})`;
       case "path": {
-        // Fork: a drive that carries a park from its spot: kit.path(label, path, park, seconds).
+        // Fork: a drive that carries a park from its spot:
+        // kit.path(label, path, seconds, park, parkSeconds).
         const parkId = auto.parkFrom?.[card.id];
         if (parkId && catalog.byId.has(parkId)) {
           const { info, varName } = pathOf(card.lineId);
           const park = pathOf(parkId);
-          return `kit.path(${javaString(info.name)}, ${varName}, ${park.varName}, ${javaNumber(parkSeconds(park.info.seconds))})`;
+          return `kit.path(${javaString(info.name)}, ${varName}, ${javaNumber(parkSeconds(info.seconds))}, ${park.varName}, ${javaNumber(parkSeconds(park.info.seconds))})`;
         }
         return pathNode(card.lineId);
       }

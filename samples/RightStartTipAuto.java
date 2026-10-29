@@ -71,28 +71,28 @@ public final class RightStartTipAuto {
 
         // Steps two routes share: a rejoin runs them from the stop it joins at.
         Supplier<Command> afterLeftFlower = () -> kit.sequence(
-                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.3,
+                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.4,
                         kit.firstOf("Collect at LEFT_FLOWER",
                                 kit.when("IntakeFull"),
                                 kit.afterMs(2000)),
-                        kit.path("to LEFT_SHOT", toLeftShot),
+                        kit.path("to LEFT_SHOT", toLeftShot, 1.3),
                         kit.command("LaunchAll"),
-                        kit.path("LEFT_SHOT to LEFT_LOADING_ZONE", leftShotToLeftLoadingZone)));
+                        kit.path("LEFT_SHOT to LEFT_LOADING_ZONE", leftShotToLeftLoadingZone, 1.4)));
 
         return kit.sequence(
                 kit.firstOf("Did the HIVE tip?", kit.command("LaunchAll"),
                         kit.when("Tip").then(
-                                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.3,
-                                        kit.path("to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(toRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
+                                kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.4,
+                                        kit.path("to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(toRightHiveEntrance, toLeftHiveEntrance, toLeftFlower), 5.2),
                                         afterLeftFlower.get())),
                         kit.afterMs(4000).then(
-                                kit.path("to GARDEN", toGarden),
+                                kit.path("to GARDEN", toGarden, 1.9),
                                 kit.firstOf("Collect in the GARDEN",
                                         kit.when("IntakeFull"),
                                         kit.afterMs(2000)),
-                                kit.path("to RIGHT_SHOT", toRightShot),
+                                kit.path("to RIGHT_SHOT", toRightShot, 1.6),
                                 kit.command("LaunchAll"),
-                                kit.path("RIGHT_SHOT to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(rightShotToRightHiveEntrance, toLeftHiveEntrance, toLeftFlower)),
+                                kit.path("RIGHT_SHOT to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(rightShotToRightHiveEntrance, toLeftHiveEntrance, toLeftFlower), 5),
                                 afterLeftFlower.get())));
     }
 }

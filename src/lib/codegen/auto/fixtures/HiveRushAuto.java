@@ -77,28 +77,28 @@ public final class HiveRushAuto {
                 kit.firstOf("Did the HIVE tip?",
                         kit.when("HiveTipped").then(
                                 kit.guarded("If tipped", parkFarPath, 2.1,
-                                        kit.path("ToFarPickups", toFarPickups),
-                                        kit.path("CollectFar", collectFar),
-                                        kit.path("ToUpCellShot", toUpCellShot),
+                                        kit.path("ToFarPickups", toFarPickups, 3),
+                                        kit.path("CollectFar", collectFar, 1.5),
+                                        kit.path("ToUpCellShot", toUpCellShot, 1.5),
                                         kit.command("ShootAll"),
-                                        kit.path("ParkFarPath", parkFarPath))),
+                                        kit.path("ParkFarPath", parkFarPath, 2.1))),
                         kit.afterMs(1500).then(
-                                kit.path("CollectNear", collectNear),
+                                kit.path("CollectNear", collectNear, 2),
                                 kit.firstOf("Wait for IntakeFull",
                                         kit.when("IntakeFull"),
                                         kit.afterMs(1800)),
-                                kit.path("BackToShoot", backToShoot),
+                                kit.path("BackToShoot", backToShoot, 2),
                                 kit.command("SpinUp"),
                                 kit.command("ShootAll"),
                                 kit.firstOf("Did it tip this time?",
                                         kit.when("HiveTipped").then(
                                                 kit.guarded("Tipped late", parkFarPath, 2.1,
-                                                        kit.path("ToFarPickups", toFarPickups),
-                                                        kit.path("CollectFar", collectFar),
+                                                        kit.path("ToFarPickups", toFarPickups, 3),
+                                                        kit.path("CollectFar", collectFar, 1.5),
                                                         kit.command("IntakeOff"),
-                                                        kit.path("ToUpCellShot", toUpCellShot),
+                                                        kit.path("ToUpCellShot", toUpCellShot, 1.5),
                                                         kit.command("ShootAll"),
-                                                        kit.path("ParkFarPath", parkFarPath))),
+                                                        kit.path("ParkFarPath", parkFarPath, 2.1))),
                                         kit.afterMs(2000).then(
                                                 kit.command("SpinDown"))))));
     }
