@@ -4,8 +4,14 @@ import { buildExportModel } from "../model";
 import { pathExpression } from "../emit";
 import { javaSpec } from "../languages/java";
 import { camelCase, isReservedWord, sanitizeIdentifier } from "../identifiers";
-import type { HeadingCall, InterpolatorRef, PathExpr, PoseDecl } from "../types";
+import type {
+  HeadingCall,
+  InterpolatorRef,
+  PathExpr,
+  PoseDecl,
+} from "../types";
 import { buildPathCatalog, type PathCatalog } from "../../auto/geometry";
+import { parkSeconds } from "../../auto/simulate";
 import { validateAuto } from "../../auto/validate";
 import { relink } from "../../auto/links";
 import {
@@ -33,7 +39,8 @@ import {
  * the contract between the two (docs/auto-format.md, "Generated Java").
  */
 
-export const AUTO_PACKAGE = "org.firstinspires.ftc.teamcode.opmodes.auto.generated";
+export const AUTO_PACKAGE =
+  "org.firstinspires.ftc.teamcode.opmodes.auto.generated";
 
 export interface AutoExportInput {
   auto: AutoSection;
@@ -46,14 +53,22 @@ export interface AutoExportInput {
 }
 
 export type AutoExportResult =
-  | { ok: true; className: string; fileName: string; source: string; warnings: string[] }
+  | {
+      ok: true;
+      className: string;
+      fileName: string;
+      source: string;
+      warnings: string[];
+    }
   | { ok: false; errors: string[]; warnings: string[] };
 
 /** `hive-rush` → `HiveRushAuto`. */
 export function autoClassName(exportName: string): string {
   const stem = exportName.replace(/\.pp$/i, "");
   const words = stem.split(/[^A-Za-z0-9]+/).filter(Boolean);
-  let name = words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join("");
+  let name = words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
   if (!name) name = "Untitled";
   if (/^[0-9]/.test(name)) name = `Auto${name}`;
   return `${name}Auto`;
@@ -75,10 +90,7 @@ export function javaString(value: string): string {
   return `"${escaped}"`;
 }
 
-/** Seconds reserved for the park path: the drive time, rounded up to 0.1 s. */
-export function parkSeconds(seconds: number): number {
-  return Math.ceil(Math.round(seconds * 1000) / 100) / 10;
-}
+export { parkSeconds };
 
 class Names {
   private readonly used = new Set<string>(["p", "kit", "rotated"]);
@@ -103,7 +115,10 @@ class Names {
 
 // --- pose references inside path expressions -------------------------------
 
-function interpolatorVars(ref: InterpolatorRef): { vars: string[]; headingVars: string[] } {
+function interpolatorVars(ref: InterpolatorRef): {
+  vars: string[];
+  headingVars: string[];
+} {
   switch (ref.kind) {
     case "constant":
       return { vars: [ref.poseVar], headingVars: [ref.poseVar] };
@@ -119,7 +134,10 @@ function interpolatorVars(ref: InterpolatorRef): { vars: string[]; headingVars: 
   }
 }
 
-function headingVarsOf(heading: HeadingCall | null): { vars: string[]; headingVars: string[] } {
+function headingVarsOf(heading: HeadingCall | null): {
+  vars: string[];
+  headingVars: string[];
+} {
   if (!heading) return { vars: [], headingVars: [] };
   switch (heading.kind) {
     case "constant":
@@ -146,13 +164,20 @@ function headingVarsOf(heading: HeadingCall | null): { vars: string[]; headingVa
   }
 }
 
-function collectVars(expr: PathExpr, vars: Set<string>, headingVars: Set<string>): void {
+function collectVars(
+  expr: PathExpr,
+  vars: Set<string>,
+  headingVars: Set<string>,
+): void {
   if (expr.kind === "group") {
     expr.children.forEach((child) => collectVars(child, vars, headingVars));
   } else {
-    [expr.startPoseVar, ...expr.controlPoseVars, ...expr.throughPoseVars, expr.endPoseVar].forEach(
-      (name) => vars.add(name),
-    );
+    [
+      expr.startPoseVar,
+      ...expr.controlPoseVars,
+      ...expr.throughPoseVars,
+      expr.endPoseVar,
+    ].forEach((name) => vars.add(name));
   }
   const found = headingVarsOf(expr.heading);
   found.vars.forEach((name) => vars.add(name));
@@ -164,12 +189,19 @@ function usesPiecewise(expr: PathExpr): boolean {
   return expr.kind === "group" && expr.children.some(usesPiecewise);
 }
 
-function renameInterpolator(ref: InterpolatorRef, map: (name: string) => string): InterpolatorRef {
+function renameInterpolator(
+  ref: InterpolatorRef,
+  map: (name: string) => string,
+): InterpolatorRef {
   switch (ref.kind) {
     case "constant":
       return { kind: "constant", poseVar: map(ref.poseVar) };
     case "linear":
-      return { kind: "linear", startPoseVar: map(ref.startPoseVar), endPoseVar: map(ref.endPoseVar) };
+      return {
+        kind: "linear",
+        startPoseVar: map(ref.startPoseVar),
+        endPoseVar: map(ref.endPoseVar),
+      };
     case "facingPoint":
       return { kind: "facingPoint", poseVar: map(ref.poseVar) };
     case "tangent":
@@ -177,7 +209,10 @@ function renameInterpolator(ref: InterpolatorRef, map: (name: string) => string)
   }
 }
 
-function renameHeading(heading: HeadingCall | null, map: (name: string) => string): HeadingCall | null {
+function renameHeading(
+  heading: HeadingCall | null,
+  map: (name: string) => string,
+): HeadingCall | null {
   if (!heading) return null;
   switch (heading.kind) {
     case "constant":
@@ -232,14 +267,17 @@ function printNode(node: JNode, indent: number): string {
   if (node.children.length > 0) {
     if (node.args.length > 0) out += ",";
     out += node.children
-      .map((child, index) => `${index > 0 ? "," : ""}\n${pad}${printNode(child, indent + 8)}`)
+      .map(
+        (child, index) =>
+          `${index > 0 ? "," : ""}\n${pad}${printNode(child, indent + 8)}`,
+      )
       .join("");
   }
   return `${out})`;
 }
 
 const sameAngle = (a: number, b: number) =>
-  Math.abs((((a - b) % 360) + 540) % 360 - 180) < 1e-6;
+  Math.abs(((((a - b) % 360) + 540) % 360) - 180) < 1e-6;
 
 // --- the generator ------------------------------------------------------------
 
@@ -249,8 +287,12 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const lines = relink(startPoint, input.lines, auto, settings).lines;
   const catalog: PathCatalog = buildPathCatalog(startPoint, lines, settings);
   const issues = validateAuto(auto, catalog, startPoint);
-  const errors = issues.filter((issue) => issue.level === "error").map((issue) => issue.message);
-  const warnings = issues.filter((issue) => issue.level === "warning").map((issue) => issue.message);
+  const errors = issues
+    .filter((issue) => issue.level === "error")
+    .map((issue) => issue.message);
+  const warnings = issues
+    .filter((issue) => issue.level === "warning")
+    .map((issue) => issue.message);
   if (errors.length > 0) return { ok: false, errors, warnings };
 
   const sourceFileName = input.sourceFileName || "untitled.pp";
@@ -265,7 +307,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   const pointDecls: { varName: string; point: NamedPoint }[] = [];
   for (const [name, point] of Object.entries(auto.points)) {
     if (!isUsed(uses.get(name))) continue;
-    const varName = names.take(camelCase(sanitizeIdentifier(lowerShouting(name), "point")));
+    const varName = names.take(
+      camelCase(sanitizeIdentifier(lowerShouting(name), "point")),
+    );
     pointVars.set(name, varName);
     pointDecls.push({ varName, point });
   }
@@ -309,7 +353,8 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       ({ point }) =>
         Math.abs(point[0] - pose.x) < 1e-6 &&
         Math.abs(point[1] - pose.y) < 1e-6 &&
-        (!headingVars.has(pose.varName) || sameAngle(point[2] ?? 0, pose.headingDeg)),
+        (!headingVars.has(pose.varName) ||
+          sameAngle(point[2] ?? 0, pose.headingDeg)),
     );
     if (named) {
       poseRename.set(pose.varName, named.varName);
@@ -329,7 +374,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   let usesInterpolator = false;
   for (const index of usedIndices) {
     const info = catalog.paths.find((path) => path.index === index)!;
-    const base = camelCase(sanitizeIdentifier(lowerShouting(info.name), "path"));
+    const base = camelCase(
+      sanitizeIdentifier(lowerShouting(info.name), "path"),
+    );
     const varName = names.take(names.has(base) ? `${base}Path` : base);
     pathVars.set(index, varName);
     const decl = model.paths[index];
@@ -367,14 +414,19 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         return {
           head: "kit.firstOf",
           args: card.alongside
-            ? [javaString(firstOfLabel(card)), `kit.command(${javaString(card.alongside)})`]
+            ? [
+                javaString(firstOfLabel(card)),
+                `kit.command(${javaString(card.alongside)})`,
+              ]
             : [javaString(firstOfLabel(card))],
           children: card.rows.map(rowNode),
         };
       case "rejoin": {
         // Joining a drive-through: one Pedro path on through the rest of its chain.
         const through = rejoinTail(auto.cards, card.target)?.through ?? [];
-        return through.length > 0 ? chainNode([card.lineId, ...through.map((c) => c.lineId)]) : pathNode(card.lineId);
+        return through.length > 0
+          ? chainNode([card.lineId, ...through.map((c) => c.lineId)])
+          : pathNode(card.lineId);
       }
     }
   };
@@ -388,11 +440,16 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const tail = rejoinTail(auto.cards, card.target);
     // Keyed by the stop the shared steps follow: a drive-through target's chain end.
     if (!tail || tailVars.has(tail.join.id)) continue;
-    const spot = auto.pathEnds[catalog.byId.get(tail.join.lineId)?.endSegmentId ?? ""];
+    const spot =
+      auto.pathEnds[catalog.byId.get(tail.join.lineId)?.endSegmentId ?? ""];
     const base = `after${pascal(spot ?? catalog.byId.get(tail.join.lineId)?.name ?? "Stop")}`;
     const varName = names.take(base);
     tailVars.set(tail.join.id, varName);
-    tailDecls.push({ varName, targetId: tail.join.id, size: allCards(tail.list.slice(tail.index)).length });
+    tailDecls.push({
+      varName,
+      targetId: tail.join.id,
+      size: allCards(tail.list.slice(tail.index)).length,
+    });
   }
   tailDecls.sort((a, b) => a.size - b.size);
 
@@ -403,7 +460,10 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       if (card.kind === "path" && card.through) {
         // A drive-through chain: one Pedro path, so the robot does not stop between them.
         const chain = [card];
-        while (chain[chain.length - 1].through && list[i + chain.length]?.kind === "path") {
+        while (
+          chain[chain.length - 1].through &&
+          list[i + chain.length]?.kind === "path"
+        ) {
           chain.push(list[i + chain.length] as typeof card);
         }
         if (chain.length > 1) {
@@ -420,7 +480,8 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       nodes.push(cardNode(card));
       if (card.kind === "rejoin") {
         const join = rejoinTail(auto.cards, card.target)?.join;
-        if (join && tailVars.has(join.id)) nodes.push(`${tailVars.get(join.id)}.get()`);
+        if (join && tailVars.has(join.id))
+          nodes.push(`${tailVars.get(join.id)}.get()`);
       }
       if (tailVars.has(card.id)) {
         nodes.push(`${tailVars.get(card.id)}.get()`);
@@ -433,7 +494,11 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     return [
       {
         head: "kit.guarded",
-        args: [javaString(label), varName, javaNumber(parkSeconds(info.seconds))],
+        args: [
+          javaString(label),
+          varName,
+          javaNumber(parkSeconds(info.seconds)),
+        ],
         children: nodes,
       },
     ];
@@ -445,7 +510,11 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         ? `kit.when(${row.when.map(javaString).join(", ")})`
         : `kit.afterMs(${javaNumber(row.afterMs)})`;
     if (row.cards.length === 0) return condition;
-    return { head: `${condition}.then`, args: [], children: listNodes(row.cards, rowLabel(row)) };
+    return {
+      head: `${condition}.then`,
+      args: [],
+      children: listNodes(row.cards, rowLabel(row)),
+    };
   };
 
   const used = usedNames(auto);
@@ -462,7 +531,8 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "import com.pedropathing.math.Pose;",
     "import com.pedropathing.paths.Path;",
   );
-  if (usesInterpolator) out.push("import com.pedropathing.paths.interpolator.Interpolator;");
+  if (usesInterpolator)
+    out.push("import com.pedropathing.paths.interpolator.Interpolator;");
   if (tailDecls.length > 0) out.push("", "import java.util.function.Supplier;");
   out.push("", "import org.firstinspires.ftc.teamcode.autokit.AutoKit;", "");
   out.push(
@@ -500,32 +570,53 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   );
 
   if (pointDecls.length > 0) {
-    out.push("", "        // Named points (x, y in inches, heading in degrees, Pedro field frame).");
+    out.push(
+      "",
+      "        // Named points (x, y in inches, heading in degrees, Pedro field frame).",
+    );
     pointDecls.forEach(({ varName, point }) =>
-      out.push(`        Pose ${varName} = ${pose(point[0], point[1], point[2] ?? 0)};`),
+      out.push(
+        `        Pose ${varName} = ${pose(point[0], point[1], point[2] ?? 0)};`,
+      ),
     );
   }
   if (poseDecls.length > 0) {
-    out.push("", "        // Other poses the paths need (control points, unnamed endpoints).");
+    out.push(
+      "",
+      "        // Other poses the paths need (control points, unnamed endpoints).",
+    );
     poseDecls.forEach((decl) =>
-      out.push(`        Pose ${decl.varName} = ${pose(decl.x, decl.y, decl.headingDeg)};`),
+      out.push(
+        `        Pose ${decl.varName} = ${pose(decl.x, decl.y, decl.headingDeg)};`,
+      ),
     );
   }
   if (pathDecls.length > 0) {
-    out.push("", "        // Paths, written as the stock Visualizer export writes them.");
+    out.push(
+      "",
+      "        // Paths, written as the stock Visualizer export writes them.",
+    );
     out.push(...pathDecls);
   }
   if (tailDecls.length > 0) {
-    out.push("", "        // Steps two routes share: a rejoin runs them from the stop it joins at.");
+    out.push(
+      "",
+      "        // Steps two routes share: a rejoin runs them from the stop it joins at.",
+    );
     for (const decl of tailDecls) {
       const tail = rejoinTail(auto.cards, decl.targetId)!;
       const location = locateCard(auto.cards, decl.targetId)!;
       const body: JNode = {
         head: "kit.sequence",
         args: [],
-        children: listNodes(tail.list.slice(tail.index), listLabel(location.parent)),
+        children: listNodes(
+          tail.list.slice(tail.index),
+          listLabel(location.parent),
+        ),
       };
-      out.push(`        Supplier<Command> ${decl.varName} = () -> ${printNode(body, 8)};`);
+      out.push(
+        `        Supplier<Command> ${decl.varName} = () -> ${printNode(body, 8)};`,
+      );
     }
   }
   const top: JNode = {
@@ -535,13 +626,20 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   };
   out.push("", `        return ${printNode(top, 8)};`, "    }", "}", "");
 
-  return { ok: true, className, fileName: `${className}.java`, source: out.join("\n"), warnings };
+  return {
+    ok: true,
+    className,
+    fileName: `${className}.java`,
+    source: out.join("\n"),
+    warnings,
+  };
 }
 
 export function firstOfLabel(card: FirstOfCard): string {
   if (card.label && card.label.trim()) return card.label.trim();
   if (isPlainWait(card)) {
-    const when = card.rows.find((row) => "when" in row) as { when: string[] } | undefined;
+    const when = card.rows.find((row) => "when" in row) as
+      { when: string[] } | undefined;
     return when ? `Wait for ${when.when.join(" or ")}` : "Wait";
   }
   return "Decision";
@@ -569,7 +667,9 @@ function lowerShouting(text: string): string {
 /** `LEFT_FLOWER` or `to left flower` → `LeftFlower`. */
 function pascal(text: string): string {
   const words = text.split(/[^A-Za-z0-9]+/).filter(Boolean);
-  const name = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+  const name = words
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join("");
   return /^[A-Za-z]/.test(name) ? name : `Stop${name}`;
 }
 

@@ -33,6 +33,8 @@
     /** Where the robot is now, in inches: Setup's "Add at robot" puts a point there. */
     robotAt: { x: number; y: number };
     onExport: () => void;
+    /** Shows the plan view instead (fork: lib/plan). */
+    onPlan?: () => void;
   }
 
   let {
@@ -46,6 +48,7 @@
     defaultExportName,
     robotAt,
     onExport,
+    onPlan,
   }: Props = $props();
 
   let setupOpen = $state(false);
@@ -322,6 +325,10 @@
     <h3 class="module-title">Auto</h3>
     <span class="module-caption">{cardCount} card{cardCount === 1 ? "" : "s"} · {auto.drawnFor}</span>
     <span class="auto-head-actions">
+      {#if onPlan}
+        <button type="button" class="path-list-action" onclick={onPlan}
+          title="Back to the plan: the good path in TIP chapters">Plan</button>
+      {/if}
       <button type="button" class="path-list-action" onclick={() => (setupOpen = true)}
         title="Start pose, actions and conditions, named points, alliance, export name">Setup</button>
       <button type="button" class="path-list-action" onclick={onExport}

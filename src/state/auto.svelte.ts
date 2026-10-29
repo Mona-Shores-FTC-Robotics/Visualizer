@@ -37,6 +37,13 @@ import {
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
+import {
+  cardTimes,
+  missScenario,
+  planOf,
+  GOOD_PATH,
+  type PlanStep,
+} from "../lib/plan/plan";
 import type { EditorState } from "./editor.svelte";
 import type { Overlay, Overlays } from "./overlays.svelte";
 import type { ProjectStore } from "./project.svelte";
@@ -51,6 +58,12 @@ import type { ProjectStore } from "./project.svelte";
 export class AutoState {
   /** Draw the branches the preview does not take, dashed. */
   showUntaken = $state(true);
+  /** How the left panel shows the Auto: the plan (good path, chapters, misses) or every card. */
+  view = $state<"plan" | "cards">("plan");
+  /** The chapter open in the plan view. */
+  chapter = $state(0);
+  /** The branching wait whose miss is open in the plan view, by card id. */
+  miss = $state<string | null>(null);
 
   #project: ProjectStore;
   #getSettings: () => Settings;
@@ -96,9 +109,13 @@ export class AutoState {
       if (!auto || !catalog) return null;
       const doc = this.#project.doc;
       if (this.#timingMode.current === "typical") {
+        // Alone, nothing models the partner's Auto, so a tip we wait for is
+        // taken to come; the plan view's good path depends on it.
         return previewTogether(
           [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
           this.#timingValues.current,
+          true,
+          { tipsCome: true },
         );
       }
       return {
@@ -110,6 +127,18 @@ export class AutoState {
     },
   );
   preview = $derived(this.together?.previews[0] ?? null);
+  /** The Auto as a plan: good path, chapters, misses (lib/plan). */
+  plan = $derived.by(() =>
+    this.auto && this.catalog ? planOf(this.auto, this.catalog.names) : null,
+  );
+  /** When each card runs in the preview on screen. */
+  times = $derived.by(() =>
+    this.preview ? cardTimes(this.preview) : NO_TIMES,
+  );
+  /** The open miss's wait, when one is open. */
+  missStep = $derived.by(
+    () => this.plan?.branches.find((step) => step.cardId === this.miss) ?? null,
+  );
   worst = $derived(
     this.auto && this.catalog ? worstCase(this.auto, this.catalog) : null,
   );
@@ -191,6 +220,20 @@ export class AutoState {
       untrack(() => {
         resetAutoView();
         this.#pinned = null;
+        this.chapter = 0;
+        this.miss = null;
+      });
+    });
+
+    // The plan view previews the good path, or the miss it has open; answers set on the cards
+    // do not carry into it. A miss whose wait is gone closes.
+    $effect.pre(() => {
+      if (this.view !== "plan") return;
+      const step = this.missStep;
+      void this.miss;
+      untrack(() => {
+        if (this.miss && !step) this.miss = null;
+        previewScenario.set(step ? missScenario(step) : GOOD_PATH);
       });
     });
 
@@ -307,6 +350,58 @@ export class AutoState {
     };
   }
 
+  /** Shows what happens when `step`'s tip doesn't come: the preview and the field follow it. */
+  openMiss(step: PlanStep) {
+    this.miss = step.cardId;
+    previewScenario.set(missScenario(step));
+  }
+
+  /** The field's ◆: opens that wait's miss, or closes it when it is the one open. */
+  toggleMiss(cardId: string) {
+    const step = this.plan?.branches.find((branch) => branch.cardId === cardId);
+    if (!step || this.miss === cardId) this.closeMiss();
+    else this.openMiss(step);
+  }
+
+  /** Back to the good path. */
+  closeMiss() {
+    this.miss = null;
+    previewScenario.set(GOOD_PATH);
+  }
+
+  /**
+   * Every way the Auto can run, for "All outcomes": the good path, then each wait that branches
+   * with its tip missed. Each is a preview of its own, so it is computed when asked for.
+   */
+  outcomes(): {
+    label: string;
+    step: PlanStep | null;
+    preview: PreviewResult;
+  }[] {
+    const auto = this.auto;
+    const catalog = this.catalog;
+    const plan = this.plan;
+    if (!auto || !catalog || !plan) return [];
+    const doc = this.#project.doc;
+    const run = (scenario: Record<string, boolean>) =>
+      this.#timingMode.current === "typical"
+        ? previewTogether(
+            [this.#entry(doc, this.#getSettings(), scenario)],
+            this.#timingValues.current,
+            false,
+            { tipsCome: true },
+          ).previews[0]
+        : simulateAuto(auto, catalog, doc.startPoint, scenario);
+    return [
+      { label: "Every tip comes", step: null, preview: run(GOOD_PATH) },
+      ...plan.branches.map((step) => ({
+        label: `${step.tip ?? step.label} doesn't come`,
+        step,
+        preview: run(missScenario(step)),
+      })),
+    ];
+  }
+
   /** Where the open project's robot is, `seconds` into the preview. */
   poseAt(seconds: number, settings: Settings): RobotPose | null {
     const preview = this.preview;
@@ -385,6 +480,10 @@ function idSet(ids: string[]): ReadonlySet<string> {
 }
 
 const NONE = idSet([]);
+const NO_TIMES: ReadonlyMap<string, { t0: number; t1: number }> = cardTimes({
+  log: [],
+  drives: [],
+} as unknown as PreviewResult);
 
 /** Where a robot is in a preview: on its project paths, or on a routine's own drive. */
 export function previewPose(

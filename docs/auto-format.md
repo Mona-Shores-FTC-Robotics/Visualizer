@@ -252,10 +252,14 @@ row and event with its time against the 30 s budget.
 Each branch also shows its **worst case**: the Auto's end time if that branch
 is taken and every later wait runs to its time row. Over 30 s it is flagged.
 
-The endgame guard is previewed the way `kit.guarded` is meant to work: once
-the time left is no more than the park path's seconds, whatever is running
-(a wait, an action, a path part-way) stops, the rest of the branch is
-skipped and the park path is driven. The robot then jumps to the park path's
+The endgame guard is previewed the way `kit.guarded` works on the robot: once
+the time left is no more than the park path's exported seconds plus
+`AutoKit.GUARD_MARGIN_S` (1 s), a running wait or action stops, the rest of
+the branch is skipped and the park path is driven. A path is never cut short:
+one the guard let start runs to its end, and the robot parks from there. The
+reserve is the exported one, at the drawing's speed, even when the timing
+model's measured `driveSpeed` previews the drives faster. Checked against the
+robot's first match logs in `test/real-autos.test.ts`. The robot then jumps to the park path's
 start in the preview, because a path always starts where the Path List says.
 
 ## Share links

@@ -20,6 +20,7 @@
   import { useLinks } from "../state/links.svelte";
   import { exportAutoJava } from "../lib/auto/exportAction";
   import AutoCardList from "../lib/auto/components/AutoCardList.svelte";
+  import PlanPanel from "../lib/plan/PlanPanel.svelte";
 
   interface Props {
     settings: Settings;
@@ -79,18 +80,27 @@
     {#if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
       <div class="flex min-h-80 flex-1 flex-col">
-        <AutoCardList
-          auto={auto.auto}
-          catalog={auto.catalog}
-          issues={auto.issues}
-          preview={auto.preview}
-          worst={auto.worst}
-          shapes={project.doc.shapes}
-          now={playback.seconds}
-          defaultExportName={pathStem(links.sourceName) || "untitled"}
-          robotAt={{ x: playback.robotPose.x, y: playback.robotPose.y }}
-          onExport={exportAuto}
-        />
+        {#if auto.view === "plan" && auto.plan}
+          <PlanPanel
+            onExport={exportAuto}
+            errorCount={auto.issues.filter((issue) => issue.level === "error")
+              .length}
+          />
+        {:else}
+          <AutoCardList
+            auto={auto.auto}
+            catalog={auto.catalog}
+            issues={auto.issues}
+            preview={auto.preview}
+            worst={auto.worst}
+            shapes={project.doc.shapes}
+            now={playback.seconds}
+            defaultExportName={pathStem(links.sourceName) || "untitled"}
+            robotAt={{ x: playback.robotPose.x, y: playback.robotPose.y }}
+            onExport={exportAuto}
+            onPlan={() => (auto.view = "plan")}
+          />
+        {/if}
       </div>
     {:else}
       <PanelSection

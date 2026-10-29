@@ -36,6 +36,12 @@ export interface PathInfo {
   length: number;
   /** Seconds to drive it from rest to rest, by the app's motion model. */
   seconds: number;
+  /**
+   * Seconds at the drawing's own speed, when the catalog was built at another (the timing
+   * model's measured `driveSpeed`): what the Java export writes for it, and so what the robot's
+   * endgame guard reserves.
+   */
+  drawnSeconds?: number;
   /** The app's travel events for it alone, starting at time 0. */
   travel: TimelineEvent[];
   /** Sampled points along the whole path, for drawing and event markers. */
@@ -91,7 +97,9 @@ export function buildPathCatalog(
 ): PathCatalog {
   const flat = flattenToAtomicSegments(startPoint, lines);
   const names = pathDisplayNames(lines);
-  const bySegmentId = new Map(flat.map((segment) => [segment.line.id, segment]));
+  const bySegmentId = new Map(
+    flat.map((segment) => [segment.line.id, segment]),
+  );
   const nestedIds = new Set<string>();
   const paths: PathInfo[] = [];
 
@@ -128,7 +136,8 @@ export function buildPathCatalog(
       for (let k = segmentIndex === 0 ? 0 : 1; k <= SAMPLES_PER_SEGMENT; k++) {
         const point = segment.curve.pointAt(k / SAMPLES_PER_SEGMENT);
         const previous = samples[samples.length - 1];
-        if (previous) travelled += Math.hypot(point.x - previous.x, point.y - previous.y);
+        if (previous)
+          travelled += Math.hypot(point.x - previous.x, point.y - previous.y);
         samples.push(point);
         sampleDistances.push(travelled);
       }
@@ -186,14 +195,24 @@ export interface ChainInfo {
  * in the list cannot be one drive; they are timed one after another instead.
  */
 export function chainInfo(catalog: PathCatalog, ids: string[]): ChainInfo {
-  const infos = ids.map((id) => catalog.byId.get(id)).filter((info): info is PathInfo => !!info);
-  const consecutive = infos.every((info, i) => i === 0 || info.index === infos[i - 1].index + 1);
+  const infos = ids
+    .map((id) => catalog.byId.get(id))
+    .filter((info): info is PathInfo => !!info);
+  const consecutive = infos.every(
+    (info, i) => i === 0 || info.index === infos[i - 1].index + 1,
+  );
   const times = new Map<string, { t0: number; t1: number }>();
   if (!consecutive || infos.length < 2) {
     let t = 0;
     const travel: TimelineEvent[] = [];
     for (const info of infos) {
-      travel.push(...info.travel.map((e) => ({ ...e, startTime: e.startTime + t, endTime: e.endTime + t })));
+      travel.push(
+        ...info.travel.map((e) => ({
+          ...e,
+          startTime: e.startTime + t,
+          endTime: e.endTime + t,
+        })),
+      );
       times.set(info.id, { t0: t, t1: t + info.seconds });
       t += info.seconds;
     }
@@ -207,18 +226,31 @@ export function chainInfo(catalog: PathCatalog, ids: string[]): ChainInfo {
     kind: "compound",
     segments: chainLines,
   } as Path;
-  const lines = [...catalog.lines.slice(0, first), merged, ...catalog.lines.slice(first + infos.length)];
+  const lines = [
+    ...catalog.lines.slice(0, first),
+    merged,
+    ...catalog.lines.slice(first + infos.length),
+  ];
   const prediction = calculatePathTime(
     catalog.startPoint,
     lines,
     catalog.settings,
-    atomicSegments(chainLines).map((line) => ({ kind: "path" as const, lineId: line.id })),
+    atomicSegments(chainLines).map((line) => ({
+      kind: "path" as const,
+      lineId: line.id,
+    })),
   );
   const travel = prediction.timeline.filter((event) => event.type === "travel");
   for (const info of infos) {
     const own = new Set(info.segments.map((segment) => segment.line.id));
-    const mine = travel.filter((event) => event.lineId && own.has(event.lineId));
-    if (mine.length) times.set(info.id, { t0: mine[0].startTime, t1: mine[mine.length - 1].endTime });
+    const mine = travel.filter(
+      (event) => event.lineId && own.has(event.lineId),
+    );
+    if (mine.length)
+      times.set(info.id, {
+        t0: mine[0].startTime,
+        t1: mine[mine.length - 1].endTime,
+      });
   }
   return { seconds: prediction.totalTime, travel, times };
 }

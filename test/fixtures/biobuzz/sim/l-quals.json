@@ -1,0 +1,84 @@
+{
+  "auto": "l-quals",
+  "spec": "LQualsAuto,PartnerPreloadsRightHighAuto@50",
+  "design": "rigid V",
+  "commit": "d5d03a7",
+  "ranAt": "2026-10-15T13:27:38.485498+00:00",
+  "runs": 60,
+  "driveSeconds": {
+    "START to FAR_FLOWER_TURN": {
+      "median": 1.16,
+      "runs": 60
+    },
+    "FAR_FLOWER_TURN to FAR_FLOWER": {
+      "median": 0.46,
+      "runs": 60
+    },
+    "FAR_FLOWER to N_FIRE": {
+      "median": 1.08,
+      "runs": 60
+    },
+    "N_FIRE to WALL_FLOWER_TURN": {
+      "median": 2.38,
+      "runs": 57
+    },
+    "WALL_FLOWER_TURN to WALL_FLOWER": {
+      "median": 0.64,
+      "runs": 57
+    },
+    "WALL_FLOWER to FIRE3": {
+      "median": 1.44,
+      "runs": 57
+    },
+    "FIRE3 to GARDEN_IN": {
+      "median": 1.4,
+      "runs": 57
+    },
+    "GARDEN_IN to GARDEN": {
+      "median": 0.7,
+      "runs": 57
+    },
+    "GARDEN to FIRE_G": {
+      "median": 1.48,
+      "runs": 57
+    },
+    "FAR_FLOWER_TURN to LANE_TOP": {
+      "median": 0.74,
+      "runs": 3
+    },
+    "LANE_TOP to S_CATCH": {
+      "median": 2.6,
+      "runs": 3
+    },
+    "S_CATCH to FAR_FLOWER_TURN": {
+      "median": 2.86,
+      "runs": 3
+    },
+    "N_FIRE to LANE_LOW": {
+      "median": 2.38,
+      "runs": 3
+    },
+    "LANE_LOW to FIRE_G": {
+      "median": 1.18,
+      "runs": 3
+    }
+  },
+  "finishedAt": {
+    "median": 25.4,
+    "runs": 60
+  },
+  "tipAt": [
+    {
+      "median": 4.26,
+      "runs": 60
+    },
+    {
+      "median": 11.61,
+      "runs": 58
+    },
+    {
+      "median": 23.7,
+      "runs": 55
+    }
+  ]
+}

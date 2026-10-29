@@ -1,0 +1,22 @@
+{
+  "source": "biobuzz claude/simulator doc/real-vs-sim-25-oct.md (robot 20245, light chassis, 25 Oct 2026; logs in the team Drive, 2026-2027 FTC Biobuzz / Logs / 20245-RC)",
+  "note": "No launcher was on the robot, so nothing fired and no CELL tipped: every wait ran to its time limit (the endgame guard cut the last). Times are match seconds; a drive's seconds are from its start until Pedro reported it done (R-Simple: until within 2 in of PARK).",
+  "r-quals": {
+    "run": "2026-10-25 19:53",
+    "drives": {
+      "START to S_CATCH": { "start": 3.03, "seconds": 0.49 },
+      "S_CATCH to FAR_FLOWER_TURN": { "start": 13.65, "seconds": 2.14 },
+      "FAR_FLOWER_TURN to FAR_FLOWER": { "start": 17.82, "seconds": 0.45 },
+      "FAR_FLOWER to N_FIRE": { "start": 21.29, "seconds": 1.17 }
+    },
+    "guardAt": 26.26,
+    "parkSeconds": 1.86,
+    "endedAt": 30.07
+  },
+  "r-simple": {
+    "run": "2026-10-25 19:44 and 19:49",
+    "drives": {
+      "START to PARK": { "start": 4.03, "seconds": 2.5 }
+    }
+  }
+}

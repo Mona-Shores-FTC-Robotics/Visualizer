@@ -1,6 +1,19 @@
 import type { BasePoint, StartPose, TimelineEvent } from "../../types";
-import { chainInfo, pointAlong, type PathCatalog, type PathInfo } from "./geometry";
-import { allCards, cardTitle, describeRow, isPlainWait, parkCardOf, rejoinTail, rowLabel } from "./tree";
+import {
+  chainInfo,
+  pointAlong,
+  type PathCatalog,
+  type PathInfo,
+} from "./geometry";
+import {
+  allCards,
+  cardTitle,
+  describeRow,
+  isPlainWait,
+  parkCardOf,
+  rejoinTail,
+  rowLabel,
+} from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import {
   DEFAULT_TIMEOUT_S,
@@ -17,9 +30,15 @@ import {
  * How long a command step keeps the robot busy in the preview: the command's typical time from
  * the robot's list, else an older file's preview time, else instant; never past its timeout.
  */
-export function commandSeconds(auto: AutoSection, card: ActionCard, timing?: PreviewTiming): number {
+export function commandSeconds(
+  auto: AutoSection,
+  card: ActionCard,
+  timing?: PreviewTiming,
+): number {
   const typical =
-    timing?.actionSeconds(card.name) ?? auto.registry.typicalS?.[card.name] ?? (card.previewMs ?? 0) / 1000;
+    timing?.actionSeconds(card.name) ??
+    auto.registry.typicalS?.[card.name] ??
+    (card.previewMs ?? 0) / 1000;
   return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
 }
 
@@ -27,9 +46,16 @@ export function commandSeconds(auto: AutoSection, card: ActionCard, timing?: Pre
  * How long a wait's `alongside` command runs in the preview: its typical time, capped at the
  * default timeout (the robot runs it with `kit.command(name)`). 0 with none.
  */
-export function alongsideSeconds(auto: AutoSection, card: FirstOfCard, timing?: PreviewTiming): number {
+export function alongsideSeconds(
+  auto: AutoSection,
+  card: FirstOfCard,
+  timing?: PreviewTiming,
+): number {
   if (!card.alongside) return 0;
-  const typical = timing?.actionSeconds(card.alongside) ?? auto.registry.typicalS?.[card.alongside] ?? 0;
+  const typical =
+    timing?.actionSeconds(card.alongside) ??
+    auto.registry.typicalS?.[card.alongside] ??
+    0;
   return Math.min(typical, DEFAULT_TIMEOUT_S);
 }
 
@@ -69,7 +95,11 @@ export function switchKey(cardId: string): string {
 }
 
 /** Whether `card`'s trigger fires in `scenario`. */
-export function answerFor(scenario: Scenario, card: FirstOfCard, condition: string): boolean {
+export function answerFor(
+  scenario: Scenario,
+  card: FirstOfCard,
+  condition: string,
+): boolean {
   const own = isPlainWait(card) ? undefined : scenario[switchKey(card.id)];
   return own ?? scenario[condition] ?? DEFAULT_ANSWER;
 }
@@ -92,8 +122,18 @@ export function previewQuestions(auto: AutoSection): PreviewQuestion[] {
     for (const row of card.rows) {
       if (!("when" in row)) continue;
       for (const condition of row.when) {
-        if (questions.some((q) => q.cardId === card.id && q.condition === condition)) continue;
-        questions.push({ cardId: card.id, condition, card: cardTitle(card), branching: !isPlainWait(card) });
+        if (
+          questions.some(
+            (q) => q.cardId === card.id && q.condition === condition,
+          )
+        )
+          continue;
+        questions.push({
+          cardId: card.id,
+          condition,
+          card: cardTitle(card),
+          branching: !isPlainWait(card),
+        });
       }
     }
   }
@@ -101,7 +141,12 @@ export function previewQuestions(auto: AutoSection): PreviewQuestion[] {
 }
 
 /** A scenario where every wait on `condition` answers `yes`: its own switches cleared. */
-export function setTrigger(scenario: Scenario, auto: AutoSection, condition: string, yes: boolean): Scenario {
+export function setTrigger(
+  scenario: Scenario,
+  auto: AutoSection,
+  condition: string,
+  yes: boolean,
+): Scenario {
   const next: Scenario = { ...scenario, [condition]: yes };
   for (const q of previewQuestions(auto)) {
     if (q.condition === condition) delete next[switchKey(q.cardId)];
@@ -177,9 +222,24 @@ type Signal = { abortTo: Guard } | null;
 /** How many rejoins one preview follows before calling it a loop. */
 const MAX_REJOINS = 20;
 
-/** Seconds the endgame guard reserves for a park path. */
+/**
+ * Extra seconds the robot's endgame guard leaves on top of a park path's time
+ * (biobuzz `AutoKit.GUARD_MARGIN_S`).
+ */
+export const GUARD_MARGIN_S = 1.0;
+
+/** Seconds the export writes for a park path: its drive time at the drawing's speed, rounded up to 0.1 s. */
+export function parkSeconds(seconds: number): number {
+  return Math.ceil(Math.round(seconds * 1000) / 100) / 10;
+}
+
+/**
+ * Seconds the endgame guard reserves for a park path, as the robot does: the time the export
+ * wrote for it, plus the margin. The reserve is fixed when the Auto is exported, so it does not
+ * shrink when the preview drives faster than the drawing.
+ */
 export function guardSeconds(path: PathInfo): number {
-  return path.seconds;
+  return parkSeconds(path.drawnSeconds ?? path.seconds) + GUARD_MARGIN_S;
 }
 
 export function simulateAuto(
@@ -253,12 +313,17 @@ export function simulateAuto(
    * HIVE), so ✓ never looks faster than the command it waits on.
    */
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
-    const alongEnd = card.alongside ? t0 + alongsideSeconds(auto, card, timing) : Infinity;
+    const alongEnd = card.alongside
+      ? t0 + alongsideSeconds(auto, card, timing)
+      : Infinity;
     if ("when" in row) {
       let soonest = Infinity;
       for (const name of row.when) {
         if (!answerFor(scenario, card, name)) continue;
-        const at = Math.max(timing?.trueAt(name, t0) ?? t0, card.alongside ? alongEnd : t0);
+        const at = Math.max(
+          timing?.trueAt(name, t0) ?? t0,
+          card.alongside ? alongEnd : t0,
+        );
         soonest = Math.min(soonest, at);
       }
       return soonest;
@@ -268,7 +333,9 @@ export function simulateAuto(
 
   const whyRow = (card: FirstOfCard, row: AutoRow): string => {
     if (rowKind(row) === "when") {
-      const first = (row as { when: string[] }).when.find((name) => answerFor(scenario, card, name));
+      const first = (row as { when: string[] }).when.find((name) =>
+        answerFor(scenario, card, name),
+      );
       return `${first ?? "condition"} true`;
     }
     return describeRow(row);
@@ -296,7 +363,7 @@ export function simulateAuto(
     guard.parked = true;
     guardFired ??= { t, label: guard.label };
     note(
-      `Endgame (${guard.label}): ${(AUTO_LENGTH_S - t).toFixed(1)} s left, ${guard.path.name} needs ${guard.path.seconds.toFixed(1)} s → park now`,
+      `Endgame (${guard.label}): ${(AUTO_LENGTH_S - t).toFixed(1)} s left, ${guard.path.name} needs ${guardSeconds(guard.path).toFixed(1)} s → park now`,
       "guard",
       guard.park.id,
     );
@@ -323,15 +390,29 @@ export function simulateAuto(
       return { abortTo: deadline };
     }
     if (winner < 0) {
-      note(`${label}: no row can ever fire; the robot would wait here forever`, "warn", card.id);
+      note(
+        `${label}: no row can ever fire; the robot would wait here forever`,
+        "warn",
+        card.id,
+      );
       stalled = true;
       return null;
     }
     if (card.alongside) {
       const along = alongsideSeconds(auto, card, timing);
-      launches.push({ cardId: card.id, command: card.alongside, t0, t1: Math.min(at, t0 + along) });
+      launches.push({
+        cardId: card.id,
+        command: card.alongside,
+        t0,
+        t1: Math.min(at, t0 + along),
+      });
       note(`${label}: ${card.alongside} alongside`, "card", card.id);
-      if (at < t0 + along - 1e-9) note(`${card.alongside} stopped after ${(at - t0).toFixed(2)} s`, "event", card.id);
+      if (at < t0 + along - 1e-9)
+        note(
+          `${card.alongside} stopped after ${(at - t0).toFixed(2)} s`,
+          "event",
+          card.id,
+        );
     }
     stay(at - t0);
     const row = card.rows[winner];
@@ -339,7 +420,10 @@ export function simulateAuto(
     if (card.alongside) timing?.commandRan?.(card.alongside, t0, at);
     if ("when" in row) {
       for (const name of row.when) {
-        if (answerFor(scenario, card, name) && fireTime(card, { ...row, when: [name] }, t0) <= at + 1e-9) {
+        if (
+          answerFor(scenario, card, name) &&
+          fireTime(card, { ...row, when: [name] }, t0) <= at + 1e-9
+        ) {
           timing?.becameTrue?.(name, at);
         }
       }
@@ -376,20 +460,20 @@ export function simulateAuto(
           note("Path card with no path: skipped", "warn", card.id);
           return null;
         }
-        // The guard does not wait for a path to finish.
-        const deadline = pendingDeadline(guards);
-        if (deadline && deadline.deadline < t + path.seconds - 1e-9) {
-          drive(card, path, Math.max(0, deadline.deadline - t));
-          note(`${path.name}: stopped by the endgame guard`, "warn", card.id);
-          return { abortTo: deadline };
-        }
+        // The guard never cuts a path short (biobuzz AutoKit.guarded): a path it let start
+        // runs to its end, and the check before the next card parks from there.
         drive(card, path);
         return null;
       }
       case "firstOf":
         return runFirstOf(card, guards);
       case "rejoin": {
-        const own: PathCard = { id: card.id, kind: "path", lineId: card.lineId, park: false };
+        const own: PathCard = {
+          id: card.id,
+          kind: "path",
+          lineId: card.lineId,
+          park: false,
+        };
         const tail = rejoinTail(auto.cards, card.target);
         // Joining a drive-through: drive on through the rest of its chain without stopping.
         const signal = tail?.through.length
@@ -406,7 +490,11 @@ export function simulateAuto(
           return null;
         }
         note(`Rejoin at ${pathName(tail.target.lineId)}`, "row", card.id);
-        return runList(tail.list.slice(tail.index), guards, `Rejoined at ${pathName(tail.target.lineId)}`);
+        return runList(
+          tail.list.slice(tail.index),
+          guards,
+          `Rejoined at ${pathName(tail.target.lineId)}`,
+        );
       }
     }
   };
@@ -424,22 +512,39 @@ export function simulateAuto(
       return null;
     }
     cards.forEach((card) => ran.add(card.id));
-    const chain = chainInfo(catalog, cards.map((card) => card.lineId));
+    const chain = chainInfo(
+      catalog,
+      cards.map((card) => card.lineId),
+    );
+    // Driven as one path, so like one it is never cut short by the guard.
     const t0 = t;
-    const deadline = pendingDeadline(guards);
-    const cut = !!deadline && deadline.deadline < t0 + chain.seconds - 1e-9;
-    const stop = cut && deadline ? Math.max(0, deadline.deadline - t0) : chain.seconds;
+    const stop = chain.seconds;
     for (const event of chain.travel) {
       if (event.startTime >= stop - 1e-9) break;
       const end = Math.min(event.endTime, stop);
-      timeline.push({ ...event, startTime: event.startTime + t0, endTime: end + t0, duration: end - event.startTime });
+      timeline.push({
+        ...event,
+        startTime: event.startTime + t0,
+        endTime: end + t0,
+        duration: end - event.startTime,
+      });
     }
     for (const [i, card] of cards.entries()) {
       const path = catalog.byId.get(card.lineId)!;
       const at = chain.times.get(path.id) ?? { t0: 0, t1: 0 };
       if (at.t0 >= stop - 1e-9) break;
-      note(`Drive ${path.name}${i < cards.length - 1 ? " · through" : ""}${card.park ? " · park" : ""}`, "card", card.id, t0 + at.t0);
-      drives.push({ cardId: card.id, pathId: path.id, t0: t0 + at.t0, t1: t0 + Math.min(at.t1, stop) });
+      note(
+        `Drive ${path.name}${i < cards.length - 1 ? " · through" : ""}${card.park ? " · park" : ""}`,
+        "card",
+        card.id,
+        t0 + at.t0,
+      );
+      drives.push({
+        cardId: card.id,
+        pathId: path.id,
+        t0: t0 + at.t0,
+        t1: t0 + Math.min(at.t1, stop),
+      });
       if (at.t1 > stop + 1e-9) {
         const fraction = at.t1 > at.t0 ? (stop - at.t0) / (at.t1 - at.t0) : 1;
         pos = pointAlong(path, fraction);
@@ -449,10 +554,6 @@ export function simulateAuto(
       }
     }
     t = t0 + stop;
-    if (cut && deadline) {
-      note("Drive-through: stopped by the endgame guard", "warn", cards[0].id);
-      return { abortTo: deadline };
-    }
     return null;
   };
 
@@ -500,10 +601,15 @@ export function simulateAuto(
         }
         return { abortTo: due };
       }
-      const chain = card.kind === "path" && card.through ? chainFrom(list, i) : [];
+      const chain =
+        card.kind === "path" && card.through ? chainFrom(list, i) : [];
       if (chain.length > 1) i += chain.length - 1;
-      if (chain.length > 1 && own && chain.includes(parkCard!)) own.parked = true;
-      const signal = chain.length > 1 ? runChain(chain, own?.parked ? outer : guards) : runCard(card, guards);
+      if (chain.length > 1 && own && chain.includes(parkCard!))
+        own.parked = true;
+      const signal =
+        chain.length > 1
+          ? runChain(chain, own?.parked ? outer : guards)
+          : runCard(card, guards);
       if (signal) {
         if (signal.abortTo === own && own) {
           park(own);
@@ -526,7 +632,18 @@ export function simulateAuto(
     t <= AUTO_LENGTH_S && !stalled ? "end" : "warn",
   );
   log.sort((a, b) => a.t - b.t);
-  return { timeline, log, endTime: t, ran, taken, drives, motions, launches, guard: guardFired, stalled };
+  return {
+    timeline,
+    log,
+    endTime: t,
+    ran,
+    taken,
+    drives,
+    motions,
+    launches,
+    guard: guardFired,
+    stalled,
+  };
 }
 
 /** The robot's pose during a preview motion that is not a project path, else null (none today). */
@@ -536,7 +653,10 @@ export function motionPoseAt(
 ): { x: number; y: number; headingDeg: number } | null {
   for (const record of preview.motions) {
     if (time >= record.t0 - 1e-9 && time <= record.t1 + 1e-9) {
-      return poseAlong(record.motion, record.motion.distanceAt(time - record.t0));
+      return poseAlong(
+        record.motion,
+        record.motion.distanceAt(time - record.t0),
+      );
     }
   }
   return null;
@@ -565,10 +685,16 @@ function waitLimit(card: FirstOfCard, t0: number): number {
 
 export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
   const rows = new Map<string, (number | null)[]>();
-  const record = (id: string, index: number, count: number, value: number | null) => {
+  const record = (
+    id: string,
+    index: number,
+    count: number,
+    value: number | null,
+  ) => {
     const list = rows.get(id) ?? new Array<number | null>(count).fill(null);
     const current = list[index];
-    if (value !== null && (current === null || value > current)) list[index] = value;
+    if (value !== null && (current === null || value > current))
+      list[index] = value;
     rows.set(id, list);
   };
 
@@ -595,19 +721,36 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
         // A drive-through chain is one drive.
         const ids = [card.lineId];
         let j = i;
-        while (list[j]?.kind === "path" && (list[j] as { through?: boolean }).through && list[j + 1]?.kind === "path") {
+        while (
+          list[j]?.kind === "path" &&
+          (list[j] as { through?: boolean }).through &&
+          list[j + 1]?.kind === "path"
+        ) {
           j++;
           ids.push((list[j] as { lineId: string }).lineId);
         }
-        t += ids.length > 1 ? chainInfo(catalog, ids).seconds : catalog.byId.get(card.lineId)?.seconds ?? 0;
+        t +=
+          ids.length > 1
+            ? chainInfo(catalog, ids).seconds
+            : (catalog.byId.get(card.lineId)?.seconds ?? 0);
         i = j;
       } else if (card.kind === "rejoin") {
         const tail = rejoinTail(auto.cards, card.target);
         t += tail?.through.length
-          ? chainInfo(catalog, [card.lineId, ...tail.through.map((c) => c.lineId)]).seconds
-          : catalog.byId.get(card.lineId)?.seconds ?? 0;
+          ? chainInfo(catalog, [
+              card.lineId,
+              ...tail.through.map((c) => c.lineId),
+            ]).seconds
+          : (catalog.byId.get(card.lineId)?.seconds ?? 0);
         if (!tail || rejoins + 1 > MAX_REJOINS) return rest(t);
-        return endOf(tail.list, t, tail.index, (x) => x, rejoins + 1, recording);
+        return endOf(
+          tail.list,
+          t,
+          tail.index,
+          (x) => x,
+          rejoins + 1,
+          recording,
+        );
       } else {
         const limit = waitLimit(card, t);
         if (!Number.isFinite(limit)) return Infinity;
@@ -628,14 +771,24 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
           endOf(card.rows[k].cards, time, 0, fallsThrough, rejoins, false);
         });
         // …so those cards are worked out once, from there.
-        const afterwards = latest === -Infinity ? 0 : endOf(list, latest, i + 1, rest, rejoins, recording) - latest;
+        const afterwards =
+          latest === -Infinity
+            ? 0
+            : endOf(list, latest, i + 1, rest, rejoins, recording) - latest;
         let worst = -Infinity;
         times.forEach((time, k) => {
           if (time === null) {
             if (recording) record(card.id, k, card.rows.length, null);
             return;
           }
-          const end = endOf(card.rows[k].cards, time, 0, (x) => x + afterwards, rejoins, recording);
+          const end = endOf(
+            card.rows[k].cards,
+            time,
+            0,
+            (x) => x + afterwards,
+            rejoins,
+            recording,
+          );
           if (recording) record(card.id, k, card.rows.length, end);
           worst = Math.max(worst, end);
         });

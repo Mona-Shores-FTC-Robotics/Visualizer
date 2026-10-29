@@ -1,0 +1,25 @@
+TIP 1
+  command SpinUp
+  shoot   Fire the preloads (TIP 1) (up to 3 s, empty)
+  drive   START to S_CATCH
+  wait    TIP 1 (up to 4 s, tip)  ◆ miss: 2 steps, then back to Catch TIP 1's spill
+TIP 2
+  collect Catch TIP 1's spill (up to 1.5 s, full)
+  drive   S_CATCH to FAR_FLOWER_TURN
+  shoot   Fire the catch at the left CELL (up to 2 s, empty)
+  drive   FAR_FLOWER_TURN to FAR_FLOWER
+  collect The far FLOWER's 4 (up to 3 s, full)
+  drive   FAR_FLOWER to N_FIRE
+  shoot   Fire the far FLOWER's 4 (TIP 2) (up to 4 s, tip)
+TIP 3
+  collect TIP 2's spill lands (up to 0.5 s, full)
+  drive   N_FIRE to S_FIRE
+  drive   S_FIRE to LANE_FIRE
+  shoot   Fire TIP 2's catch at the right CELL (up to 2 s, empty)
+  drive   LANE_FIRE to WALL_FLOWER_TURN
+  drive   WALL_FLOWER_TURN to WALL_FLOWER
+  collect The wall FLOWER's 4 (up to 3 s, full)
+  drive   WALL_FLOWER to FIRE3
+  shoot   Fire the wall FLOWER's 4 (TIP 3) (up to 2.5 s, tip)
+Park
+  park    FIRE3 to PARK

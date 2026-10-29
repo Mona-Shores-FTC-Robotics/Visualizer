@@ -446,7 +446,15 @@
           preview={auto.preview}
           {x}
           {y}
-          showUntaken={auto.showUntaken}
+          showUntaken={auto.showUntaken && auto.view === "cards"}
+          onDecision={auto.view === "plan"
+            ? (id) => auto.toggleMiss(id)
+            : undefined}
+          missId={auto.miss}
+          decisionLabel={(id) => {
+            const step = auto.plan?.branches.find((s) => s.cardId === id);
+            return step?.tip ?? step?.label ?? "this wait";
+          }}
         />
       {/if}
 

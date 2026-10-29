@@ -1,0 +1,64 @@
+{
+  "auto": "r-quals",
+  "spec": "RQualsAuto,PartnerLeftVAuto@50",
+  "design": "rigid V",
+  "commit": "45f0bf1",
+  "ranAt": "2026-10-15T13:32:39.155093+00:00",
+  "runs": 60,
+  "driveSeconds": {
+    "START to S_CATCH": {
+      "median": 0.56,
+      "runs": 60
+    },
+    "S_CATCH to FAR_FLOWER_TURN": {
+      "median": 2.86,
+      "runs": 60
+    },
+    "FAR_FLOWER_TURN to FAR_FLOWER": {
+      "median": 0.46,
+      "runs": 60
+    },
+    "FAR_FLOWER to N_FIRE": {
+      "median": 1.08,
+      "runs": 60
+    },
+    "N_FIRE to S_FIRE": {
+      "median": 2.62,
+      "runs": 60
+    },
+    "S_FIRE to LANE_FIRE": {
+      "median": 1.12,
+      "runs": 60
+    },
+    "LANE_FIRE to WALL_FLOWER_TURN": {
+      "median": 1.26,
+      "runs": 60
+    },
+    "WALL_FLOWER_TURN to WALL_FLOWER": {
+      "median": 0.64,
+      "runs": 59
+    },
+    "WALL_FLOWER to FIRE3": {
+      "median": 1.44,
+      "runs": 56
+    }
+  },
+  "finishedAt": {
+    "median": 27.74,
+    "runs": 60
+  },
+  "tipAt": [
+    {
+      "median": 4.29,
+      "runs": 60
+    },
+    {
+      "median": 11.85,
+      "runs": 56
+    },
+    {
+      "median": 26.15,
+      "runs": 54
+    }
+  ]
+}

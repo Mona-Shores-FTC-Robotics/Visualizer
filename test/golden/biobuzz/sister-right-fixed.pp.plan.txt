@@ -1,0 +1,27 @@
+TIP 1
+  command SpinUp
+  drive   START to R_PRE
+  shoot   Preloads at the right CELL (TIP 1) (up to 3 s, empty)
+  drive   R_PRE to S_CATCH
+  wait    TIP 1 (up to 4 s, tip)  ◆ miss: 2 steps, then back to Catch TIP 1's spill
+TIP 2
+  collect Catch TIP 1's spill (up to 1.5 s, full)
+  wait    TIP 2 (L): the right CELL up (up to 9 s, tip)  ◆ miss: 3 steps, then back to R_N to PARK
+TIP 4
+  shoot   TIP 1's catch at the right CELL (up to 2 s, empty)
+  drive   S_CATCH to GARDEN_IN
+  drive   GARDEN_IN to GARDEN
+  collect The GARDEN's 4 (up to 1.5 s, full)
+  drive   GARDEN to R_S
+  wait    The right CELL up (up to 1.5 s, tip)  ◆ miss: 3 steps, then back to The left CELL up
+TIP 3
+  shoot   The GARDEN's 4 (TIP 3) (up to 2.5 s, tip)
+TIP 5
+  drive   R_S to WALL_FLOWER_TURN
+  drive   WALL_FLOWER_TURN to WALL_FLOWER
+  collect The wall FLOWER's 4 (up to 3 s, full)
+  drive   WALL_FLOWER to R_N
+  wait    The left CELL up (up to 4 s, tip)
+Park
+  shoot   R's 4 at the left CELL (TIP 4, with L) (up to 2 s, empty)
+  park    R_N to PARK

@@ -10,11 +10,13 @@ import {
   AUTO_LENGTH_S,
   simulateAuto,
   type PreviewResult,
+  type PreviewTiming,
   type Scenario,
 } from "../auto/simulate";
 import {
   FACTS,
   previewTiming,
+  TIP_CONDITIONS,
   tipsFrom,
   VOLLEY_COMMAND,
   type Tip,
@@ -42,7 +44,12 @@ function atSpeed(settings: Settings, speed: number): Settings {
   if (!(speed > 0) || Math.abs(speed - 1) < 1e-9) return settings;
   const s = settings as Settings & Record<string, number>;
   const scaled: Record<string, number> = {};
-  for (const key of ["maxVelocity", "forwardVelocity", "strafeVelocity", "aVelocity"]) {
+  for (const key of [
+    "maxVelocity",
+    "forwardVelocity",
+    "strafeVelocity",
+    "aVelocity",
+  ]) {
     if (typeof s[key] === "number") scaled[key] = s[key] * speed;
   }
   for (const key of ["maxAcceleration", "maxDeceleration"]) {
@@ -64,18 +71,45 @@ function sameTips(a: Tip[], b: Tip[]): boolean {
   );
 }
 
+/**
+ * A tip the robot waits for comes within one HIVE swing of the wait starting, unless the TIPs
+ * the volleys make bring it sooner. For an Auto previewed alone: nothing models the partner's
+ * Auto, so without this a wait for the partner's tip would never end and the good path (every
+ * tip comes) could not be shown.
+ */
+function tipsCome(timing: PreviewTiming, values: TimingValues): PreviewTiming {
+  const swing = Math.max(0, values.tipStartS) + Math.max(0, values.tipSwingS);
+  return {
+    ...timing,
+    trueAt(condition, t0) {
+      const modelled = timing.trueAt(condition, t0);
+      if (!TIP_CONDITIONS.includes(condition)) return modelled;
+      return Math.min(modelled ?? t0, t0 + swing);
+    },
+  };
+}
+
 export function previewTogether(
   entries: FieldEntry[],
   values: TimingValues,
   withLog = true,
+  options: { tipsCome?: boolean } = {},
 ): TogetherResult {
-  const catalogs = entries.map((e) =>
-    buildPathCatalog(
+  const speed = values.driveSpeed ?? 1;
+  const catalogs = entries.map((e) => {
+    const catalog = buildPathCatalog(
       e.startPoint,
       e.lines,
-      atSpeed(e.settings, values.driveSpeed ?? 1),
-    ),
-  );
+      atSpeed(e.settings, speed),
+    );
+    if (catalog.paths.length && atSpeed(e.settings, speed) !== e.settings) {
+      // The robot's endgame guard reserves the export's time, at the drawing's speed.
+      const drawn = buildPathCatalog(e.startPoint, e.lines, e.settings);
+      for (const path of catalog.paths)
+        path.drawnSeconds = drawn.byId.get(path.id)?.seconds;
+    }
+    return catalog;
+  });
   let tips: Tip[] = [];
   let previews: PreviewResult[] = [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -85,7 +119,9 @@ export function previewTogether(
         catalogs[i],
         e.startPoint,
         e.scenario,
-        previewTiming(values, tips),
+        options.tipsCome
+          ? tipsCome(previewTiming(values, tips), values)
+          : previewTiming(values, tips),
       ),
     );
     const next = tipsFrom(volleyEnds(previews), values);

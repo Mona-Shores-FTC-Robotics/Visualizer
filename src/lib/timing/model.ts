@@ -263,6 +263,9 @@ function cellUpFrom(tips: Tip[], t0: number, cell: "right" | "left"): number {
   return Infinity;
 }
 
+/** Conditions that mean "a CELL tipped". `Tip` is the camera's; the others are placeholders today. */
+export const TIP_CONDITIONS = ["Tip", "LeftCellUp", "RightCellUp"];
+
 /** Commands that leave the robot empty. */
 const EMPTIES = new Set([VOLLEY_COMMAND, "SetDown"]);
 
