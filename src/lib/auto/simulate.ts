@@ -15,12 +15,7 @@ import {
   rowLabel,
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
-import {
-  approachSeconds,
-  flowerFor,
-  pickMotions,
-  pickSpot,
-} from "../simple/flowers";
+import { pickFrom, pickMotions } from "../simple/flowers";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -456,20 +451,12 @@ export function simulateAuto(
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
-        // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): it drives to the
-        // pick spot first if the robot is not there (that time on top of its own), picks, and
-        // ends at the pick spot.
-        const flower = card.name === "PickFlower" ? flowerFor(pos.x, pos.y) : null;
-        if (flower) {
-          const from = { ...pos, headingDeg: heading };
-          const total = busy + approachSeconds(from, flower);
-          motions.push(...pickMotions(card.id, from, flower, t, total));
-          stay(total);
-          const spot = pickSpot(flower);
-          pos = { x: spot.x, y: spot.y };
-          heading = spot.headingDeg;
-          timing?.commandRan?.(card.name, t - total, t);
-          return null;
+        // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): straight ahead
+        // to its FLOWER and back to where it started, in the command's own time. A pick the robot
+        // would refuse just takes its time here; the builder marks it.
+        const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
+        if (pick?.ok) {
+          motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, pick.contact, t, busy));
         }
         stay(busy);
         timing?.commandRan?.(card.name, t - busy, t);

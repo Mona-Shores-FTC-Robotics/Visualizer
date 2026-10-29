@@ -437,9 +437,11 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   card, so files, preview and export are unchanged. A drive's heading turns from the step before
   to its spot's; a click on a FLOWER's line makes a spot on its pick spot (24 in out, square).
   Pick flower is biobuzz's `FlowerPicker`, the robot's one pick routine (D-pad up and the
-  PickFlower card): `flowers.ts` holds its numbers, and the preview (`simulate.ts` motions) draws
-  its approach when the robot is off the pick spot, the stick, the push in to 12 in, the dwell and
-  the back-out to the pick spot, where it ends. Its card gets an 8 s timeout. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
+  PickFlower card); `flowers.ts` holds its numbers. An Auto's pick does not line up first: the
+  preview (`simulate.ts` motions) draws the stick, the push straight ahead to 12 in from the
+  nearest FLOWER, the dwell and the back-out to where it started, where it ends. A pick the robot
+  would refuse (the FLOWER more than 6 in off the line ahead) is marked red. Its card gets an 8 s
+  timeout. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
   steps, the plan view otherwise; Advanced and ← Simple switch. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
   goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside

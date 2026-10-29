@@ -15,7 +15,7 @@ import { relink } from "../src/lib/auto/links";
 import { motionPoseAt, simulateAuto } from "../src/lib/auto/simulate";
 import { generateAutoJava } from "../src/lib/codegen/auto/javaAuto";
 import {
-  atPickSpot,
+  pickFrom,
   contactPose,
   flowerFor,
   FLOWERS,
@@ -103,9 +103,9 @@ describe("the simple builder", () => {
       "Park at PARK",
     ]);
     expect(steps[2].flower?.name).toBe("WALL FLOWER");
-    expect(steps[2].atSpot).toBe(true);
+    expect(steps[2].problem).toBeNull();
     expect(steps[6].flower?.name).toBe("FAR FLOWER");
-    expect(steps[6].atSpot).toBe(true);
+    expect(steps[6].problem).toBeNull();
   });
 
   it("turns each drive from the heading the step before left the robot at", () => {
@@ -154,7 +154,7 @@ describe("the simple builder", () => {
   it("parks by 30 s, and shows each pick as the robot's FlowerPicker does it", () => {
     const run = preview(rQualsV2());
     expect(run.endTime).toBeLessThan(30);
-    // Both picks start on their pick spots: stick, push, dwell, back; no approach.
+    // Each pick: stick, push, dwell, back.
     expect(run.motions).toHaveLength(8);
     const [stick, push, dwell, back] = run.motions;
     const wall = FLOWERS[0];
@@ -164,9 +164,9 @@ describe("the simple builder", () => {
       26.7,
       1,
     );
-    // It ends back on the pick spot, 24 in out, facing the FLOWER.
+    // It ends exactly where it started: WALL_PICK, facing the FLOWER.
     const end = motionPoseAt(run, back.t1)!;
-    expect(end.x).toBeCloseTo(pickSpot(wall).x, 6);
+    expect(end.x).toBeCloseTo(26.7, 6);
     expect(end.headingDeg).toBe(180);
     // The stick and the dwell are FlowerPicker's 0.7 s and 1.5 s; the card's 4 s in all.
     expect(stick.t1 - stick.t0).toBeCloseTo(0.7, 6);
@@ -175,17 +175,31 @@ describe("the simple builder", () => {
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 
-  it("drives to the pick spot first when the step before left the robot elsewhere", () => {
+  it("pushes straight ahead from wherever the drive left the robot, and back there", () => {
     let doc = fresh();
-    doc = addSpot(doc, "NEAR", 30, 52, 180); // 5 in off the WALL FLOWER's line
-    doc = add(doc, "drive", "NEAR");
+    doc = addSpot(doc, "BESIDE", 30, 50, 180); // 2.6 in off the WALL FLOWER's line
+    doc = add(doc, "drive", "BESIDE");
     doc = add(doc, "pick");
-    const steps = stepsOf(doc);
-    expect(steps[1].flower?.name).toBe("WALL FLOWER");
-    expect(steps[1].atSpot).toBe(false);
+    expect(stepsOf(doc)[1].problem).toBeNull();
     const run = preview(doc);
-    expect(run.motions).toHaveLength(5); // approach, stick, push, dwell, back
-    expect(run.motions[4].t1 - run.motions[0].t0).toBeGreaterThan(4);
+    expect(run.motions).toHaveLength(4); // stick, push, dwell, back: no line-up
+    const contact = motionPoseAt(
+      run,
+      (run.motions[2].t0 + run.motions[2].t1) / 2,
+    )!;
+    expect(contact.y).toBeCloseTo(50, 6); // straight ahead, not onto the FLOWER's line
+    expect(contact.x).toBeCloseTo(2.71 + 12, 6);
+    const end = motionPoseAt(run, run.motions[3].t1)!;
+    expect([end.x, end.y]).toEqual([30, 50]);
+  });
+
+  it("marks a pick the robot would refuse", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "OFF", 30, 60, 180); // 12.6 in off the WALL FLOWER's line
+    doc = add(doc, "drive", "OFF");
+    doc = add(doc, "pick");
+    expect(stepsOf(doc)[1].problem).toMatch(/off the robot's line ahead/);
+    expect(preview(doc).motions).toHaveLength(0);
   });
 
   it("removes and moves steps, a drive taking its path with it", () => {
@@ -222,11 +236,12 @@ describe("the simple builder", () => {
     if (java.ok) expect(java.source).toContain("PickFlower");
   });
 
-  it("picks the nearest FLOWER within 48 in, as the robot does, and knows its pick spot", () => {
+  it("picks the nearest FLOWER within 48 in, as the robot does", () => {
     expect(flowerFor(70, 70)).toBeNull();
     expect(flowerFor(26.7, 47.4)?.name).toBe("WALL FLOWER");
-    expect(atPickSpot(26.7, 47.4, 180, FLOWERS[0])).toBe(true);
-    expect(atPickSpot(26.7, 47.4, 170, FLOWERS[0])).toBe(false);
+    expect(pickFrom(26.7, 47.4, 180).ok).toBe(true);
+    expect(pickFrom(26.7, 47.4, 0).ok).toBe(false); // facing away
+    expect(pickFrom(14, 47.4, 180).ok).toBe(false); // already past the contact
     expect(pickSpot(FLOWERS[1])).toEqual({
       x: 47.36,
       y: 141.5 - 2.71 - 24,

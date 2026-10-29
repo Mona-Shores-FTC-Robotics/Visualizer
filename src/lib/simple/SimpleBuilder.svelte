@@ -72,7 +72,7 @@
       kind: "pick",
       label: "Pick flower",
       icon: Flower2,
-      hint: "Pick the nearest FLOWER (the robot's D-pad up pick) and come back to this spot",
+      hint: "The robot's D-pad up pick, straight ahead from here and back to this spot",
     },
     {
       kind: "park",
@@ -377,20 +377,14 @@
           </div>
         {:else if step.kind === "pick"}
           <div class="mt-1 pl-6 text-xs">
-            {#if step.flower && step.atSpot}
+            {#if step.flower && !step.problem}
               <span class="text-body"
-                >at the {step.flower.name}, comes back to this spot</span
-              >
-            {:else if step.flower}
-              <span class="text-warning"
-                >Not on the {step.flower.name}'s pick spot: the robot drives to
-                it first, and ends there. Drive to a spot on its line to save
-                the time.</span
+                >at the {step.flower.name}, straight ahead and back to this spot</span
               >
             {:else}
               <span class="text-danger"
-                >No FLOWER within 48 in: the robot won't pick here. Drive to a
-                FLOWER's pick spot first.</span
+                >{step.problem}: the robot won't pick here. Drive to a spot on a
+                FLOWER's line (click on its line to make one).</span
               >
             {/if}
           </div>

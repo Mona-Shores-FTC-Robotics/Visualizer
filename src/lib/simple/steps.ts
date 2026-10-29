@@ -19,7 +19,7 @@ import { createSegment } from "../../utils/normalize";
 import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type { AutoCard, AutoSection, NamedPoint } from "../auto/types";
-import { atPickSpot, flowerFor, pickSpot, type Flower } from "./flowers";
+import { pickFrom, type Flower } from "./flowers";
 
 export type StepKind = "launch" | "pick" | "drive" | "park" | "other";
 
@@ -34,8 +34,8 @@ export interface Step {
   lineId: string | null;
   /** Pick flower: the FLOWER the robot will pick (the nearest within range), or null for none. */
   flower?: Flower | null;
-  /** Pick flower: the robot is on that FLOWER's pick spot, so the pick needs no approach. */
-  atSpot?: boolean;
+  /** Pick flower: why the robot would refuse this pick, or null when it will pick. */
+  problem?: string | null;
 }
 
 /** The two places our Autos start, drawn for RED (the robot turns them for BLUE). */
@@ -73,14 +73,15 @@ export function stepsOf(doc: ProjectDoc): Step[] {
       return { ...base, kind: "launch", label: "Launch all" };
     }
     if (card.kind === "action" && card.name === PICK_FLOWER) {
-      const flower = flowerFor(here.x, here.y);
-      const atSpot = !!flower && atPickSpot(here.x, here.y, here.h, flower);
-      // A pick ends on its FLOWER's pick spot (FlowerPicker's contract).
-      if (flower) {
-        const spot = pickSpot(flower);
-        here = { x: spot.x, y: spot.y, h: spot.headingDeg };
-      }
-      return { ...base, kind: "pick", label: "Pick flower", flower, atSpot };
+      // A pick ends where it started (FlowerPicker's contract), so `here` stays.
+      const pick = pickFrom(here.x, here.y, here.h);
+      return {
+        ...base,
+        kind: "pick",
+        label: "Pick flower",
+        flower: pick.flower,
+        problem: pick.ok ? null : pick.why,
+      };
     }
     if (card.kind === "path") {
       const spot = spotOf(auto, doc.lines, card.lineId);

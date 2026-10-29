@@ -7,15 +7,17 @@
  * a turn about the field centre.
  *
  * The pick is biobuzz `opmodes/FlowerPicker`, the one routine the driver's D-pad up and an Auto's
- * PickFlower card both run, and every number here is one of its own. Change one, change the other:
- *   the nearest FLOWER within 48 in (maxRangeIn), else it refuses;
- *   approach: a path to 24 in back from the FLOWER, square to it (approachStandoffIn), skipped
- *     when already within 1.5 in and 5° of there (atApproachIn, atApproachDeg);
+ * PickFlower card both run, and every number here is one of its own. Change one, change the other.
+ * An Auto's card (what the preview shows) does not line up first: the Auto's drive has put the
+ * robot where it picks from.
+ *   the nearest FLOWER within 48 in (maxRangeIn); it refuses when that FLOWER is more than 6 in
+ *     off the robot's line ahead (aheadToleranceIn) or not far enough ahead to push;
  *   stick: 0.7 s for the stick to come down (stickDownMs);
- *   push: a path straight in to 12 in from the FLOWER's centre (contactStandoffIn);
+ *   push: a path straight ahead to 12 in from the FLOWER's centre (contactStandoffIn);
  *   dwell: 1.5 s (dwellMs);
- *   back: a path straight back out to the approach pose. So a pick that starts at the approach pose
- *     ends there: the pick spot an Auto drives to.
+ *   back: a path straight back to where the push started. So a pick ends where it started.
+ * A pick spot (approachStandoffIn, 24 in out, square to the FLOWER) is where the button lines up
+ * to, and where the builder puts a spot clicked on a FLOWER's line.
  */
 import { FIELD_SIZE } from "../../config/defaults";
 import type { BasePoint } from "../../types";
@@ -47,14 +49,11 @@ export const MAX_RANGE_IN = 48;
 export const APPROACH_STANDOFF_IN = 24;
 /** FlowerPicker.contactStandoffIn: where the push stops, from the FLOWER's centre. */
 export const CONTACT_STANDOFF_IN = 12;
-/** FlowerPicker.atApproachIn and atApproachDeg: already at the pick spot. */
-export const AT_APPROACH_IN = 1.5;
-export const AT_APPROACH_DEG = 5;
+/** FlowerPicker.aheadToleranceIn: how far off the line ahead the FLOWER may be, inches. */
+export const AHEAD_TOLERANCE_IN = 6;
 /** FlowerPicker.stickDownMs and dwellMs, in seconds. */
 const STICK_S = 0.7;
 const DWELL_S = 1.5;
-/** The preview's speed for an approach path, when one is needed, inches/s: an estimate. */
-const APPROACH_IN_PER_S = 30;
 
 const angleOff = (a: number, b: number) =>
   Math.abs(((a - b + 540) % 360) - 180);
@@ -101,18 +100,45 @@ export function contactPose(flower: Flower): {
   return standoff(flower, CONTACT_STANDOFF_IN);
 }
 
-/** Whether a robot at (x, y, headingDeg) is at `flower`'s pick spot, so the pick skips its approach. */
-export function atPickSpot(
-  x: number,
-  y: number,
-  headingDeg: number,
-  flower: Flower,
-): boolean {
-  const spot = pickSpot(flower);
-  return (
-    Math.hypot(x - spot.x, y - spot.y) <= AT_APPROACH_IN + 0.05 &&
-    angleOff(headingDeg, spot.headingDeg) <= AT_APPROACH_DEG
-  );
+/** What an Auto's pick from a pose does: where its push stops, or why the robot refuses. */
+export type PickFrom =
+  | {
+      ok: true;
+      flower: Flower;
+      contact: { x: number; y: number };
+      offIn: number;
+    }
+  | { ok: false; flower: Flower | null; why: string };
+
+/** An Auto's pick from (x, y, headingDeg), as FlowerPicker decides it. */
+export function pickFrom(x: number, y: number, headingDeg: number): PickFrom {
+  const flower = flowerFor(x, y);
+  if (!flower)
+    return { ok: false, flower, why: `No FLOWER within ${MAX_RANGE_IN} in` };
+  const rad = (headingDeg * Math.PI) / 180;
+  const dx = flower.x - x;
+  const dy = flower.y - y;
+  const ahead = dx * Math.cos(rad) + dy * Math.sin(rad);
+  const offIn = Math.abs(-dx * Math.sin(rad) + dy * Math.cos(rad));
+  if (offIn > AHEAD_TOLERANCE_IN)
+    return {
+      ok: false,
+      flower,
+      why: `The ${flower.name} is ${offIn.toFixed(1)} in off the robot's line ahead`,
+    };
+  const drive = ahead - CONTACT_STANDOFF_IN;
+  if (!(drive > 0.5))
+    return {
+      ok: false,
+      flower,
+      why: `The ${flower.name} is not far enough ahead to push`,
+    };
+  return {
+    ok: true,
+    flower,
+    contact: { x: x + drive * Math.cos(rad), y: y + drive * Math.sin(rad) },
+    offIn,
+  };
 }
 
 /**
@@ -132,64 +158,46 @@ export function flowerLinedUp(x: number, y: number): Flower | null {
   return null;
 }
 
-/** Seconds of approach a pick from `from` needs before its own time: none at the pick spot. */
-export function approachSeconds(
-  from: { x: number; y: number; headingDeg: number },
-  flower: Flower,
-): number {
-  if (atPickSpot(from.x, from.y, from.headingDeg, flower)) return 0;
-  const spot = pickSpot(flower);
-  const turn = angleOff(from.headingDeg, spot.headingDeg) / 180;
-  return Math.max(
-    0.5,
-    Math.hypot(spot.x - from.x, spot.y - from.y) / APPROACH_IN_PER_S + turn,
-  );
-}
-
 /**
- * The preview's picture of a pick lasting `busy` seconds from `t0`, its approach included: the
- * approach to the pick spot when the robot is not there, the stick coming down, the push in along
- * the FLOWER's line, the dwell, and the back-out to the pick spot. It ends at the pick spot.
+ * The preview's picture of an Auto's pick lasting `busy` seconds from `t0`, from `from`: the stick
+ * coming down, the push straight ahead to `contact`, the dwell, and the back-out to `from`, where it
+ * ends.
  */
 export function pickMotions(
   cardId: string,
   from: { x: number; y: number; headingDeg: number },
-  flower: Flower,
+  contact: { x: number; y: number },
   t0: number,
   busy: number,
 ): MotionRecord[] {
-  const spot = pickSpot(flower);
-  const contact = contactPose(flower);
-  const approach = Math.min(busy, approachSeconds(from, flower));
-  const pick = busy - approach;
   // The stick and the dwell take their own times; the push and back-out share what is left.
   const fixed = STICK_S + DWELL_S;
-  const scale = pick < fixed + 0.4 ? pick / (fixed + 0.4) : 1;
+  const scale = busy < fixed + 0.4 ? busy / (fixed + 0.4) : 1;
   const stick = STICK_S * scale;
   const dwell = DWELL_S * scale;
-  const leg = (pick - stick - dwell) / 2;
-  const at = (p: { x: number; y: number }): BasePoint => ({ x: p.x, y: p.y });
+  const leg = (busy - stick - dwell) / 2;
+  const home: BasePoint = { x: from.x, y: from.y };
+  const at: BasePoint = { x: contact.x, y: contact.y };
+  const h = from.headingDeg;
   const records: MotionRecord[] = [];
   let t = t0;
   const add = (seconds: number, motion: Motion) => {
     records.push({ cardId, t0: t, t1: t + seconds, motion });
     t += seconds;
   };
-  if (approach > 0)
-    add(approach, easedLine(at(from), at(spot), approach, null));
-  add(stick, easedLine(at(spot), at(spot), stick, spot.headingDeg));
-  add(leg, easedLine(at(spot), at(contact), leg, spot.headingDeg));
-  add(dwell, easedLine(at(contact), at(contact), dwell, spot.headingDeg));
-  add(leg, easedLine(at(contact), at(spot), leg, spot.headingDeg));
+  add(stick, easedLine(home, home, stick, h));
+  add(leg, easedLine(home, at, leg, h));
+  add(dwell, easedLine(at, at, dwell, h));
+  add(leg, easedLine(at, home, leg, h));
   return records;
 }
 
-/** A straight drive over `seconds`, easing in and out; `headingDeg` null faces along it. */
+/** A straight drive over `seconds`, easing in and out, holding `headingDeg`. */
 function easedLine(
   from: BasePoint,
   to: BasePoint,
   seconds: number,
-  headingDeg: number | null,
+  headingDeg: number,
 ): Motion {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   return {
