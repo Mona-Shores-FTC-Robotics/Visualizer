@@ -47,17 +47,45 @@ export interface Step {
   problem?: string | null;
 }
 
-/** The two places our Autos start, drawn for RED (the robot turns them for BLUE). */
-export const STARTS = {
-  // biobuzz StartPositions.RED_AUDIENCE: back on the audience wall, left side on the B-C seam.
-  right: { label: "Right start", pose: [55.17, 7.72, 90] as NamedPoint },
-  // The left-side Autos' start (L-Quals, L-Simple): back on the far wall, facing the audience.
-  left: { label: "Left start", pose: [59, 133.69, 270] as NamedPoint },
+/**
+ * Fork: the starts are team spots named START_… (lib/team/teamSpots.ts): the builder's start
+ * buttons are the team's START_ spots. These are the ones it knows before the team's list is read
+ * (or with no network), drawn for RED (the robot turns them for BLUE). START_RIGHT is biobuzz
+ * StartPositions.RED_AUDIENCE, measured: back on the audience wall, left side on the B-C seam.
+ * START_LEFT is where the left-side Autos (L-Quals, L-Simple) were drawn to start, not measured.
+ */
+export const DEFAULT_STARTS: Readonly<Record<string, NamedPoint>> = {
+  START_RIGHT: [55.17, 7.72, 90],
+  START_LEFT: [59, 133.69, 270],
 };
-export type StartSide = keyof typeof STARTS;
+/** Where a new Auto starts. */
+export const DEFAULT_START = "START_RIGHT";
 
-/** The named point the start sits on. */
-export const START_SPOT = "START";
+/** Whether a spot is a start: START_…, or an older file's START. */
+export function isStartName(name: string): boolean {
+  return name === "START" || name.startsWith("START_");
+}
+
+/** The starts to offer: the team's START_ spots, over the built-in ones. */
+export function startsFrom(
+  team: Readonly<Record<string, NamedPoint>>,
+): Record<string, NamedPoint> {
+  const out: Record<string, NamedPoint> = { ...DEFAULT_STARTS };
+  for (const [name, pose] of Object.entries(team))
+    if (name.startsWith("START_")) out[name] = pose;
+  return out;
+}
+
+/** "START_RIGHT" → "Right start". */
+export function startLabel(name: string): string {
+  const words = name
+    .replace(/^START_?/, "")
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean);
+  if (!words.length) return "Start";
+  return `${words.join(" ").replace(/^./, (c) => c.toUpperCase())} start`;
+}
 
 export const LAUNCH_ALL = "LaunchAll";
 export const PICK_FLOWER = "PickFlower";
@@ -143,7 +171,8 @@ export function stepsOf(doc: ProjectDoc): Step[] {
 export function blankAuto(doc: ProjectDoc): ProjectDoc {
   return setStart(
     { ...doc, lines: [], sequence: [], auto: createEmptyAuto() },
-    "right",
+    DEFAULT_START,
+    DEFAULT_STARTS[DEFAULT_START],
   );
 }
 
@@ -152,29 +181,54 @@ export function isSimple(doc: ProjectDoc): boolean {
   return stepsOf(doc).every((step) => step.kind !== "other");
 }
 
-/** Which of our two starts the Auto begins at, or null for any other start. */
-export function startSide(doc: ProjectDoc): StartSide | null {
+/**
+ * The start spot the Auto begins on (START_…), or null for any other start. An older Auto (its
+ * start named START, or none) whose start sits on one of `starts` counts as that one.
+ */
+export function startName(
+  doc: ProjectDoc,
+  starts: Readonly<Record<string, NamedPoint>> = DEFAULT_STARTS,
+): string | null {
+  const at = doc.auto?.startAt;
+  if (at && at.startsWith("START_")) return at;
   const { x, y, headingDeg } = doc.startPoint;
-  for (const side of Object.keys(STARTS) as StartSide[]) {
-    const [sx, sy, sh] = STARTS[side].pose;
+  for (const [name, [sx, sy, sh]] of Object.entries(starts)) {
     if (
       Math.abs(x - sx) < 0.05 &&
       Math.abs(y - sy) < 0.05 &&
       Math.abs(headingDeg - (sh ?? 0)) < 0.5
-    ) {
-      return side;
-    }
+    )
+      return name;
   }
   return null;
 }
 
-/** Starts the Auto at one of our starts: the robot is placed there, on the START spot. */
-export function setStart(doc: ProjectDoc, side: StartSide): ProjectDoc {
+/**
+ * Starts the Auto on the start spot `name`, linked to the team's list: the robot is placed there.
+ * The start it leaves goes, unless a drive ends on it.
+ */
+export function setStart(
+  doc: ProjectDoc,
+  name: string,
+  pose: NamedPoint,
+): ProjectDoc {
   return edit(doc, (next, auto) => {
-    const [x, y, h] = STARTS[side].pose;
+    const [x, y, h] = pose;
+    const old = auto.startAt;
     next.startPoint = { ...next.startPoint, x, y, headingDeg: h ?? 0 };
-    auto.points[START_SPOT] = [x, y, h ?? 0];
-    auto.startAt = START_SPOT;
+    auto.points[name] = [x, y, h ?? 0];
+    auto.startAt = name;
+    auto.teamSpots = [...new Set([...(auto.teamSpots ?? []), name])].sort();
+    if (
+      old &&
+      old !== name &&
+      isStartName(old) &&
+      !Object.values(auto.pathEnds).includes(old)
+    ) {
+      delete auto.points[old];
+      auto.teamSpots = auto.teamSpots.filter((n) => n !== old);
+    }
+    if (!auto.teamSpots.length) delete auto.teamSpots;
   });
 }
 

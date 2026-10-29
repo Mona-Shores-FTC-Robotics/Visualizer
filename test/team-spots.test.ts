@@ -62,14 +62,15 @@ describe("team spots", () => {
 
   it("links a spot into an Auto, saves it, and unlinks it", () => {
     const doc = linked();
-    expect(doc.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "PARK"]);
+    expect(doc.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "PARK", "START_RIGHT"]);
     const again = parseProject(serializeProject(doc), robotConfigOf(settings));
     expect(again.ok && again.doc.auto!.teamSpots).toEqual([
       "LAUNCH_LEFT",
       "PARK",
+      "START_RIGHT",
     ]);
     const own = unlinkSpot(doc, "PARK");
-    expect(own.auto!.teamSpots).toEqual(["LAUNCH_LEFT"]);
+    expect(own.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "START_RIGHT"]);
     expect(own.auto!.points.PARK).toEqual(TEAM.PARK);
   });
 
@@ -174,5 +175,14 @@ describe("saving team spots", () => {
     expect(plan.ok && Object.keys(plan.files)).toEqual([
       "TeamCode/autos/spots.json",
     ]);
+  });
+});
+
+describe("starts as team spots", () => {
+  it("moves an Auto's start when its START_ spot moves", () => {
+    const doc = linked();
+    const moved = applyTeamSpots(doc, { START_RIGHT: [56, 8, 90] });
+    expect(moved.startPoint).toMatchObject({ x: 56, y: 8, headingDeg: 90 });
+    expect(moved.auto!.points.START_RIGHT).toEqual([56, 8, 90]);
   });
 });

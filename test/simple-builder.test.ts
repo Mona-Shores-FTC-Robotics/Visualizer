@@ -32,7 +32,10 @@ import {
   removeStep,
   setSpotHeading,
   setStart,
-  startSide,
+  startName,
+  DEFAULT_STARTS,
+  startLabel,
+  startsFrom,
   stepsOf,
   type StepKind,
 } from "../src/lib/simple/steps";
@@ -81,13 +84,38 @@ describe("the simple builder", () => {
     const doc = fresh();
     expect(doc.auto!.cards).toEqual([]);
     expect(doc.lines).toEqual([]);
-    expect(startSide(doc)).toBe("right");
+    expect(startName(doc)).toBe("START_RIGHT");
+    expect(doc.auto!.teamSpots).toEqual(["START_RIGHT"]);
     expect([
       doc.startPoint.x,
       doc.startPoint.y,
       doc.startPoint.headingDeg,
     ]).toEqual([55.17, 7.72, 90]);
-    expect(startSide(setStart(doc, "left"))).toBe("left");
+    const left = setStart(doc, "START_LEFT", DEFAULT_STARTS.START_LEFT);
+    expect(startName(left)).toBe("START_LEFT");
+    // The start it left goes with it.
+    expect(left.auto!.points.START_RIGHT).toBeUndefined();
+    expect(left.auto!.teamSpots).toEqual(["START_LEFT"]);
+    expect(left.startPoint).toMatchObject({
+      x: 59,
+      y: 133.69,
+      headingDeg: 270,
+    });
+  });
+
+  it("offers the team's START_ spots as starts", () => {
+    const starts = startsFrom({
+      START_RIGHT: [55.17, 7.72, 90],
+      START_CORNER: [10, 10, 45],
+      PARK: [14, 100, 270],
+    });
+    expect(Object.keys(starts).sort()).toEqual([
+      "START_CORNER",
+      "START_LEFT",
+      "START_RIGHT",
+    ]);
+    expect(startLabel("START_RIGHT")).toBe("Right start");
+    expect(startLabel("START_FAR_WALL")).toBe("Far wall start");
   });
 
   it("reads back as the steps it was built from", () => {

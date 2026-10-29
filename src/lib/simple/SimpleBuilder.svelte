@@ -42,12 +42,12 @@
     removeStep,
     setSpotHeading,
     setStart,
+    isStartName,
+    startLabel,
+    startName,
+    startsFrom,
     setStepSpot,
-    startSide,
-    STARTS,
-    START_SPOT,
     stepsOf,
-    type StartSide,
     type Step,
     type StepKind,
   } from "./steps";
@@ -119,19 +119,21 @@
   let steps = $derived(stepsOf(doc));
   /** Fork: the spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
   let parks = $derived(spotParks(doc, auto.catalog));
-  let side = $derived(startSide(doc));
+  /** Fork: the start buttons, the team's START_ spots (steps.ts startsFrom). */
+  let starts = $derived(startsFrom($teamSpots));
+  let side = $derived(startName(doc, starts));
   /** Fork: spots linked to the team's list (lib/team/teamSpots.ts). */
   let linkedSpots = $derived(new Set(doc.auto?.teamSpots ?? []));
   /** This Auto's own spots. */
   let ownSpots = $derived(
     Object.keys(doc.auto?.points ?? {})
-      .filter((name) => name !== START_SPOT && !linkedSpots.has(name))
+      .filter((name) => !isStartName(name) && !linkedSpots.has(name))
       .sort(),
   );
   /** The team's spots, and any this Auto links that the list does not have (yet). */
   let teamNames = $derived(
     [...new Set([...Object.keys($teamSpots), ...linkedSpots])]
-      .filter((name) => name !== START_SPOT && !ownSpots.includes(name))
+      .filter((name) => !isStartName(name) && !ownSpots.includes(name))
       .sort(),
   );
   let spots = $derived([...ownSpots, ...teamNames]);
@@ -175,8 +177,8 @@
     if (next !== doc) project.apply(() => next);
   }
 
-  function chooseStart(choice: StartSide) {
-    apply(setStart(doc, choice));
+  function chooseStart(name: string) {
+    apply(setStart(doc, name, starts[name]));
   }
 
   function add(kind: AddKind, index = insertIndex()) {
@@ -195,9 +197,7 @@
   /** The document with the team spot `name` linked in, if it is one and is not yet. */
   function withTeamSpot(base: typeof doc, name: string): typeof doc {
     const pose = $teamSpots[name];
-    return pose && !base.auto?.points[name]
-      ? linkSpot(base, name, pose)
-      : base;
+    return pose && !base.auto?.points[name] ? linkSpot(base, name, pose) : base;
   }
 
   function addAt(kind: AddKind, index: number, spot: string) {
@@ -348,8 +348,6 @@
   }
 
   const fmt = (s: number) => s.toFixed(1);
-
-
 </script>
 
 {#snippet spotOptions()}
@@ -360,7 +358,8 @@
   {/if}
   {#if teamNames.length}
     <optgroup label="Team spots">
-      {#each teamNames as name (name)}<option value={name}>{name}</option>{/each}
+      {#each teamNames as name (name)}<option value={name}>{name}</option
+        >{/each}
     </optgroup>
   {/if}
 {/snippet}
@@ -418,12 +417,13 @@
   </div>
 
   <div class="grid grid-cols-2 gap-1.5" role="group" aria-label="Start">
-    {#each Object.entries(STARTS) as [key, start] (key)}
+    {#each Object.keys(starts).sort().reverse() as name (name)}
       <button
         type="button"
-        class={["simple-start", side === key && "simple-start--on"]}
-        aria-pressed={side === key}
-        onclick={() => chooseStart(key as StartSide)}>{start.label}</button
+        class={["simple-start", side === name && "simple-start--on"]}
+        aria-pressed={side === name}
+        title={`${name}: a team spot`}
+        onclick={() => chooseStart(name)}>{startLabel(name)}</button
       >
     {/each}
   </div>
