@@ -28,11 +28,21 @@
     overlays: Overlays;
     hidden?: boolean;
     onHide: () => void;
-    /** Fork: opens Save to GitHub, for the simple builder's Save. */
+    /** Fork: the simple builder's Save to computer, Share link and GitHub. */
     onSave: () => void;
+    onShare: () => void;
+    onGithub: () => void;
   }
 
-  let { settings, overlays, hidden = false, onHide, onSave }: Props = $props();
+  let {
+    settings,
+    overlays,
+    hidden = false,
+    onHide,
+    onSave,
+    onShare,
+    onGithub,
+  }: Props = $props();
 
   const project = useProject();
   const editor = useEditor();
@@ -82,17 +92,20 @@
   <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
     {#if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
-      <div class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}>
+      <div
+        class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}
+      >
         {#if auto.view !== "simple"}
           <button
             type="button"
             class="mb-1 self-start px-1 text-xs text-body underline"
             onclick={() => (auto.view = "simple")}
-            title="Back to the simple builder: our robot's steps">← Simple</button
+            title="Back to the simple builder: our robot's steps"
+            >← Simple</button
           >
         {/if}
         {#if auto.view === "simple"}
-          <SimpleBuilder {onSave} onExport={exportAuto} />
+          <SimpleBuilder {onSave} {onShare} {onGithub} onExport={exportAuto} />
         {:else if auto.view === "plan" && auto.plan}
           <PlanPanel
             onExport={exportAuto}
@@ -160,51 +173,51 @@
     </PanelSection>
 
     {#if auto.view !== "simple"}
-    <PanelSection title="Robot">
-      {@const pose = playback.robotPose}
-      {@const readouts = [
-        { label: "X", value: pose.x.toFixed(1), unit: "in" },
-        { label: "Y", value: pose.y.toFixed(1), unit: "in" },
-        { label: "Heading", value: pose.heading.toFixed(0), unit: "°" },
-        { label: "t", value: pose.t?.toFixed(3) ?? "–", unit: "" },
-      ]}
-      <dl class="grid grid-cols-2 gap-1.5 px-1" aria-label="Robot pose">
-        {#each readouts as { label, value, unit } (label)}
-          <div
-            class="flex flex-col gap-0.5 rounded-lg border border-border bg-base/60 px-2.5 py-1.5"
-          >
-            <dt
-              class="text-[10px] font-medium tracking-wide text-body uppercase"
+      <PanelSection title="Robot">
+        {@const pose = playback.robotPose}
+        {@const readouts = [
+          { label: "X", value: pose.x.toFixed(1), unit: "in" },
+          { label: "Y", value: pose.y.toFixed(1), unit: "in" },
+          { label: "Heading", value: pose.heading.toFixed(0), unit: "°" },
+          { label: "t", value: pose.t?.toFixed(3) ?? "–", unit: "" },
+        ]}
+        <dl class="grid grid-cols-2 gap-1.5 px-1" aria-label="Robot pose">
+          {#each readouts as { label, value, unit } (label)}
+            <div
+              class="flex flex-col gap-0.5 rounded-lg border border-border bg-base/60 px-2.5 py-1.5"
             >
-              {label}
-            </dt>
-            <dd
-              class="flex items-baseline gap-1 font-mono text-sm text-heading tabular-nums"
-            >
-              {value}
-              {#if unit}<span class="text-[10px] text-body">{unit}</span>{/if}
-            </dd>
+              <dt
+                class="text-[10px] font-medium tracking-wide text-body uppercase"
+              >
+                {label}
+              </dt>
+              <dd
+                class="flex items-baseline gap-1 font-mono text-sm text-heading tabular-nums"
+              >
+                {value}
+                {#if unit}<span class="text-[10px] text-body">{unit}</span>{/if}
+              </dd>
+            </div>
+          {/each}
+        </dl>
+        <!-- The padding widens the hover target beyond the thin bar. -->
+        <div
+          class="mx-1 mt-0.5 cursor-help py-1.5"
+          role="progressbar"
+          title="t: how far the robot is along the current path segment, from 0 (start) to 1 (end)"
+          aria-label="Progress along the current segment"
+          aria-valuemin={0}
+          aria-valuemax={1}
+          aria-valuenow={pose.t ?? 0}
+        >
+          <div class="h-1 overflow-hidden rounded-full bg-border">
+            <div
+              class="h-full rounded-full bg-primary"
+              style={`width: ${(pose.t ?? 0) * 100}%`}
+            ></div>
           </div>
-        {/each}
-      </dl>
-      <!-- The padding widens the hover target beyond the thin bar. -->
-      <div
-        class="mx-1 mt-0.5 cursor-help py-1.5"
-        role="progressbar"
-        title="t: how far the robot is along the current path segment, from 0 (start) to 1 (end)"
-        aria-label="Progress along the current segment"
-        aria-valuemin={0}
-        aria-valuemax={1}
-        aria-valuenow={pose.t ?? 0}
-      >
-        <div class="h-1 overflow-hidden rounded-full bg-border">
-          <div
-            class="h-full rounded-full bg-primary"
-            style={`width: ${(pose.t ?? 0) * 100}%`}
-          ></div>
         </div>
-      </div>
-    </PanelSection>
+      </PanelSection>
     {/if}
   </div>
 </aside>

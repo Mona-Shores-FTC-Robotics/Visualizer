@@ -7,7 +7,12 @@
   import FieldPanel from "./view/FieldPanel.svelte";
   import Inspector from "./view/Inspector.svelte";
   import AppDialogs from "./view/AppDialogs.svelte";
-  import { createActions, shortcutsFor, type ActionDeps } from "./view/actions";
+  import {
+    actionById,
+    createActions,
+    shortcutsFor,
+    type ActionDeps,
+  } from "./view/actions";
   import { installShortcuts } from "./lib/shortcuts";
   import { createDefaultProject, robotConfigOf } from "./io";
   import { DEFAULT_SETTINGS, FIELD_SIZE } from "./config";
@@ -148,7 +153,9 @@
         {overlays}
         hidden={leftHidden}
         onHide={() => layout.toggle("left")}
-        onSave={() => (dialogs.github = true)}
+        onSave={() => actionById(actions, "file.saveAs").run()}
+        onShare={() => actionById(actions, "export.shareLink").run()}
+        onGithub={() => (dialogs.github = true)}
       />
 
       <PanelDivider

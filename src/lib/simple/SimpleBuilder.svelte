@@ -16,7 +16,7 @@
   import { useAuto } from "../../state/auto.svelte";
   import { usePlayback } from "../../state/playback.svelte";
   import { parseSelection, selectedCardId, spotPicker } from "../auto/store";
-  import { AUTO_LENGTH_S } from "../auto/simulate";
+  import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
   import { fieldClass } from "../components/ui/styles";
   import { flowerLinedUp, pickSpot } from "./flowers";
   import {
@@ -39,12 +39,16 @@
   } from "./steps";
 
   interface Props {
-    /** Opens Save to GitHub. */
+    /** Downloads the .pp file. */
     onSave: () => void;
+    /** Makes a link that opens this Auto. */
+    onShare: () => void;
+    /** The mentors' Save to GitHub and simulate. */
+    onGithub: () => void;
     onExport: () => void;
   }
 
-  let { onSave, onExport }: Props = $props();
+  let { onSave, onShare, onGithub, onExport }: Props = $props();
 
   const project = useProject();
   const auto = useAuto();
@@ -255,6 +259,15 @@
   }
 
   const fmt = (s: number) => s.toFixed(1);
+
+  /**
+   * The latest the endgame guard sends the robot to park (simulate.ts guardSeconds): the park
+   * drive's time plus its margin, before 30 s.
+   */
+  function parkLeaveBy(step: Step): number | null {
+    const path = step.lineId ? auto.catalog?.byId.get(step.lineId) : undefined;
+    return path ? AUTO_LENGTH_S - guardSeconds(path) : null;
+  }
 </script>
 
 <div class="simple flex flex-col gap-3 px-1 pb-2 text-sm">
@@ -278,13 +291,28 @@
     <button
       type="button"
       class="simple-tile flex-1 justify-center"
-      onclick={onSave}>Save to GitHub</button
+      title="Download this Auto's .pp file, to keep or to give to a mentor"
+      onclick={onSave}>Save to computer</button
     >
+    <button
+      type="button"
+      class="simple-tile flex-1 justify-center"
+      title="A link that opens this Auto: paste it in the GitHub issue or send it to a mentor"
+      onclick={onShare}>Share link</button
+    >
+  </div>
+  <div class="-mt-2 flex items-center justify-end gap-3">
     <button
       type="button"
       class="text-xs text-body underline"
       onclick={onExport}
-      title="Download the Java for the robot">Java</button
+      title="Download the Java for the robot (mentors)">Java</button
+    >
+    <button
+      type="button"
+      class="text-xs text-body underline"
+      onclick={onGithub}
+      title="Save to GitHub and simulate (mentors)">GitHub…</button
     >
     <button
       type="button"
@@ -385,6 +413,13 @@
           </div>
           {#if step.problem}
             <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
+          {:else if step.kind === "park" && parkLeaveBy(step) !== null}
+            <p class="mt-1 pl-6 text-xs text-body">
+              If time runs short, the robot stops what it's doing (never a
+              drive) and parks here. It leaves for {step.spot} by {fmt(
+                parkLeaveBy(step)!,
+              )} s at the latest.
+            </p>
           {/if}
         {:else if step.kind === "gather"}
           <div class="mt-1 pl-6 text-xs">
@@ -415,6 +450,12 @@
       </li>
     {/each}
 
+    {#if steps.length && !steps.some((step) => step.kind === "park")}
+      <li class="px-1 text-xs text-warning">
+        No Park step: add one, so the robot parks by 30 s even when a step runs
+        long.
+      </li>
+    {/if}
     <li
       class={["simple-end", dropAt === steps.length && "simple-step--drop"]}
       ondragover={(e) => dragOver(e, steps.length)}
