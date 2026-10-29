@@ -119,6 +119,12 @@ export interface Settings {
   kFriction: number;
   rLength: number; // inches along the heading
   rWidth: number; // inches side to side
+  /**
+   * Fork: how far the box's centre sits ahead of the robot's centre, inches. A robot whose body
+   * reaches further forward than back (a part sticking out of the front) is drawn and checked for
+   * collisions as a box that starts at its back and ends at its front. 0 when unset.
+   */
+  rForward?: number;
   safetyMargin: number;
   /**
    * Fork: the speed the robot's profile tops out at, inches/sec. Without it
@@ -164,6 +170,7 @@ export type RobotConfig = Pick<
   | "kFriction"
   | "rLength"
   | "rWidth"
+  | "rForward"
   | "safetyMargin"
   | "maxVelocity"
   | "maxAcceleration"

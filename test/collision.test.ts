@@ -412,3 +412,25 @@ describe("collision performance", () => {
     expect(perCall).toBeLessThan(5);
   });
 });
+
+describe("a box ahead of the robot's centre (fork: rForward)", () => {
+  it("shifts the footprint along the heading, and only along it", () => {
+    const robot = { rLength: 17.5, rWidth: 16, safetyMargin: 0 };
+    const pose = { x: 50, y: 50, heading: 90 };
+    const centred = robotFootprint(pose, robot);
+    const ahead = robotFootprint(pose, { ...robot, rForward: 1.03 });
+    const ys = (corners: BasePoint[]) => corners.map((c) => c.y);
+    // Facing +y: the box reaches 7.72 in behind the centre and 9.78 ahead.
+    expect(Math.min(...ys(ahead))).toBeCloseTo(50 - 7.72, 6);
+    expect(Math.max(...ys(ahead))).toBeCloseTo(50 + 9.78, 6);
+    expect(ahead.map((c) => c.x)).toEqual(centred.map((c) => c.x));
+  });
+
+  it("is the centred box when unset", () => {
+    const robot = { rLength: 18, rWidth: 18, safetyMargin: 1 };
+    const pose = { x: 10, y: 20, heading: 37 };
+    expect(robotFootprint(pose, { ...robot, rForward: 0 })).toEqual(
+      robotFootprint(pose, robot),
+    );
+  });
+});

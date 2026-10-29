@@ -9,7 +9,7 @@
     type PointAddress,
   } from "../model/commands";
   import { atomicSegments, segmentStartById } from "../utils/pathTraversal";
-  import { robotFootprint } from "../model/collision";
+  import { boxCentre, robotFootprint } from "../model/collision";
   import { generateGhostPathPoints, generateOnionLayers } from "../model/sweep";
   import { robotPoseAt } from "../sim/pose";
   import { smoothStrokePreview } from "../lib/pen/strokeFitting";
@@ -167,6 +167,9 @@
     xy: { x: x(pose.x), y: y(pose.y) },
     heading: -pose.heading,
   });
+  /** Fork: the sprite for the robot's box, which may sit ahead of its centre (`rForward`). */
+  const boxSprite = (pose: { x: number; y: number; heading: number }) =>
+    sprite({ ...boxCentre(pose, settings), heading: pose.heading });
 
   type DragTarget =
     | { kind: "project"; address: PointAddress }
@@ -486,7 +489,7 @@
 
       {#if overlays.active}
         {#each playback.overlayPoses as pose, index (index)}
-          {@const { xy, heading } = sprite(pose)}
+          {@const { xy, heading } = boxSprite(pose)}
           <RobotSprite
             {xy}
             {heading}
@@ -502,7 +505,7 @@
           />
         {/each}
       {:else}
-        {@const { xy, heading } = sprite(playback.robotPose)}
+        {@const { xy, heading } = boxSprite(playback.robotPose)}
         <RobotSprite
           {xy}
           {heading}

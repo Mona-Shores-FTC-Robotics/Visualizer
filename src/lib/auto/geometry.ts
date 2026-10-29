@@ -12,7 +12,7 @@ import {
   type FlatSegment,
 } from "../../utils/pathTraversal";
 import { segmentHeadingAt } from "../../utils/headingInterpolation";
-import { motionProfile, runDistanceAt } from "../../sim/motionProfile";
+import { runDistanceAt } from "../../sim/motionProfile";
 
 /**
  * What the Auto needs to know about one of the project's paths.

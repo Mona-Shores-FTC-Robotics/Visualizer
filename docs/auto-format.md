@@ -404,6 +404,10 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   autosave, overlays and saves carry it from there.
 - `src/types.ts`, `src/io/robot.ts`, `src/sim/motionProfile.ts` — `maxVelocity`
   in the robot block, and the profile's cap.
+- `src/types.ts`, `src/io/robot.ts`, `src/model/collision.ts`,
+  `src/view/FieldPanel.svelte`, `src/lib/components/settings/RobotSettingsSection.svelte`
+  — `rForward` in the robot block: the box (drawing and collision footprint) sits that many
+  inches ahead of the robot's centre, for a robot that reaches further forward than back.
 - `src/utils/timeCalculator.ts`, `src/sim/pose.ts`, `src/types.ts` (`TravelRun`)
   — one motion profile per exported path (see `test/chained-timing.test.ts`).
 - `src/state/project.svelte.ts` — `amend()` (pins and link paths adjust the

@@ -7,6 +7,7 @@ export const ROBOT_CONFIG_KEYS = [
   "kFriction",
   "rLength",
   "rWidth",
+  "rForward",
   "safetyMargin",
   "maxVelocity",
   "maxAcceleration",

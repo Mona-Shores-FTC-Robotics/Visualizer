@@ -43,18 +43,40 @@ export interface CollisionOptions {
   angleStep?: number;
 }
 
-type Footprint = Pick<RobotConfig, "rLength" | "rWidth" | "safetyMargin">;
+type Footprint = Pick<
+  RobotConfig,
+  "rLength" | "rWidth" | "rForward" | "safetyMargin"
+>;
 
 const DEFAULT_ANGLE_STEP = 5;
 /** Bisection rounds when locating where contact begins or ends. */
 const BOUNDARY_ROUNDS = 12;
 
+/**
+ * Fork: where the robot's box is centred at `pose` (heading in degrees): `rForward` inches ahead of
+ * the robot's centre, along its heading.
+ */
+export function boxCentre(
+  pose: { x: number; y: number; heading: number },
+  robot: Pick<RobotConfig, "rForward">,
+): BasePoint {
+  const ahead = Number.isFinite(robot.rForward)
+    ? (robot.rForward as number)
+    : 0;
+  const rad = (pose.heading * Math.PI) / 180;
+  return {
+    x: pose.x + ahead * Math.cos(rad),
+    y: pose.y + ahead * Math.sin(rad),
+  };
+}
+
 /** The robot rectangle at `pose`, grown by the safety margin on every side. */
 export function robotFootprint(pose: Pose, robot: Footprint): BasePoint[] {
   const margin = Math.max(0, robot.safetyMargin || 0);
+  const centre = boxCentre(pose, robot);
   return getRobotCorners(
-    pose.x,
-    pose.y,
+    centre.x,
+    centre.y,
     pose.heading,
     robot.rLength + 2 * margin,
     robot.rWidth + 2 * margin,

@@ -52,6 +52,17 @@
   </div>
 
   <NumberField
+    id="robot-forward"
+    label="Box ahead of centre (in)"
+    description="How far the box's middle sits ahead of the robot's centre, for a robot that reaches further forward than back."
+    value={robot.rForward ?? 0}
+    min={-12}
+    max={12}
+    step={0.25}
+    onInput={(v) => setNumber(v, "rForward", -12, 12)}
+  />
+
+  <NumberField
     id="safety-margin"
     label="Safety margin (in)"
     description="Buffer kept around obstacles."
