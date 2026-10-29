@@ -58,7 +58,7 @@ export async function refreshTeamSpots(): Promise<void> {
     spotsStatus.set("ok");
   } catch (error) {
     spotsStatus.set(
-      `Could not read the team's spots: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not read the team's spots from GitHub (${error instanceof Error ? error.message : String(error)}): a school network may block raw.githubusercontent.com.`,
     );
   }
 }

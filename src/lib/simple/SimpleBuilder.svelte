@@ -27,6 +27,8 @@
   import {
     discardSpotEdits,
     editSpot,
+    refreshTeamSpots,
+    spotsStatus,
     saveSpotsOpen,
     setSpotUnlocked,
     spotEdits,
@@ -428,6 +430,18 @@
     {/each}
   </div>
 
+  {#if $spotsStatus !== "ok" && $spotsStatus !== "loading"}
+    <div class="simple-pending flex items-center gap-1.5" role="alert">
+      <p class="flex-1 text-xs text-warning">
+        {$spotsStatus} Team spots and starts from biobuzz are missing until it can.
+      </p>
+      <button
+        type="button"
+        class="text-xs text-body underline"
+        onclick={() => void refreshTeamSpots()}>Try again</button
+      >
+    </div>
+  {/if}
   {#if Object.keys($spotEdits).length}
     <div class="simple-pending flex flex-col gap-1.5" role="status">
       <p class="text-xs text-heading">
