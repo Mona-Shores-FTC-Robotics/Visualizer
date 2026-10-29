@@ -5,6 +5,8 @@
   import { clampNumberInput } from "../../settings/numericSetting";
   import { updateRobot } from "../../../model/commands";
   import { useProject } from "../../../state/project.svelte";
+  import { TEAM_ROBOT_BOX } from "../../auto/teamRobot";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     /** Display preferences: the robot image. */
@@ -15,6 +17,11 @@
 
   const project = useProject();
   let robot = $derived(project.doc.robot);
+  let isTeamBox = $derived(
+    robot.rLength === TEAM_ROBOT_BOX.rLength &&
+      robot.rWidth === TEAM_ROBOT_BOX.rWidth &&
+      (robot.rForward ?? 0) === TEAM_ROBOT_BOX.rForward,
+  );
 
   function setNumber(
     value: string,
@@ -30,6 +37,22 @@
 </script>
 
 <div class="flex flex-col gap-3 px-1">
+  <div class="flex items-center gap-2">
+    <Button
+      size="sm"
+      disabled={isTeamBox}
+      title={`Length ${TEAM_ROBOT_BOX.rLength}, Width ${TEAM_ROBOT_BOX.rWidth}, Box ahead of centre ${TEAM_ROBOT_BOX.rForward}`}
+      onclick={() => project.apply(updateRobot({ ...TEAM_ROBOT_BOX }))}
+    >
+      Use our robot
+    </Button>
+    <span class="text-xs text-body">
+      {isTeamBox
+        ? "This file has our robot's size."
+        : "Sets this file to our robot's size."}
+    </span>
+  </div>
+
   <div class="grid grid-cols-2 gap-2">
     <NumberField
       id="robot-length"
@@ -73,5 +96,5 @@
     onInput={(v) => setNumber(v, "safetyMargin", 0, 24)}
   />
 
-  <RobotImagePicker bind:settings />
+  <RobotImagePicker bind:settings {robot} />
 </div>

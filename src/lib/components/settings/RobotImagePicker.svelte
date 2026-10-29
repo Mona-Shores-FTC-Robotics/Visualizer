@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Upload, X } from "@lucide/svelte";
   import { publicAsset } from "../../../utils/publicAsset";
-  import type { Settings } from "../../../types";
+  import { robotImageSrc } from "../../auto/teamRobot";
+  import type { RobotConfig, Settings } from "../../../types";
   import { imageToBase64 } from "../../../utils/file";
   import { showToast } from "../../toast";
   import Button from "../ui/Button.svelte";
@@ -9,9 +10,11 @@
 
   interface Props {
     settings: Settings;
+    /** The open file's robot: "Our robot" is drawn to fit its box. */
+    robot: RobotConfig;
   }
 
-  let { settings = $bindable() }: Props = $props();
+  let { settings = $bindable(), robot }: Props = $props();
 
   const DEFAULT_ROBOT_IMAGE = "/robot.png";
   const PLAIN_IMAGE = "/robot-plain.png";
@@ -22,7 +25,7 @@
     {
       src: DEFAULT_ROBOT_IMAGE,
       label: "Our robot",
-      hint: "Mona Shores' robot, for Length 17.5, Width 16, Box ahead of centre 1.03",
+      hint: "Mona Shores' robot, drawn to fit the Length, Width and Box ahead of centre",
     },
     {
       src: PLAIN_IMAGE,
@@ -85,7 +88,7 @@
       class="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-base"
     >
       <img
-        src={publicAsset(currentImage)}
+        src={publicAsset(robotImageSrc({ ...robot, robotImage: currentImage }))}
         alt="Robot preview"
         class="size-full object-contain"
         onerror={(e) => {
@@ -123,7 +126,7 @@
           {customImage.substring(0, 30)}...
         </p>
       {:else}
-        <p class="text-body">Using the default robot image</p>
+        <p class="text-body">Our robot, drawn to fit its box</p>
       {/if}
     </div>
   </div>

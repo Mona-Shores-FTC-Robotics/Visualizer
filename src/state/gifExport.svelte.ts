@@ -1,3 +1,4 @@
+import { robotImageSrc } from "../lib/auto/teamRobot";
 import { get } from "svelte/store";
 import { downloadBlob } from "../utils/download";
 import {
@@ -53,7 +54,7 @@ export class GifExport {
       const blob = await renderPathGif({
         paths: this.#paths(),
         fieldImageSrc,
-        robotImageSrc: this.#prefs.settings.robotImage || "/robot.png",
+        robotImageSrc: robotImageSrc(this.#prefs.settings),
         fieldPixels,
         shouldCancel: () => this.#cancelled,
         onProgress: (progress) => {
