@@ -5,7 +5,11 @@ import {
   type AutoRegistry,
   type AutoRow,
   type AutoSection,
+  type Ladder,
   type NamedPoint,
+  type Play,
+  type PlayStep,
+  type Source,
 } from "./types";
 import { makeCardId } from "./tree";
 
@@ -165,7 +169,77 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
   if (typeof raw.exportName === "string" && raw.exportName.trim()) {
     auto.exportName = raw.exportName.trim();
   }
+  if (raw.plays !== undefined) {
+    if (!isObject(raw.plays)) {
+      problems.push("plays is not an object of id → play; ignored it.");
+    } else {
+      const plays: Record<string, Play> = {};
+      for (const [id, value] of Object.entries(raw.plays)) {
+        const play = normalizePlay(id, value, problems);
+        if (play) plays[id] = play;
+      }
+      if (Object.keys(plays).length) auto.plays = plays;
+    }
+  }
   return { auto, problems };
+}
+
+const SOURCES: readonly Source[] = ["FAR_FLOWER", "WALL_FLOWER", "GARDEN"];
+
+function normalizePlay(id: string, raw: unknown, problems: string[]): Play | null {
+  const where = `plays.${id}`;
+  if (!isObject(raw) || !Array.isArray(raw.steps)) {
+    problems.push(`${where} is not a play with steps; dropped it.`);
+    return null;
+  }
+  const points: Record<string, NamedPoint> = {};
+  if (isObject(raw.points)) {
+    for (const [name, value] of Object.entries(raw.points)) {
+      if (Array.isArray(value) && (value.length === 2 || value.length === 3) && value.every(finite)) {
+        points[name] = [...value] as NamedPoint;
+      }
+    }
+  }
+  const steps: PlayStep[] = [];
+  for (const step of raw.steps) {
+    if (!isObject(step)) continue;
+    if (step.kind === "drive" && typeof step.to === "string" && points[step.to]) {
+      steps.push({ kind: "drive", to: step.to });
+    } else if ((step.kind === "collect" || step.kind === "shoot") && finite(step.upToS) && step.upToS > 0) {
+      steps.push({ kind: step.kind, upToS: step.upToS });
+    } else {
+      problems.push(`${where} has a step that is not a drive to one of its points, a collect or a shoot; dropped the play.`);
+      return null;
+    }
+  }
+  const play: Play = {
+    id,
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : id,
+    points,
+    steps,
+  };
+  if (SOURCES.includes(raw.source as Source)) play.source = raw.source as Source;
+  return play;
+}
+
+function normalizeLadder(raw: unknown, where: string, problems: string[]): Ladder | null {
+  if (!isObject(raw) || !Array.isArray(raw.tries)) {
+    problems.push(`${where}.ladder is not a list of tries; dropped it.`);
+    return null;
+  }
+  const tries: Ladder["tries"] = [];
+  for (const entry of raw.tries) {
+    if (!isObject(entry) || typeof entry.play !== "string" || !entry.play) {
+      problems.push(`${where}.ladder has a try with no play; dropped the try.`);
+      continue;
+    }
+    tries.push({
+      play: entry.play,
+      ...(finite(entry.shootS) && entry.shootS > 0 ? { shootS: entry.shootS } : {}),
+      ...(finite(entry.collectS) && entry.collectS > 0 ? { collectS: entry.collectS } : {}),
+    });
+  }
+  return { tries };
 }
 
 function normalizeCards(
@@ -259,6 +333,7 @@ function normalizeCard(
         ...(typeof raw.alongside === "string" && raw.alongside.trim()
           ? { alongside: raw.alongside.trim() }
           : {}),
+        ...ladderOf(raw.ladder, where, problems),
       };
     }
     case "routine":
@@ -272,6 +347,12 @@ function normalizeCard(
       );
       return null;
   }
+}
+
+function ladderOf(raw: unknown, where: string, problems: string[]): { ladder?: Ladder } {
+  if (raw === undefined) return {};
+  const ladder = normalizeLadder(raw, where, problems);
+  return ladder ? { ladder } : {};
 }
 
 const ROW_KEYS = ["when", "afterMs"] as const;
@@ -351,6 +432,9 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           label: c.label,
           rows: c.rows.map(row),
           ...(c.alongside ? { alongside: c.alongside } : {}),
+          ...(c.ladder
+            ? { ladder: { tries: c.ladder.tries.map((t) => ({ ...t })) } }
+            : {}),
         };
     }
   };
@@ -384,5 +468,21 @@ export function serializeAuto(auto: AutoSection): AutoSection {
   if (auto.startAt) out.startAt = auto.startAt;
   if (auto.linkPaths?.length) out.linkPaths = [...auto.linkPaths];
   if (auto.exportName) out.exportName = auto.exportName;
+  if (auto.plays && Object.keys(auto.plays).length) {
+    out.plays = Object.fromEntries(
+      Object.entries(auto.plays).map(([id, play]) => [
+        id,
+        {
+          id: play.id,
+          name: play.name,
+          ...(play.source ? { source: play.source } : {}),
+          points: Object.fromEntries(
+            Object.entries(play.points).map(([name, point]) => [name, [...point]]),
+          ) as Record<string, NamedPoint>,
+          steps: play.steps.map((step) => ({ ...step })),
+        },
+      ]),
+    );
+  }
   return out;
 }

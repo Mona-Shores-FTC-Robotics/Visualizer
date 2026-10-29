@@ -22,14 +22,14 @@
     by {AUTO_LENGTH_S} s.
   </p>
   <ul class="flex flex-col gap-1">
-    {#each rows as row (row.label)}
+    {#each rows as row (row.label + row.k)}
       {@const end = row.preview.endTime}
       <li>
         <button
           type="button"
           class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-border px-3 py-2 text-left hover:bg-body/10"
           onclick={() => {
-            if (row.step) auto.openMiss(row.step);
+            if (row.step) auto.openMiss(row.step, row.k);
             else auto.closeMiss();
             isOpen = false;
           }}

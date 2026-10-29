@@ -18,6 +18,12 @@ What the fork adds:
   with − / +; **All outcomes** lists every way the Auto can go. **Edit as cards** shows the full
   card list. Waits on a condition the robot registers but cannot sense yet (biobuzz
   `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
+- **Ladders.** A miss is a ladder of tries, then park: "if TIP 1 doesn't come, refill at the wall
+  FLOWER and shoot again; then the GARDEN; then park". Tries are shared plays picked from a
+  short BIOBUZZ list, and three fixed rules finish every route (a try that works goes back to the
+  plan, a source is used once, every route ends at the park). The ladder is built into ordinary
+  cards, so the robot runs it with no new code. See
+  [`docs/auto-format.md`](docs/auto-format.md#ladders).
 - **Tested against real data.** `test/real-autos.test.ts` reads the team's six Autos, the
   simulator's runs of two of them and robot 20245's first match logs (refresh with
   `node scripts/refresh-biobuzz-fixtures.mjs ../biobuzz`), and fails when the preview drifts out

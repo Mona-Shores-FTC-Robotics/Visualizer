@@ -11,6 +11,7 @@ import type { AutoCard, AutoSection, FirstOfCard } from "../auto/types";
 import { isPlainWait } from "../auto/tree";
 import { switchKey, type PreviewResult, type Scenario } from "../auto/simulate";
 import { TIP_CONDITIONS } from "../timing/model";
+import type { LadderInfo } from "../ladder/compile";
 
 export { TIP_CONDITIONS };
 
@@ -211,6 +212,32 @@ export const GOOD_PATH: Scenario = {};
 /** The scenario that previews `branch`'s miss: its condition never comes; every other one does. */
 export function missScenario(branch: PlanStep): Scenario {
   return { [switchKey(branch.cardId)]: false };
+}
+
+/**
+ * The scenario for one outcome of a ladder: the wait's tip doesn't come, the tries before kept
+ * try `k` miss and try `k` works. `k` past the last try: every try misses and the robot parks.
+ */
+export function ladderScenario(
+  waitId: string,
+  ladder: LadderInfo | null,
+  k: number,
+): Scenario {
+  const scenario: Scenario = { [switchKey(waitId)]: false };
+  const kept = ladder?.tries.filter((t) => t.status === "kept") ?? [];
+  kept.slice(0, k).forEach((t) => (scenario[switchKey(t.waitId!)] = false));
+  return scenario;
+}
+
+/** The outcomes of a ladder, in order: each kept try working, then all of them missing. */
+export function ladderOutcomes(
+  ladder: LadderInfo,
+): { k: number; label: string }[] {
+  const kept = ladder.tries.filter((t) => t.status === "kept");
+  return [
+    ...kept.map((t, k) => ({ k, label: `Try ${t.index + 1} works` })),
+    { k: kept.length, label: kept.length ? "Every try misses: park" : "Park" },
+  ];
 }
 
 /**

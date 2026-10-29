@@ -154,3 +154,40 @@ test("All outcomes lists the good path and each miss, each parked by 30 s", asyn
   await dialog.getByRole("button", { name: /TIP 1 doesn't come/ }).click();
   await expect(page.getByText("◆ If TIP 1 doesn't come")).toBeVisible();
 });
+
+test("a miss becomes a ladder of tries: add one, see its outcomes, undo", async ({
+  page,
+}) => {
+  const errors = await openSample(page);
+  await page
+    .getByRole("button", { name: "Show what happens if TIP 1 doesn't come" })
+    .click();
+  await page.getByRole("button", { name: /Replace with tries/ }).click();
+  await page.getByRole("button", { name: "Replace", exact: true }).click();
+  const tries = page.getByRole("list", { name: "Tries" });
+  await expect(tries.getByRole("listitem")).toHaveText([/^P\s*Park/]);
+
+  await page.getByRole("button", { name: "+ Add a try" }).click();
+  await page.getByRole("button", { name: /Refill in the GARDEN/ }).click();
+  await expect(tries.getByRole("listitem")).toHaveText([
+    /Refill in the GARDEN/,
+    /Then park/,
+  ]);
+  await expect(page.getByText("1 backup")).toBeVisible();
+
+  await page
+    .getByRole("button", { name: "Close: back to the good path" })
+    .click();
+  await page.getByRole("button", { name: /All outcomes \(3\)/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button")).toHaveText([
+    /Every tip comes/,
+    /TIP 1 doesn't come · Try 1 works/,
+    /TIP 1 doesn't come · Every try misses: park/,
+  ]);
+  await page.keyboard.press("Escape");
+
+  await page.getByTitle("Undo").click();
+  await expect(page.getByText("1 backup")).toBeHidden();
+  expect(errors).toEqual([]);
+});

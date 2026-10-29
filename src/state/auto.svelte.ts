@@ -35,11 +35,14 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
+import { compileLadders, ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
 import {
   cardTimes,
   missScenario,
+  ladderScenario,
+  ladderOutcomes,
   planOf,
   GOOD_PATH,
   type PlanStep,
@@ -135,10 +138,16 @@ export class AutoState {
   times = $derived.by(() =>
     this.preview ? cardTimes(this.preview) : NO_TIMES,
   );
-  /** The open miss's wait, when one is open. */
+  /** The open miss's wait, when one is open: a wait that branches, or a plain wait for a tip. */
   missStep = $derived.by(
-    () => this.plan?.branches.find((step) => step.cardId === this.miss) ?? null,
+    () => this.plan?.steps.find((step) => step.cardId === this.miss) ?? null,
   );
+  /** The open miss's ladder, when it has one. */
+  missLadder = $derived.by(() =>
+    this.auto && this.miss ? ladderInfo(this.auto, this.miss) : null,
+  );
+  /** Which outcome of the open ladder the preview shows (`ladderOutcomes`'s `k`). */
+  missTry = $state(0);
   worst = $derived(
     this.auto && this.catalog ? worstCase(this.auto, this.catalog) : null,
   );
@@ -230,10 +239,10 @@ export class AutoState {
     $effect.pre(() => {
       if (this.view !== "plan") return;
       const step = this.missStep;
-      void this.miss;
+      const scenario = step ? this.#missScenario(step) : GOOD_PATH;
       untrack(() => {
         if (this.miss && !step) this.miss = null;
-        previewScenario.set(step ? missScenario(step) : GOOD_PATH);
+        previewScenario.set(scenario);
       });
     });
 
@@ -290,6 +299,13 @@ export class AutoState {
     let auto = doc.auto!;
     let { startPoint, lines } = doc;
 
+    // Ladders first: they write cards, paths and pins of their own (lib/ladder).
+    const built = compileLadders(auto, lines);
+    if (built.changed) {
+      auto = built.auto;
+      lines = built.lines;
+    }
+
     const segments = atomicPaths(lines);
     const stale = Object.keys(auto.pathEnds).filter((id) => !segments.has(id));
     if (stale.length) {
@@ -318,13 +334,15 @@ export class AutoState {
     const result = relink(startPoint, lines, auto, settings);
     if (result.changed) {
       lines = result.lines;
+      auto = { ...auto };
+      if (result.linkIds.length) auto.linkPaths = result.linkIds;
+      else delete auto.linkPaths;
+    }
+    if (result.changed || built.changed) {
       sequence = atomicSegments(lines).map((line) => ({
         kind: "path" as const,
         lineId: line.id,
       }));
-      auto = { ...auto };
-      if (result.linkIds.length) auto.linkPaths = result.linkIds;
-      else delete auto.linkPaths;
     }
 
     if (
@@ -350,15 +368,26 @@ export class AutoState {
     };
   }
 
-  /** Shows what happens when `step`'s tip doesn't come: the preview and the field follow it. */
-  openMiss(step: PlanStep) {
+  #missScenario(step: PlanStep) {
+    const ladder = this.missLadder;
+    return ladder
+      ? ladderScenario(step.cardId, ladder, this.missTry)
+      : missScenario(step);
+  }
+
+  /**
+   * Shows what happens when `step`'s tip doesn't come: the preview and the field follow it. With
+   * a ladder, outcome `k` (`ladderOutcomes`): the first try working, unless another is asked for.
+   */
+  openMiss(step: PlanStep, k = 0) {
     this.miss = step.cardId;
-    previewScenario.set(missScenario(step));
+    this.missTry = k;
+    previewScenario.set(this.#missScenario(step));
   }
 
   /** The field's ◆: opens that wait's miss, or closes it when it is the one open. */
   toggleMiss(cardId: string) {
-    const step = this.plan?.branches.find((branch) => branch.cardId === cardId);
+    const step = this.plan?.steps.find((s) => s.cardId === cardId);
     if (!step || this.miss === cardId) this.closeMiss();
     else this.openMiss(step);
   }
@@ -376,6 +405,8 @@ export class AutoState {
   outcomes(): {
     label: string;
     step: PlanStep | null;
+    /** For a ladder: which outcome (`ladderOutcomes`'s `k`). */
+    k: number;
     preview: PreviewResult;
   }[] {
     const auto = this.auto;
@@ -393,12 +424,21 @@ export class AutoState {
           ).previews[0]
         : simulateAuto(auto, catalog, doc.startPoint, scenario);
     return [
-      { label: "Every tip comes", step: null, preview: run(GOOD_PATH) },
-      ...plan.branches.map((step) => ({
-        label: `${step.tip ?? step.label} doesn't come`,
-        step,
-        preview: run(missScenario(step)),
-      })),
+      { label: "Every tip comes", step: null, k: 0, preview: run(GOOD_PATH) },
+      ...plan.branches.flatMap((step) => {
+        const name = `${step.tip ?? step.label} doesn't come`;
+        const ladder = ladderInfo(auto, step.cardId);
+        if (!ladder)
+          return [
+            { label: name, step, k: 0, preview: run(missScenario(step)) },
+          ];
+        return ladderOutcomes(ladder).map(({ k, label }) => ({
+          label: `${name} · ${label}`,
+          step,
+          k,
+          preview: run(ladderScenario(step.cardId, ladder, k)),
+        }));
+      }),
     ];
   }
 

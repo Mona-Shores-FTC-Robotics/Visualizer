@@ -11,10 +11,15 @@
   import {
     NOT_SENSED_YET,
     chapterSeconds,
+    ladderOutcomes,
     setLimit,
     type PlanStep,
   } from "./plan";
   import Stepper from "./Stepper.svelte";
+  import LadderList from "./LadderList.svelte";
+  import { startLadder } from "../ladder/edit";
+  import { ladderInfo } from "../ladder/compile";
+  import { confirmDialog } from "../dialog";
   import PlanOutcomes from "./PlanOutcomes.svelte";
 
   interface Props {
@@ -35,6 +40,14 @@
   let selected = $derived(parseSelection($selectedCardId).cardId);
   let total = $derived(auto.preview?.endTime ?? 0);
   let missStep = $derived(auto.missStep);
+  /** Every way the Auto can go: the good path, each miss, and each try of a ladder. */
+  let outcomeCount = $derived(
+    1 +
+      (plan?.branches ?? []).reduce((n, step) => {
+        const ladder = auto.auto ? ladderInfo(auto.auto, step.cardId) : null;
+        return n + (ladder ? ladderOutcomes(ladder).length : 1);
+      }, 0),
+  );
 
   const icon: Record<PlanStep["kind"], string> = {
     drive: "→",
@@ -84,6 +97,16 @@
       .map((step) => auto.times.get(step.cardId)?.t0)
       .find((t) => t !== undefined);
     if (first !== undefined && total > 0) playback.seek((first / total) * 100);
+  }
+
+  /** A miss drawn by hand becomes a ladder (empty: park) once the student says so. */
+  async function replaceWithTries(step: PlanStep) {
+    const ok = await confirmDialog({
+      title: "Replace this route with tries?",
+      message: `The ${step.miss?.length ?? 0} steps drawn for when ${step.tip ?? "the tip"} doesn't come are replaced by a ladder: tries you pick from the list, then park. Undo brings them back.`,
+      confirmLabel: "Replace",
+    });
+    if (ok) updateAuto((d) => void startLadder(d, step.cardId));
   }
 
   /** Close the miss and open the plan where it goes back to, with that step selected. */
@@ -174,7 +197,7 @@
         {:else}
           <div>A robot command; it takes as long as the robot's list says.</div>
         {/if}
-        {#if step.miss && !missStep}
+        {#if (step.miss || (step.sense === "tip" && step.tip)) && !missStep}
           <button
             type="button"
             class="self-start rounded-lg border border-warning px-2 py-1 font-medium text-heading hover:bg-warning/10"
@@ -209,6 +232,7 @@
         <button
           type="button"
           class="rounded-lg border border-border px-2 py-0.5 text-xs text-heading hover:bg-body/10"
+          aria-label="Close: back to the good path"
           onclick={() => auto.closeMiss()}>Close</button
         >
       </div>
@@ -223,32 +247,49 @@
           />
         </div>
       {/if}
-      <div class="text-xs text-body">Then:</div>
-      <ul class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        {#each missStep.miss ?? [] as step (step.cardId)}
-          {@render stepRow(step, true)}
-        {/each}
-        {#if missStep.then}
-          {@const then = missStep.then}
-          <li>
-            <button
-              type="button"
-              class="grid w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-border px-2 py-1.5 text-left hover:bg-body/10"
-              title="Close this and show that step on the plan"
-              onclick={() => backTo(then)}
-            >
-              <span
-                class="grid size-[22px] place-items-center rounded-md bg-base text-xs font-bold text-success"
-                aria-hidden="true">↩</span
+      {#if auto.missLadder || !missStep.miss?.length}
+        <div class="text-xs text-body">
+          {auto.missLadder
+            ? "Then, in order (the first that works goes back to the plan):"
+            : "Then the robot carries on with the plan. To try something first:"}
+        </div>
+        <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+          <LadderList waitId={missStep.cardId} ladder={auto.missLadder} />
+        </div>
+      {:else}
+        <div class="text-xs text-body">Then:</div>
+        <ul class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+          {#each missStep.miss ?? [] as step (step.cardId)}
+            {@render stepRow(step, true)}
+          {/each}
+          {#if missStep.then}
+            {@const then = missStep.then}
+            <li>
+              <button
+                type="button"
+                class="grid w-full grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-border px-2 py-1.5 text-left hover:bg-body/10"
+                title="Close this and show that step on the plan"
+                onclick={() => backTo(then)}
               >
-              <span class="min-w-0 text-sm text-heading"
-                >Back to the plan at <b class="font-semibold">{then.label}</b
-                ></span
-              >
-            </button>
-          </li>
-        {/if}
-      </ul>
+                <span
+                  class="grid size-[22px] place-items-center rounded-md bg-base text-xs font-bold text-success"
+                  aria-hidden="true">↩</span
+                >
+                <span class="min-w-0 text-sm text-heading"
+                  >Back to the plan at <b class="font-semibold">{then.label}</b
+                  ></span
+                >
+              </button>
+            </li>
+          {/if}
+        </ul>
+        <button
+          type="button"
+          class="self-start rounded-lg border border-warning px-2 py-1 text-xs font-medium text-heading hover:bg-warning/10"
+          onclick={() => replaceWithTries(missStep!)}
+          >Replace with tries…</button
+        >
+      {/if}
       <p class="text-[11px] text-body">
         The field and the playback show this route. If time runs short, the
         robot's endgame guard parks it.
@@ -302,7 +343,7 @@
       type="button"
       class="rounded-lg border border-border px-2 py-1 text-xs text-heading hover:bg-body/10"
       onclick={() => (outcomesOpen = true)}
-      >All outcomes ({(plan?.branches.length ?? 0) + 1})</button
+      >All outcomes ({outcomeCount})</button
     >
     <button
       type="button"

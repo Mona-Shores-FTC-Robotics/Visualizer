@@ -44,6 +44,7 @@
   import { lockToAxis, snapPoint } from "./snap";
   import { useAuto } from "../state/auto.svelte";
   import AutoFieldOverlay from "../lib/auto/components/AutoFieldOverlay.svelte";
+  import { ladderInfo } from "../lib/ladder/compile";
   import FieldAxes from "../lib/components/FieldAxes.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
   import { linkSegmentIds } from "../lib/auto/links";
@@ -451,9 +452,15 @@
             ? (id) => auto.toggleMiss(id)
             : undefined}
           missId={auto.miss}
-          decisionLabel={(id) => {
+          decision={(id) => {
             const step = auto.plan?.branches.find((s) => s.cardId === id);
-            return step?.tip ?? step?.label ?? "this wait";
+            if (!step) return null;
+            const ladder = auto.auto ? ladderInfo(auto.auto, id) : null;
+            return {
+              label: step.tip ?? step.label,
+              backups:
+                ladder?.tries.filter((t) => t.status === "kept").length ?? 0,
+            };
           }}
         />
       {/if}

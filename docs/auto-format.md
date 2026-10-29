@@ -75,6 +75,7 @@ A complete example that uses every card kind is
 | `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
 | `startAt` | string, optional | The named point the start pose is on. |
 | `cards` | card[] | The Auto, top to bottom (the "trunk"). |
+| `plays` | `{ id: play }`, optional | The plays this Auto's ladders use, copied in so the file stands alone (see "Ladders"). |
 
 ### Cards
 
@@ -84,7 +85,7 @@ Every card has a unique `id` (the editor addresses cards by it) and a `kind`.
 |---|---|---|
 | `action` | `name`, `timeoutS?`, `previewMs?` | Runs a registered **command** (the editor calls it that; the file keeps the key `action`). On the robot it runs until it finishes or `timeoutS` (default 5 s), exported as `kit.command(name[, timeoutS])`. The preview uses the command's typical time from `registry.typicalS`, else `previewMs` (older files), else instant, never past the timeout. |
 | `path` | `lineId`, `park`, `through`? | Drives an existing path. `through`: the robot drives through this path's end without stopping, so it and the paths after it (up to the first without `through`) are one drive, exported as one Pedro path. `lineId` is the id of a **top-level** entry in the Path List (a path, or a group, which Pedro follows as one path). `park`: this is the branch's park path for the endgame guard. Nothing runs while it drives. |
-| `firstOf` | `label`, `rows`, `alongside`? | **Wait for a trigger, at most a time**: exactly one `when` row and one `afterMs` row. With no cards on either row it is a plain **Wait for**; with cards each row holds the rest of its route (a **decision**). `alongside` names a command run *while* it waits ("LaunchAll · wait for Tip"): it starts with the wait and is stopped when a row fires, if still running. |
+| `firstOf` | `label`, `rows`, `alongside`?, `ladder`? | **Wait for a trigger, at most a time**: exactly one `when` row and one `afterMs` row. With no cards on either row it is a plain **Wait for**; with cards each row holds the rest of its route (a **decision**). `alongside` names a command run *while* it waits ("LaunchAll · wait for Tip"): it starts with the wait and is stopped when a row fires, if still running. |
 
 | `rejoin` | `lineId`, `target` | Ends a route by joining another at one of its stops: drives `lineId` (from where the robot is to the spot the target stop ends on), then runs the steps after the target path card in its list. Those steps are shared by both routes. Must be the last step of its route; the target must not lead back to the rejoin. A drive-through target is joined on the move: the rejoin's path drives on through the rest of that chain in one drive, and the steps after the chain's last stop follow. |
 
@@ -113,6 +114,58 @@ Rules the editor enforces (errors block the Java export):
 Warnings (shown, not blocking): a path that starts more than 2 in from where
 the robot can be when it starts; a park card that is not last in its branch; a
 branch whose worst case runs past 30 s.
+
+### Ladders
+
+What the robot tries when a tip doesn't come. A ladder sits on a `firstOf` on the plan (the
+main sequence, or the row an earlier wait takes when its trigger comes):
+
+```json
+"ladder": { "tries": [{ "play": "wall-flower" }, { "play": "garden", "shootS": 3 }] }
+```
+
+Each try names a play in the section's `plays`; `shootS` and `collectS` override the play's own
+time limits for this Auto. A play is drives to named points, collects and shoots, with the
+source it collects from and the points it needs:
+
+```json
+"wall-flower": {
+  "id": "wall-flower", "name": "Refill at the wall FLOWER, shoot from FIRE3",
+  "source": "WALL_FLOWER",
+  "points": { "WALL_FLOWER_TURN": [23.16, 47.36, 180], "WALL_FLOWER": [14.86, 47.36, 180], "FIRE3": [45, 26, 90] },
+  "steps": [
+    { "kind": "drive", "to": "WALL_FLOWER_TURN" }, { "kind": "drive", "to": "WALL_FLOWER" },
+    { "kind": "collect", "upToS": 3 }, { "kind": "drive", "to": "FIRE3" }, { "kind": "shoot", "upToS": 2.5 }
+  ]
+}
+```
+
+The plays the editor offers are the BIOBUZZ list in `src/lib/ladder/plays.ts`, written from the
+named points the team's Autos share; the file keeps its own copy of each it uses.
+
+**The ladder is built into ordinary cards** (`src/lib/ladder/compile.ts`), after every edit and
+before the Java export, so the preview, the export and a stock Visualizer read the Auto as any
+other. Cards and paths the ladder writes have ids starting `lad-<wait id>-`; the editor owns
+them. A bend drawn on one of those paths is kept when the ladder is built again.
+
+- The plan after the wait becomes the wait's `when` row, except the plan's park card, which stays
+  at the end of its list so the endgame guard covers every route.
+- The `afterMs` row is the ladder: each try's drives, collect (a wait for `IntakeFull`) and shot
+  (`LaunchAll` alongside a wait for `Tip`); that wait's `when` row is what happens when the try
+  works and its `afterMs` row is the next try.
+
+Three fixed rules finish every route. Every outcome is decided when the Auto is built; the robot
+never improvises.
+
+1. **A try that works goes back to the plan**: a `rejoin` to the plan's next stop after the wait.
+2. **A source is used once** (`FAR_FLOWER`, `WALL_FLOWER`, `GARDEN`: a wait for `IntakeFull` right
+   after a drive to one). A try whose source the plan or an earlier try has used is skipped. When
+   a try that works would send the robot back to a source already used, its route copies the plan
+   up to the drive there instead of rejoining it.
+3. **Every route ends where the plan's park starts** (a drive there when it ends elsewhere) and
+   goes on to the park. When time runs short on any route, the endgame guard parks it. A path
+   is never cut, so a long try can still run past 30 s: **All outcomes** shows each route's time,
+   and one past 30 s is red.
 
 ### Loading
 
@@ -329,13 +382,15 @@ which. Code: `src/utils/gitLink.ts`.
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`, `src/lib/timing/`,
+`src/lib/plan/`, `src/lib/ladder/`,
 `src/lib/team/`, `src/lib/sim/`, `src/lib/github/`, `src/lib/session/`
 (`drafts.ts`, `sharedCopy.ts`), the link helpers in `src/utils/`, and three
 fork modules in upstream's layout:
 
 - `src/state/auto.svelte.ts` — the open project's Auto, its preview, worst
-  case and validation; the pins and link paths that keep it consistent with
-  the paths; card ↔ path selection; adding a path with its card.
+  case and validation; the ladders, pins and link paths that keep it consistent
+  with the paths; card ↔ path selection; adding a path with its card; the plan
+  view's state (chapter, open miss, ladder outcome).
 - `src/state/links.svelte.ts` — share, sample and `#gh=` links, the shared copy,
   and drafts of files from biobuzz.
 - `src/view/ForkDialogs.svelte`, `src/view/forkActions.ts`,

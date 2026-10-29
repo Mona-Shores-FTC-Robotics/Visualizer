@@ -1,6 +1,6 @@
 import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
-import { rowKind, type AutoCard, type AutoSection } from "./types";
+import { rowKind, type AutoCard, type AutoSection, type PathCard } from "./types";
 import { allCards, rejoinTail } from "./tree";
 import { isUsed, pointUses } from "./pins";
 
@@ -123,7 +123,12 @@ export function validateAuto(
             if (gap > DISCONTINUITY_LIMIT_IN) {
               warn(card.id, `${path.name} starts ${gap.toFixed(1)} in from where the robot can be (${from.x.toFixed(1)}, ${from.y.toFixed(1)}).`);
             }
-            at = [path.end];
+            // After a rejoin the robot runs the rest of the route it joined, so it ends where
+            // that route's last drive ends.
+            const joined = tail ? tail.list.slice(tail.index) : [];
+            const last = joined.filter((c): c is PathCard => c.kind === "path").pop();
+            const lastPath = last ? catalog.byId.get(last.lineId) : undefined;
+            at = [lastPath?.end ?? path.end];
           }
           break;
         }

@@ -23,7 +23,8 @@
      */
     onDecision?: (cardId: string) => void;
     missId?: string | null;
-    decisionLabel?: (cardId: string) => string;
+    /** A wait on the plan: its tip's name and how many tries back it up; null for any other. */
+    decision?: (cardId: string) => { label: string; backups: number } | null;
   }
 
   let {
@@ -35,7 +36,7 @@
     showUntaken,
     onDecision,
     missId = null,
-    decisionLabel,
+    decision,
   }: Props = $props();
 
   let size = $derived(x(FIELD_SIZE));
@@ -194,9 +195,9 @@
 </svg>
 
 {#if onDecision}
-  {#each decisionSpots.filter((spot) => spot.taken || spot.id === missId) as spot (spot.id)}
+  {#each decisionSpots.filter((spot) => (spot.taken || spot.id === missId) && decision?.(spot.id)) as spot (spot.id)}
     {@const open = spot.id === missId}
-    {@const label = decisionLabel?.(spot.id) ?? "this wait"}
+    {@const { label, backups } = decision!(spot.id)!}
     <button
       type="button"
       class={[
@@ -217,5 +218,12 @@
       onclick={() => onDecision(spot.id)}
       ><span class="-rotate-45">{open ? "✕" : "?"}</span></button
     >
+    {#if backups > 0}
+      <span
+        class="pointer-events-none absolute z-40 translate-x-3 -translate-y-1/2 rounded-full border border-warning bg-base px-1.5 text-[10px] font-semibold whitespace-nowrap text-warning"
+        style={`left: ${x(spot.at.x)}px; top: ${y(spot.at.y)}px;`}
+        >{backups} {backups === 1 ? "backup" : "backups"}</span
+      >
+    {/if}
   {/each}
 {/if}

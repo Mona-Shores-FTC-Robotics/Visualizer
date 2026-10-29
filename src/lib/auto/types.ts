@@ -89,6 +89,51 @@ export interface FirstOfCard {
    * stopped when a row fires, if still running.
    */
   alongside?: string;
+  /**
+   * What the robot tries when the trigger doesn't come: a ladder of plays, then park (see
+   * lib/ladder). When set, the time-limit row's cards and the paths they drive are built from it
+   * by the editor, and rebuilt after every edit; the file still holds them, so the export, the
+   * preview and a stock Visualizer read the Auto as before. Only on a wait in the main sequence.
+   */
+  ladder?: Ladder;
+}
+
+/** One try on a ladder: a play, with this Auto's time limits for it. */
+export interface LadderTry {
+  /** The play's id, in `AutoSection.plays`. */
+  play: string;
+  /** Seconds to wait for the tip after shooting; unset means the play's own. */
+  shootS?: number;
+  /** Seconds to wait for the intake to fill; unset means the play's own. */
+  collectS?: number;
+}
+
+export interface Ladder {
+  /** In order: the first that works goes back to the plan; when all fail, the robot parks. */
+  tries: LadderTry[];
+}
+
+/** A place POLLEN is collected from. Each holds 4 at the start, so it is used once. */
+export type Source = "FAR_FLOWER" | "WALL_FLOWER" | "GARDEN";
+
+/** One step of a play. Drives end on a named point; the play brings the points it needs. */
+export type PlayStep =
+  | { kind: "drive"; to: string }
+  | { kind: "collect"; upToS: number }
+  | { kind: "shoot"; upToS: number };
+
+/**
+ * A try that works in any Auto: drive to named points, collect, shoot and wait for the tip. Copied
+ * into each Auto that uses it (`AutoSection.plays`) so the file stands alone.
+ */
+export interface Play {
+  id: string;
+  name: string;
+  /** The source it collects from, if any: a play whose source is already used is skipped. */
+  source?: Source;
+  /** The named points it drives to, as `AutoSection.points`; added to an Auto that lacks them. */
+  points: Record<string, NamedPoint>;
+  steps: PlayStep[];
 }
 
 export type AutoCard = ActionCard | PathCard | FirstOfCard | RejoinCard;
@@ -131,6 +176,8 @@ export interface AutoSection {
    * so each driven path starts where the robot is (see links.ts). Rebuilt after every edit.
    */
   linkPaths?: string[];
+  /** The plays this Auto's ladders use, by id (see `FirstOfCard.ladder`). */
+  plays?: Record<string, Play>;
   cards: AutoCard[];
 }
 

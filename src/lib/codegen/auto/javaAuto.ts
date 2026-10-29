@@ -14,6 +14,7 @@ import { buildPathCatalog, type PathCatalog } from "../../auto/geometry";
 import { parkSeconds } from "../../auto/simulate";
 import { validateAuto } from "../../auto/validate";
 import { relink } from "../../auto/links";
+import { compileLadders } from "../../ladder/compile";
 import {
   allCards,
   isPlainWait,
@@ -282,9 +283,12 @@ const sameAngle = (a: number, b: number) =>
 // --- the generator ------------------------------------------------------------
 
 export function generateAutoJava(input: AutoExportInput): AutoExportResult {
-  const { auto, startPoint, settings } = input;
-  // Lay the paths out as the editor does, so a file straight from disk exports the same.
-  const lines = relink(startPoint, input.lines, auto, settings).lines;
+  const { startPoint, settings } = input;
+  // Build the ladders and lay the paths out as the editor does, so a file straight from disk
+  // exports the same.
+  const built = compileLadders(input.auto, input.lines);
+  const auto = built.auto;
+  const lines = relink(startPoint, built.lines, auto, settings).lines;
   const catalog: PathCatalog = buildPathCatalog(startPoint, lines, settings);
   const issues = validateAuto(auto, catalog, startPoint);
   const errors = issues
