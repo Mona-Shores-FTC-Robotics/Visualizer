@@ -76,7 +76,7 @@ export const WAIT_DEFAULT_S = 7;
  * START_LEFT is where the left-side Autos (L-Quals, L-Simple) were drawn to start, not measured.
  */
 export const DEFAULT_STARTS: Readonly<Record<string, NamedPoint>> = {
-  START_RIGHT: [55.17, 7.72, 90],
+  START_RIGHT: [54.06, 7.72, 90],
   START_LEFT: [59, 133.69, 270],
 };
 /** Where a new Auto starts. */
@@ -453,7 +453,8 @@ export function renameSpot(
     return {
       problem: `${from} is a team spot: its name is shared by every Auto that uses it.`,
     };
-  if (auto.points[name]) return { problem: `This Auto already has a spot ${name}.` };
+  if (auto.points[name])
+    return { problem: `This Auto already has a spot ${name}.` };
   const next = edit(doc, (draft, a) => {
     a.points[name] = a.points[from];
     delete a.points[from];

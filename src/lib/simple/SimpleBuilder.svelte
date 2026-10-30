@@ -25,6 +25,7 @@
   import { fieldClass } from "../components/ui/styles";
   import { flowerLinedUp, pickSpot } from "./flowers";
   import { spotParks } from "./parkFrom";
+  import { stepCollisions, type StepHits } from "./collide";
   import { useEditor } from "../../state/editor.svelte";
   import { linkSpot } from "../team/teamSpots";
   import {
@@ -134,6 +135,10 @@
   let steps = $derived(stepsOf(doc));
   /** Fork: the spots' own park paths (parkFrom.ts), by the drive card that reaches each. */
   let parks = $derived(spotParks(doc, auto.catalog));
+  /** Fork: what each drive, and the park from its spot, runs into (collide.ts). */
+  let hits = $derived(
+    auto.catalog ? stepCollisions(doc, auto.catalog) : new Map<string, StepHits>(),
+  );
   /** Fork: the start buttons, the team's START_ spots (steps.ts startsFrom). */
   let starts = $derived(startsFrom($teamSpots));
   let side = $derived(startName(doc, starts));
@@ -648,7 +653,9 @@
                 value={step.spot}
                 onchange={(e) => {
                   const name = e.currentTarget.value;
-                  apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
+                  apply(
+                    setStepSpot(withTeamSpot(doc, name), step.cardId, name),
+                  );
                 }}
               >
                 {@render spotOptions()}
@@ -740,6 +747,22 @@
           {/if}
           {#if step.problem}
             <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
+          {/if}
+          {#if hits.get(step.cardId)}
+            {@const hit = hits.get(step.cardId)!}
+            {#if hit.drive.length}
+              <p class="mt-1 pl-6 text-xs text-danger">
+                The drive here touches {hit.drive.join(" and ")} (within the robot's
+                {doc.robot.safetyMargin} in safety margin). Move the spot, or bend the
+                path with a control point.
+              </p>
+            {/if}
+            {#if hit.park.length}
+              <p class="mt-1 pl-6 text-xs text-warning">
+                Its park path (P) touches {hit.park.join(" and ")}: press P and bend
+                it.
+              </p>
+            {/if}
           {/if}
         {:else if step.kind === "wait"}
           <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">

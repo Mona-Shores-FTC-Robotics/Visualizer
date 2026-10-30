@@ -92,7 +92,7 @@ describe("the simple builder", () => {
       doc.startPoint.x,
       doc.startPoint.y,
       doc.startPoint.headingDeg,
-    ]).toEqual([55.17, 7.72, 90]);
+    ]).toEqual([54.06, 7.72, 90]);
     const left = setStart(doc, "START_LEFT", DEFAULT_STARTS.START_LEFT);
     expect(startName(left)).toBe("START_LEFT");
     // The start it left goes with it.
@@ -107,7 +107,7 @@ describe("the simple builder", () => {
 
   it("offers the team's START_ spots as starts", () => {
     const starts = startsFrom({
-      START_RIGHT: [55.17, 7.72, 90],
+      START_RIGHT: [54.06, 7.72, 90],
       START_CORNER: [10, 10, 45],
       PARK: [14, 100, 270],
     });
