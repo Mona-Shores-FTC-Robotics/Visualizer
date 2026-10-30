@@ -33,6 +33,7 @@ import {
   setSpotHeading,
   setStart,
   setWait,
+  renameSpot,
   startName,
   DEFAULT_STARTS,
   startLabel,
@@ -537,6 +538,47 @@ describe("the Wait for TIP step", () => {
       kind: "wait",
       waitFor: "LeftCellUp",
       waitS: 7,
+    });
+  });
+});
+
+describe("renaming a spot", () => {
+  it("renames an Auto's own spot everywhere it is used", () => {
+    const doc = rQualsV2();
+    const result = renameSpot(doc, "LEFT_FIRE", "launch left");
+    expect("doc" in result, JSON.stringify(result)).toBe(true);
+    if (!("doc" in result)) return;
+    const auto = result.doc.auto!;
+    expect(auto.points.LEFT_FIRE).toBeUndefined();
+    expect(auto.points.LAUNCH_LEFT).toEqual(doc.auto!.points.LEFT_FIRE);
+    expect(
+      stepsOf(result.doc).filter((s) => s.spot === "LAUNCH_LEFT"),
+    ).toHaveLength(2);
+    expect(
+      result.doc.lines.filter((l) => l.name === "to LAUNCH_LEFT"),
+    ).toHaveLength(2);
+  });
+
+  it("refuses a team spot, a start, a name in use and an empty name", () => {
+    let doc = rQualsV2();
+    doc = {
+      ...doc,
+      auto: {
+        ...doc.auto!,
+        teamSpots: ["PARK", ...(doc.auto!.teamSpots ?? [])],
+      },
+    };
+    expect(renameSpot(doc, "PARK", "HOME")).toMatchObject({
+      problem: expect.stringContaining("team spot"),
+    });
+    expect(renameSpot(doc, "START_RIGHT", "HOME")).toMatchObject({
+      problem: expect.stringContaining("START_"),
+    });
+    expect(renameSpot(doc, "WALL_PICK", "FAR_PICK")).toMatchObject({
+      problem: expect.stringContaining("already"),
+    });
+    expect(renameSpot(doc, "WALL_PICK", " !! ")).toMatchObject({
+      problem: expect.stringContaining("needs a name"),
     });
   });
 });

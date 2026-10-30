@@ -5,8 +5,10 @@
   import {
     Flower2,
     Hourglass,
+    Link2,
     Lock,
     LockOpen,
+    Pencil,
     Sprout,
     GripVertical,
     Navigation,
@@ -51,6 +53,7 @@
     startsFrom,
     setStepSpot,
     setWait,
+    renameSpot,
     WAIT_FOR,
     stepsOf,
     type Step,
@@ -175,6 +178,73 @@
     at: { x: number; y: number } | null;
     name: string;
   } | null>(null);
+
+  /**
+   * Fork: team spots this Auto links that the team's list does not have: made as team spots on a
+   * laptop that never saved them. Offered back to the list so they are not lost.
+   */
+  let missingSpots = $derived(
+    $spotsStatus === "ok"
+      ? (doc.auto?.teamSpots ?? []).filter(
+          (name) => !$teamSpots[name] && doc.auto?.points[name],
+        )
+      : [],
+  );
+
+  function addMissingSpots() {
+    for (const name of missingSpots) editSpot(name, doc.auto!.points[name]);
+  }
+
+  /** Save to computer, saying first when team spots are only in this browser. */
+  function saveFile() {
+    const unsaved = [
+      ...new Set([...Object.keys($spotEdits), ...missingSpots]),
+    ].sort();
+    if (
+      unsaved.length &&
+      !confirm(
+        `Team spots ${unsaved.join(", ")} are only in this browser, not in biobuzz. ` +
+          "The file keeps their numbers, but nobody else gets them until someone presses " +
+          "Save team spots. Save the file anyway?",
+      )
+    )
+      return;
+    onSave();
+  }
+
+  /** Fork: a spot being renamed, on the step it was started from. */
+  let renaming = $state<{
+    cardId: string;
+    from: string;
+    text: string;
+    problem: string | null;
+  } | null>(null);
+
+  function finishRename() {
+    if (!renaming) return;
+    const result = renameSpot(doc, renaming.from, renaming.text);
+    if ("problem" in result) {
+      renaming.problem = result.problem;
+      return;
+    }
+    apply(result.doc);
+    renaming = null;
+  }
+
+  /** Fork: one of this Auto's own spots becomes a team spot (saved with Save team spots). */
+  function makeTeamSpot(name: string) {
+    const pose = doc.auto?.points[name];
+    if (!pose) return;
+    if (
+      $teamSpots[name] &&
+      !confirm(
+        `The team already has a spot ${name}. Move it to where this Auto has it?`,
+      )
+    )
+      return;
+    editSpot(name, pose);
+    apply(linkSpot(doc, name, pose));
+  }
 
   /** Fork: a spot named from a field click is also saved as a team spot. */
   let asTeamSpot = $state(false);
@@ -398,7 +468,7 @@
       type="button"
       class="simple-tile flex-1 justify-center"
       title="Download this Auto's .pp file, to keep or to give to a mentor"
-      onclick={onSave}>Save to computer</button
+      onclick={saveFile}>Save to computer</button
     >
     <button
       type="button"
@@ -449,6 +519,20 @@
         type="button"
         class="text-xs text-body underline"
         onclick={() => void refreshTeamSpots()}>Try again</button
+      >
+    </div>
+  {/if}
+  {#if missingSpots.length}
+    <div class="simple-pending flex flex-col gap-1.5" role="status">
+      <p class="text-xs text-heading">
+        This Auto uses team spots the team's list doesn't have:
+        <b class="font-mono">{missingSpots.join(", ")}</b>. They were made on a
+        computer that never saved them.
+      </p>
+      <button
+        type="button"
+        class="simple-tile justify-center"
+        onclick={addMissingSpots}>Add them to the team's spots</button
       >
     </div>
   {/if}
@@ -537,17 +621,62 @@
         {#if (step.kind === "drive" || step.kind === "park") && step.spot && doc.auto?.points[step.spot]}
           {@const point = doc.auto.points[step.spot]}
           <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
-            <select
-              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-              aria-label="Spot"
-              value={step.spot}
-              onchange={(e) => {
-                const name = e.currentTarget.value;
-                apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
-              }}
-            >
-              {@render spotOptions()}
-            </select>
+            {#if renaming?.cardId === step.cardId}
+              <form
+                class="flex items-center gap-1"
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  finishRename();
+                }}
+              >
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
+                  aria-label="New name"
+                  bind:value={renaming.text}
+                  autofocus
+                  onkeydown={(e) => e.key === "Escape" && (renaming = null)}
+                />
+                <button type="submit" class="simple-tile !min-h-0 !py-0.5"
+                  >Rename</button
+                >
+              </form>
+            {:else}
+              <select
+                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+                aria-label="Spot"
+                value={step.spot}
+                onchange={(e) => {
+                  const name = e.currentTarget.value;
+                  apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
+                }}
+              >
+                {@render spotOptions()}
+              </select>
+            {/if}
+            {#if !linkedSpots.has(step.spot) && !isStartName(step.spot) && renaming?.cardId !== step.cardId}
+              <button
+                type="button"
+                class="simple-icon"
+                title={`Rename ${step.spot} (every step that goes there follows)`}
+                aria-label={`Rename ${step.spot}`}
+                onclick={() =>
+                  (renaming = {
+                    cardId: step.cardId,
+                    from: step.spot!,
+                    text: step.spot!,
+                    problem: null,
+                  })}><Pencil class="size-3.5" /></button
+              >
+              <button
+                type="button"
+                class="simple-icon"
+                title={`Make ${step.spot} a team spot, for every Auto (then Save team spots)`}
+                aria-label={`Make ${step.spot} a team spot`}
+                onclick={() => makeTeamSpot(step.spot!)}
+                ><Link2 class="size-3.5" /></button
+              >
+            {/if}
             {#if linkedSpots.has(step.spot)}
               {@const open = $unlockedSpots.has(step.spot)}
               <button
@@ -584,6 +713,9 @@
               />°
             </label>
           </div>
+          {#if renaming?.cardId === step.cardId && renaming.problem}
+            <p class="mt-1 pl-6 text-xs text-danger">{renaming.problem}</p>
+          {/if}
           {#if focusedCard === step.cardId}
             {@const park = parks.get(step.cardId)!}
             {@const by = spotLeaveBy(park.lineId)}

@@ -431,6 +431,46 @@ export function setWait(
   });
 }
 
+/**
+ * Renames one of this Auto's own spots: every drive that ends on it, its paths' names ("to X",
+ * "X park") and the start, if it sits there, follow. A team spot is not renamed here (its name is
+ * shared by every Auto that uses it), nor is a start. Returns the reason it cannot, or the new
+ * document.
+ */
+export function renameSpot(
+  doc: ProjectDoc,
+  from: string,
+  to: string,
+): { doc: ProjectDoc } | { problem: string } {
+  const auto = doc.auto;
+  const name = cleanSpotName(to);
+  if (!auto?.points[from]) return { problem: `There is no spot ${from}.` };
+  if (!name) return { problem: "A spot needs a name: letters, digits and _." };
+  if (name === from) return { doc };
+  if (isStartName(from) || isStartName(name))
+    return { problem: "Starts keep their START_ names." };
+  if (auto.teamSpots?.includes(from))
+    return {
+      problem: `${from} is a team spot: its name is shared by every Auto that uses it.`,
+    };
+  if (auto.points[name]) return { problem: `This Auto already has a spot ${name}.` };
+  const next = edit(doc, (draft, a) => {
+    a.points[name] = a.points[from];
+    delete a.points[from];
+    for (const id of Object.keys(a.pathEnds))
+      if (a.pathEnds[id] === from) a.pathEnds[id] = name;
+    if (a.startAt === from) a.startAt = name;
+    draft.lines = draft.lines.map((line) =>
+      line.name === `to ${from}`
+        ? { ...line, name: `to ${name}` }
+        : line.name === `${from} park`
+          ? { ...line, name: `${name} park` }
+          : line,
+    );
+  });
+  return { doc: next };
+}
+
 /** A name for a new spot that no spot has yet: SPOT_1, SPOT_2... */
 export function freeSpotName(auto: AutoSection, base = "SPOT"): string {
   for (let n = 1; ; n++)
