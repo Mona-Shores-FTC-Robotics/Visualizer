@@ -199,10 +199,10 @@ describe("the simple builder", () => {
     const end = motionPoseAt(run, back.t1)!;
     expect(end.x).toBeCloseTo(26.7, 6);
     expect(end.headingDeg).toBe(180);
-    // The stick and the dwell are FlowerPicker's 0.7 s and 1.5 s; the card's 4 s in all.
+    // The stick and the dwell are FlowerPicker's 0.7 s and 2 s (the dwell's cap); the card's 4.5 s in all.
     expect(stick.t1 - stick.t0).toBeCloseTo(0.7, 6);
-    expect(dwell.t1 - dwell.t0).toBeCloseTo(1.5, 6);
-    expect(back.t1 - stick.t0).toBeCloseTo(4, 6);
+    expect(dwell.t1 - dwell.t0).toBeCloseTo(2, 6);
+    expect(back.t1 - stick.t0).toBeCloseTo(4.5, 6);
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 

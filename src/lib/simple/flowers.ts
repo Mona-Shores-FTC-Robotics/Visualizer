@@ -14,7 +14,9 @@
  *     off the robot's line ahead (aheadToleranceIn) or not far enough ahead to push;
  *   stick: 0.7 s for the stick to come down (stickDownMs);
  *   push: a path straight ahead to 12 in from the FLOWER's centre (contactStandoffIn);
- *   dwell: 1.5 s (dwellMs);
+ *   dwell: 2 s, the worst case: the robot's dwell ends by itself from the intake current, typically
+ *     after 1.0-1.3 s, but runs to its cap (dwellMs, 2 s) while pieces keep trickling in, and an
+ *     Auto's timing plans for that;
  *   back: a path straight back to where the push started. So a pick ends where it started.
  * A pick spot (approachStandoffIn, 24 in out, square to the FLOWER) is where the button lines up
  * to, and where the builder puts a spot clicked on a FLOWER's line.
@@ -51,9 +53,9 @@ export const APPROACH_STANDOFF_IN = 24;
 export const CONTACT_STANDOFF_IN = 12;
 /** FlowerPicker.aheadToleranceIn: how far off the line ahead the FLOWER may be, inches. */
 export const AHEAD_TOLERANCE_IN = 6;
-/** FlowerPicker.stickDownMs and dwellMs, in seconds. */
+/** FlowerPicker.stickDownMs, and dwellMs (the dwell's cap, its worst case), in seconds. */
 const STICK_S = 0.7;
-const DWELL_S = 1.5;
+const DWELL_S = 2.0;
 
 const angleOff = (a: number, b: number) =>
   Math.abs(((a - b + 540) % 360) - 180);
