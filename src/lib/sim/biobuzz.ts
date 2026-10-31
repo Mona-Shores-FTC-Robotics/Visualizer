@@ -17,13 +17,23 @@ export const GENERATED_DIRS = [
   `TeamCode/src/test/java/${GENERATED}`,
 ] as const;
 
-/** The file the workflow watches; one commit carries it with the .pp and its Java. */
+/**
+ * The file the workflow watches on a branch other than master's fast lane; one commit carries it
+ * with the .pp and its Java.
+ */
 export const SIM_REQUEST_PATH = "TeamCode/sim-request.json";
+/** On the fast lane each Auto has its own request, so two Autos in flight never conflict. */
+export const SIM_REQUESTS_DIR = "TeamCode/sim-requests";
 export const SIM_RESULTS_BRANCH = "sim-results";
 /** The workflow's name, as GitHub lists its runs. */
 export const SIM_WORKFLOW = "Simulate Auto";
-/** Where saves go unless the file was opened from another branch. */
-export const DEFAULT_BRANCH = "claude/simulator";
+/**
+ * Where saves go unless the file was opened from another branch: master, through the fast lane
+ * ({@link laneBranch}). The simulator is on master since 31 Oct 2026.
+ */
+export const DEFAULT_BRANCH = "master";
+/** The branch the fast lane merges into. */
+export const FAST_LANE_BASE = "master";
 
 /**
  * The robot design a save asks for, until a result lists the simulator's own: the real robot.
@@ -45,6 +55,21 @@ export function ppPathProblem(path: string): string | null {
     return `${path} is outside ${PP_DIRS.join(" and ")}`;
   }
   return null;
+}
+
+/**
+ * The fast lane's branch for an Auto: one per Auto, so a second save while its pull request is
+ * open adds to that pull request rather than opening another.
+ */
+export function laneBranch(ppPath: string): string {
+  return `auto/${simAutoName(ppPath).replace(/[^A-Za-z0-9._-]+/g, "-")}`;
+}
+
+/** Where a save's simulation request goes: the Auto's own file on the fast lane, else the shared one. */
+export function simRequestPath(ppPath: string, viaFastLane: boolean): string {
+  return viaFastLane
+    ? `${SIM_REQUESTS_DIR}/${simAutoName(ppPath)}.json`
+    : SIM_REQUEST_PATH;
 }
 
 /** The branches "Save to GitHub" never writes to: work reaches them by pull request. */

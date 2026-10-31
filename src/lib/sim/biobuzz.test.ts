@@ -2,8 +2,10 @@ import { assert, assertEqual, test } from "../testing/harness";
 import {
   GENERATED_DIRS,
   generatedPathFor,
+  laneBranch,
   ppPathProblem,
   protectedBranch,
+  simRequestPath,
   simRequestText,
   simResultPath,
   simSpec,
@@ -193,5 +195,21 @@ test("the request names the .pp, the run and what to stamp on each log", () => {
       protectedBranch("main") &&
       !protectedBranch("claude/simulator"),
     "not master",
+  );
+});
+
+test("the fast lane: one branch and one simulation request per Auto", () => {
+  assertEqual(
+    laneBranch("TeamCode/autos/r-quals-locked.pp"),
+    "auto/r-quals-locked",
+  );
+  assertEqual(laneBranch("TeamCode/autos/my auto (2).pp"), "auto/my-auto-2-");
+  assertEqual(
+    simRequestPath("TeamCode/autos/r-quals-locked.pp", true),
+    "TeamCode/sim-requests/r-quals-locked.json",
+  );
+  assertEqual(
+    simRequestPath("TeamCode/autos/r-quals-locked.pp", false),
+    "TeamCode/sim-request.json",
   );
 });
