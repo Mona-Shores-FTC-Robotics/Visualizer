@@ -138,8 +138,25 @@ export function parsePairs(text: string): TeamPair[] {
 /** Fetches text; null for "not found"; throws when GitHub cannot be reached. */
 export type FetchText = (url: string) => Promise<string | null>;
 
+/** How long a read from GitHub may take before it counts as no answer, ms. */
+export const FETCH_TIMEOUT_MS = 8000;
+
 export const fetchText: FetchText = async (url) => {
-  const response = await fetch(url, { cache: "no-cache" });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      cache: "no-cache",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // A laptop on the robot's Wi-Fi has no internet: the read hangs or fails outright.
+    throw new Error(
+      error instanceof DOMException && error.name === "TimeoutError"
+        ? `No answer from GitHub in ${FETCH_TIMEOUT_MS / 1000} s. Is this laptop on the robot's Wi-Fi?`
+        : "Could not reach GitHub. Is this laptop on the robot's Wi-Fi?",
+      { cause: error },
+    );
+  }
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
   return response.text();

@@ -34,7 +34,7 @@ import {
 } from "./garden";
 
 export type StepKind =
-  "launch" | "pick" | "gather" | "wait" | "drive" | "park" | "other";
+  "launch" | "spinup" | "pick" | "gather" | "wait" | "drive" | "park" | "other";
 
 export interface Step {
   cardId: string;
@@ -57,6 +57,8 @@ export interface Step {
   /** Wait: the trigger it waits for (WAIT_FOR), and the most it waits, seconds. */
   waitFor?: string;
   waitS?: number;
+  /** Wait: the launcher spins up while it waits (SpinUp alongside). */
+  spinUp?: boolean;
 }
 
 /**
@@ -113,6 +115,11 @@ export function startLabel(name: string): string {
 }
 
 export const LAUNCH_ALL = "LaunchAll";
+/**
+ * The robot's SpinUp: starts the launcher's wheels and finishes at once; the wheels keep spinning
+ * (biobuzz LaunchCards), so a Launch all after it fires without waiting for them.
+ */
+export const SPIN_UP = "SpinUp";
 export const PICK_FLOWER = "PickFlower";
 export const GARDEN_GATHER = "GardenGather";
 /**
@@ -143,6 +150,9 @@ export function stepsOf(doc: ProjectDoc): Step[] {
         aim: aimFrom(here.x, here.y, here.h, auto.drawnFor),
         atSpot: onSpot,
       };
+    }
+    if (card.kind === "action" && card.name === SPIN_UP) {
+      return { ...base, kind: "spinup", label: "Spin up the launcher" };
     }
     if (card.kind === "action" && card.name === PICK_FLOWER) {
       // A pick ends where it started (FlowerPicker's contract), so `here` stays.
@@ -180,6 +190,7 @@ export function stepsOf(doc: ProjectDoc): Step[] {
           label: `Wait for ${label}`,
           waitFor: wait.trigger,
           waitS: wait.seconds,
+          spinUp: wait.spinUp,
         };
       }
     }
@@ -340,6 +351,8 @@ export function addStep(
           { afterMs: WAIT_DEFAULT_S * 1000, cards: [] },
         ],
       };
+    } else if (kind === "spinup") {
+      card = { id: makeCardId(), kind: "action", name: SPIN_UP };
     } else if (kind === "launch" || kind === "pick" || kind === "gather") {
       card =
         kind === "launch"
@@ -426,11 +439,14 @@ export function moveStep(
   });
 }
 
-/** Changes what a Wait step waits for, or the most it waits (seconds, at least 0.1). */
+/**
+ * Changes what a Wait step waits for, the most it waits (seconds, at least 0.1), or whether the
+ * launcher spins up while it waits.
+ */
 export function setWait(
   doc: ProjectDoc,
   cardId: string,
-  change: { waitFor?: string; seconds?: number },
+  change: { waitFor?: string; seconds?: number; spinUp?: boolean },
 ): ProjectDoc {
   return edit(doc, (_draft, auto) => {
     const card = auto.cards.find((c) => c.id === cardId);
@@ -440,6 +456,8 @@ export function setWait(
       if ("afterMs" in row && change.seconds !== undefined)
         row.afterMs = Math.round(Math.max(0.1, change.seconds) * 10) * 100;
     }
+    if (change.spinUp === true) card.alongside = SPIN_UP;
+    if (change.spinUp === false) delete card.alongside;
     const wait = waitOf(card)!;
     card.label = `Wait for ${WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ?? wait.trigger}`;
   });
@@ -578,13 +596,14 @@ function spotOf(
 }
 
 /**
- * A Wait step's trigger and limit, when `card` is one: a trigger row and a time row, nothing run
- * alongside and nothing after either. Any other wait is an advanced step.
+ * A Wait step's trigger and limit, when `card` is one: a trigger row and a time row, nothing after
+ * either, and nothing run alongside but SpinUp. Any other wait is an advanced step.
  */
 function waitOf(
   card: FirstOfCard,
-): { trigger: string; seconds: number } | null {
-  if (card.alongside || card.ladder || card.rows.length !== 2) return null;
+): { trigger: string; seconds: number; spinUp: boolean } | null {
+  if (card.alongside && card.alongside !== SPIN_UP) return null;
+  if (card.ladder || card.rows.length !== 2) return null;
   if (card.rows.some((row) => row.cards.length)) return null;
   const when = card.rows.find((row) => "when" in row) as
     { when: string[] } | undefined;
@@ -592,7 +611,11 @@ function waitOf(
     { afterMs: number } | undefined;
   if (!when || !time || when.when.length !== 1) return null;
   if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
-  return { trigger: when.when[0], seconds: time.afterMs / 1000 };
+  return {
+    trigger: when.when[0],
+    seconds: time.afterMs / 1000,
+    spinUp: card.alongside === SPIN_UP,
+  };
 }
 
 function clearParks(cards: AutoCard[]): void {

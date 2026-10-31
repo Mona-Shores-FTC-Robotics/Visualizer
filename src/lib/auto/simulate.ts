@@ -322,10 +322,12 @@ export function simulateAuto(
   /**
    * A row asking conditions fires the moment it is asked if any is answered true; while a command
    * runs alongside, answered true means "by the time it finishes" (the launch is what tips the
-   * HIVE), so ✓ never looks faster than the command it waits on.
+   * HIVE), so ✓ never looks faster than the command it waits on. Fork: SpinUp only starts the
+   * wheels, so it makes nothing happen and a wait beside it is answered as if it ran alone.
    */
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
-    const alongEnd = card.alongside
+    const causes = !!card.alongside && card.alongside !== "SpinUp";
+    const alongEnd = causes
       ? t0 + alongsideSeconds(auto, card, timing)
       : Infinity;
     if ("when" in row) {
@@ -334,7 +336,7 @@ export function simulateAuto(
         if (!answerFor(scenario, card, name)) continue;
         const at = Math.max(
           timing?.trueAt(name, t0) ?? t0,
-          card.alongside ? alongEnd : t0,
+          causes ? alongEnd : t0,
         );
         soonest = Math.min(soonest, at);
       }

@@ -12,6 +12,7 @@
     Sprout,
     GripVertical,
     Navigation,
+    Fan,
     Rocket,
     SquareParking,
     X,
@@ -91,6 +92,12 @@
       hint: "Shoot everything the robot holds",
     },
     {
+      kind: "spinup",
+      label: "Spin up",
+      icon: Fan,
+      hint: "Start the launcher's wheels now; they keep spinning, so a later Launch all fires at once",
+    },
+    {
       kind: "drive",
       label: "Drive to",
       icon: Navigation,
@@ -123,6 +130,7 @@
   ];
   const ICONS: Record<StepKind, Component | null> = {
     launch: Rocket,
+    spinup: Fan,
     drive: Navigation,
     pick: Flower2,
     gather: Sprout,
@@ -865,6 +873,19 @@
               />s
             </label>
           </div>
+          <label class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body">
+            <input
+              type="checkbox"
+              checked={step.spinUp}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    spinUp: e.currentTarget.checked,
+                  }),
+                )}
+            />
+            Spin up the launcher while waiting
+          </label>
         {:else if step.kind === "gather"}
           <div class="mt-1 pl-6 text-xs">
             {#if step.garden}
