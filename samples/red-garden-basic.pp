@@ -260,7 +260,6 @@
     "fieldMap": "biobuzz.webp"
   },
   "version": "1.5.0",
-  "timestamp": "2026-09-28T12:00:00.000Z",
   "auto": {
     "version": 1,
     "drawnFor": "RED",

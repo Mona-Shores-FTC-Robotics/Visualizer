@@ -23,11 +23,8 @@ export function exportAutoJava(input: {
     );
     return ["This project has no Auto yet."];
   }
-  const result = generateAutoJava({
-    ...input,
-    auto,
-    savedAt: new Date().toISOString(),
-  });
+  // A download, not a save: no SAVED stamp (Save to GitHub and Save team spots stamp theirs).
+  const result = generateAutoJava({ ...input, auto });
   if (!result.ok) {
     const more =
       result.errors.length > 1
