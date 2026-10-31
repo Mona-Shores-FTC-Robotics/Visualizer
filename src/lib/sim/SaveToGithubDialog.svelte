@@ -34,6 +34,8 @@
     SIM_WORKFLOW,
     baseName,
     generatedPathFor,
+    currentDesigns,
+    isCurrentDesign,
     laneBranch,
     ppPathProblem,
     protectedBranch,
@@ -105,7 +107,10 @@
   let speed = $state(50);
   let seeds = $state(10);
   let alliance = $state<"RED" | "BLUE">("RED");
-  let designs = $state<string[]>(loadJson(DESIGNS_KEY, [DEFAULT_DESIGN]));
+  // Only the simulator's current designs: a list saved from an old result (the 88 what-if designs) is dropped.
+  let designs = $state<string[]>(
+    currentDesigns(loadJson<string[]>(DESIGNS_KEY, [DEFAULT_DESIGN])),
+  );
 
   let saving = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
@@ -171,8 +176,12 @@
 
   async function opened() {
     const saved = loadJson<Record<string, unknown>>(OPTIONS_KEY, {});
-    if (typeof saved.design === "string") design = saved.design;
-    if (typeof saved.partnerDesign === "string")
+    if (typeof saved.design === "string" && isCurrentDesign(saved.design))
+      design = saved.design;
+    if (
+      typeof saved.partnerDesign === "string" &&
+      (saved.partnerDesign === "" || isCurrentDesign(saved.partnerDesign))
+    )
       partnerDesign = saved.partnerDesign;
     if (typeof saved.speed === "number") speed = saved.speed;
     if (typeof saved.seeds === "number") seeds = saved.seeds;
@@ -265,18 +274,24 @@
         ppFiles.find((f) => autoClassName(baseName(f)) === partnerClass) ??
         partner;
     }
-    if (r.design) design = r.design;
+    // A result from before the simulator's real-robot designs: its numbers are shown, its design is not reused.
+    if (!isCurrentDesign(r.design)) return;
+    design = r.design!;
     partnerDesign =
-      r.partnerDesign && r.partnerDesign !== r.design ? r.partnerDesign : "";
+      r.partnerDesign &&
+      r.partnerDesign !== r.design &&
+      isCurrentDesign(r.partnerDesign)
+        ? r.partnerDesign
+        : "";
     if (Number(at) > 0) speed = Number(at);
     if (r.runs?.length) seeds = r.runs.length;
     if (r.alliance === "RED" || r.alliance === "BLUE") alliance = r.alliance;
   }
 
   function rememberDesigns(r: SimResult) {
-    if (r.designs?.length) {
-      designs = r.designs;
-      saveJson(DESIGNS_KEY, r.designs);
+    if ((r.designs ?? []).some(isCurrentDesign)) {
+      designs = currentDesigns(r.designs!);
+      saveJson(DESIGNS_KEY, designs);
     }
   }
 
