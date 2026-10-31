@@ -181,6 +181,11 @@ test("SAVED: the .pp's save time, Michigan time, for the OpMode's name", () => {
   assertEqual(savedStamp("2026-10-31T04:22:12.112Z"), "10-31|12:22AM");
   assertEqual(savedStamp("2026-07-04T17:05:00Z"), "07-04|1:05PM");
   assertEqual(savedStamp("2026-12-01T03:00:00Z"), "11-30|10:00PM");
-  assertEqual(savedStamp(undefined), "unsaved");
-  assertEqual(savedStamp("not a date"), "unsaved");
+  assertEqual(savedStamp(undefined), "");
+  assertEqual(savedStamp("not a date"), "");
+  assertEqual(
+    savedStamp("2026-01-01T00:00:00.000Z"),
+    "",
+    "the tests' frozen clock is no save time",
+  );
 });
