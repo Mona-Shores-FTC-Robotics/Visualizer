@@ -503,6 +503,26 @@
     if (isOpen && polls < 240) timer = setTimeout(poll, 5000);
   }
 
+  /** biobuzz's AdvantageScope layout for match logs, which also shows a simulated log's robot and path. */
+  const LAYOUT_PATH = "tools/advantagescope/match-layout.json";
+
+  async function downloadLayout() {
+    try {
+      const blob = await readBytes(token, LAYOUT_PATH, "master");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "biobuzz-match-layout.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      showToast(
+        `Could not download the layout: ${(error as Error).message}`,
+        "error",
+      );
+    }
+  }
+
   async function download(r: SimResult, file: string) {
     try {
       const blob = await readBytes(
@@ -916,6 +936,11 @@
             >
           {/each}
         </div>
+        <p class="text-xs text-body mb-3">
+          Then drag the file onto AdvantageScope's window (or File → Open
+          Logs…). A web page cannot open AdvantageScope by itself, so it is
+          download, then drag.
+        </p>
         <table class="w-full text-xs">
           <thead class="text-body text-left">
             <tr>
@@ -975,12 +1000,38 @@
           </tbody>
         </table>
         <p class="text-xs text-body mt-3">
-          ▲ the best seed, ★ the median one: both logs are published. In
-          AdvantageScope open one, then File → Import Layout with biobuzz's <code
-            >sim-review/advantagescope-layout.json</code
-          >; AUTO starts 10 s into the log. Its Metadata tab names the commit
-          and .pp it simulated.
+          ▲ the best seed, ★ the median one: both logs are published. AUTO
+          starts 10 s into the log; its Metadata tab names the commit and .pp it
+          simulated.
         </p>
+        <details class="text-xs text-body mt-3">
+          <summary class="cursor-pointer text-heading"
+            >Set up AdvantageScope on this laptop (once)</summary
+          >
+          <ol class="list-decimal ml-5 mt-2 flex flex-col gap-1">
+            <li>
+              Install <a
+                class="underline"
+                href="https://github.com/Mechanical-Advantage/AdvantageScope/releases"
+                target="_blank"
+                rel="noreferrer">AdvantageScope</a
+              > (v27 alpha 6 or newer).
+            </li>
+            <li>
+              <button class="underline" onclick={downloadLayout}
+                >Download the team layout</button
+              >, then in AdvantageScope File → Import Layout… and pick it. It is
+              the same layout as for the robot's real match logs, so a simulated
+              run and a real one look alike.
+            </li>
+            <li>
+              The team's robot model (optional): in your biobuzz checkout,
+              double-click <code
+                >tools/advantagescope/setup-advantagescope.cmd</code
+              >, then restart AdvantageScope.
+            </li>
+          </ol>
+        </details>
       {/if}
     </div>
   {/if}
