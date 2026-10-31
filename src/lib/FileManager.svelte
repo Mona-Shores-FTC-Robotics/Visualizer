@@ -37,6 +37,8 @@
   import IconButton from "./components/ui/IconButton.svelte";
   import FileListItem from "./components/FileListItem.svelte";
   import FileActionsPanel from "./components/FileActionsPanel.svelte";
+  import { DEFAULT_REF, TEAM_DIR, listTeamFiles } from "./team/teamAutos";
+  import { gitHash, gitLinkFor } from "../utils/gitLink";
 
   interface Props {
     isOpen?: boolean;
@@ -56,6 +58,39 @@
   let files: FileInfo[] = $state([]);
   let loading = $state(false);
   let errorMessage = $state("");
+
+  /**
+   * biobuzz's Autos on master, listed under the browser's own files. Opening one links the project to
+   * that file, so Save to GitHub saves it back (through the fast lane into master).
+   */
+  let teamFiles: string[] = $state([]);
+  let teamError = $state("");
+  let teamLoaded = false;
+
+  async function loadTeamFiles() {
+    teamLoaded = true;
+    teamError = "";
+    try {
+      teamFiles = await listTeamFiles(DEFAULT_REF);
+    } catch (error) {
+      teamFiles = [];
+      teamError = getErrorMessage(error);
+      teamLoaded = false;
+    }
+  }
+
+  $effect(() => {
+    if (isOpen && !teamLoaded) void loadTeamFiles();
+  });
+
+  function openTeamFile(file: string) {
+    const hash = gitHash(gitLinkFor(DEFAULT_REF, `${TEAM_DIR}/${file}`));
+    // Already the address: setting it again fires nothing, so ask for the same reload by hand.
+    if (location.hash === hash)
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    else location.hash = hash;
+    isOpen = false;
+  }
 
   let selectedFile = $derived(
     files.find((file) => file.path === $currentFilePath) ?? null,
@@ -383,6 +418,35 @@
           {/each}
         </div>
       {/if}
+
+      <div class="mt-3 border-t border-border pt-3">
+        <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
+          biobuzz <span class="font-mono font-normal text-body"
+            >{DEFAULT_REF}</span
+          >
+        </h3>
+        <p class="px-2 pb-2 text-xs text-body">
+          The team's Autos. Open one to edit it; Save to GitHub saves it back to
+          biobuzz.
+        </p>
+        {#if teamError}
+          <p class="px-2 text-xs text-danger">
+            {teamError}
+            <button class="underline" onclick={loadTeamFiles}>Try again</button>
+          </p>
+        {:else}
+          <div class="flex flex-col gap-px">
+            {#each teamFiles as file (file)}
+              <button
+                type="button"
+                class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
+                title={`Open ${TEAM_DIR}/${file} from biobuzz ${DEFAULT_REF}`}
+                onclick={() => openTeamFile(file)}>{file}</button
+              >
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
 
     <FileActionsPanel
