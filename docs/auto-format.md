@@ -224,7 +224,9 @@ field and gets a warning; it is not exported.
 `org.firstinspires.ftc.teamcode.opmodes.auto.generated`, following the
 contract with the robot's `autokit` library:
 
-- `SOURCE`, `COMMANDS`, `TRIGGERS` (every registered name used, sorted, no
+- `SOURCE`, `SAVED` (when the .pp was saved, Michigan time, e.g. `10-31|12:22AM`, from its
+  `timestamp`, empty when it has none; the OpMode's name on the Driver Station ends with it, so the
+  drive team sees which save is on the robot), `COMMANDS`, `TRIGGERS` (every registered name used, sorted, no
   duplicates), `DRAWN_FOR`, `startPose(boolean rotated)`, a private
   `poses(boolean rotated)` factory and `build(AutoKit kit, boolean rotated)`;
 - every pose is a `Pose` local built with `p.of(...)` so the robot's half-turn

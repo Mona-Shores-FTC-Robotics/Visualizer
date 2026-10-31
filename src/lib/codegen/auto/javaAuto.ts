@@ -51,6 +51,47 @@ export interface AutoExportInput {
   settings: Settings;
   /** The .pp file name, e.g. `hive-rush.pp`; recorded in SOURCE. */
   sourceFileName: string;
+  /**
+   * When the .pp was saved (its `timestamp`, ISO 8601); recorded in SAVED, which the OpMode's name on the
+   * Driver Station ends with, so the drive team can see which save is on the robot.
+   */
+  savedAt?: string;
+}
+
+/** The team's time zone: SAVED reads the same whichever computer exported the Auto. */
+export const SAVED_TIME_ZONE = "America/Detroit";
+
+/**
+ * The time the Visualizer's own tests freeze the clock at (test/support/setup.ts). A .pp written by a
+ * script under them carries it, and it is no save time: such a .pp gets no stamp.
+ */
+const TEST_CLOCK = "2026-01-01T00:00:00.000Z";
+
+/**
+ * `2026-10-31T04:22:12Z` → `10-31|12:22AM` (Michigan time). Empty without a real save time, so the
+ * Driver Station shows the plain name until the Auto is next saved.
+ */
+export function savedStamp(savedAt: string | undefined): string {
+  const date = savedAt ? new Date(savedAt) : null;
+  if (
+    !date ||
+    Number.isNaN(date.getTime()) ||
+    date.toISOString() === TEST_CLOCK
+  )
+    return "";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: SAVED_TIME_ZONE,
+      month: "2-digit",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.month}-${parts.day}|${parts.hour}:${parts.minute}${String(parts.dayPeriod).toUpperCase()}`;
 }
 
 export type AutoExportResult =
@@ -565,6 +606,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "",
     "    /** The .pp file this was generated from. */",
     `    public static final String SOURCE = ${javaString(sourceFileName)};`,
+    "",
+    "    /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */",
+    `    public static final String SAVED = ${javaString(savedStamp(input.savedAt))};`,
     "",
     "    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */",
     `    public static final String[] COMMANDS = ${sortedList(used.actions.keys())};`,

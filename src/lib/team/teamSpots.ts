@@ -221,6 +221,8 @@ export function reexportWithSpots(
   }
 
   const name = ppPath.split("/").pop()!;
+  // The .pp first, so the Java's SAVED is the time the .pp records.
+  const savedText = serializeProject(doc, { pretty: true });
   const java = generateAutoJava({
     auto: doc.auto!,
     startPoint: doc.startPoint,
@@ -228,10 +230,11 @@ export function reexportWithSpots(
     shapes: doc.shapes,
     settings,
     sourceFileName: name,
+    savedAt: JSON.parse(savedText).timestamp,
   });
   if (!java.ok) return { error: `${name}: ${java.errors.join("; ")}` };
   return {
-    ppText: serializeProject(doc, { pretty: true }),
+    ppText: savedText,
     java: java.source,
     javaFileName: java.fileName,
   };

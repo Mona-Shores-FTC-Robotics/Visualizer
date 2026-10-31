@@ -17,16 +17,26 @@ export function exportAutoJava(input: {
 }): string[] {
   const auto = currentAuto();
   if (!auto) {
-    showToast("This project has no Auto yet. Turn on Auto mode to build one.", "warning");
+    showToast(
+      "This project has no Auto yet. Turn on Auto mode to build one.",
+      "warning",
+    );
     return ["This project has no Auto yet."];
   }
+  // A download, not a save: no SAVED stamp (Save to GitHub and Save team spots stamp theirs).
   const result = generateAutoJava({ ...input, auto });
   if (!result.ok) {
-    const more = result.errors.length > 1 ? ` (+${result.errors.length - 1} more, listed in the Auto panel)` : "";
+    const more =
+      result.errors.length > 1
+        ? ` (+${result.errors.length - 1} more, listed in the Auto panel)`
+        : "";
     showToast(`Export blocked: ${result.errors[0]}${more}`, "error");
     return result.errors;
   }
-  downloadBlob(new Blob([result.source], { type: "text/x-java" }), result.fileName);
+  downloadBlob(
+    new Blob([result.source], { type: "text/x-java" }),
+    result.fileName,
+  );
   showToast(
     result.warnings.length
       ? `Exported ${result.fileName} with ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`
