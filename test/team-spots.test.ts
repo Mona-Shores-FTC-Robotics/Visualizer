@@ -20,6 +20,7 @@ import {
   parseTeamSpots,
   reexportWithSpots,
   serializeTeamSpots,
+  startSpotFollowsStart,
   teamSpotSave,
   unlinkSpot,
   type TeamSpots,
@@ -184,5 +185,25 @@ describe("starts as team spots", () => {
     const moved = applyTeamSpots(doc, { START_RIGHT: [56, 8, 90] });
     expect(moved.startPoint).toMatchObject({ x: 56, y: 8, headingDeg: 90 });
     expect(moved.auto!.points.START_RIGHT).toEqual([56, 8, 90]);
+  });
+
+  it("moves an unlocked start spot with the start, and never a locked one", () => {
+    let doc = linked();
+    doc = {
+      ...doc,
+      auto: {
+        ...doc.auto!,
+        startAt: "START_LEFT",
+        teamSpots: [...doc.auto!.teamSpots!, "START_LEFT"].sort(),
+      },
+    };
+    const typed = {
+      ...doc,
+      startPoint: { ...doc.startPoint, x: 63.86, y: 133.78, headingDeg: 270 },
+    };
+    expect(startSpotFollowsStart(typed, new Set())).toBe(typed);
+    const moved = startSpotFollowsStart(typed, new Set(["START_LEFT"]));
+    expect(moved.auto!.points.START_LEFT).toEqual([63.86, 133.78, 270]);
+    expect(startSpotFollowsStart(moved, new Set(["START_LEFT"]))).toBe(moved);
   });
 });
