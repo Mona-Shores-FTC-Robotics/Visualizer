@@ -137,7 +137,9 @@
   let parks = $derived(spotParks(doc, auto.catalog));
   /** Fork: what each drive, and the park from its spot, runs into (collide.ts). */
   let hits = $derived(
-    auto.catalog ? stepCollisions(doc, auto.catalog) : new Map<string, StepHits>(),
+    auto.catalog
+      ? stepCollisions(doc, auto.catalog)
+      : new Map<string, StepHits>(),
   );
   /** Fork: the start buttons, the team's START_ spots (steps.ts startsFrom). */
   let starts = $derived(startsFrom($teamSpots));
@@ -215,6 +217,18 @@
     )
       return;
     onSave();
+  }
+
+  /**
+   * Fork: turns the spot a launch is made from to face our CELL (aim.ts). A team spot changes for
+   * every Auto that uses it, once saved.
+   */
+  function faceCell(spot: string, needDeg: number) {
+    const point = doc.auto?.points[spot];
+    if (!point) return;
+    const h = ((Math.round(needDeg) % 360) + 360) % 360;
+    if (linkedSpots.has(spot)) editSpot(spot, [point[0], point[1], h]);
+    apply(setSpotHeading(doc, spot, h));
   }
 
   /** Fork: a spot being renamed, on the step it was started from. */
@@ -753,16 +767,48 @@
             {#if hit.drive.length}
               <p class="mt-1 pl-6 text-xs text-danger">
                 The drive here touches {hit.drive.join(" and ")} (within the robot's
-                {doc.robot.safetyMargin} in safety margin). Move the spot, or bend the
-                path with a control point.
+                {doc.robot.safetyMargin} in safety margin). Move the spot, or bend
+                the path with a control point.
               </p>
             {/if}
             {#if hit.park.length}
               <p class="mt-1 pl-6 text-xs text-warning">
-                Its park path (P) touches {hit.park.join(" and ")}: press P and bend
-                it.
+                Its park path (P) touches {hit.park.join(" and ")}: press P and
+                bend it.
               </p>
             {/if}
+          {/if}
+        {:else if step.kind === "launch" && step.aim}
+          {@const aim = step.aim}
+          {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
+          <div class="mt-1 flex items-center gap-2 pl-6 text-xs">
+            <span class={["flex-1", aim.on ? "text-body" : "text-danger"]}>
+              {#if aim.on}
+                At our {cell} CELL, {Math.round(aim.rangeIn)} in away, {Math.abs(
+                  aim.offDeg,
+                ).toFixed(1)}° off: on, with the turret locked.
+              {:else}
+                Faces {Math.abs(aim.offDeg).toFixed(0)}° off our {cell} CELL (it needs
+                {Math.round(aim.needDeg)}°): with the turret locked, this
+                misses.
+              {/if}
+            </span>
+            {#if !aim.on && step.atSpot && !isStartName(step.atSpot)}
+              <button
+                type="button"
+                class="simple-tile !min-h-0 !py-0.5"
+                title={`Turn ${step.atSpot} to face the CELL (${Math.round(aim.needDeg)}°)`}
+                onclick={() => faceCell(step.atSpot!, aim.needDeg)}
+                >Face the CELL</button
+              >
+            {/if}
+          </div>
+          {#if !aim.on && (!step.atSpot || isStartName(step.atSpot))}
+            <p class="mt-1 pl-6 text-xs text-body">
+              {step.atSpot && isStartName(step.atSpot)
+                ? "The start's heading is set by the marks: drive to a launch spot first, and aim that."
+                : "Drive to a spot first, and aim that."}
+            </p>
           {/if}
         {:else if step.kind === "wait"}
           <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">

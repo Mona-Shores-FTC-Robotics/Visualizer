@@ -26,6 +26,7 @@ import type {
 } from "../auto/types";
 import { robotFootprints } from "../../model/collision";
 import { ownHalf, pickFrom, type Flower } from "./flowers";
+import { aimFrom, type Aim } from "./aim";
 import {
   gardenFor,
   MAX_RANGE_IN as GARDEN_RANGE_IN,
@@ -50,6 +51,9 @@ export interface Step {
   garden?: Garden | null;
   /** Pick flower, Garden gather: why the robot would refuse, or null when it will do it. */
   problem?: string | null;
+  /** Launch all: where it goes with the turret locked (aim.ts), and the spot it is launched from. */
+  aim?: Aim;
+  atSpot?: string | null;
   /** Wait: the trigger it waits for (WAIT_FOR), and the most it waits, seconds. */
   waitFor?: string;
   waitS?: number;
@@ -126,10 +130,19 @@ export function stepsOf(doc: ProjectDoc): Step[] {
     y: doc.startPoint.y,
     h: doc.startPoint.headingDeg,
   };
+  /** The named spot the robot is on: the start's, then each drive's. */
+  let onSpot: string | null = auto.startAt ?? null;
   return auto.cards.map((card): Step => {
     const base = { cardId: card.id, spot: null, lineId: null };
     if (card.kind === "action" && card.name === LAUNCH_ALL) {
-      return { ...base, kind: "launch", label: "Launch all" };
+      // The turret stays locked straight ahead in an Auto: the heading is the aim (aim.ts).
+      return {
+        ...base,
+        kind: "launch",
+        label: "Launch all",
+        aim: aimFrom(here.x, here.y, here.h, auto.drawnFor),
+        atSpot: onSpot,
+      };
     }
     if (card.kind === "action" && card.name === PICK_FLOWER) {
       // A pick ends where it started (FlowerPicker's contract), so `here` stays.
@@ -174,6 +187,7 @@ export function stepsOf(doc: ProjectDoc): Step[] {
       const spot = spotOf(auto, doc.lines, card.lineId);
       const point = spot ? auto.points[spot] : null;
       if (point) here = { x: point[0], y: point[1], h: point[2] ?? here.h };
+      onSpot = spot;
       const park = card.park;
       // An Auto may not cross the centre line with any part of the robot.
       const crosses =
