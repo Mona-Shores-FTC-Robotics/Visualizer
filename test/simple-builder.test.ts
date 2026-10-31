@@ -352,9 +352,9 @@ describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () 
     const pick = startOf(26.71, 47.36, 180);
     expect(pick.squares).toBe(false);
     expect(pick.start.x).toBeCloseTo(26.71, 2);
-    const at20 = startOf(20, 47.36, 181);
-    expect(at20.squares).toBe(false);
-    expect(at20.start.x).toBeCloseTo(20, 2);
+    const at21 = startOf(21, 47.36, 181);
+    expect(at21.squares).toBe(false);
+    expect(at21.start.x).toBeCloseTo(21, 2);
   });
 
   it("squares up onto the line after an overshoot, at the distance it stopped", () => {
@@ -368,6 +368,11 @@ describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () 
     const close = startOf(14, 47.4, 180);
     expect(close.squares).toBe(true);
     expect(close.start.x).toBeCloseTo(2.71 + 18, 2);
+    // On the line but under 17.5 in out: not square yet, it backs out to 18.
+    const near = startOf(2.71 + 17.2, 47.36, 180);
+    expect(near.squares).toBe(true);
+    expect(near.start.x).toBeCloseTo(2.71 + 18, 2);
+    expect(startOf(2.71 + 17.6, 47.36, 180).squares).toBe(false);
     const far = startOf(32, 47.36, 180);
     expect(far.squares).toBe(true);
     expect(far.start.x).toBeCloseTo(2.71 + 24, 2);

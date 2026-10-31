@@ -64,6 +64,8 @@ export const MIN_AUTO_START_IN = 18;
 /** FlowerPicker.atApproachIn and atApproachDeg: this close to the square-up point, it is skipped. */
 const AT_APPROACH_IN = 1.5;
 const AT_APPROACH_DEG = 5;
+/** FlowerPicker: a robot this much nearer than minAutoStartIn still squares up, inches. */
+const STICK_ROOM_SLACK_IN = 0.5;
 /** The preview's time for a square-up that runs: a turn and a short slide, seconds. */
 const SQUARE_S = 0.6;
 /** FlowerPicker.stickDownMs, and dwellMs (the dwell's cap, its worst case), in seconds. */
@@ -175,12 +177,14 @@ export function pickFrom(x: number, y: number, headingDeg: number): PickFrom {
       why: `The robot faces ${offDeg.toFixed(0)}° from square to the ${flower.name} (at most ${AUTO_MAX_OFF_DEG}°)`,
     };
   const keep = Math.min(APPROACH_STANDOFF_IN, Math.max(MIN_AUTO_START_IN, out));
-  // The robot clamps, then skips the move when already that close to the clamped point; a
-  // skipped square-up pushes from, and backs out to, where the robot is.
+  // The robot clamps, then skips the move when already that close to the clamped point and no
+  // nearer the FLOWER than the stick allows (minAutoStartIn less 0.5 in); a skipped square-up
+  // pushes from, and backs out to, where the robot is.
   const lined = standoff(flower, keep);
   const squares =
     Math.hypot(lined.x - x, lined.y - y) > AT_APPROACH_IN ||
-    offDeg > AT_APPROACH_DEG;
+    offDeg > AT_APPROACH_DEG ||
+    out < MIN_AUTO_START_IN - STICK_ROOM_SLACK_IN;
   const start = squares ? lined : { x, y, headingDeg };
   const contact = contactPose(flower);
   return {
