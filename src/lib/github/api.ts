@@ -64,7 +64,7 @@ async function call(
       message =
         "GitHub refused the token: it may have expired. Paste a new one.";
     if (response.status === 403 && token) {
-      message = `${message}. Check the token has Contents: read and write, and Actions: read, on biobuzz.`;
+      message = `${message}. Check the token has Contents: read and write, Pull requests: read and write, and Actions: read, on biobuzz.`;
     }
     throw new GitHubError(message, response.status);
   }
@@ -112,6 +112,90 @@ export async function createBranch(
   });
 }
 
+/** Points `branch` at `commit`, whatever it pointed at before (a fast-lane branch starting over from master). */
+export async function moveBranch(
+  token: string,
+  branch: string,
+  commit: string,
+): Promise<void> {
+  await json(token, repo(`/git/refs/heads/${encodePath(branch)}`), {
+    method: "PATCH",
+    body: JSON.stringify({ sha: commit, force: true }),
+  });
+}
+
+/** The commit a branch points at, or null if there is no such branch. */
+export async function branchHeadOrNull(
+  token: string | null,
+  branch: string,
+): Promise<string | null> {
+  try {
+    return await branchHead(token, branch);
+  } catch (error) {
+    if (error instanceof GitHubError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export interface PullRequest {
+  number: number;
+  node_id: string;
+  html_url: string;
+}
+
+/** The open pull request from `branch` into `base`, or null. */
+export async function openPullFrom(
+  token: string,
+  branch: string,
+  base: string,
+): Promise<PullRequest | null> {
+  const owner = GIT_REPO.split("/")[0];
+  const pulls = await json<PullRequest[]>(
+    token,
+    repo(
+      `/pulls?state=open&base=${encodeURIComponent(base)}&head=${encodeURIComponent(`${owner}:${branch}`)}`,
+    ),
+  );
+  return pulls[0] ?? null;
+}
+
+/** Opens a pull request from `branch` into `base`. */
+export async function createPull(
+  token: string,
+  branch: string,
+  base: string,
+  title: string,
+  body: string,
+): Promise<PullRequest> {
+  return json<PullRequest>(token, repo("/pulls"), {
+    method: "POST",
+    body: JSON.stringify({ title, head: branch, base, body }),
+  });
+}
+
+/**
+ * Asks GitHub to merge the pull request by itself once its required checks pass (GraphQL: the
+ * REST API has no call for it). Throws when biobuzz's settings do not allow auto-merge, or the
+ * token may not write pull requests.
+ */
+export async function enableAutoMerge(
+  token: string,
+  pullNodeId: string,
+): Promise<void> {
+  const response = await call(token, "/graphql", {
+    method: "POST",
+    body: JSON.stringify({
+      query:
+        "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: MERGE}) { clientMutationId } }",
+      variables: { id: pullNodeId },
+    }),
+  });
+  const data = (await response.json()) as { errors?: { message: string }[] };
+  if (data.errors?.length) {
+    throw new GitHubError(data.errors.map((e) => e.message).join("; "), 422);
+  }
+}
+
 /** Fork: where GitHub opens a pull request from `branch` into master. */
 export function pullRequestUrl(branch: string, title: string): string {
   return `https://github.com/${GIT_REPO}/compare/master...${encodePath(branch)}?expand=1&title=${encodeURIComponent(title)}`;
@@ -144,7 +228,9 @@ export async function readText(
   try {
     const response = await call(
       token,
-      repo(`/contents/${encodePath(path)}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`),
+      repo(
+        `/contents/${encodePath(path)}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`,
+      ),
       {
         accept: "application/vnd.github.raw+json",
       },
@@ -242,6 +328,9 @@ export function commitUrl(commit: string): string {
  * older than GitHub just after its own save). Null if there is no such file;
  * throws if the API refuses (a rate limit), so the caller can fall back.
  */
-export async function currentText(path: string, ref: string | null): Promise<string | null> {
+export async function currentText(
+  path: string,
+  ref: string | null,
+): Promise<string | null> {
   return readText(savedToken(), path, ref ?? "");
 }

@@ -8,7 +8,13 @@
   import {
     GitHubError,
     branchHead,
+    branchHeadOrNull,
     commitFiles,
+    createBranch,
+    createPull,
+    enableAutoMerge,
+    moveBranch,
+    openPullFrom,
     commitUrl,
     listFiles,
     readBytes,
@@ -22,12 +28,13 @@
   import {
     DEFAULT_BRANCH,
     DEFAULT_DESIGN,
+    FAST_LANE_BASE,
     PP_DIRS,
-    SIM_REQUEST_PATH,
     SIM_RESULTS_BRANCH,
     SIM_WORKFLOW,
     baseName,
     generatedPathFor,
+    laneBranch,
     ppPathProblem,
     protectedBranch,
     robotProblems,
@@ -35,6 +42,7 @@
     simLatestPath,
     simLogPath,
     simRequestText,
+    simRequestPath,
     simResultPath,
     simSpec,
     suggestPpPath,
@@ -100,6 +108,10 @@
   let designs = $state<string[]>(loadJson(DESIGNS_KEY, [DEFAULT_DESIGN]));
 
   let saving = $state(false);
+  /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
+  let pull = $state<{ url: string; number: number; autoMerge: boolean } | null>(null);
+  /** Master, or a fast-lane branch: the save goes to master through a pull request that merges itself. */
+  let viaFastLane = $derived(branch.trim() === FAST_LANE_BASE || branch.trim().startsWith("auto/"));
   let blocked = $state<string[]>([]);
   /** The commit being simulated, or the one whose result is shown. */
   let commit = $state<string | null>(null);
@@ -168,7 +180,7 @@
       !/^[0-9a-f]{7,40}$/.test(source.ref);
     branch = fromBranch
       ? source!.ref!
-      : typeof saved.branch === "string"
+      : typeof saved.branch === "string" && saved.branch !== "claude/simulator"
         ? saved.branch
         : DEFAULT_BRANCH;
 
@@ -288,8 +300,9 @@
     const ppPath = path.trim();
     blocked = [];
     if (pathProblem) return void (blocked = [pathProblem]);
-    if (protectedBranch(branch))
+    if (protectedBranch(branch) && !viaFastLane)
       return void (blocked = [`Save to a working branch, not ${branch}.`]);
+    const target = viaFastLane ? laneBranch(ppPath) : branch;
     if (
       isNew &&
       !confirm(
@@ -306,20 +319,27 @@
         blocked = exported.errors;
         return;
       }
-      let head = await branchHead(token, branch);
+      // The fast lane: the Auto's own branch, from master unless its pull request is still open.
+      let open = viaFastLane ? await openPullFrom(token, target, FAST_LANE_BASE) : null;
+      let head: string;
+      if (!viaFastLane || open) {
+        head = await branchHead(token, target);
+      } else {
+        head = await branchHead(token, FAST_LANE_BASE);
+        if ((await branchHeadOrNull(token, target)) === null) await createBranch(token, target, head);
+        else await moveBranch(token, target, head);
+      }
       // Someone else's change since this draft began is not replaced without asking.
-      if (
-        baseText !== null &&
-        source &&
-        ppPath === source.path &&
-        (source.ref ?? branch) === branch
-      ) {
+      const sameRef = viaFastLane
+        ? [FAST_LANE_BASE, target].includes(source?.ref ?? FAST_LANE_BASE)
+        : (source?.ref ?? branch) === branch;
+      if (baseText !== null && source && ppPath === source.path && sameRef) {
         const onGithub = await readText(token, ppPath, head);
         if (
           onGithub !== null &&
           onGithub !== baseText &&
           !confirm(
-            `${baseName(ppPath)} changed on ${branch} since you started editing it. Replace that version with yours?\n\n` +
+            `${baseName(ppPath)} changed on ${target} since you started editing it. Replace that version with yours?\n\n` +
               "Cancel saves nothing and keeps your draft as it is.",
           )
         ) {
@@ -338,7 +358,7 @@
           !existing.some((f) => f.endsWith(`/generated/${partnerClass}.java`))
         ) {
           blocked = [
-            `${baseName(partner)} has no exported Java on ${branch} yet: save it to GitHub first.`,
+            `${baseName(partner)} has no exported Java on ${target} yet: save it to GitHub first.`,
           ];
           return;
         }
@@ -348,7 +368,7 @@
       const files = {
         [ppPath]: text,
         [javaPath]: exported.source,
-        [SIM_REQUEST_PATH]: simRequestText({
+        [simRequestPath(ppPath, viaFastLane)]: simRequestText({
           ppPath,
           spec,
           design,
@@ -362,7 +382,7 @@
       const message = `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${spec}.`;
       let sha: string;
       try {
-        sha = await commitFiles(token, branch, head, files, message);
+        sha = await commitFiles(token, target, head, files, message);
       } catch (error) {
         // Someone pushed in between: once more on top of theirs.
         if (
@@ -370,8 +390,35 @@
           (error.status !== 422 && error.status !== 409)
         )
           throw error;
-        head = await branchHead(token, branch);
-        sha = await commitFiles(token, branch, head, files, message);
+        head = await branchHead(token, target);
+        sha = await commitFiles(token, target, head, files, message);
+      }
+      pull = null;
+      if (viaFastLane) {
+        const fresh = !open;
+        if (!open) {
+          open = await createPull(
+            token,
+            target,
+            FAST_LANE_BASE,
+            `Auto: ${baseName(ppPath)}`,
+            `Saved from the Visualizer by ${login}: \`${ppPath}\`, its generated Java and its simulation request (simulates ${spec}).\n\n` +
+              "Fast lane: an Auto-only change, merged by GitHub once its checks pass. Simulated points are shown, never enforced.",
+          );
+        }
+        let autoMerge = !fresh;
+        if (fresh) {
+          try {
+            await enableAutoMerge(token, open.node_id);
+            autoMerge = true;
+          } catch (error) {
+            showToast(
+              `Pull request #${open.number} is open, but GitHub would not merge it by itself (${(error as Error).message}): merge it on GitHub once its checks pass.`,
+              "warning",
+            );
+          }
+        }
+        pull = { url: open.html_url, number: open.number, autoMerge };
       }
       saveJson(OPTIONS_KEY, {
         design,
@@ -388,8 +435,13 @@
       });
       saveJson(PENDING_KEY, { path: ppPath, commit: sha });
       exported.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
-      showToast(`Saved ${baseName(ppPath)} to ${branch}`, "success");
-      onSaved(branch, ppPath, text);
+      showToast(
+        pull
+          ? `Saved ${baseName(ppPath)} to pull request #${pull.number}${pull.autoMerge ? ": it merges into master once its checks pass" : ""}`
+          : `Saved ${baseName(ppPath)} to ${branch}`,
+        "success",
+      );
+      onSaved(target, ppPath, text);
       commit = sha;
       commitPath = ppPath;
       result = null;
@@ -664,7 +716,13 @@
         {#if pathProblem}
           {pathProblem}.
         {:else}
-          One commit on <code>{branch}</code>: <code>{path}</code>
+          {#if viaFastLane}
+            Fast lane: one commit on <code>{laneBranch(path.trim())}</code>, in a pull request into master that
+            merges itself once its checks pass (about 1.5 minutes):
+          {:else}
+            One commit on <code>{branch}</code>:
+          {/if}
+          <code>{path}</code>
           {#if isNew}<strong class="text-warning">(a new file)</strong
             >{:else}(updated){/if}, its Java, and the simulation request. GitHub
           then runs
@@ -702,7 +760,7 @@
         <li>Repository access: <b>Only select repositories → biobuzz</b>.</li>
         <li>
           Permissions: <b>Contents: Read and write</b>,
-          <b>Actions: Read-only</b>.
+          <b>Pull requests: Read and write</b>, <b>Actions: Read-only</b>.
         </li>
         <li>Generate it, copy it, and paste it here.</li>
       </ol>
@@ -727,6 +785,17 @@
         </button>
       </div>
     </div>
+  {/if}
+
+  {#if pull}
+    <p class="mt-3 text-sm text-heading">
+      <a class="underline" href={pull.url} target="_blank" rel="noreferrer"
+        >Pull request #{pull.number}</a
+      >
+      {pull.autoMerge
+        ? "merges into master by itself once its checks pass; then pull master and Sloth Load."
+        : "is open: merge it on GitHub once its checks pass."}
+    </p>
   {/if}
 
   {#if blocked.length}
