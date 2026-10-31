@@ -22,6 +22,7 @@ import {
   flowerFor,
   FLOWERS,
   flowerLinedUp,
+  pickMotions,
   pickSpot,
 } from "../src/lib/simple/flowers";
 import {
@@ -208,22 +209,23 @@ describe("the simple builder", () => {
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 
-  it("pushes straight ahead from wherever the drive left the robot, and back there", () => {
+  it("squares up onto the FLOWER's line first when the drive left it beside it", () => {
     let doc = fresh();
     doc = addSpot(doc, "BESIDE", 30, 50, 180); // 2.6 in off the WALL FLOWER's line
     doc = add(doc, "drive", "BESIDE");
     doc = add(doc, "pick");
-    expect(stepsOf(doc)[1].problem).toBeNull();
+    expect(stepsOf(doc)[1]).toMatchObject({ problem: null, squares: true });
     const run = preview(doc);
-    expect(run.motions).toHaveLength(4); // stick, push, dwell, back: no line-up
+    expect(run.motions).toHaveLength(5); // square-up, stick, push, dwell, back
     const contact = motionPoseAt(
       run,
-      (run.motions[2].t0 + run.motions[2].t1) / 2,
+      (run.motions[3].t0 + run.motions[3].t1) / 2,
     )!;
-    expect(contact.y).toBeCloseTo(50, 6); // straight ahead, not onto the FLOWER's line
+    expect(contact.y).toBeCloseTo(47.36, 6); // on the FLOWER's line
     expect(contact.x).toBeCloseTo(2.71 + 12, 6);
-    const end = motionPoseAt(run, run.motions[3].t1)!;
-    expect([end.x, end.y]).toEqual([30, 50]);
+    const end = motionPoseAt(run, run.motions[4].t1)!;
+    expect(end.x).toBeCloseTo(2.71 + 24, 6); // 27.3 in out, kept to 24
+    expect(end.y).toBeCloseTo(47.36, 6);
   });
 
   it("marks a pick the robot would refuse", () => {
@@ -231,7 +233,9 @@ describe("the simple builder", () => {
     doc = addSpot(doc, "OFF", 30, 60, 180); // 12.6 in off the WALL FLOWER's line
     doc = add(doc, "drive", "OFF");
     doc = add(doc, "pick");
-    expect(stepsOf(doc)[1].problem).toMatch(/off the robot's line ahead/);
+    expect(stepsOf(doc)[1].problem).toMatch(
+      /12\.6 in off the WALL FLOWER's line/,
+    );
     expect(preview(doc).motions).toHaveLength(0);
   });
 
@@ -320,12 +324,11 @@ describe("the simple builder", () => {
     if (java.ok) expect(java.source).toContain("PickFlower");
   });
 
-  it("picks the nearest FLOWER within 48 in, as the robot does", () => {
+  it("picks the nearest FLOWER within 60 in, as the robot does", () => {
     expect(flowerFor(70, 70)).toBeNull();
     expect(flowerFor(26.7, 47.4)?.name).toBe("WALL FLOWER");
     expect(pickFrom(26.7, 47.4, 180).ok).toBe(true);
     expect(pickFrom(26.7, 47.4, 0).ok).toBe(false); // facing away
-    expect(pickFrom(14, 47.4, 180).ok).toBe(false); // already past the contact
     expect(pickSpot(FLOWERS[1])).toEqual({
       x: 47.36,
       y: 141.5 - 2.71 - 24,
@@ -334,6 +337,71 @@ describe("the simple builder", () => {
     // A click on a FLOWER's line is put on its pick spot; one off it is not.
     expect(flowerLinedUp(30, 50)?.name).toBe("WALL FLOWER");
     expect(flowerLinedUp(30, 60)).toBeNull();
+  });
+});
+
+describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () => {
+  // The WALL FLOWER: centre (2.71, 47.36), its line runs along y, square is 180°.
+  const startOf = (x: number, y: number, h: number) => {
+    const pick = pickFrom(x, y, h);
+    if (!pick.ok) throw new Error(pick.why);
+    return pick;
+  };
+
+  it("does nothing extra when the drive ends lined up", () => {
+    const pick = startOf(26.71, 47.36, 180);
+    expect(pick.squares).toBe(false);
+    expect(pick.start.x).toBeCloseTo(26.71, 2);
+    const at20 = startOf(20, 47.36, 181);
+    expect(at20.squares).toBe(false);
+    expect(at20.start.x).toBeCloseTo(20, 2);
+  });
+
+  it("squares up onto the line after an overshoot, at the distance it stopped", () => {
+    const pick = startOf(22, 50, 168);
+    expect(pick.squares).toBe(true);
+    expect(pick.start).toMatchObject({ y: 47.36, headingDeg: 180 });
+    expect(pick.start.x).toBeCloseTo(22, 2);
+  });
+
+  it("keeps between 17 and 24 in from the FLOWER's centre", () => {
+    const close = startOf(14, 47.4, 180);
+    expect(close.squares).toBe(true);
+    expect(close.start.x).toBeCloseTo(2.71 + 17, 2);
+    const far = startOf(32, 47.36, 180);
+    expect(far.squares).toBe(true);
+    expect(far.start.x).toBeCloseTo(2.71 + 24, 2);
+  });
+
+  it("refuses past 12 in off the line or 30° from square", () => {
+    expect(pickFrom(26.7, 47.36 + 12.5, 180).ok).toBe(false);
+    expect(pickFrom(26.7, 47.36 + 11.5, 180).ok).toBe(true);
+    expect(pickFrom(26.7, 47.36, 180 + 31).ok).toBe(false);
+    expect(pickFrom(26.7, 47.36, 180 - 29).ok).toBe(true);
+  });
+
+  it("previews the square-up, then the push, and ends on the line", () => {
+    const pick = startOf(22, 50, 168);
+    const motions = pickMotions(
+      "p",
+      { x: 22, y: 50, headingDeg: 168 },
+      pick,
+      10,
+      4.5,
+    );
+    expect(motions).toHaveLength(5);
+    expect(motions[0].motion.samples[0]).toEqual({ x: 22, y: 50 });
+    expect(motions[0].motion.samples[1].y).toBeCloseTo(47.36, 2);
+    const last = motions[motions.length - 1];
+    expect(last.t1).toBeCloseTo(14.5, 6);
+    expect(last.motion.samples[1]).toEqual({
+      x: pick.start.x,
+      y: pick.start.y,
+    });
+    const lined = startOf(26.71, 47.36, 180);
+    expect(
+      pickMotions("p", { x: 26.71, y: 47.36, headingDeg: 180 }, lined, 0, 4.5),
+    ).toHaveLength(4);
   });
 });
 

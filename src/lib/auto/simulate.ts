@@ -476,15 +476,20 @@ export function simulateAuto(
           stay(Math.max(0, deadline.deadline - t));
           return { abortTo: deadline };
         }
-        // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): straight ahead
-        // to its FLOWER and back to where it started, in the command's own time. A pick the robot
+        // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): square up onto
+        // its FLOWER's line if needed, push and back out, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
         const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
         if (gather) motions.push(...gather.motions);
         if (pick?.ok) {
-          motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, pick.contact, t, busy));
+          motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, pick, t, busy));
         }
         stay(busy);
+        // A pick that squared up ends on the FLOWER's line, where its push started.
+        if (pick?.ok && pick.squares) {
+          pos = { x: pick.start.x, y: pick.start.y };
+          heading = pick.start.headingDeg;
+        }
         timing?.commandRan?.(card.name, t - busy, t);
         return null;
       }
