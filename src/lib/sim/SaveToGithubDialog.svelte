@@ -109,9 +109,13 @@
 
   let saving = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
-  let pull = $state<{ url: string; number: number; autoMerge: boolean } | null>(null);
+  let pull = $state<{ url: string; number: number; autoMerge: boolean } | null>(
+    null,
+  );
   /** Master, or a fast-lane branch: the save goes to master through a pull request that merges itself. */
-  let viaFastLane = $derived(branch.trim() === FAST_LANE_BASE || branch.trim().startsWith("auto/"));
+  let viaFastLane = $derived(
+    branch.trim() === FAST_LANE_BASE || branch.trim().startsWith("auto/"),
+  );
   let blocked = $state<string[]>([]);
   /** The commit being simulated, or the one whose result is shown. */
   let commit = $state<string | null>(null);
@@ -213,7 +217,12 @@
 
   async function loadBranch() {
     try {
-      files = await listFiles(token, await branchHead(token, branch));
+      // A fast-lane branch is gone once its pull request merged (or not made yet): master then.
+      const at = viaFastLane
+        ? ((await branchHeadOrNull(token, branch.trim())) ??
+          (await branchHead(token, FAST_LANE_BASE)))
+        : await branchHead(token, branch);
+      files = await listFiles(token, at);
     } catch (error) {
       files = [];
       showToast(
@@ -320,13 +329,16 @@
         return;
       }
       // The fast lane: the Auto's own branch, from master unless its pull request is still open.
-      let open = viaFastLane ? await openPullFrom(token, target, FAST_LANE_BASE) : null;
+      let open = viaFastLane
+        ? await openPullFrom(token, target, FAST_LANE_BASE)
+        : null;
       let head: string;
       if (!viaFastLane || open) {
         head = await branchHead(token, target);
       } else {
         head = await branchHead(token, FAST_LANE_BASE);
-        if ((await branchHeadOrNull(token, target)) === null) await createBranch(token, target, head);
+        if ((await branchHeadOrNull(token, target)) === null)
+          await createBranch(token, target, head);
         else await moveBranch(token, target, head);
       }
       // Someone else's change since this draft began is not replaced without asking.
@@ -567,8 +579,7 @@
     <div class="flex items-center justify-between gap-3 text-sm my-3">
       <p class="text-heading">
         <code>{source.path}</code> on {source.ref ?? "the default branch"}:
-        <span
-          class={draft.status === "same" ? "text-body" : "text-warning"}
+        <span class={draft.status === "same" ? "text-body" : "text-warning"}
           >{draft.label}</span
         >{#if draft.from && draft.status !== "same"}<span class="text-body"
             >&nbsp;(edits from {new Date(draft.from).toLocaleString()})</span
@@ -590,9 +601,7 @@
   {/if}
 
   {#if $teamView && !source}
-    <div
-      class="text-sm text-warning border border-warning/40 rounded p-3 my-3"
-    >
+    <div class="text-sm text-warning border border-warning/40 rounded p-3 my-3">
       <p>
         Team Autos is showing {$teamView.files.join(", ")} to watch. Those are not
         what this saves: it saves the project you are editing. To change one of them,
@@ -717,8 +726,9 @@
           {pathProblem}.
         {:else}
           {#if viaFastLane}
-            Fast lane: one commit on <code>{laneBranch(path.trim())}</code>, in a pull request into master that
-            merges itself once its checks pass (about 1.5 minutes):
+            Fast lane: one commit on <code>{laneBranch(path.trim())}</code>, in
+            a pull request into master that merges itself once its checks pass
+            (about 1.5 minutes):
           {:else}
             One commit on <code>{branch}</code>:
           {/if}
