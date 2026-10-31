@@ -46,7 +46,7 @@ export const FLOWERS: Flower[] = [
 ];
 
 /** FlowerPicker.maxRangeIn: only a FLOWER this close is picked, inches. */
-export const MAX_RANGE_IN = 48;
+export const MAX_RANGE_IN = 60;
 /** FlowerPicker.approachStandoffIn: the pick spot, this far back from the FLOWER's centre. */
 export const APPROACH_STANDOFF_IN = 24;
 /** FlowerPicker.contactStandoffIn: where the push stops, from the FLOWER's centre. */

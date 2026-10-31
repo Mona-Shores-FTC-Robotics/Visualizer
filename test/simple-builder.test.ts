@@ -28,6 +28,7 @@ import {
   addSpot,
   addStep,
   blankAuto,
+  isSimple,
   moveStep,
   removeStep,
   setSpotHeading,
@@ -539,6 +540,84 @@ describe("the Wait for TIP step", () => {
       waitFor: "LeftCellUp",
       waitS: 7,
     });
+  });
+});
+
+describe("spinning the launcher up in Simple", () => {
+  /** L-Simple for the locked turret: spin up while waiting for TIP 1, then launch. */
+  function waitThenLaunch(spinUp: boolean): ProjectDoc {
+    let doc = fresh();
+    doc = add(doc, "wait");
+    doc = setWait(doc, doc.auto!.cards[0].id, { spinUp });
+    return add(doc, "launch");
+  }
+
+  it("spins up while waiting, and stays a Wait step", () => {
+    const doc = waitThenLaunch(true);
+    const card = doc.auto!.cards[0];
+    expect(card.kind === "firstOf" && card.alongside).toBe("SpinUp");
+    expect(stepsOf(doc)[0]).toMatchObject({
+      kind: "wait",
+      label: "Wait for TIP",
+      spinUp: true,
+    });
+    expect(isSimple(doc)).toBe(true);
+    const off = setWait(doc, card.id, { spinUp: false });
+    expect(off.auto!.cards[0]).not.toHaveProperty("alongside");
+    expect(stepsOf(off)[0]).toMatchObject({ kind: "wait", spinUp: false });
+  });
+
+  it("another command alongside a wait is still an advanced step", () => {
+    const doc = waitThenLaunch(false);
+    const auto = structuredClone(doc.auto!);
+    const card = auto.cards[0];
+    if (card.kind === "firstOf") card.alongside = "LaunchAll";
+    expect(stepsOf({ ...doc, auto })[0].kind).toBe("other");
+  });
+
+  it("previews the wait the same with or without the spin-up", () => {
+    const launchAt = (doc: ProjectDoc) =>
+      preview(doc).log.find((e) => e.cardId === doc.auto!.cards[1].id)?.t;
+    const without = launchAt(waitThenLaunch(false));
+    const withSpin = launchAt(waitThenLaunch(true));
+    expect(without).toBeDefined();
+    expect(withSpin).toBeCloseTo(without!, 3);
+    expect(
+      preview(waitThenLaunch(true)).launches.map((l) => l.command),
+    ).toEqual(["SpinUp"]);
+  });
+
+  it("exports the spin-up alongside the wait", () => {
+    const doc = waitThenLaunch(true);
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "spin.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) {
+      expect(java.source).toContain('kit.command("SpinUp")');
+      expect(java.source).toContain('kit.when("Tip")');
+      expect(java.source).toContain("kit.afterMs(7000)");
+    }
+  });
+
+  it("has a plain Spin up step", () => {
+    let doc = fresh();
+    doc = add(doc, "spinup");
+    doc = add(doc, "launch");
+    expect(doc.auto!.cards[0]).toMatchObject({
+      kind: "action",
+      name: "SpinUp",
+    });
+    expect(stepsOf(doc)[0]).toMatchObject({
+      kind: "spinup",
+      label: "Spin up the launcher",
+    });
+    expect(isSimple(doc)).toBe(true);
   });
 });
 

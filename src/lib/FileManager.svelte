@@ -39,6 +39,8 @@
   import FileActionsPanel from "./components/FileActionsPanel.svelte";
   import { DEFAULT_REF, TEAM_DIR, listTeamFiles } from "./team/teamAutos";
   import { gitHash, gitLinkFor } from "../utils/gitLink";
+  import { TEAM_ROBOT } from "./auto/teamRobot";
+  import { blankAuto } from "./simple/steps";
 
   interface Props {
     isOpen?: boolean;
@@ -65,17 +67,21 @@
    */
   let teamFiles: string[] = $state([]);
   let teamError = $state("");
+  let teamLoading = $state(false);
   let teamLoaded = false;
 
   async function loadTeamFiles() {
     teamLoaded = true;
     teamError = "";
+    teamLoading = true;
     try {
       teamFiles = await listTeamFiles(DEFAULT_REF);
     } catch (error) {
       teamFiles = [];
       teamError = getErrorMessage(error);
       teamLoaded = false;
+    } finally {
+      teamLoading = false;
     }
   }
 
@@ -193,7 +199,14 @@
         return;
       }
 
-      const doc = createDefaultProject(currentProject().robot, fieldMap);
+      // Fork: the same new Auto as the menu's New (state/files.svelte.ts): empty, at the right
+      // start, with the team robot's box and its list of commands and triggers.
+      const doc = blankAuto(
+        createDefaultProject(
+          { ...currentProject().robot, ...TEAM_ROBOT },
+          fieldMap,
+        ),
+      );
       await browserFileStore.writeFile(name, serializeProject(doc));
       await refreshDirectory();
       applyProject(doc);
@@ -395,7 +408,9 @@
           The team's Autos. Open one to edit it; Save to GitHub saves it back to
           biobuzz.
         </p>
-        {#if teamError}
+        {#if teamLoading}
+          <p class="px-2 text-xs text-body">Reading the list from GitHub…</p>
+        {:else if teamError}
           <p class="px-2 text-xs text-danger">
             {teamError}
             <button class="underline" onclick={loadTeamFiles}>Try again</button>
