@@ -79,7 +79,8 @@
   }: Props = $props();
 
   const OPTIONS_KEY = "githubSimOptions";
-  const DESIGNS_KEY = "githubSimDesigns";
+  // A new key on 31 Oct 2026: the old one holds the simulator's 88 what-if designs, which it no longer has.
+  const DESIGNS_KEY = "githubSimDesignsReal";
   const PENDING_KEY = "githubSimPending";
 
   let token = $state<string | null>(savedToken());
