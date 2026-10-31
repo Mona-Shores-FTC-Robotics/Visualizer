@@ -385,6 +385,35 @@
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
+      <div class="mb-3 border-b border-border pb-3">
+        <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
+          biobuzz <span class="font-mono font-normal text-body"
+            >{DEFAULT_REF}</span
+          >
+        </h3>
+        <p class="px-2 pb-2 text-xs text-body">
+          The team's Autos. Open one to edit it; Save to GitHub saves it back to
+          biobuzz.
+        </p>
+        {#if teamError}
+          <p class="px-2 text-xs text-danger">
+            {teamError}
+            <button class="underline" onclick={loadTeamFiles}>Try again</button>
+          </p>
+        {:else}
+          <div class="flex flex-col gap-px">
+            {#each teamFiles as file (file)}
+              <button
+                type="button"
+                class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
+                title={`Open ${TEAM_DIR}/${file} from biobuzz ${DEFAULT_REF}`}
+                onclick={() => openTeamFile(file)}>{file}</button
+              >
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <h3 class="px-2 pb-1 text-xs font-semibold text-heading">This browser</h3>
       {#if loading}
         <div class="flex flex-col items-center gap-2 py-10 text-xs text-body">
           <LoaderCircle class="size-5 animate-spin text-primary" />
@@ -418,35 +447,6 @@
           {/each}
         </div>
       {/if}
-
-      <div class="mt-3 border-t border-border pt-3">
-        <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
-          biobuzz <span class="font-mono font-normal text-body"
-            >{DEFAULT_REF}</span
-          >
-        </h3>
-        <p class="px-2 pb-2 text-xs text-body">
-          The team's Autos. Open one to edit it; Save to GitHub saves it back to
-          biobuzz.
-        </p>
-        {#if teamError}
-          <p class="px-2 text-xs text-danger">
-            {teamError}
-            <button class="underline" onclick={loadTeamFiles}>Try again</button>
-          </p>
-        {:else}
-          <div class="flex flex-col gap-px">
-            {#each teamFiles as file (file)}
-              <button
-                type="button"
-                class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
-                title={`Open ${TEAM_DIR}/${file} from biobuzz ${DEFAULT_REF}`}
-                onclick={() => openTeamFile(file)}>{file}</button
-              >
-            {/each}
-          </div>
-        {/if}
-      </div>
     </div>
 
     <FileActionsPanel
