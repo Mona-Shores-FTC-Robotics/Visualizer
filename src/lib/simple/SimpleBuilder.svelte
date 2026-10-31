@@ -539,6 +539,7 @@
       title={open
         ? "Unlocked: the START panel's X, Y and heading, or dragging the start, move this team spot. Then Save team spots"
         : "The start is a team spot, locked. Unlock it to move it (every Auto that starts here moves with it once saved)"}
+      aria-label={open ? "Lock the start spot" : "Unlock the start spot"}
       onclick={() => setSpotUnlocked(side!, !open)}
     >
       {#if open}<LockOpen class="size-3.5" />
