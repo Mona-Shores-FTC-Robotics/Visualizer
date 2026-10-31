@@ -364,16 +364,17 @@ describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () 
     expect(pick.start.x).toBeCloseTo(22, 2);
   });
 
-  it("keeps between 17 and 24 in from the FLOWER's centre", () => {
+  it("keeps between 18 and 24 in from the FLOWER's centre", () => {
     const close = startOf(14, 47.4, 180);
     expect(close.squares).toBe(true);
-    expect(close.start.x).toBeCloseTo(2.71 + 17, 2);
+    expect(close.start.x).toBeCloseTo(2.71 + 18, 2);
     const far = startOf(32, 47.36, 180);
     expect(far.squares).toBe(true);
     expect(far.start.x).toBeCloseTo(2.71 + 24, 2);
   });
 
-  it("refuses past 12 in off the line or 30° from square", () => {
+  it("refuses behind the FLOWER, past 12 in off the line or 30° from square", () => {
+    expect(pickFrom(2, 47.36, 180).ok).toBe(false);
     expect(pickFrom(26.7, 47.36 + 12.5, 180).ok).toBe(false);
     expect(pickFrom(26.7, 47.36 + 11.5, 180).ok).toBe(true);
     expect(pickFrom(26.7, 47.36, 180 + 31).ok).toBe(false);

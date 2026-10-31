@@ -441,11 +441,11 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   Pick flower is biobuzz's `FlowerPicker`, the robot's one pick routine (D-pad up and the
   PickFlower card); `flowers.ts` holds its numbers. An Auto's pick squares up where the drive
   stopped: when the robot is off the FLOWER's line or not square to it, one short move puts it on
-  the line, square, at the distance it stopped (kept between 17 and 24 in from the FLOWER's
+  the line, square, at the distance it stopped (kept between 18 and 24 in from the FLOWER's
   centre); a drive that ends lined up skips it. The preview (`simulate.ts` motions) draws that
   square-up, the stick, the push along the line to 12 in from the FLOWER, the dwell and the
-  back-out to where the push started, where it ends. A pick the robot would refuse (more than
-  12 in off the FLOWER's line, or more than 30° from square) is marked red, and one that squares
+  back-out to where the push started, where it ends. A pick the robot would refuse (not in front of
+  the FLOWER, more than 12 in off its line, or more than 30° from square) is marked red, and one that squares
   up is marked so the spot can be moved onto the line. Its card gets an 8 s timeout. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its

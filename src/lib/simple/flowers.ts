@@ -10,10 +10,10 @@
  * PickFlower card both run, and every number here is one of its own. Change one, change the other.
  * An Auto's card (what the preview shows) squares up where the drive stopped, then pushes:
  *   the nearest FLOWER on our half within 60 in (maxRangeIn);
- *   it refuses when the robot is more than 12 in off the FLOWER's line (autoMaxOffIn) or more than
- *     30 degrees from square to it (autoMaxOffDeg);
+ *   it refuses when the robot is not in front of the FLOWER, more than 12 in off its line
+ *     (autoMaxOffIn) or more than 30 degrees from square to it (autoMaxOffDeg);
  *   square-up: one short move onto the FLOWER's line, square to it, at the distance from the
- *     FLOWER's centre the drive stopped at, kept between 17 in (minAutoStartIn, room for the stick)
+ *     FLOWER's centre the drive stopped at, kept between 18 in (minAutoStartIn, room for the stick)
  *     and 24 in (approachStandoffIn). Skipped when already within 1.5 in and 5 degrees of that
  *     (atApproachIn, atApproachDeg), so a drive that ends lined up costs nothing;
  *   stick: 0.7 s for the stick to come down (stickDownMs);
@@ -60,7 +60,7 @@ export const AUTO_MAX_OFF_IN = 12;
 /** FlowerPicker.autoMaxOffDeg: and past this far from square to it, degrees. */
 export const AUTO_MAX_OFF_DEG = 30;
 /** FlowerPicker.minAutoStartIn: the square-up keeps at least this far from the FLOWER's centre. */
-export const MIN_AUTO_START_IN = 17;
+export const MIN_AUTO_START_IN = 18;
 /** FlowerPicker.atApproachIn and atApproachDeg: this close to the square-up point, it is skipped. */
 const AT_APPROACH_IN = 1.5;
 const AT_APPROACH_DEG = 5;
@@ -130,7 +130,7 @@ export type PickFrom =
   | {
       ok: true;
       flower: Flower;
-      /** Where the push starts: on the FLOWER's line, square to it. The pick ends here. */
+      /** Where the push starts and the pick ends: on the FLOWER's line if it squared up, else where it was. */
       start: { x: number; y: number; headingDeg: number };
       /** The robot moves to `start` first (it stopped off the line, crooked, or too close). */
       squares: boolean;
@@ -156,6 +156,12 @@ export function pickFrom(x: number, y: number, headingDeg: number): PickFrom {
   const out = dx * Math.cos(rad) + dy * Math.sin(rad);
   const offIn = Math.abs(-dx * Math.sin(rad) + dy * Math.cos(rad));
   const offDeg = angleOff(headingDeg, flower.facingDeg);
+  if (!(out > 0))
+    return {
+      ok: false,
+      flower,
+      why: `The robot is not in front of the ${flower.name}`,
+    };
   if (offIn > AUTO_MAX_OFF_IN)
     return {
       ok: false,
@@ -169,10 +175,13 @@ export function pickFrom(x: number, y: number, headingDeg: number): PickFrom {
       why: `The robot faces ${offDeg.toFixed(0)}° from square to the ${flower.name} (at most ${AUTO_MAX_OFF_DEG}°)`,
     };
   const keep = Math.min(APPROACH_STANDOFF_IN, Math.max(MIN_AUTO_START_IN, out));
-  const start = standoff(flower, keep);
+  // The robot clamps, then skips the move when already that close to the clamped point; a
+  // skipped square-up pushes from, and backs out to, where the robot is.
+  const lined = standoff(flower, keep);
   const squares =
-    Math.hypot(start.x - x, start.y - y) > AT_APPROACH_IN ||
+    Math.hypot(lined.x - x, lined.y - y) > AT_APPROACH_IN ||
     offDeg > AT_APPROACH_DEG;
+  const start = squares ? lined : { x, y, headingDeg };
   const contact = contactPose(flower);
   return {
     ok: true,
