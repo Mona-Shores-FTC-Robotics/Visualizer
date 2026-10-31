@@ -51,6 +51,14 @@ export function isCurrentDesign(design: string | null | undefined): boolean {
   return typeof design === "string" && design.startsWith(DEFAULT_DESIGN);
 }
 
+/** `designs` without the old ones, and never empty: the real robot at least. */
+export function currentDesigns(designs: unknown): string[] {
+  const current = Array.isArray(designs)
+    ? designs.filter((d): d is string => isCurrentDesign(d))
+    : [];
+  return current.length ? current : [DEFAULT_DESIGN];
+}
+
 /** Why `path` is not a .pp that "Save to GitHub" may write, or null if it is. */
 export function ppPathProblem(path: string): string | null {
   if (!path.endsWith(".pp")) return `${path} is not a .pp file`;

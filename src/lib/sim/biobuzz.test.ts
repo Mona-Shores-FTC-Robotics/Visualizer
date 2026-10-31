@@ -1,6 +1,7 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import {
   GENERATED_DIRS,
+  currentDesigns,
   generatedPathFor,
   isCurrentDesign,
   laneBranch,
@@ -227,4 +228,15 @@ test("only the real robot's designs are current; old results' designs are not re
     "the old default",
   );
   assert(!isCurrentDesign(undefined) && !isCurrentDesign(null), "none");
+});
+
+test("a remembered list of old designs falls back to the real robot", () => {
+  assertEqual(currentDesigns(["rigid V", "rigid V, 0.25 s shots"]), [
+    "real robot",
+  ]);
+  assertEqual(
+    currentDesigns(["rigid V", "real robot", "real robot, POLLEN only"]),
+    ["real robot", "real robot, POLLEN only"],
+  );
+  assertEqual(currentDesigns("not a list"), ["real robot"]);
 });

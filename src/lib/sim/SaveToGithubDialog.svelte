@@ -34,6 +34,7 @@
     SIM_WORKFLOW,
     baseName,
     generatedPathFor,
+    currentDesigns,
     isCurrentDesign,
     laneBranch,
     ppPathProblem,
@@ -106,7 +107,10 @@
   let speed = $state(50);
   let seeds = $state(10);
   let alliance = $state<"RED" | "BLUE">("RED");
-  let designs = $state<string[]>(loadJson(DESIGNS_KEY, [DEFAULT_DESIGN]));
+  // Only the simulator's current designs: a list saved from an old result (the 88 what-if designs) is dropped.
+  let designs = $state<string[]>(
+    currentDesigns(loadJson<string[]>(DESIGNS_KEY, [DEFAULT_DESIGN])),
+  );
 
   let saving = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
@@ -285,10 +289,9 @@
   }
 
   function rememberDesigns(r: SimResult) {
-    const current = (r.designs ?? []).filter(isCurrentDesign);
-    if (current.length) {
-      designs = current;
-      saveJson(DESIGNS_KEY, current);
+    if ((r.designs ?? []).some(isCurrentDesign)) {
+      designs = currentDesigns(r.designs!);
+      saveJson(DESIGNS_KEY, designs);
     }
   }
 
