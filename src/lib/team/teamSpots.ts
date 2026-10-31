@@ -178,6 +178,29 @@ export function applyTeamSpots(doc: ProjectDoc, spots: TeamSpots): ProjectDoc {
 }
 
 /**
+ * The document with its start spot's copy moved to where the start is, when that spot is
+ * unlocked: the START panel's X, Y and heading, or a drag of the start, move the start pose, and
+ * an unlocked start spot follows it (then the list follows the copy, as a change to save). `doc`
+ * itself when the start is not on an unlocked spot, or already there.
+ */
+export function startSpotFollowsStart(
+  doc: ProjectDoc,
+  unlocked: ReadonlySet<string>,
+): ProjectDoc {
+  const auto = doc.auto;
+  const name = auto?.startAt;
+  if (!auto || !name || !unlocked.has(name) || !auto.teamSpots?.includes(name))
+    return doc;
+  const { x, y, headingDeg } = doc.startPoint;
+  const pose: NamedPoint = [x, y, headingDeg ?? 0];
+  if (samePose(auto.points[name], pose)) return doc;
+  return {
+    ...doc,
+    auto: { ...auto, points: { ...auto.points, [name]: pose } },
+  };
+}
+
+/**
  * One Auto's .pp, as it is with `spots` applied: its paths moved onto the spots, laid out and
  * parked from as the editor would, and its Java exported. Null when it links none of `names`.
  */

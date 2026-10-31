@@ -33,7 +33,12 @@ import {
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
-import { applyTeamSpots, samePose, type TeamSpots } from "../lib/team/teamSpots";
+import {
+  applyTeamSpots,
+  samePose,
+  startSpotFollowsStart,
+  type TeamSpots,
+} from "../lib/team/teamSpots";
 import { editSpot, teamSpots, unlockedSpots } from "../lib/team/spotsStore";
 import { ladderInfo } from "../lib/ladder/compile";
 import { timingMode, timingValues } from "../lib/timing/store";
@@ -302,6 +307,12 @@ export class AutoState {
       const spots = this.#teamSpots.current;
       const unlocked = this.#unlocked.current;
       untrack(() => {
+        // An unlocked start spot follows the start pose first, so its change is saved too.
+        const started = startSpotFollowsStart(doc, unlocked);
+        if (started !== doc) {
+          project.amend(() => started);
+          return;
+        }
         const auto = doc.auto;
         if (!auto?.teamSpots?.length) return;
         const locked: TeamSpots = {};

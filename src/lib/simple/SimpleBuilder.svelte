@@ -528,6 +528,26 @@
       >
     {/each}
   </div>
+  {#if side && linkedSpots.has(side)}
+    {@const open = $unlockedSpots.has(side)}
+    <button
+      type="button"
+      class={[
+        "flex items-center gap-1 self-start text-xs text-body underline",
+        open && "!text-warning",
+      ]}
+      title={open
+        ? "Unlocked: the START panel's X, Y and heading, or dragging the start, move this team spot. Then Save team spots"
+        : "The start is a team spot, locked. Unlock it to move it (every Auto that starts here moves with it once saved)"}
+      onclick={() => setSpotUnlocked(side!, !open)}
+    >
+      {#if open}<LockOpen class="size-3.5" />
+        {startLabel(side)} unlocked: move it, then Save team spots. Lock it again{:else}<Lock
+          class="size-3.5"
+        /> Unlock
+        {startLabel(side)} to move it{/if}
+    </button>
+  {/if}
 
   {#if $spotsStatus !== "ok" && $spotsStatus !== "loading"}
     <div class="simple-pending flex items-center gap-1.5" role="alert">
