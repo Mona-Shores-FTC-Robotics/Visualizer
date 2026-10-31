@@ -166,7 +166,7 @@ test("the request names the .pp, the run and what to stamp on each log", () => {
     {
       ppPath: path,
       spec: "Recycle5LeftAuto,Recycle5RightAuto@50",
-      design: "two spring hoods, full-width intake",
+      design: "real robot",
       partnerDesign: null,
       partnerSpeed: null,
       seeds: 3,

@@ -25,8 +25,12 @@ export const SIM_WORKFLOW = "Simulate Auto";
 /** Where saves go unless the file was opened from another branch. */
 export const DEFAULT_BRANCH = "claude/simulator";
 
-/** The robot design the review set uses, until a result lists the simulator's own. */
-export const DEFAULT_DESIGN = "two spring hoods, full-width intake";
+/**
+ * The robot design a save asks for, until a result lists the simulator's own: the real robot.
+ * biobuzz's simulator offers only it and its variants (turret locked forward, POLLEN only) since
+ * 31 Oct 2026, when its what-if designs went.
+ */
+export const DEFAULT_DESIGN = "real robot";
 
 /** Why `path` is not a .pp that "Save to GitHub" may write, or null if it is. */
 export function ppPathProblem(path: string): string | null {
