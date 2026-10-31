@@ -34,6 +34,7 @@
     SIM_WORKFLOW,
     baseName,
     generatedPathFor,
+    isCurrentDesign,
     laneBranch,
     ppPathProblem,
     protectedBranch,
@@ -171,8 +172,12 @@
 
   async function opened() {
     const saved = loadJson<Record<string, unknown>>(OPTIONS_KEY, {});
-    if (typeof saved.design === "string") design = saved.design;
-    if (typeof saved.partnerDesign === "string")
+    if (typeof saved.design === "string" && isCurrentDesign(saved.design))
+      design = saved.design;
+    if (
+      typeof saved.partnerDesign === "string" &&
+      (saved.partnerDesign === "" || isCurrentDesign(saved.partnerDesign))
+    )
       partnerDesign = saved.partnerDesign;
     if (typeof saved.speed === "number") speed = saved.speed;
     if (typeof saved.seeds === "number") seeds = saved.seeds;
@@ -265,18 +270,25 @@
         ppFiles.find((f) => autoClassName(baseName(f)) === partnerClass) ??
         partner;
     }
-    if (r.design) design = r.design;
+    // A result from before the simulator's real-robot designs: its numbers are shown, its design is not reused.
+    if (!isCurrentDesign(r.design)) return;
+    design = r.design!;
     partnerDesign =
-      r.partnerDesign && r.partnerDesign !== r.design ? r.partnerDesign : "";
+      r.partnerDesign &&
+      r.partnerDesign !== r.design &&
+      isCurrentDesign(r.partnerDesign)
+        ? r.partnerDesign
+        : "";
     if (Number(at) > 0) speed = Number(at);
     if (r.runs?.length) seeds = r.runs.length;
     if (r.alliance === "RED" || r.alliance === "BLUE") alliance = r.alliance;
   }
 
   function rememberDesigns(r: SimResult) {
-    if (r.designs?.length) {
-      designs = r.designs;
-      saveJson(DESIGNS_KEY, r.designs);
+    const current = (r.designs ?? []).filter(isCurrentDesign);
+    if (current.length) {
+      designs = current;
+      saveJson(DESIGNS_KEY, current);
     }
   }
 

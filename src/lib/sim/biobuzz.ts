@@ -42,6 +42,15 @@ export const FAST_LANE_BASE = "master";
  */
 export const DEFAULT_DESIGN = "real robot";
 
+/**
+ * Whether `design` is one the simulator offers now: the real robot or a variant of it. Results and
+ * remembered choices from before 31 Oct 2026 name the old what-if designs ("rigid V"), which the
+ * simulator no longer knows, so they are shown but never copied into a new request.
+ */
+export function isCurrentDesign(design: string | null | undefined): boolean {
+  return typeof design === "string" && design.startsWith(DEFAULT_DESIGN);
+}
+
 /** Why `path` is not a .pp that "Save to GitHub" may write, or null if it is. */
 export function ppPathProblem(path: string): string | null {
   if (!path.endsWith(".pp")) return `${path} is not a .pp file`;
