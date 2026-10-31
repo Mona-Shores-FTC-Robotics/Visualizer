@@ -51,6 +51,33 @@ export interface AutoExportInput {
   settings: Settings;
   /** The .pp file name, e.g. `hive-rush.pp`; recorded in SOURCE. */
   sourceFileName: string;
+  /**
+   * When the .pp was saved (its `timestamp`, ISO 8601); recorded in SAVED, which the OpMode's name on the
+   * Driver Station ends with, so the drive team can see which save is on the robot.
+   */
+  savedAt?: string;
+}
+
+/** The team's time zone: SAVED reads the same whichever computer exported the Auto. */
+export const SAVED_TIME_ZONE = "America/Detroit";
+
+/** `2026-10-31T04:22:12Z` → `10-31|12:22AM` (Michigan time); "unsaved" without a valid time. */
+export function savedStamp(savedAt: string | undefined): string {
+  const date = savedAt ? new Date(savedAt) : null;
+  if (!date || Number.isNaN(date.getTime())) return "unsaved";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: SAVED_TIME_ZONE,
+      month: "2-digit",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.month}-${parts.day}|${parts.hour}:${parts.minute}${String(parts.dayPeriod).toUpperCase()}`;
 }
 
 export type AutoExportResult =
@@ -565,6 +592,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "",
     "    /** The .pp file this was generated from. */",
     `    public static final String SOURCE = ${javaString(sourceFileName)};`,
+    "",
+    "    /** When the .pp was saved, Michigan time; the OpMode's name on the Driver Station ends with it. */",
+    `    public static final String SAVED = ${javaString(savedStamp(input.savedAt))};`,
     "",
     "    /** Registered robot commands this Auto uses; checked when the OpMode initialises. */",
     `    public static final String[] COMMANDS = ${sortedList(used.actions.keys())};`,

@@ -20,7 +20,9 @@ export function generateAutoJavaFromText(
   if (!loaded.ok || !auto) {
     return {
       ok: false,
-      errors: [loaded.ok ? `${sourceFileName} has no auto section.` : loaded.error],
+      errors: [
+        loaded.ok ? `${sourceFileName} has no auto section.` : loaded.error,
+      ],
       warnings: [],
       loadProblems: problems,
     };
@@ -33,6 +35,7 @@ export function generateAutoJavaFromText(
     shapes: doc.shapes,
     settings: { ...DEFAULT_SETTINGS, ...doc.robot },
     sourceFileName,
+    savedAt: typeof data.timestamp === "string" ? data.timestamp : undefined,
   });
   return { ...result, loadProblems: problems };
 }

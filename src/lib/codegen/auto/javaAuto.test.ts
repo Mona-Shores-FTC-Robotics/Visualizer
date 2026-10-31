@@ -9,6 +9,7 @@ import {
   javaNumber,
   javaString,
   parkSeconds,
+  savedStamp,
 } from "./javaAuto";
 import { buildPathCatalog } from "../../auto/geometry";
 import type { AutoSection } from "../../auto/types";
@@ -74,9 +75,16 @@ test("park seconds are the drive time rounded up to 0.1 s", () => {
   assertEqual(parkSeconds(2), 2);
   assertEqual(parkSeconds(2.0000001), 2);
   const sample = loadSample();
-  const catalog = buildPathCatalog(sample.startPoint, sample.lines, sample.settings);
+  const catalog = buildPathCatalog(
+    sample.startPoint,
+    sample.lines,
+    sample.settings,
+  );
   const park = catalog.byId.get("far-park")!;
-  assert(park.seconds > 1.5 && park.seconds <= 2.1, `park takes ${park.seconds}`);
+  assert(
+    park.seconds > 1.5 && park.seconds <= 2.1,
+    `park takes ${park.seconds}`,
+  );
 });
 
 test("an empty Auto still exports a compilable skeleton", () => {
@@ -86,7 +94,10 @@ test("an empty Auto still exports a compilable skeleton", () => {
   const source = sourceOf(auto);
   assert(source.includes("public static final String[] COMMANDS = {};"));
   assert(source.includes("return kit.sequence();"));
-  assert(!source.includes("Interpolator"), "no Interpolator import without a piecewise path");
+  assert(
+    !source.includes("Interpolator"),
+    "no Interpolator import without a piecewise path",
+  );
   assert(!source.includes("Path "), "no path locals when no card drives one");
 });
 
@@ -117,7 +128,10 @@ test("a wait exports as a trigger row and a time row, each with its route", () =
       kind: "firstOf",
       label: "Ready?",
       rows: [
-        { when: ["LauncherReady"], cards: [{ id: "x", kind: "action", name: "IntakeOn" }] },
+        {
+          when: ["LauncherReady"],
+          cards: [{ id: "x", kind: "action", name: "IntakeOn" }],
+        },
         { afterMs: 250, cards: [] },
       ],
     },
@@ -125,16 +139,29 @@ test("a wait exports as a trigger row and a time row, each with its route", () =
   const source = sourceOf(auto);
   assert(source.includes('kit.when("LauncherReady").then('), source);
   assert(source.includes("kit.afterMs(250))"), source);
-  assert(source.includes('public static final String[] COMMANDS = {"IntakeOn"};'), source);
-  assert(source.includes('public static final String[] TRIGGERS = {"LauncherReady"};'), source);
+  assert(
+    source.includes('public static final String[] COMMANDS = {"IntakeOn"};'),
+    source,
+  );
+  assert(
+    source.includes(
+      'public static final String[] TRIGGERS = {"LauncherReady"};',
+    ),
+    source,
+  );
 });
 
 test("errors block the export and say why", () => {
   const auto = clone(loadSample().auto);
-  auto.registry.actions = auto.registry.actions.filter((name) => name !== "SpinDown");
+  auto.registry.actions = auto.registry.actions.filter(
+    (name) => name !== "SpinDown",
+  );
   const result = exportOf(auto);
   assert(!result.ok);
-  assert(result.errors.some((error) => error.includes('"SpinDown"')), JSON.stringify(result.errors));
+  assert(
+    result.errors.some((error) => error.includes('"SpinDown"')),
+    JSON.stringify(result.errors),
+  );
 });
 
 test("a named point takes over a pose only when its heading fits", () => {
@@ -143,6 +170,17 @@ test("a named point takes over a pose only when its heading fits", () => {
   auto.points.ShootSpot = [38, 71, 90];
   const source = sourceOf(auto);
   assert(source.includes("Pose shootSpot = p.of(38, 71, 90);"), source);
-  assert(!source.includes(".constant(shootSpot)"), "constant heading must not use the 90° point");
+  assert(
+    !source.includes(".constant(shootSpot)"),
+    "constant heading must not use the 90° point",
+  );
   assert(/Pose \w+ = p\.of\(38, 71, 0\);/.test(source), source);
+});
+
+test("SAVED: the .pp's save time, Michigan time, for the OpMode's name", () => {
+  assertEqual(savedStamp("2026-10-31T04:22:12.112Z"), "10-31|12:22AM");
+  assertEqual(savedStamp("2026-07-04T17:05:00Z"), "07-04|1:05PM");
+  assertEqual(savedStamp("2026-12-01T03:00:00Z"), "11-30|10:00PM");
+  assertEqual(savedStamp(undefined), "unsaved");
+  assertEqual(savedStamp("not a date"), "unsaved");
 });
