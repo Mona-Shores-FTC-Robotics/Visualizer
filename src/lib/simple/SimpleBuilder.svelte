@@ -107,7 +107,7 @@
       kind: "pick",
       label: "Pick flower",
       icon: Flower2,
-      hint: "The robot's D-pad up pick, straight ahead from here and back to this spot",
+      hint: "The robot's D-pad up pick: squares up on the nearest FLOWER's line if it needs to, pushes in and backs out",
     },
     {
       kind: "gather",
@@ -902,8 +902,17 @@
           <div class="mt-1 pl-6 text-xs">
             {#if step.flower && !step.problem}
               <span class="text-body"
-                >at the {step.flower.name}, straight ahead and back to this spot</span
+                >at the {step.flower.name}, along its line and back{step.squares
+                  ? ""
+                  : " to this spot"}</span
               >
+              {#if step.squares}
+                <span class="block text-warning"
+                  >This spot is off the FLOWER's line or not square to it: the
+                  robot squares up first. Put the spot on its line (click on the
+                  line) to save that time.</span
+                >
+              {/if}
             {:else}
               <span class="text-danger"
                 >{step.problem}: the robot won't pick here. Drive to a spot on a

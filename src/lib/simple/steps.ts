@@ -49,6 +49,8 @@ export interface Step {
   flower?: Flower | null;
   /** Garden gather: the GARDEN it goes to, or null when none is in range. */
   garden?: Garden | null;
+  /** Pick flower: the robot squares up onto the FLOWER's line before it pushes. */
+  squares?: boolean;
   /** Pick flower, Garden gather: why the robot would refuse, or null when it will do it. */
   problem?: string | null;
   /** Launch all: where it goes with the turret locked (aim.ts), and the spot it is launched from. */
@@ -155,14 +157,18 @@ export function stepsOf(doc: ProjectDoc): Step[] {
       return { ...base, kind: "spinup", label: "Spin up the launcher" };
     }
     if (card.kind === "action" && card.name === PICK_FLOWER) {
-      // A pick ends where it started (FlowerPicker's contract), so `here` stays.
+      // A pick ends where its push started (FlowerPicker's contract): where the drive left the
+      // robot, or on the FLOWER's line if it squared up first.
       const pick = pickFrom(here.x, here.y, here.h);
+      if (pick.ok && pick.squares)
+        here = { x: pick.start.x, y: pick.start.y, h: pick.start.headingDeg };
       return {
         ...base,
         kind: "pick",
         label: "Pick flower",
         flower: pick.flower,
         problem: pick.ok ? null : pick.why,
+        squares: pick.ok && pick.squares,
       };
     }
     if (card.kind === "action" && card.name === GARDEN_GATHER) {
