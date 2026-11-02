@@ -14,7 +14,11 @@ import { TEAM_ROBOT } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc, relink } from "../src/lib/auto/links";
 import { withSpotParks } from "../src/lib/simple/parkFrom";
-import { motionPoseAt, simulateAuto } from "../src/lib/auto/simulate";
+import {
+  motionPoseAt,
+  simulateAuto,
+  worstCase,
+} from "../src/lib/auto/simulate";
 import { generateAutoJava } from "../src/lib/codegen/auto/javaAuto";
 import {
   pickFrom,
@@ -42,6 +46,7 @@ import {
   startsFrom,
   stepsOf,
   type StepKind,
+  type StepList,
 } from "../src/lib/simple/steps";
 
 const settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
@@ -57,6 +62,19 @@ const add = (
   kind: Exclude<StepKind, "other">,
   spot?: string,
 ) => addStep(doc, kind, doc.auto!.cards.length, spot).doc;
+
+/** Adds a step at the end of a wait's Otherwise list. */
+const addOtherwise = (
+  doc: ProjectDoc,
+  waitCardId: string,
+  kind: Exclude<StepKind, "other" | "wait">,
+  spot?: string,
+) => {
+  const into: StepList = { waitCardId };
+  const length =
+    stepsOf(doc).find((s) => s.cardId === waitCardId)?.otherwise?.length ?? 0;
+  return addStep(doc, kind, length, spot, into).doc;
+};
 
 /** R-Quals v2: shoot the preloads, pick both FLOWERs, shoot each at the left CELL, park. */
 function rQualsV2(): ProjectDoc {
@@ -615,6 +633,169 @@ describe("the Wait for TIP step", () => {
       waitFor: "LeftCellUp",
       waitS: 7,
     });
+  });
+});
+
+describe("a Wait step's Otherwise list", () => {
+  /** L-Simple's fallback: no TIP by 7 s means nobody made TIP 1, so make it at the right CELL. */
+  function noTipFallback(): ProjectDoc {
+    let doc = fresh();
+    doc = setStart(doc, "LEFT_START", DEFAULT_STARTS.LEFT_START);
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "LEFT_PARK", 9.8, 117.4, 0);
+    doc = add(doc, "wait");
+    const waitId = doc.auto!.cards[0].id;
+    doc = addOtherwise(doc, waitId, "drive", "RIGHT_FIRE");
+    doc = addOtherwise(doc, waitId, "launch");
+    doc = add(doc, "launch");
+    return add(doc, "park", "LEFT_PARK");
+  }
+
+  it("holds the Otherwise steps in the wait's time row, trigger row empty", () => {
+    const doc = noTipFallback();
+    const card = doc.auto!.cards[0];
+    expect(card.kind).toBe("firstOf");
+    if (card.kind !== "firstOf") return;
+    const when = card.rows.find((r) => "when" in r)!;
+    const time = card.rows.find((r) => "afterMs" in r)!;
+    expect(when.cards).toEqual([]);
+    expect(time.cards.map((c) => c.kind)).toEqual(["path", "action"]);
+    expect(doc.auto!.cards.map((c) => c.kind)).toEqual([
+      "firstOf",
+      "action",
+      "path",
+    ]);
+  });
+
+  it("reads back as a Wait step with its Otherwise steps, and stays Simple", () => {
+    const doc = noTipFallback();
+    const [wait, launch, park] = stepsOf(doc);
+    expect(wait).toMatchObject({ kind: "wait", waitFor: "Tip", waitS: 7 });
+    expect(wait.otherwise?.map((s) => s.label)).toEqual([
+      "Drive to RIGHT_FIRE",
+      "Launch all",
+    ]);
+    // The launch in the Otherwise is aimed from RIGHT_FIRE; the one below the wait from the start.
+    expect(wait.otherwise?.[1].atSpot).toBe("RIGHT_FIRE");
+    expect(launch).toMatchObject({ kind: "launch", atSpot: "LEFT_START" });
+    expect(park.kind).toBe("park");
+    expect(isSimple(doc)).toBe(true);
+  });
+
+  it("an empty Otherwise is still a plain wait", () => {
+    let doc = fresh();
+    doc = add(doc, "wait");
+    expect(stepsOf(doc)[0].otherwise).toEqual([]);
+    expect(isSimple(doc)).toBe(true);
+  });
+
+  it("refuses a wait inside an Otherwise", () => {
+    let doc = fresh();
+    doc = add(doc, "wait");
+    const waitId = doc.auto!.cards[0].id;
+    expect(() =>
+      addStep(doc, "wait", 0, undefined, { waitCardId: waitId }),
+    ).toThrow();
+  });
+
+  it("lays an Otherwise drive's heading from the heading at the wait", () => {
+    const doc = noTipFallback();
+    const drive = stepsOf(doc)[0].otherwise![0];
+    const line = doc.lines.find((l) => l.id === drive.lineId)!;
+    expect(line.kind === "atomic" && line.heading).toEqual({
+      type: "linear",
+      startDeg: 270,
+      endDeg: 92,
+    });
+  });
+
+  it("keeps one park across both lists", () => {
+    let doc = noTipFallback();
+    const waitId = doc.auto!.cards[0].id;
+    doc = addOtherwise(doc, waitId, "park", "LEFT_PARK");
+    const parks = (steps: ReturnType<typeof stepsOf>): string[] =>
+      steps.flatMap((s) => [
+        ...(s.kind === "park" ? [s.cardId] : []),
+        ...parks(s.otherwise ?? []),
+      ]);
+    expect(parks(stepsOf(doc))).toHaveLength(1);
+    expect(stepsOf(doc)[0].otherwise?.at(-1)?.kind).toBe("park");
+    expect(stepsOf(doc).at(-1)?.kind).toBe("drive");
+  });
+
+  it("removes and moves steps inside an Otherwise, a drive taking its path", () => {
+    let doc = noTipFallback();
+    const waitId = doc.auto!.cards[0].id;
+    const [drive, launch] = stepsOf(doc)[0].otherwise!;
+    const lines = doc.lines.length;
+    doc = moveStep(doc, launch.cardId, 0, { waitCardId: waitId });
+    expect(stepsOf(doc)[0].otherwise?.map((s) => s.cardId)).toEqual([
+      launch.cardId,
+      drive.cardId,
+    ]);
+    doc = removeStep(doc, drive.cardId);
+    expect(stepsOf(doc)[0].otherwise?.map((s) => s.cardId)).toEqual([
+      launch.cardId,
+    ]);
+    expect(doc.lines).toHaveLength(lines - 1);
+    // A step can move out to the main list, and a main-list step in.
+    doc = moveStep(doc, launch.cardId, 1, null);
+    expect(stepsOf(doc)[0].otherwise).toEqual([]);
+    expect(stepsOf(doc)[1].cardId).toBe(launch.cardId);
+    doc = moveStep(doc, launch.cardId, 0, { waitCardId: waitId });
+    expect(stepsOf(doc)[0].otherwise?.[0].cardId).toBe(launch.cardId);
+  });
+
+  it("removing the wait takes its Otherwise paths with it", () => {
+    let doc = noTipFallback();
+    const waitId = doc.auto!.cards[0].id;
+    doc = removeStep(doc, waitId);
+    expect(stepsOf(doc).map((s) => s.kind)).toEqual(["launch", "park"]);
+    expect(doc.lines.map((l) => l.name)).toEqual(["to LEFT_PARK"]);
+    expect(Object.keys(doc.auto!.pathEnds)).toHaveLength(1);
+  });
+
+  it("previews the trigger coming by default, and the worst case takes the Otherwise", () => {
+    const doc = noTipFallback();
+    const run = preview(doc);
+    const otherwiseDrive = stepsOf(doc)[0].otherwise![0];
+    expect(run.log.some((e) => e.cardId === otherwiseDrive.cardId)).toBe(false);
+    const catalog = buildPathCatalog(doc.startPoint, doc.lines, settings);
+    const worst = worstCase(doc.auto!, catalog);
+    expect(worst.total).toBeGreaterThan(run.endTime);
+  });
+
+  it("exports the Otherwise in the wait's time row", () => {
+    const doc = noTipFallback();
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "otherwise.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) {
+      expect(java.source).toContain('kit.when("Tip")');
+      expect(java.source).toMatch(
+        /kit\.afterMs\(7000\)\.then\(\s*kit\.path\("to RIGHT_FIRE"/,
+      );
+      expect(java.source).toContain('kit.command("LaunchAll")');
+    }
+  });
+
+  it("saves and opens again with its Otherwise", () => {
+    const doc = noTipFallback();
+    const text = serializeProject(doc, { pretty: true });
+    const back = parseProject(text, doc.robot);
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    expect(stepsOf(back.doc)[0].otherwise?.map((s) => s.label)).toEqual([
+      "Drive to RIGHT_FIRE",
+      "Launch all",
+    ]);
+    expect(isSimple(back.doc)).toBe(true);
   });
 });
 
