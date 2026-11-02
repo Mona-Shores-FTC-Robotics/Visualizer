@@ -77,37 +77,46 @@ export const WAIT_FOR: readonly { trigger: string; label: string }[] = [
 export const WAIT_DEFAULT_S = 7;
 
 /**
- * Fork: the starts are team spots named START_… (lib/team/teamSpots.ts): the builder's start
- * buttons are the team's START_ spots. These are the ones it knows before the team's list is read
- * (or with no network), drawn for RED (the robot turns them for BLUE). START_RIGHT is biobuzz
- * StartPositions.RED_AUDIENCE, measured: back on the audience wall, left side on the B-C seam.
- * START_LEFT is where the left-side Autos (L-Quals, L-Simple) were drawn to start, not measured.
+ * Fork: the starts are team spots named …_START (lib/team/teamSpots.ts; the team's names are
+ * side first: RIGHT_START, RIGHT_PARK, RIGHT_LAUNCH_OFFSET). The builder's start buttons are the
+ * team's _START spots. These are the ones it knows before the team's list is read (or with no
+ * network), drawn for RED (the robot turns them for BLUE): biobuzz StartPositions, measured on
+ * 31 Oct 2026, back flat on the wall and the frame's left side on a seam.
  */
 export const DEFAULT_STARTS: Readonly<Record<string, NamedPoint>> = {
-  START_RIGHT: [54.06, 7.72, 90],
-  START_LEFT: [59, 133.69, 270],
+  RIGHT_START: [55.6, 7.7, 90],
+  LEFT_START: [62.3, 133.8, 270],
 };
 /** Where a new Auto starts. */
-export const DEFAULT_START = "START_RIGHT";
+export const DEFAULT_START = "RIGHT_START";
 
-/** Whether a spot is a start: START_…, or an older file's START. */
+/** Whether a spot is a start: …_START, or an older file's START or START_…. */
 export function isStartName(name: string): boolean {
-  return name === "START" || name.startsWith("START_");
+  return (
+    name === "START" || name.endsWith("_START") || name.startsWith("START_")
+  );
 }
 
-/** The starts to offer: the team's START_ spots, over the built-in ones. */
+/** The starts to offer: the team's _START spots, over the built-in ones. */
 export function startsFrom(
   team: Readonly<Record<string, NamedPoint>>,
 ): Record<string, NamedPoint> {
   const out: Record<string, NamedPoint> = { ...DEFAULT_STARTS };
   for (const [name, pose] of Object.entries(team))
-    if (name.startsWith("START_")) out[name] = pose;
+    if (name.endsWith("_START")) out[name] = pose;
   return out;
 }
 
-/** "START_RIGHT" → "Right start". */
+/** The team's spot that pairs with a start by side: "RIGHT_START" + "PARK" → "RIGHT_PARK". */
+export function sideSpot(start: string | null, role: string): string | null {
+  const side = start?.match(/^(.+)_START$/)?.[1];
+  return side ? `${side}_${role}` : null;
+}
+
+/** "RIGHT_START" → "Right start". */
 export function startLabel(name: string): string {
   const words = name
+    .replace(/_START$/, "")
     .replace(/^START_?/, "")
     .toLowerCase()
     .split("_")
@@ -249,7 +258,7 @@ export function isSimple(doc: ProjectDoc): boolean {
 }
 
 /**
- * The start spot the Auto begins on (START_…), or null for any other start. An older Auto (its
+ * The start spot the Auto begins on (…_START), or null for any other start. An older Auto (its
  * start named START, or none) whose start sits on one of `starts` counts as that one.
  */
 export function startName(
@@ -257,7 +266,7 @@ export function startName(
   starts: Readonly<Record<string, NamedPoint>> = DEFAULT_STARTS,
 ): string | null {
   const at = doc.auto?.startAt;
-  if (at && at.startsWith("START_")) return at;
+  if (at && (at.endsWith("_START") || at.startsWith("START_"))) return at;
   const { x, y, headingDeg } = doc.startPoint;
   for (const [name, [sx, sy, sh]] of Object.entries(starts)) {
     if (
@@ -486,7 +495,7 @@ export function renameSpot(
   if (!name) return { problem: "A spot needs a name: letters, digits and _." };
   if (name === from) return { doc };
   if (isStartName(from) || isStartName(name))
-    return { problem: "Starts keep their START_ names." };
+    return { problem: "Starts keep their _START names." };
   if (auto.teamSpots?.includes(from))
     return {
       problem: `${from} is a team spot: its name is shared by every Auto that uses it.`,
@@ -565,8 +574,10 @@ function withHeadings(doc: ProjectDoc): Path[] {
   for (const card of auto.cards) {
     if (card.kind !== "path") continue;
     const spot = auto.pathEnds[card.lineId];
-    const end = spot ? auto.points[spot]?.[2] : undefined;
-    if (end === undefined) continue;
+    const point = spot ? auto.points[spot] : undefined;
+    if (!point) continue;
+    // A spot with no heading (the parks) is reached at whatever heading the robot arrives with.
+    const end = point[2] ?? h;
     turned.set(
       card.lineId,
       Math.abs(end - h) < 1e-9

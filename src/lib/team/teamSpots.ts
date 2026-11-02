@@ -56,14 +56,18 @@ export function parseTeamSpots(
     if (
       !NAME.test(name) ||
       !Array.isArray(value) ||
-      value.length !== 3 ||
+      (value.length !== 3 && value.length !== 2) ||
       !value.every((n) => typeof n === "number" && Number.isFinite(n))
     )
       return {
         ok: false,
-        problem: `${SPOTS_FILE}: "${name}" is not NAME: [x, y, heading].`,
+        problem: `${SPOTS_FILE}: "${name}" is not NAME: [x, y, heading] (or [x, y]: reached at any heading).`,
       };
-    spots[name] = [value[0], value[1], value[2]];
+    // A spot with no heading (a park) is reached at whatever heading the robot arrives with.
+    spots[name] =
+      value.length === 3
+        ? [value[0], value[1], value[2]]
+        : [value[0], value[1]];
   }
   return { ok: true, spots };
 }
@@ -77,7 +81,7 @@ export function serializeTeamSpots(spots: TeamSpots): string {
   );
   return [
     "{",
-    '  "about": "The team\'s spots, shared by every Auto (the Visualizer links them). x, y in inches, heading in degrees, Pedro field frame, drawn for RED. Change them in the Visualizer: saving re-exports every Auto that uses one.",',
+    '  "about": "The team\'s spots, shared by every Auto (the Visualizer links them). x, y in inches, heading in degrees (none: reached at any heading), Pedro field frame, drawn for RED. Change them in the Visualizer: saving re-exports every Auto that uses one.",',
     '  "spots": {',
     ...rows,
     "  }",
@@ -100,9 +104,7 @@ export async function loadTeamSpots(
 
 /** Whether two poses are the same spot. */
 export function samePose(a: NamedPoint | undefined, b: NamedPoint | undefined) {
-  return (
-    !!a && !!b && a[0] === b[0] && a[1] === b[1] && (a[2] ?? 0) === (b[2] ?? 0)
-  );
+  return !!a && !!b && a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
 /** The names whose pose differs between two lists, or that one has and the other not. */
