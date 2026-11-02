@@ -19,6 +19,7 @@
   } from "@lucide/svelte";
   import { untrack, type Component } from "svelte";
   import { useProject } from "../../state/project.svelte";
+  import { currentFilePath } from "../../stores";
   import { useAuto } from "../../state/auto.svelte";
   import { usePlayback } from "../../state/playback.svelte";
   import { parseSelection, selectedCardId, spotPicker } from "../auto/store";
@@ -46,6 +47,7 @@
     cleanSpotName,
     freeSpotName,
     moveStep,
+    pruneUnusedPaths,
     removeStep,
     setSpotHeading,
     setStart,
@@ -438,6 +440,16 @@
     auto.focusedPark = null;
     auto.editingPark = false;
   }
+
+  // A file opened here drops the paths no step drives (steps.ts pruneUnusedPaths): an older
+  // version's leftovers would draw as stray dashed lines. Once per file, as an undoable edit.
+  $effect(() => {
+    void $currentFilePath;
+    untrack(() => {
+      const pruned = pruneUnusedPaths(doc);
+      if (pruned !== doc) project.apply(() => pruned);
+    });
+  });
 
   // Selecting a step, or the park going away (its step removed or moved last), puts it back.
   $effect(() => {
