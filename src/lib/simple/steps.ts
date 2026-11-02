@@ -631,6 +631,43 @@ export function layHeadings(doc: ProjectDoc): ProjectDoc {
   return lines === doc.lines ? doc : { ...doc, lines };
 }
 
+/**
+ * The document without the paths no step drives: a path left behind by an earlier version of
+ * the Auto (a file rebuilt in the builder keeps the old file's lines) draws as a stray dashed
+ * line and chains the paths after it from the wrong place. Kept: every drive's and park's path,
+ * in the main list and each Otherwise, the spots' parks (parkFrom.ts) and the link paths the
+ * layout needs (lib/auto/links.ts). Every edit here prunes; the builder prunes once when it
+ * opens a file. The same document when nothing is pruned.
+ */
+export function pruneUnusedPaths(doc: ProjectDoc): ProjectDoc {
+  const auto = doc.auto;
+  if (!auto) return doc;
+  const keep = new Set<string>([
+    ...(auto.linkPaths ?? []),
+    ...Object.values(auto.parkFrom ?? {}),
+  ]);
+  const walk = (cards: AutoCard[]) => {
+    for (const card of cards) {
+      if (card.kind === "path" || card.kind === "rejoin") keep.add(card.lineId);
+      if (card.kind === "firstOf") for (const row of card.rows) walk(row.cards);
+    }
+  };
+  walk(auto.cards);
+  const stale = doc.lines.filter((line) => !keep.has(line.id));
+  if (!stale.length) return doc;
+  const gone = new Set(stale.map((line) => line.id));
+  const pathEnds = { ...auto.pathEnds };
+  for (const id of gone) delete pathEnds[id];
+  return {
+    ...doc,
+    lines: doc.lines.filter((line) => !gone.has(line.id)),
+    sequence: doc.sequence.filter(
+      (item) => item.kind !== "path" || !gone.has(item.lineId),
+    ),
+    auto: { ...auto, pathEnds },
+  };
+}
+
 // --- inside -------------------------------------------------------------------------------------
 
 /**
@@ -649,8 +686,9 @@ function edit(
     lines: doc.lines,
   };
   change(draft, draft.auto!);
-  draft.lines = withHeadings(draft);
-  return draft;
+  const pruned = pruneUnusedPaths(draft);
+  pruned.lines = withHeadings(pruned);
+  return pruned;
 }
 
 function withHeadings(doc: ProjectDoc): Path[] {

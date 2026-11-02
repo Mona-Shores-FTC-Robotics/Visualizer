@@ -1,5 +1,6 @@
 // The simple builder (src/lib/simple): R-Quals v2 built step by step, the way a student would,
 // previews by 30 s, exports, and shows each Pick flower at its FLOWER.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/config/defaults";
 import {
@@ -44,6 +45,7 @@ import {
   DEFAULT_STARTS,
   startLabel,
   startsFrom,
+  pruneUnusedPaths,
   stepsOf,
   type StepKind,
   type StepList,
@@ -796,6 +798,128 @@ describe("a Wait step's Otherwise list", () => {
       "Launch all",
     ]);
     expect(isSimple(back.doc)).toBe(true);
+  });
+});
+
+describe("an Otherwise's paths on a rebuilt file", () => {
+  /** L-Simple as the mentor saved it on 2 Nov 2026 (biobuzz auto/l-simple): rebuilt in Simple, with the old file's lines still in it. */
+  function draft(): ProjectDoc {
+    const text = readFileSync(
+      `${__dirname}/fixtures/autos/l-simple-draft.pp`,
+      "utf8",
+    );
+    const result = parseProject(text, robotConfigOf(settings));
+    if (!result.ok) throw new Error(result.error);
+    return result.doc;
+  }
+  /** Where each path starts once the paths are laid out the way the editor lays them. */
+  function starts(doc: ProjectDoc) {
+    const laid = layOutDoc(doc, settings);
+    const catalog = buildPathCatalog(laid.startPoint, laid.lines, settings);
+    return {
+      laid,
+      startOf: (lineId: string) => catalog.byId.get(lineId)!.start,
+    };
+  }
+  const waitPose = { x: 62.3, y: 133.8 };
+  const near = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
+
+  it("drops the old file's paths no step drives", () => {
+    const doc = draft();
+    const used = new Set(
+      doc.auto!.cards.flatMap((c) => (c.kind === "path" ? [c.lineId] : [])),
+    );
+    expect(
+      doc.lines.some(
+        (line) =>
+          !used.has(line.id) &&
+          !doc.auto!.linkPaths?.includes(line.id) &&
+          !Object.values(doc.auto!.parkFrom ?? {}).includes(line.id),
+      ),
+    ).toBe(true);
+    const pruned = pruneUnusedPaths(doc);
+    const keep = new Set([
+      ...used,
+      ...(pruned.auto!.linkPaths ?? []),
+      ...Object.values(pruned.auto!.parkFrom ?? {}),
+    ]);
+    expect(pruned.lines.every((line) => keep.has(line.id))).toBe(true);
+    expect(pruned.lines.map((l) => l.name)).not.toContain(
+      "to WALL_FLOWER_STAGING",
+    );
+    expect(Object.keys(pruned.auto!.pathEnds).every((id) => keep.has(id))).toBe(
+      true,
+    );
+    expect(
+      pruned.sequence.every(
+        (item) => item.kind !== "path" || keep.has(item.lineId),
+      ),
+    ).toBe(true);
+    expect(pruneUnusedPaths(pruned)).toBe(pruned);
+    // Any edit prunes too.
+    const edited = addSpot(doc, "X", 10, 10, 0);
+    expect(edited.lines.map((l) => l.name)).not.toContain(
+      "to WALL_FLOWER_STAGING",
+    );
+  });
+
+  it("an Otherwise drive starts at the wait, and the list below goes on from the wait", () => {
+    const doc = draft();
+    const waitId = stepsOf(doc).find((s) => s.kind === "wait")!.cardId;
+    const next = addOtherwise(doc, waitId, "drive", "RIGHT_LAUNCH_CATCH");
+    const otherwise = stepsOf(next).find(
+      (s) => s.cardId === waitId,
+    )!.otherwise!;
+    expect(otherwise.map((s) => s.label)).toEqual([
+      "Drive to RIGHT_LAUNCH_CATCH",
+    ]);
+    const { laid, startOf } = starts(next);
+    expect(near(startOf(otherwise[0].lineId!), waitPose)).toBe(true);
+    const below = stepsOf(next).find((s) => s.kind === "drive")!;
+    expect(below.label).toBe("Drive to SCORING_FLOWER_STAGING");
+    expect(near(startOf(below.lineId!), waitPose)).toBe(true);
+    // The chain comes back by a link path that ends on the wait's pose.
+    const links = laid.auto!.linkPaths ?? [];
+    expect(links.length).toBeGreaterThan(0);
+    const back = laid.lines.find(
+      (line) =>
+        links.includes(line.id) &&
+        line.kind === "atomic" &&
+        near(line.endPoint, waitPose),
+    );
+    expect(back).toBeDefined();
+    // Nothing stray: every line is a step's, a spot's park, or a link.
+    const keep = new Set([
+      ...laid.auto!.cards.flatMap((c) => (c.kind === "path" ? [c.lineId] : [])),
+      ...otherwise.map((s) => s.lineId!),
+      ...links,
+      ...Object.values(laid.auto!.parkFrom ?? {}),
+    ]);
+    expect(laid.lines.every((line) => keep.has(line.id))).toBe(true);
+  });
+
+  it("removing the Otherwise drive takes its link with it", () => {
+    const doc = draft();
+    const waitId = stepsOf(doc).find((s) => s.kind === "wait")!.cardId;
+    let next = addOtherwise(doc, waitId, "drive", "RIGHT_LAUNCH_CATCH");
+    const driveId = stepsOf(next).find((s) => s.cardId === waitId)!
+      .otherwise![0].cardId;
+    next = removeStep(next, driveId);
+    const { laid, startOf } = starts(next);
+    expect(stepsOf(laid).find((s) => s.cardId === waitId)!.otherwise).toEqual(
+      [],
+    );
+    const below = stepsOf(laid).find((s) => s.kind === "drive")!;
+    expect(near(startOf(below.lineId!), waitPose)).toBe(true);
+    expect(
+      laid.lines.some(
+        (line) =>
+          (laid.auto!.linkPaths ?? []).includes(line.id) &&
+          line.kind === "atomic" &&
+          near(line.endPoint, waitPose),
+      ),
+    ).toBe(false);
   });
 });
 

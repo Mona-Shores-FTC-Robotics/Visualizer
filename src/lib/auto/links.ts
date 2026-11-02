@@ -1,4 +1,10 @@
-import type { BasePoint, Path, SequenceItem, Settings, StartPose } from "../../types";
+import type {
+  BasePoint,
+  Path,
+  SequenceItem,
+  Settings,
+  StartPose,
+} from "../../types";
 import { atomicSegments } from "../../utils/pathTraversal";
 import { buildPathCatalog } from "./geometry";
 import { atomicPaths } from "./pins";
@@ -20,7 +26,8 @@ import type { AutoCard, AutoSection } from "./types";
 export const LINK_NAME = "Link (never driven)";
 
 const CLOSE_IN = 1e-3;
-const same = (a: BasePoint, b: BasePoint) => Math.hypot(a.x - b.x, a.y - b.y) < CLOSE_IN;
+const same = (a: BasePoint, b: BasePoint) =>
+  Math.hypot(a.x - b.x, a.y - b.y) < CLOSE_IN;
 
 export interface RelinkResult {
   lines: Path[];
@@ -60,7 +67,9 @@ export function relink(
   const oldLinks = new Set(auto.linkPaths ?? []);
   const byId = new Map(lines.map((line) => [line.id, line]));
   const catalog = buildPathCatalog(startPoint, lines, settings);
-  const endHeading = new Map(catalog.paths.map((path) => [path.id, path.endHeadingDeg]));
+  const endHeading = new Map(
+    catalog.paths.map((path) => [path.id, path.endHeadingDeg]),
+  );
 
   const out: Path[] = [];
   const linkIds: string[] = [];
@@ -97,7 +106,10 @@ export function relink(
         const line = byId.get(card.lineId);
         if (!line || oldLinks.has(line.id)) continue;
         if (!placed.has(line.id)) place(line, here.at, here.headingDeg);
-        here = { at: { ...endOf(line) }, headingDeg: endHeading.get(line.id) ?? here.headingDeg };
+        here = {
+          at: { ...endOf(line) },
+          headingDeg: endHeading.get(line.id) ?? here.headingDeg,
+        };
         // Fork: its park from this spot starts here too; the next card's link brings the chain
         // back (types.ts parkFrom).
         const parkId = auto.parkFrom?.[card.id];
@@ -107,23 +119,31 @@ export function relink(
         const line = byId.get(card.lineId);
         if (!line || oldLinks.has(line.id)) continue;
         if (!placed.has(line.id)) place(line, here.at, here.headingDeg);
-        here = { at: { ...endOf(line) }, headingDeg: endHeading.get(line.id) ?? here.headingDeg };
+        here = {
+          at: { ...endOf(line) },
+          headingDeg: endHeading.get(line.id) ?? here.headingDeg,
+        };
       } else if (card.kind === "firstOf") {
         const ends = card.rows.map((row) => visit(row.cards, here));
-        // With no cards on any row the robot has not moved; otherwise the rest of the list runs
-        // after whichever route was taken, and the first is as good a guess as any.
-        const moved = card.rows.findIndex((row) => row.cards.length > 0);
-        if (moved >= 0) here = ends[moved];
+        // The rest of the list runs after whichever route was taken. The paths are laid out for
+        // the first route (the one the preview draws by default): a plain wait whose trigger row
+        // is empty leaves the robot where it waited, so the list below starts there, not at the
+        // end of the timed-out route (the Simple builder's Otherwise).
+        if (ends.length) here = ends[0];
       }
     }
     return here;
   };
-  visit(auto.cards, { at: { x: startPoint.x, y: startPoint.y }, headingDeg: startPoint.headingDeg });
+  visit(auto.cards, {
+    at: { x: startPoint.x, y: startPoint.y },
+    headingDeg: startPoint.headingDeg,
+  });
 
   // Paths no card drives keep their drawing: each starts where it started before.
   const oldStarts = new Map(catalog.paths.map((path) => [path.id, path.start]));
   for (const line of lines) {
-    if (placed.has(line.id) || oldLinks.has(line.id) || isLegacyLink(line)) continue;
+    if (placed.has(line.id) || oldLinks.has(line.id) || isLegacyLink(line))
+      continue;
     const start = oldStarts.get(line.id) ?? cursor;
     place(line, start, endHeading.get(line.id) ?? 0);
   }
@@ -156,7 +176,10 @@ export function layOutShown<T extends ShownFile>(file: T): T {
   const auto: AutoSection = { ...file.auto };
   if (result.linkIds.length) auto.linkPaths = result.linkIds;
   else delete auto.linkPaths;
-  const sequence = atomicSegments(result.lines).map((line) => ({ kind: "path" as const, lineId: line.id }));
+  const sequence = atomicSegments(result.lines).map((line) => ({
+    kind: "path" as const,
+    lineId: line.id,
+  }));
   return { ...file, lines: result.lines, sequence, auto };
 }
 
@@ -168,17 +191,29 @@ export function isLinkPath(auto: AutoSection | null, id: string): boolean {
 /** Segment ids of the link paths, for code that works on atomic segments. */
 export function linkSegmentIds(auto: AutoSection, lines: Path[]): Set<string> {
   const ids = new Set<string>();
-  const segments = atomicPaths(lines.filter((line) => isLinkPath(auto, line.id)));
+  const segments = atomicPaths(
+    lines.filter((line) => isLinkPath(auto, line.id)),
+  );
   segments.forEach((_, id) => ids.add(id));
   return ids;
 }
 
 /** `layOutShown` for a whole project document (an overlay): the same object if nothing moved. */
 export function layOutDoc<
-  T extends { startPoint: StartPose; lines: Path[]; sequence: SequenceItem[]; auto?: AutoSection | null },
+  T extends {
+    startPoint: StartPose;
+    lines: Path[];
+    sequence: SequenceItem[];
+    auto?: AutoSection | null;
+  },
 >(doc: T, settings: Settings): T {
   if (!doc.auto) return doc;
   const laid = layOutShown({ ...doc, auto: doc.auto, settings });
   if (laid.lines === doc.lines) return doc;
-  return { ...doc, lines: laid.lines, sequence: laid.sequence, auto: laid.auto };
+  return {
+    ...doc,
+    lines: laid.lines,
+    sequence: laid.sequence,
+    auto: laid.auto,
+  };
 }
