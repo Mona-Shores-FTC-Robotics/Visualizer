@@ -164,13 +164,16 @@
       </PanelSection>
     {/if}
 
-    <PanelSection
-      title="Overlays"
-      count={overlays.items.length || undefined}
-      bind:open={overlaysOpen}
-    >
-      <OverlayList {overlays} />
-    </PanelSection>
+    <!-- Fork: never squeezed to a sliver under a tall builder; the panel scrolls to it instead. -->
+    <div class="shrink-0">
+      <PanelSection
+        title="Overlays"
+        count={overlays.items.length || undefined}
+        bind:open={overlaysOpen}
+      >
+        <OverlayList {overlays} />
+      </PanelSection>
+    </div>
 
     {#if auto.view !== "simple"}
       <PanelSection title="Robot">

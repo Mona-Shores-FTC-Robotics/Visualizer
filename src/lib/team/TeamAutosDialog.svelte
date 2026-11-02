@@ -71,6 +71,14 @@
     }
   }
 
+  // Opening the dialog while Autos are shown starts it on their branch, ticked, so what is on
+  // the field can be changed from here (a link may have opened a branch other than the last one).
+  let wasOpen = false;
+  $effect.pre(() => {
+    if (isOpen && !wasOpen && $teamView) branch = $teamView.ref;
+    wasOpen = isOpen;
+  });
+
   $effect.pre(() => {
     if (isOpen && loadedFor !== branch.trim()) {
       selected =
