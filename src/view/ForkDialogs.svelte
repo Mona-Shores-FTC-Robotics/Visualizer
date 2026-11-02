@@ -15,6 +15,9 @@
   import SharedCopyBanner from "../lib/components/SharedCopyBanner.svelte";
   import SaveSpotsDialog from "../lib/team/SaveSpotsDialog.svelte";
   import { saveSpotsOpen } from "../lib/team/spotsStore";
+  import { teamOpenRequest } from "../lib/team/teamView";
+  import { parseProject } from "../io";
+  import { showToast } from "../lib/toast";
 
   interface Props {
     dialogs: Dialogs;
@@ -24,6 +27,22 @@
   let { dialogs, files }: Props = $props();
 
   const links = useLinks();
+
+  // A team view's first Auto opens as the project (lib/team/teamView.ts): the view has no
+  // project store of its own, so it asks from here.
+  $effect(() => {
+    const request = $teamOpenRequest;
+    if (!request) return;
+    teamOpenRequest.set(null);
+    const result = parseProject(request.text, files.current().robot);
+    if (!result.ok) {
+      showToast(result.error, "error");
+      return;
+    }
+    result.warnings.forEach((warning) => showToast(warning, "warning"));
+    files.open(result.doc, { saved: true });
+    currentFilePath.set(request.path);
+  });
 </script>
 
 <TeamAutosDialog bind:isOpen={dialogs.teamAutos} />
