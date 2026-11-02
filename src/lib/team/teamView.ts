@@ -1,7 +1,9 @@
 /**
- * Shows team Autos together: fetches them (teamAutos.ts), keeps a `biobuzz-<file>` copy of
- * each in the browser's file list, and selects those copies in multi-path mode, which draws
- * and plays only them. The last view is remembered so Reload can fetch it again.
+ * Shows team Autos: fetches them (teamAutos.ts) and keeps a `biobuzz-<file>` copy of each in the
+ * browser's file list. The first is opened as the project, steps and all, so one Auto from a link
+ * is there to read and edit; any others are drawn alongside it as overlays (multi-path mode),
+ * which draws and plays them but does not edit them. The last view is remembered so Reload can
+ * fetch it again.
  */
 import { get, writable } from "svelte/store";
 import { activePaths } from "../../stores";
@@ -29,6 +31,14 @@ export interface TeamView {
 
 export const teamView = writable<TeamView | null>(null);
 
+/**
+ * The copy a team view wants opened as the project (its first file): the app's dialogs, which
+ * have the project store, open it and clear this.
+ */
+export const teamOpenRequest = writable<{ path: string; text: string } | null>(
+  null,
+);
+
 /** Fetches the files and shows them together; returns false (after a message) on failure. */
 export async function showTeamView(
   ref: string,
@@ -46,9 +56,16 @@ export async function showTeamView(
   for (const { file, text } of fetched) {
     await browserFileStore.writeFile(copyName(file), text);
   }
-  activePaths.set(fetched.map(({ file }) => copyName(file)));
+  const [first, ...others] = fetched;
+  activePaths.set(others.map(({ file }) => copyName(file)));
   teamView.set({ ref, files, pair, fetchedAt: Date.now() });
-  showToast(`Showing ${files.join(" + ")} from biobuzz ${ref}`, "success");
+  teamOpenRequest.set({ path: copyName(first.file), text: first.text });
+  showToast(
+    others.length
+      ? `Opened ${first.file} from biobuzz ${ref}, with ${others.map((o) => o.file).join(" + ")} drawn alongside`
+      : `Opened ${first.file} from biobuzz ${ref}`,
+    "success",
+  );
   return true;
 }
 
