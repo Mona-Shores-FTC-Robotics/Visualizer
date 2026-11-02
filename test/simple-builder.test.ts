@@ -88,38 +88,39 @@ describe("the simple builder", () => {
     const doc = fresh();
     expect(doc.auto!.cards).toEqual([]);
     expect(doc.lines).toEqual([]);
-    expect(startName(doc)).toBe("START_RIGHT");
-    expect(doc.auto!.teamSpots).toEqual(["START_RIGHT"]);
+    expect(startName(doc)).toBe("RIGHT_START");
+    expect(doc.auto!.teamSpots).toEqual(["RIGHT_START"]);
     expect([
       doc.startPoint.x,
       doc.startPoint.y,
       doc.startPoint.headingDeg,
-    ]).toEqual([54.06, 7.72, 90]);
-    const left = setStart(doc, "START_LEFT", DEFAULT_STARTS.START_LEFT);
-    expect(startName(left)).toBe("START_LEFT");
+    ]).toEqual([55.6, 7.7, 90]);
+    const left = setStart(doc, "LEFT_START", DEFAULT_STARTS.LEFT_START);
+    expect(startName(left)).toBe("LEFT_START");
     // The start it left goes with it.
-    expect(left.auto!.points.START_RIGHT).toBeUndefined();
-    expect(left.auto!.teamSpots).toEqual(["START_LEFT"]);
+    expect(left.auto!.points.RIGHT_START).toBeUndefined();
+    expect(left.auto!.teamSpots).toEqual(["LEFT_START"]);
     expect(left.startPoint).toMatchObject({
-      x: 59,
-      y: 133.69,
+      x: 62.3,
+      y: 133.8,
       headingDeg: 270,
     });
   });
 
-  it("offers the team's START_ spots as starts", () => {
+  it("offers the team's _START spots as starts", () => {
     const starts = startsFrom({
-      START_RIGHT: [54.06, 7.72, 90],
-      START_CORNER: [10, 10, 45],
+      RIGHT_START: [55.6, 7.7, 90],
+      CORNER_START: [10, 10, 45],
       PARK: [14, 100, 270],
     });
     expect(Object.keys(starts).sort()).toEqual([
-      "START_CORNER",
-      "START_LEFT",
-      "START_RIGHT",
+      "CORNER_START",
+      "LEFT_START",
+      "RIGHT_START",
     ]);
-    expect(startLabel("START_RIGHT")).toBe("Right start");
-    expect(startLabel("START_FAR_WALL")).toBe("Far wall start");
+    expect(startLabel("RIGHT_START")).toBe("Right start");
+    expect(startLabel("FAR_WALL_START")).toBe("Far wall start");
+    expect(startLabel("RIGHT_START")).toBe("Right start"); // an older file
   });
 
   it("reads back as the steps it was built from", () => {
@@ -724,8 +725,8 @@ describe("renaming a spot", () => {
     expect(renameSpot(doc, "PARK", "HOME")).toMatchObject({
       problem: expect.stringContaining("team spot"),
     });
-    expect(renameSpot(doc, "START_RIGHT", "HOME")).toMatchObject({
-      problem: expect.stringContaining("START_"),
+    expect(renameSpot(doc, "RIGHT_START", "HOME")).toMatchObject({
+      problem: expect.stringContaining("_START"),
     });
     expect(renameSpot(doc, "WALL_PICK", "FAR_PICK")).toMatchObject({
       problem: expect.stringContaining("already"),

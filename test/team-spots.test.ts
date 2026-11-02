@@ -58,20 +58,25 @@ describe("team spots", () => {
     const back = parseTeamSpots(text);
     expect(back).toEqual({ ok: true, spots: TEAM });
     expect(parseTeamSpots('{"spots": {"park": [1, 2, 3]}}').ok).toBe(false);
-    expect(parseTeamSpots('{"spots": {"PARK": [1, 2]}}').ok).toBe(false);
+    // A park has no heading: it is reached at whatever heading the robot arrives with.
+    expect(parseTeamSpots('{"spots": {"PARK": [1, 2]}}')).toEqual({
+      ok: true,
+      spots: { PARK: [1, 2] },
+    });
+    expect(parseTeamSpots('{"spots": {"PARK": [1]}}').ok).toBe(false);
   });
 
   it("links a spot into an Auto, saves it, and unlinks it", () => {
     const doc = linked();
-    expect(doc.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "PARK", "START_RIGHT"]);
+    expect(doc.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "PARK", "RIGHT_START"]);
     const again = parseProject(serializeProject(doc), robotConfigOf(settings));
     expect(again.ok && again.doc.auto!.teamSpots).toEqual([
       "LAUNCH_LEFT",
       "PARK",
-      "START_RIGHT",
+      "RIGHT_START",
     ]);
     const own = unlinkSpot(doc, "PARK");
-    expect(own.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "START_RIGHT"]);
+    expect(own.auto!.teamSpots).toEqual(["LAUNCH_LEFT", "RIGHT_START"]);
     expect(own.auto!.points.PARK).toEqual(TEAM.PARK);
   });
 
@@ -182,9 +187,9 @@ describe("saving team spots", () => {
 describe("starts as team spots", () => {
   it("moves an Auto's start when its START_ spot moves", () => {
     const doc = linked();
-    const moved = applyTeamSpots(doc, { START_RIGHT: [56, 8, 90] });
+    const moved = applyTeamSpots(doc, { RIGHT_START: [56, 8, 90] });
     expect(moved.startPoint).toMatchObject({ x: 56, y: 8, headingDeg: 90 });
-    expect(moved.auto!.points.START_RIGHT).toEqual([56, 8, 90]);
+    expect(moved.auto!.points.RIGHT_START).toEqual([56, 8, 90]);
   });
 
   it("moves an unlocked start spot with the start, and never a locked one", () => {
@@ -193,8 +198,8 @@ describe("starts as team spots", () => {
       ...doc,
       auto: {
         ...doc.auto!,
-        startAt: "START_LEFT",
-        teamSpots: [...doc.auto!.teamSpots!, "START_LEFT"].sort(),
+        startAt: "LEFT_START",
+        teamSpots: [...doc.auto!.teamSpots!, "LEFT_START"].sort(),
       },
     };
     const typed = {
@@ -202,8 +207,8 @@ describe("starts as team spots", () => {
       startPoint: { ...doc.startPoint, x: 63.86, y: 133.78, headingDeg: 270 },
     };
     expect(startSpotFollowsStart(typed, new Set())).toBe(typed);
-    const moved = startSpotFollowsStart(typed, new Set(["START_LEFT"]));
-    expect(moved.auto!.points.START_LEFT).toEqual([63.86, 133.78, 270]);
-    expect(startSpotFollowsStart(moved, new Set(["START_LEFT"]))).toBe(moved);
+    const moved = startSpotFollowsStart(typed, new Set(["LEFT_START"]));
+    expect(moved.auto!.points.LEFT_START).toEqual([63.86, 133.78, 270]);
+    expect(startSpotFollowsStart(moved, new Set(["LEFT_START"]))).toBe(moved);
   });
 });

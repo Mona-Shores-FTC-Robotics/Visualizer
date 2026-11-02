@@ -55,6 +55,7 @@
     startsFrom,
     setStepSpot,
     setWait,
+    sideSpot,
     renameSpot,
     WAIT_FOR,
     stepsOf,
@@ -149,7 +150,7 @@
       ? stepCollisions(doc, auto.catalog)
       : new Map<string, StepHits>(),
   );
-  /** Fork: the start buttons, the team's START_ spots (steps.ts startsFrom). */
+  /** Fork: the start buttons, the team's _START spots (steps.ts startsFrom). */
   let starts = $derived(startsFrom($teamSpots));
   let side = $derived(startName(doc, starts));
   /** Fork: spots linked to the team's list (lib/team/teamSpots.ts). */
@@ -292,8 +293,16 @@
 
   function add(kind: AddKind, index = insertIndex()) {
     if (kind === "drive" || kind === "park") {
+      // The team's park for this side (RIGHT_START → RIGHT_PARK), else an older file's PARK.
+      const teamPark = sideSpot(side, "PARK");
       const parkSpot =
-        kind === "park" && spots.includes("PARK") ? "PARK" : null;
+        kind !== "park"
+          ? null
+          : teamPark && $teamSpots[teamPark]
+            ? teamPark
+            : spots.includes("PARK")
+              ? "PARK"
+              : null;
       if (parkSpot) return addAt(kind, index, parkSpot);
       startPicking(kind, index);
       return;
