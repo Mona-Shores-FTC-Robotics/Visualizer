@@ -61,6 +61,7 @@
     stepsOf,
     type Step,
     type StepKind,
+    type StepList,
   } from "./steps";
 
   interface Props {
@@ -191,9 +192,14 @@
   let pending = $state<{
     kind: "drive" | "park";
     index: number;
+    /** The list it goes in: the main one, or a wait's Otherwise. */
+    into: StepList;
     at: { x: number; y: number } | null;
     name: string;
   } | null>(null);
+
+  /** A list's key for drag-and-drop: the main list, or the wait whose Otherwise it is. */
+  const listKey = (into: StepList) => into?.waitCardId ?? "";
 
   /**
    * Fork: team spots this Auto links that the team's list does not have: made as team spots on a
@@ -291,7 +297,7 @@
     apply(setStart(doc, name, starts[name]));
   }
 
-  function add(kind: AddKind, index = insertIndex()) {
+  function add(kind: AddKind, index = insertIndex(), into: StepList = null) {
     if (kind === "drive" || kind === "park") {
       // The team's park for this side (RIGHT_START → RIGHT_PARK), else an older file's PARK.
       const teamPark = sideSpot(side, "PARK");
@@ -303,11 +309,11 @@
             : spots.includes("PARK")
               ? "PARK"
               : null;
-      if (parkSpot) return addAt(kind, index, parkSpot);
-      startPicking(kind, index);
+      if (parkSpot) return addAt(kind, index, parkSpot, into);
+      startPicking(kind, index, into);
       return;
     }
-    const result = addStep(doc, kind, index);
+    const result = addStep(doc, kind, index, undefined, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
   }
@@ -318,15 +324,24 @@
     return pose && !base.auto?.points[name] ? linkSpot(base, name, pose) : base;
   }
 
-  function addAt(kind: AddKind, index: number, spot: string) {
-    const result = addStep(withTeamSpot(doc, spot), kind, index, spot);
+  function addAt(
+    kind: AddKind,
+    index: number,
+    spot: string,
+    into: StepList = null,
+  ) {
+    const result = addStep(withTeamSpot(doc, spot), kind, index, spot, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
     stopPicking();
   }
 
-  function startPicking(kind: "drive" | "park", index: number) {
-    pending = { kind, index, at: null, name: "" };
+  function startPicking(
+    kind: "drive" | "park",
+    index: number,
+    into: StepList = null,
+  ) {
+    pending = { kind, index, into, at: null, name: "" };
     spotPicker.set((at) => {
       if (!pending || !doc.auto) return;
       pending = {
@@ -375,7 +390,7 @@
   function nameAndAdd() {
     if (!pending?.at || !doc.auto) return;
     const name = cleanSpotName(pending.name) || freeSpotName(doc.auto);
-    const { kind, index, at } = pending;
+    const { kind, index, into, at } = pending;
     const pose = newSpotPose(at);
     let withSpot = withTeamSpot(doc, name);
     if (!withSpot.auto?.points[name]) {
@@ -387,7 +402,7 @@
         withSpot = linkSpot(withSpot, name, point);
       }
     }
-    const result = addStep(withSpot, kind, index, name);
+    const result = addStep(withSpot, kind, index, name, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
     stopPicking();
@@ -442,31 +457,391 @@
 
   // --- dragging: palette tiles into the list, and steps within it ---------------------------------
 
-  let dropAt = $state<number | null>(null);
+  /** Where a dragged step would land: which list (listKey) and the index in it. */
+  let dropAt = $state<{ list: string; index: number } | null>(null);
+  const dropping = (into: StepList, index: number) =>
+    dropAt?.list === listKey(into) && dropAt.index === index;
 
   function dragStart(event: DragEvent, payload: string) {
     event.dataTransfer?.setData("text/x-step", payload);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "copyMove";
   }
 
-  function dragOver(event: DragEvent, index: number) {
+  function dragOver(event: DragEvent, index: number, into: StepList = null) {
     if (!event.dataTransfer?.types.includes("text/x-step")) return;
     event.preventDefault();
-    dropAt = index;
+    event.stopPropagation();
+    dropAt = { list: listKey(into), index };
   }
 
-  function drop(event: DragEvent, index: number) {
+  function drop(event: DragEvent, index: number, into: StepList = null) {
     const payload = event.dataTransfer?.getData("text/x-step") ?? "";
     dropAt = null;
     event.preventDefault();
+    event.stopPropagation();
     if (payload.startsWith("move:"))
-      apply(moveStep(doc, payload.slice(5), index));
+      apply(moveStep(doc, payload.slice(5), index, into));
     else if (payload.startsWith("add:"))
-      add(payload.slice(4) as AddKind, index);
+      add(payload.slice(4) as AddKind, index, into);
   }
 
   const fmt = (s: number) => s.toFixed(1);
 </script>
+
+{#snippet stepItem(step: Step, index: number, into: StepList)}
+  {@const Icon = ICONS[step.kind]}
+  <li
+    class={[
+      "simple-step",
+      selectedId === step.cardId && "simple-step--selected",
+      runningId === step.cardId && "simple-step--running",
+      dropping(into, index) && "simple-step--drop",
+    ]}
+    draggable="true"
+    ondragstart={(e) => dragStart(e, `move:${step.cardId}`)}
+    ondragover={(e) => dragOver(e, index, into)}
+    ondragleave={() => (dropAt = null)}
+    ondrop={(e) => drop(e, index, into)}
+  >
+    <div class="flex items-center gap-2">
+      <GripVertical class="size-3.5 shrink-0 cursor-grab text-body" />
+      <button
+        type="button"
+        class="flex min-w-0 flex-1 items-center gap-2 text-left"
+        onclick={() => select(step)}
+      >
+        <span class="w-4 shrink-0 text-right font-mono text-xs text-body"
+          >{index + 1}</span
+        >
+        {#if Icon}<Icon class="size-4 shrink-0 text-primary" />{/if}
+        <span
+          class={[
+            "truncate",
+            step.kind === "other" ? "text-body" : "text-heading",
+          ]}>{step.label}</span
+        >
+        {#if step.kind === "other"}<span class="text-[10px] text-body"
+            >advanced</span
+          >{/if}
+      </button>
+      {#if parks.has(step.cardId)}
+        <button
+          type="button"
+          class={["simple-park", parkShown(step.cardId) && "simple-park--on"]}
+          title="Where the robot parks from this spot if time runs short. Show and edit its park path"
+          aria-label={`Park path from ${step.spot ?? "this spot"}`}
+          aria-pressed={parkShown(step.cardId)}
+          onclick={() => togglePark(step.cardId)}>P</button
+        >
+      {/if}
+      <button
+        type="button"
+        class="simple-icon"
+        title="Remove this step"
+        aria-label={`Remove ${step.label}`}
+        onclick={() => apply(removeStep(doc, step.cardId))}
+        ><X class="size-3.5" /></button
+      >
+    </div>
+
+    {#if (step.kind === "drive" || step.kind === "park") && step.spot && doc.auto?.points[step.spot]}
+      {@const point = doc.auto.points[step.spot]}
+      <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
+        {#if renaming?.cardId === step.cardId}
+          <form
+            class="flex items-center gap-1"
+            onsubmit={(e) => {
+              e.preventDefault();
+              finishRename();
+            }}
+          >
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
+              aria-label="New name"
+              bind:value={renaming.text}
+              autofocus
+              onkeydown={(e) => e.key === "Escape" && (renaming = null)}
+            />
+            <button type="submit" class="simple-tile !min-h-0 !py-0.5"
+              >Rename</button
+            >
+          </form>
+        {:else}
+          <select
+            class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+            aria-label="Spot"
+            value={step.spot}
+            onchange={(e) => {
+              const name = e.currentTarget.value;
+              apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
+            }}
+          >
+            {@render spotOptions()}
+          </select>
+        {/if}
+        {#if !linkedSpots.has(step.spot) && !isStartName(step.spot) && renaming?.cardId !== step.cardId}
+          <button
+            type="button"
+            class="simple-icon"
+            title={`Rename ${step.spot} (every step that goes there follows)`}
+            aria-label={`Rename ${step.spot}`}
+            onclick={() =>
+              (renaming = {
+                cardId: step.cardId,
+                from: step.spot!,
+                text: step.spot!,
+                problem: null,
+              })}><Pencil class="size-3.5" /></button
+          >
+          <button
+            type="button"
+            class="simple-icon"
+            title={`Make ${step.spot} a team spot, for every Auto (then Save team spots)`}
+            aria-label={`Make ${step.spot} a team spot`}
+            onclick={() => makeTeamSpot(step.spot!)}
+            ><Link2 class="size-3.5" /></button
+          >
+        {/if}
+        {#if linkedSpots.has(step.spot)}
+          {@const open = $unlockedSpots.has(step.spot)}
+          <button
+            type="button"
+            class={["simple-icon", open && "!text-warning"]}
+            title={open
+              ? "Unlocked: dragging its end on the field moves this team spot. Lock it again"
+              : "A team spot, locked. Unlock it to move it (every Auto that uses it moves with it once saved)"}
+            aria-label={open ? "Lock team spot" : "Unlock team spot"}
+            onclick={() => setSpotUnlocked(step.spot!, !open)}
+          >
+            {#if open}<LockOpen class="size-3.5" />{:else}<Lock
+                class="size-3.5"
+              />{/if}
+          </button>
+        {/if}
+        <label class="flex items-center gap-1">
+          facing
+          <input
+            class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+            type="number"
+            step="5"
+            value={point[2] ?? 0}
+            disabled={linkedSpots.has(step.spot) &&
+              !$unlockedSpots.has(step.spot)}
+            onchange={(e) =>
+              apply(
+                setSpotHeading(
+                  doc,
+                  step.spot!,
+                  Number(e.currentTarget.value) || 0,
+                ),
+              )}
+          />°
+        </label>
+      </div>
+      {#if renaming?.cardId === step.cardId && renaming.problem}
+        <p class="mt-1 pl-6 text-xs text-danger">{renaming.problem}</p>
+      {/if}
+      {#if focusedCard === step.cardId}
+        {@const park = parks.get(step.cardId)!}
+        {@const by = spotLeaveBy(park.lineId)}
+        {@const visits = [...parks.values()].filter(
+          (p) => p.lineId === park.lineId,
+        ).length}
+        <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
+          <span class="flex-1"
+            >Planned to leave here at {fmt(park.leaveS)} s. If the robot runs behind
+            and time runs short here, it parks along this path{by !== null
+              ? `, leaving by ${fmt(by)} s at the latest`
+              : ""}.{visits > 1
+              ? ` All ${visits} drives to ${step.spot} share this park.`
+              : ""} To bend it, add a control point in the Path panel and drag it
+            on the field.</span
+          >
+          <button type="button" class="simple-tile" onclick={closePark}
+            >Done</button
+          >
+        </div>
+      {/if}
+      {#if step.problem}
+        <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
+      {/if}
+      {#if hits.get(step.cardId)}
+        {@const hit = hits.get(step.cardId)!}
+        {#if hit.drive.length}
+          <p class="mt-1 pl-6 text-xs text-danger">
+            The drive here touches {hit.drive.join(" and ")} (within the robot's
+            {doc.robot.safetyMargin} in safety margin). Move the spot, or bend the
+            path with a control point.
+          </p>
+        {/if}
+        {#if hit.park.length}
+          <p class="mt-1 pl-6 text-xs text-warning">
+            Its park path (P) touches {hit.park.join(" and ")}: press P and bend
+            it.
+          </p>
+        {/if}
+      {/if}
+    {:else if step.kind === "launch" && step.aim}
+      {@const aim = step.aim}
+      {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
+      <div class="mt-1 flex items-center gap-2 pl-6 text-xs">
+        <span class={["flex-1", aim.on ? "text-body" : "text-danger"]}>
+          {#if aim.on}
+            At our {cell} CELL, {Math.round(aim.rangeIn)} in away, {Math.abs(
+              aim.offDeg,
+            ).toFixed(1)}° off: on, with the turret locked.
+          {:else}
+            Faces {Math.abs(aim.offDeg).toFixed(0)}° off our {cell} CELL (it needs
+            {Math.round(aim.needDeg)}°): with the turret locked, this misses.
+          {/if}
+        </span>
+        {#if !aim.on && step.atSpot && !isStartName(step.atSpot)}
+          <button
+            type="button"
+            class="simple-tile !min-h-0 !py-0.5"
+            title={`Turn ${step.atSpot} to face the CELL (${Math.round(aim.needDeg)}°)`}
+            onclick={() => faceCell(step.atSpot!, aim.needDeg)}
+            >Face the CELL</button
+          >
+        {/if}
+      </div>
+      {#if !aim.on && (!step.atSpot || isStartName(step.atSpot))}
+        <p class="mt-1 pl-6 text-xs text-body">
+          {step.atSpot && isStartName(step.atSpot)
+            ? "The start's heading is set by the marks: drive to a launch spot first, and aim that."
+            : "Drive to a spot first, and aim that."}
+        </p>
+      {/if}
+    {:else if step.kind === "wait"}
+      <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
+        <select
+          class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+          aria-label="Wait for"
+          value={step.waitFor}
+          onchange={(e) =>
+            apply(
+              setWait(doc, step.cardId, {
+                waitFor: e.currentTarget.value,
+              }),
+            )}
+        >
+          {#each WAIT_FOR as w (w.trigger)}<option value={w.trigger}
+              >{w.label}</option
+            >{/each}
+        </select>
+        <label class="flex items-center gap-1">
+          at most
+          <input
+            class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+            type="number"
+            min="0.1"
+            step="0.5"
+            value={step.waitS}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  seconds: Number(e.currentTarget.value) || 0.1,
+                }),
+              )}
+          />s
+        </label>
+      </div>
+      <label class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body">
+        <input
+          type="checkbox"
+          checked={step.spinUp}
+          onchange={(e) =>
+            apply(
+              setWait(doc, step.cardId, {
+                spinUp: e.currentTarget.checked,
+              }),
+            )}
+        />
+        Spin up the launcher while waiting
+      </label>
+      <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
+      {@const sub = { waitCardId: step.cardId }}
+      <div class="mt-1.5 pl-6">
+        <p class="text-xs text-heading">
+          Otherwise<span class="text-body">
+            (no {WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
+              "TIP"} in {step.waitS} s):</span
+          >
+        </p>
+        <ol class="mt-1 flex flex-col gap-1" aria-label="Otherwise steps">
+          {#each step.otherwise ?? [] as other, i (other.cardId)}
+            {@render stepItem(other, i, sub)}
+          {/each}
+          <li
+            class={[
+              "simple-end",
+              dropping(sub, step.otherwise?.length ?? 0) && "simple-step--drop",
+            ]}
+            ondragover={(e) => dragOver(e, step.otherwise?.length ?? 0, sub)}
+            ondragleave={() => (dropAt = null)}
+            ondrop={(e) => drop(e, step.otherwise?.length ?? 0, sub)}
+          >
+            <span
+              >{step.otherwise?.length
+                ? "then carry on below. Drop a step here, or add one:"
+                : "carry on below as if it came. Drop a step here, or add one:"}</span
+            >
+            <select
+              class={[fieldClass, "mt-1 !w-auto !py-0.5 text-xs"]}
+              aria-label="Add an Otherwise step"
+              value=""
+              onchange={(e) => {
+                const kind = e.currentTarget.value as AddKind;
+                e.currentTarget.value = "";
+                if (kind) add(kind, step.otherwise?.length ?? 0, sub);
+              }}
+            >
+              <option value="">add a step…</option>
+              {#each PALETTE.filter((t) => t.kind !== "wait") as tile (tile.kind)}
+                <option value={tile.kind}>{tile.label}</option>
+              {/each}
+            </select>
+          </li>
+        </ol>
+      </div>
+    {:else if step.kind === "gather"}
+      <div class="mt-1 pl-6 text-xs">
+        {#if step.garden}
+          <span class="text-body"
+            >into the {step.garden.name} and back to this spot</span
+          >
+        {:else}
+          <span class="text-danger"
+            >{step.problem}: the robot won't gather from here.</span
+          >
+        {/if}
+      </div>
+    {:else if step.kind === "pick"}
+      <div class="mt-1 pl-6 text-xs">
+        {#if step.flower && !step.problem}
+          <span class="text-body"
+            >at the {step.flower.name}, along its line and back{step.squares
+              ? ""
+              : " to this spot"}</span
+          >
+          {#if step.squares}
+            <span class="block text-warning"
+              >This spot is off the FLOWER's line or not square to it: the robot
+              squares up first. Put the spot on its line (click on the line) to
+              save that time.</span
+            >
+          {/if}
+        {:else}
+          <span class="text-danger"
+            >{step.problem}: the robot won't pick here. Drive to a spot on a
+            FLOWER's line (click on its line to make one).</span
+          >
+        {/if}
+      </div>
+    {/if}
+  </li>
+{/snippet}
 
 {#snippet spotOptions()}
   {#if ownSpots.length}
@@ -617,333 +992,23 @@
   {/if}
   <ol class="flex flex-col gap-1" aria-label="Steps">
     {#each steps as step, index (step.cardId)}
-      {@const Icon = ICONS[step.kind]}
-      <li
-        class={[
-          "simple-step",
-          selectedId === step.cardId && "simple-step--selected",
-          runningId === step.cardId && "simple-step--running",
-          dropAt === index && "simple-step--drop",
-        ]}
-        draggable="true"
-        ondragstart={(e) => dragStart(e, `move:${step.cardId}`)}
-        ondragover={(e) => dragOver(e, index)}
-        ondragleave={() => (dropAt = null)}
-        ondrop={(e) => drop(e, index)}
-      >
-        <div class="flex items-center gap-2">
-          <GripVertical class="size-3.5 shrink-0 cursor-grab text-body" />
-          <button
-            type="button"
-            class="flex min-w-0 flex-1 items-center gap-2 text-left"
-            onclick={() => select(step)}
-          >
-            <span class="w-4 shrink-0 text-right font-mono text-xs text-body"
-              >{index + 1}</span
-            >
-            {#if Icon}<Icon class="size-4 shrink-0 text-primary" />{/if}
-            <span
-              class={[
-                "truncate",
-                step.kind === "other" ? "text-body" : "text-heading",
-              ]}>{step.label}</span
-            >
-            {#if step.kind === "other"}<span class="text-[10px] text-body"
-                >advanced</span
-              >{/if}
-          </button>
-          {#if parks.has(step.cardId)}
-            <button
-              type="button"
-              class={[
-                "simple-park",
-                parkShown(step.cardId) && "simple-park--on",
-              ]}
-              title="Where the robot parks from this spot if time runs short. Show and edit its park path"
-              aria-label={`Park path from ${step.spot ?? "this spot"}`}
-              aria-pressed={parkShown(step.cardId)}
-              onclick={() => togglePark(step.cardId)}>P</button
-            >
-          {/if}
-          <button
-            type="button"
-            class="simple-icon"
-            title="Remove this step"
-            aria-label={`Remove ${step.label}`}
-            onclick={() => apply(removeStep(doc, step.cardId))}
-            ><X class="size-3.5" /></button
-          >
-        </div>
-
-        {#if (step.kind === "drive" || step.kind === "park") && step.spot && doc.auto?.points[step.spot]}
-          {@const point = doc.auto.points[step.spot]}
-          <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
-            {#if renaming?.cardId === step.cardId}
-              <form
-                class="flex items-center gap-1"
-                onsubmit={(e) => {
-                  e.preventDefault();
-                  finishRename();
-                }}
-              >
-                <!-- svelte-ignore a11y_autofocus -->
-                <input
-                  class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
-                  aria-label="New name"
-                  bind:value={renaming.text}
-                  autofocus
-                  onkeydown={(e) => e.key === "Escape" && (renaming = null)}
-                />
-                <button type="submit" class="simple-tile !min-h-0 !py-0.5"
-                  >Rename</button
-                >
-              </form>
-            {:else}
-              <select
-                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-                aria-label="Spot"
-                value={step.spot}
-                onchange={(e) => {
-                  const name = e.currentTarget.value;
-                  apply(
-                    setStepSpot(withTeamSpot(doc, name), step.cardId, name),
-                  );
-                }}
-              >
-                {@render spotOptions()}
-              </select>
-            {/if}
-            {#if !linkedSpots.has(step.spot) && !isStartName(step.spot) && renaming?.cardId !== step.cardId}
-              <button
-                type="button"
-                class="simple-icon"
-                title={`Rename ${step.spot} (every step that goes there follows)`}
-                aria-label={`Rename ${step.spot}`}
-                onclick={() =>
-                  (renaming = {
-                    cardId: step.cardId,
-                    from: step.spot!,
-                    text: step.spot!,
-                    problem: null,
-                  })}><Pencil class="size-3.5" /></button
-              >
-              <button
-                type="button"
-                class="simple-icon"
-                title={`Make ${step.spot} a team spot, for every Auto (then Save team spots)`}
-                aria-label={`Make ${step.spot} a team spot`}
-                onclick={() => makeTeamSpot(step.spot!)}
-                ><Link2 class="size-3.5" /></button
-              >
-            {/if}
-            {#if linkedSpots.has(step.spot)}
-              {@const open = $unlockedSpots.has(step.spot)}
-              <button
-                type="button"
-                class={["simple-icon", open && "!text-warning"]}
-                title={open
-                  ? "Unlocked: dragging its end on the field moves this team spot. Lock it again"
-                  : "A team spot, locked. Unlock it to move it (every Auto that uses it moves with it once saved)"}
-                aria-label={open ? "Lock team spot" : "Unlock team spot"}
-                onclick={() => setSpotUnlocked(step.spot!, !open)}
-              >
-                {#if open}<LockOpen class="size-3.5" />{:else}<Lock
-                    class="size-3.5"
-                  />{/if}
-              </button>
-            {/if}
-            <label class="flex items-center gap-1">
-              facing
-              <input
-                class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
-                type="number"
-                step="5"
-                value={point[2] ?? 0}
-                disabled={linkedSpots.has(step.spot) &&
-                  !$unlockedSpots.has(step.spot)}
-                onchange={(e) =>
-                  apply(
-                    setSpotHeading(
-                      doc,
-                      step.spot!,
-                      Number(e.currentTarget.value) || 0,
-                    ),
-                  )}
-              />°
-            </label>
-          </div>
-          {#if renaming?.cardId === step.cardId && renaming.problem}
-            <p class="mt-1 pl-6 text-xs text-danger">{renaming.problem}</p>
-          {/if}
-          {#if focusedCard === step.cardId}
-            {@const park = parks.get(step.cardId)!}
-            {@const by = spotLeaveBy(park.lineId)}
-            {@const visits = [...parks.values()].filter(
-              (p) => p.lineId === park.lineId,
-            ).length}
-            <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
-              <span class="flex-1"
-                >Planned to leave here at {fmt(park.leaveS)} s. If the robot runs
-                behind and time runs short here, it parks along this path{by !==
-                null
-                  ? `, leaving by ${fmt(by)} s at the latest`
-                  : ""}.{visits > 1
-                  ? ` All ${visits} drives to ${step.spot} share this park.`
-                  : ""} To bend it, add a control point in the Path panel and drag
-                it on the field.</span
-              >
-              <button type="button" class="simple-tile" onclick={closePark}
-                >Done</button
-              >
-            </div>
-          {/if}
-          {#if step.problem}
-            <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
-          {/if}
-          {#if hits.get(step.cardId)}
-            {@const hit = hits.get(step.cardId)!}
-            {#if hit.drive.length}
-              <p class="mt-1 pl-6 text-xs text-danger">
-                The drive here touches {hit.drive.join(" and ")} (within the robot's
-                {doc.robot.safetyMargin} in safety margin). Move the spot, or bend
-                the path with a control point.
-              </p>
-            {/if}
-            {#if hit.park.length}
-              <p class="mt-1 pl-6 text-xs text-warning">
-                Its park path (P) touches {hit.park.join(" and ")}: press P and
-                bend it.
-              </p>
-            {/if}
-          {/if}
-        {:else if step.kind === "launch" && step.aim}
-          {@const aim = step.aim}
-          {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
-          <div class="mt-1 flex items-center gap-2 pl-6 text-xs">
-            <span class={["flex-1", aim.on ? "text-body" : "text-danger"]}>
-              {#if aim.on}
-                At our {cell} CELL, {Math.round(aim.rangeIn)} in away, {Math.abs(
-                  aim.offDeg,
-                ).toFixed(1)}° off: on, with the turret locked.
-              {:else}
-                Faces {Math.abs(aim.offDeg).toFixed(0)}° off our {cell} CELL (it needs
-                {Math.round(aim.needDeg)}°): with the turret locked, this
-                misses.
-              {/if}
-            </span>
-            {#if !aim.on && step.atSpot && !isStartName(step.atSpot)}
-              <button
-                type="button"
-                class="simple-tile !min-h-0 !py-0.5"
-                title={`Turn ${step.atSpot} to face the CELL (${Math.round(aim.needDeg)}°)`}
-                onclick={() => faceCell(step.atSpot!, aim.needDeg)}
-                >Face the CELL</button
-              >
-            {/if}
-          </div>
-          {#if !aim.on && (!step.atSpot || isStartName(step.atSpot))}
-            <p class="mt-1 pl-6 text-xs text-body">
-              {step.atSpot && isStartName(step.atSpot)
-                ? "The start's heading is set by the marks: drive to a launch spot first, and aim that."
-                : "Drive to a spot first, and aim that."}
-            </p>
-          {/if}
-        {:else if step.kind === "wait"}
-          <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
-            <select
-              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-              aria-label="Wait for"
-              value={step.waitFor}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    waitFor: e.currentTarget.value,
-                  }),
-                )}
-            >
-              {#each WAIT_FOR as w (w.trigger)}<option value={w.trigger}
-                  >{w.label}</option
-                >{/each}
-            </select>
-            <label class="flex items-center gap-1">
-              at most
-              <input
-                class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
-                type="number"
-                min="0.1"
-                step="0.5"
-                value={step.waitS}
-                onchange={(e) =>
-                  apply(
-                    setWait(doc, step.cardId, {
-                      seconds: Number(e.currentTarget.value) || 0.1,
-                    }),
-                  )}
-              />s
-            </label>
-          </div>
-          <label class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body">
-            <input
-              type="checkbox"
-              checked={step.spinUp}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    spinUp: e.currentTarget.checked,
-                  }),
-                )}
-            />
-            Spin up the launcher while waiting
-          </label>
-        {:else if step.kind === "gather"}
-          <div class="mt-1 pl-6 text-xs">
-            {#if step.garden}
-              <span class="text-body"
-                >into the {step.garden.name} and back to this spot</span
-              >
-            {:else}
-              <span class="text-danger"
-                >{step.problem}: the robot won't gather from here.</span
-              >
-            {/if}
-          </div>
-        {:else if step.kind === "pick"}
-          <div class="mt-1 pl-6 text-xs">
-            {#if step.flower && !step.problem}
-              <span class="text-body"
-                >at the {step.flower.name}, along its line and back{step.squares
-                  ? ""
-                  : " to this spot"}</span
-              >
-              {#if step.squares}
-                <span class="block text-warning"
-                  >This spot is off the FLOWER's line or not square to it: the
-                  robot squares up first. Put the spot on its line (click on the
-                  line) to save that time.</span
-                >
-              {/if}
-            {:else}
-              <span class="text-danger"
-                >{step.problem}: the robot won't pick here. Drive to a spot on a
-                FLOWER's line (click on its line to make one).</span
-              >
-            {/if}
-          </div>
-        {/if}
-      </li>
+      {@render stepItem(step, index, null)}
     {/each}
 
-    {#if steps.length && !steps.some((step) => step.kind === "park")}
+    {#if steps.length && !steps.some((step) => step.kind === "park" || step.otherwise?.some((o) => o.kind === "park"))}
       <li class="px-1 text-xs text-warning">
         No Park step: add one, so the robot parks by 30 s even when a step runs
         long.
       </li>
     {/if}
     <li
-      class={["simple-end", dropAt === steps.length && "simple-step--drop"]}
-      ondragover={(e) => dragOver(e, steps.length)}
+      class={[
+        "simple-end",
+        dropping(null, steps.length) && "simple-step--drop",
+      ]}
+      ondragover={(e) => dragOver(e, steps.length, null)}
       ondragleave={() => (dropAt = null)}
-      ondrop={(e) => drop(e, steps.length)}
+      ondrop={(e) => drop(e, steps.length, null)}
     >
       {steps.length
         ? "Drop a step here, or click one below"
@@ -965,7 +1030,12 @@
             aria-label="Existing spot"
             onchange={(e) =>
               pending &&
-              addAt(pending.kind, pending.index, e.currentTarget.value)}
+              addAt(
+                pending.kind,
+                pending.index,
+                e.currentTarget.value,
+                pending.into,
+              )}
           >
             <option value="">choose a spot…</option>
             {@render spotOptions()}
