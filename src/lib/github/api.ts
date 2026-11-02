@@ -173,29 +173,6 @@ export async function createPull(
   });
 }
 
-/**
- * Asks GitHub to merge the pull request by itself once its required checks pass (GraphQL: the
- * REST API has no call for it). Throws when biobuzz's settings do not allow auto-merge, or the
- * token may not write pull requests.
- */
-export async function enableAutoMerge(
-  token: string,
-  pullNodeId: string,
-): Promise<void> {
-  const response = await call(token, "/graphql", {
-    method: "POST",
-    body: JSON.stringify({
-      query:
-        "mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: MERGE}) { clientMutationId } }",
-      variables: { id: pullNodeId },
-    }),
-  });
-  const data = (await response.json()) as { errors?: { message: string }[] };
-  if (data.errors?.length) {
-    throw new GitHubError(data.errors.map((e) => e.message).join("; "), 422);
-  }
-}
-
 /** Fork: where GitHub opens a pull request from `branch` into master. */
 export function pullRequestUrl(branch: string, title: string): string {
   return `https://github.com/${GIT_REPO}/compare/master...${encodePath(branch)}?expand=1&title=${encodeURIComponent(title)}`;

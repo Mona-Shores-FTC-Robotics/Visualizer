@@ -12,7 +12,6 @@
     commitFiles,
     createBranch,
     createPull,
-    enableAutoMerge,
     moveBranch,
     openPullFrom,
     commitUrl,
@@ -114,9 +113,7 @@
 
   let saving = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
-  let pull = $state<{ url: string; number: number; autoMerge: boolean } | null>(
-    null,
-  );
+  let pull = $state<{ url: string; number: number } | null>(null);
   /** Master, or a fast-lane branch: the save goes to master through a pull request that merges itself. */
   let viaFastLane = $derived(
     branch.trim() === FAST_LANE_BASE || branch.trim().startsWith("auto/"),
@@ -422,7 +419,8 @@
       }
       pull = null;
       if (viaFastLane) {
-        const fresh = !open;
+        // The draft waits: it is tried on the robot first, and a mentor merges it on GitHub if it
+        // is better. Auto-merge would land it as soon as its checks pass, before anyone drove it.
         if (!open) {
           open = await createPull(
             token,
@@ -430,22 +428,10 @@
             FAST_LANE_BASE,
             `Auto: ${baseName(ppPath)}`,
             `Saved from the Visualizer by ${login}: \`${ppPath}\`, its generated Java and its simulation request (simulates ${spec}).\n\n` +
-              "Fast lane: an Auto-only change, merged by GitHub once its checks pass. Simulated points are shown, never enforced.",
+              "Fast lane: an Auto-only change, so it needs no issue or review. Try it on the robot; merge it here if it is better than master's. Simulated points are shown, never enforced.",
           );
         }
-        let autoMerge = !fresh;
-        if (fresh) {
-          try {
-            await enableAutoMerge(token, open.node_id);
-            autoMerge = true;
-          } catch (error) {
-            showToast(
-              `Pull request #${open.number} is open, but GitHub would not merge it by itself (${(error as Error).message}): merge it on GitHub once its checks pass.`,
-              "warning",
-            );
-          }
-        }
-        pull = { url: open.html_url, number: open.number, autoMerge };
+        pull = { url: open.html_url, number: open.number };
       }
       saveJson(OPTIONS_KEY, {
         design,
@@ -464,7 +450,7 @@
       exported.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
       showToast(
         pull
-          ? `Saved ${baseName(ppPath)} to pull request #${pull.number}${pull.autoMerge ? ": it merges into master once its checks pass" : ""}`
+          ? `Saved ${baseName(ppPath)} to pull request #${pull.number}: try it on the robot, then merge it on GitHub if it is better`
           : `Saved ${baseName(ppPath)} to ${branch}`,
         "success",
       );
@@ -837,9 +823,8 @@
       <a class="underline" href={pull.url} target="_blank" rel="noreferrer"
         >Pull request #{pull.number}</a
       >
-      {pull.autoMerge
-        ? "merges into master by itself once its checks pass; then pull master and Sloth Load."
-        : "is open: merge it on GitHub once its checks pass."}
+      is open. Sloth Load this branch and try it on the robot; if it is better than
+      master's, a mentor merges it on GitHub, and master is the Auto you run.
     </p>
   {/if}
 
