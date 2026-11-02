@@ -22,8 +22,13 @@
   import { currentFilePath } from "../../stores";
   import { useAuto } from "../../state/auto.svelte";
   import { usePlayback } from "../../state/playback.svelte";
-  import { parseSelection, selectedCardId, spotPicker } from "../auto/store";
-  import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
+  import {
+    parseSelection,
+    previewScenario,
+    selectedCardId,
+    spotPicker,
+  } from "../auto/store";
+  import { AUTO_LENGTH_S, guardSeconds, switchKey } from "../auto/simulate";
   import { fieldClass } from "../components/ui/styles";
   import { flowerLinedUp, pickSpot } from "./flowers";
   import { spotParks } from "./parkFrom";
@@ -299,7 +304,22 @@
     apply(setStart(doc, name, starts[name]));
   }
 
+  /** Whether the preview draws a wait's "it came" branch (true) or its Otherwise (false). */
+  function previewsTip(cardId: string): boolean {
+    return $previewScenario[switchKey(cardId)] ?? true;
+  }
+
+  /** Draws one branch of a wait: the steps below it as if the trigger came, or its Otherwise. */
+  function previewTip(cardId: string, yes: boolean) {
+    previewScenario.update((scenario) => ({
+      ...scenario,
+      [switchKey(cardId)]: yes,
+    }));
+  }
+
   function add(kind: AddKind, index = insertIndex(), into: StepList = null) {
+    // Building an Otherwise: show it, so the step just added is drawn.
+    if (into) previewTip(into.waitCardId, false);
     if (kind === "drive" || kind === "park") {
       // The team's park for this side (RIGHT_START → RIGHT_PARK), else an older file's PARK.
       const teamPark = sideSpot(side, "PARK");
@@ -775,11 +795,38 @@
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
       {@const sub = { waitCardId: step.cardId }}
       <div class="mt-1.5 pl-6">
-        <p class="text-xs text-heading">
-          Otherwise<span class="text-body">
-            (no {WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
-              "TIP"} in {step.waitS} s):</span
+        <p class="flex flex-wrap items-center gap-x-2 text-xs text-heading">
+          <span
+            >Otherwise<span class="text-body">
+              (no {WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
+                "TIP"} in {step.waitS} s):</span
+            ></span
           >
+          {#if step.otherwise?.length}
+            <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->
+            <span
+              class="simple-branch"
+              role="group"
+              aria-label="Which branch the field draws"
+            >
+              <button
+                type="button"
+                class:on={previewsTip(step.cardId)}
+                aria-pressed={previewsTip(step.cardId)}
+                onclick={() => previewTip(step.cardId, true)}
+                >draw: {WAIT_FOR.find((w) => w.trigger === step.waitFor)
+                  ?.label ?? "TIP"} comes</button
+              >
+              <button
+                type="button"
+                class:on={!previewsTip(step.cardId)}
+                aria-pressed={!previewsTip(step.cardId)}
+                onclick={() => previewTip(step.cardId, false)}
+                >no {WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
+                  "TIP"}</button
+              >
+            </span>
+          {/if}
         </p>
         <ol class="mt-1 flex flex-col gap-1" aria-label="Otherwise steps">
           {#each step.otherwise ?? [] as other, i (other.cardId)}
@@ -1133,6 +1180,23 @@
   }
   .simple-step--drop {
     box-shadow: 0 -2px 0 var(--primary);
+  }
+  .simple-branch {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.7rem;
+  }
+  .simple-branch button {
+    padding: 1px 8px;
+    background: var(--base);
+    color: var(--body);
+  }
+  .simple-branch button.on {
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: var(--heading);
+    font-weight: 600;
   }
   .simple-end {
     border-radius: 0.6rem;
