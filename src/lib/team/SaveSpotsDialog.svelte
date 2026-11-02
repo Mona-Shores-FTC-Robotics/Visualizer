@@ -7,6 +7,7 @@
   import Button from "../components/ui/Button.svelte";
   import { fieldClass } from "../components/ui/styles";
   import {
+    GitHubError,
     branchHead,
     commitFiles,
     createBranch,
@@ -88,6 +89,11 @@
       done = { url: pullRequestUrl(branch, title), autos: plan.autos };
     } catch (error) {
       problems = [(error as Error).message];
+      // A refused token (expired, or revoked) is forgotten, so the box to paste a new one shows.
+      if (error instanceof GitHubError && error.status === 401) {
+        saveToken(null);
+        token = null;
+      }
     } finally {
       saving = false;
     }
