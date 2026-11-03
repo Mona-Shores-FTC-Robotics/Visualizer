@@ -32,6 +32,8 @@ export interface PlanStep {
   sense?: Sense;
   condition?: string;
   limitS?: number;
+  /** Fork: `limitS` is a time on the match clock ("until 8.5 s"), not since the wait began. */
+  limitOnMatchClock?: boolean;
   /** Set on the wait that ends a chapter: "TIP 1". */
   tip?: string;
   /** Set on a wait that branches: what happens when the condition never comes. */
@@ -73,7 +75,7 @@ function waitStep(card: FirstOfCard): PlanStep {
   const when = card.rows.find((row) => "when" in row) as
     { when: string[] } | undefined;
   const time = card.rows.find((row) => "afterMs" in row) as
-    { afterMs: number } | undefined;
+    { afterMs: number; matchClock?: boolean } | undefined;
   const condition = when?.when[0];
   const sense = senseOf(condition);
   const kind: StepKind =
@@ -91,6 +93,7 @@ function waitStep(card: FirstOfCard): PlanStep {
     sense,
     condition,
     limitS: time ? time.afterMs / 1000 : undefined,
+    ...(time?.matchClock ? { limitOnMatchClock: true } : {}),
   };
 }
 

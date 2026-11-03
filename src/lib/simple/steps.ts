@@ -64,6 +64,10 @@ export interface Step {
   /** Wait: the trigger it waits for (WAIT_FOR), and the most it waits, seconds. */
   waitFor?: string;
   waitS?: number;
+  /** Wait: `waitS` is a time on the match clock ("until 8 s"), not since the wait began. */
+  waitClock?: boolean;
+  /** Wait: the drive team may move it in INIT, as the partner's TIP time (biobuzz InitOptions). */
+  waitAdjustable?: boolean;
   /** Wait: the launcher spins up while it waits (SpinUp alongside). */
   spinUp?: boolean;
   /** Wait: the steps that run only if it times out (its Otherwise list), in order. */
@@ -245,6 +249,8 @@ function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
           label: `Wait for ${label}`,
           waitFor: wait.trigger,
           waitS: wait.seconds,
+          waitClock: wait.matchClock,
+          waitAdjustable: wait.adjustable,
           spinUp: wait.spinUp,
           otherwise,
         };
@@ -492,6 +498,14 @@ export function setStepSpot(
     const card = found?.list[found.index];
     const point = auto.points[spot];
     if (card?.kind !== "path" || !point) return;
+    // Park on a spot the drive team was offered: the two swap, so the old park is offered instead.
+    const old = auto.pathEnds[card.lineId];
+    if (card.park && auto.parkChoices?.includes(spot)) {
+      auto.parkChoices = [
+        ...auto.parkChoices.filter((n) => n !== spot),
+        ...(old ? [old] : []),
+      ].sort();
+    }
     auto.pathEnds[card.lineId] = spot;
     draft.lines = draft.lines.map((line) =>
       line.id === card.lineId && line.kind === "atomic"
@@ -511,6 +525,8 @@ export function removeStep(doc: ProjectDoc, cardId: string): ProjectDoc {
     const found = findCard(auto, cardId);
     if (!found) return;
     const [card] = found.list.splice(found.index, 1);
+    // No park left, nothing to offer in its place.
+    if (card.kind === "path" && card.park) dropParkChoices(auto);
     const gone: AutoCard[] = [card];
     if (card.kind === "firstOf")
       for (const row of card.rows) gone.push(...row.cards);
@@ -555,20 +571,65 @@ export function moveStep(
 export function setWait(
   doc: ProjectDoc,
   cardId: string,
-  change: { waitFor?: string; seconds?: number; spinUp?: boolean },
+  change: {
+    waitFor?: string;
+    seconds?: number;
+    spinUp?: boolean;
+    /** The limit is a time on the match clock; turning it off makes it a plain limit again. */
+    matchClock?: boolean;
+    /** The drive team may move it in INIT; only on the match clock, one wait per Auto. */
+    adjustable?: boolean;
+  },
 ): ProjectDoc {
   return edit(doc, (_draft, auto) => {
     const card = auto.cards.find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
     for (const row of card.rows) {
       if ("when" in row && change.waitFor) row.when = [change.waitFor];
-      if ("afterMs" in row && change.seconds !== undefined)
+      if (!("afterMs" in row)) continue;
+      if (change.seconds !== undefined)
         row.afterMs = Math.round(Math.max(0.1, change.seconds) * 10) * 100;
+      if (change.matchClock === true) row.matchClock = true;
+      if (change.matchClock === false) {
+        delete row.matchClock;
+        delete row.adjustable;
+      }
+      if (change.adjustable === true && row.matchClock) {
+        // One wait per Auto: the D-pad's up and down move only one.
+        for (const other of auto.cards)
+          if (other.kind === "firstOf" && other !== card)
+            for (const r of other.rows) if ("afterMs" in r) delete r.adjustable;
+        row.adjustable = true;
+      }
+      if (change.adjustable === false) delete row.adjustable;
     }
     if (change.spinUp === true) card.alongside = SPIN_UP;
     if (change.spinUp === false) delete card.alongside;
     const wait = waitOf(card)!;
     card.label = `Wait for ${WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ?? wait.trigger}`;
+  });
+}
+
+/**
+ * Fork: offers the drive team another PARK spot during INIT (`on`), or stops offering it
+ * (types.ts parkChoices). An offered spot is one of the Auto's named points (link a team spot in
+ * first); one no longer offered, and used by nothing else, leaves the Auto.
+ */
+export function setParkChoice(
+  doc: ProjectDoc,
+  name: string,
+  on: boolean,
+): ProjectDoc {
+  return edit(doc, (_draft, auto) => {
+    const now = new Set(auto.parkChoices ?? []);
+    if (on && auto.points[name]) now.add(name);
+    if (!on) {
+      now.delete(name);
+      auto.parkChoices = [name];
+      dropParkChoices(auto);
+    }
+    if (now.size) auto.parkChoices = [...now].sort();
+    else delete auto.parkChoices;
   });
 }
 
@@ -762,6 +823,8 @@ function spotOf(
 function waitOf(card: FirstOfCard): {
   trigger: string;
   seconds: number;
+  matchClock: boolean;
+  adjustable: boolean;
   spinUp: boolean;
   otherwise: AutoCard[];
 } | null {
@@ -770,16 +833,36 @@ function waitOf(card: FirstOfCard): {
   const when = card.rows.find((row) => "when" in row) as
     { when: string[]; cards: AutoCard[] } | undefined;
   const time = card.rows.find((row) => "afterMs" in row) as
-    { afterMs: number; cards: AutoCard[] } | undefined;
+    | {
+        afterMs: number;
+        matchClock?: boolean;
+        adjustable?: boolean;
+        cards: AutoCard[];
+      }
+    | undefined;
   if (!when || !time || when.when.length !== 1) return null;
   if (when.cards.length) return null;
   if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
   return {
     trigger: when.when[0],
     seconds: time.afterMs / 1000,
+    matchClock: !!time.matchClock,
+    adjustable: !!time.adjustable,
     spinUp: card.alongside === SPIN_UP,
     otherwise: time.cards,
   };
+}
+
+/** Stops offering other parks in INIT; a spot that was only offered leaves the Auto. */
+function dropParkChoices(auto: AutoSection): void {
+  for (const name of auto.parkChoices ?? []) {
+    if (auto.startAt === name || Object.values(auto.pathEnds).includes(name))
+      continue;
+    delete auto.points[name];
+    auto.teamSpots = auto.teamSpots?.filter((n) => n !== name);
+    if (!auto.teamSpots?.length) delete auto.teamSpots;
+  }
+  delete auto.parkChoices;
 }
 
 function clearParks(cards: AutoCard[]): void {

@@ -62,6 +62,7 @@
     startsFrom,
     setStepSpot,
     setWait,
+    setParkChoice,
     sideSpot,
     renameSpot,
     WAIT_FOR,
@@ -287,6 +288,26 @@
       return;
     editSpot(name, pose);
     apply(linkSpot(doc, name, pose));
+  }
+
+  /**
+   * Fork: the other PARK spots the drive team could pick in INIT instead of `spot`: the team's
+   * _PARK spots, and any this Auto already has (types.ts parkChoices).
+   */
+  function parkOffers(spot: string | null): string[] {
+    const names = new Set<string>([
+      ...Object.keys($teamSpots),
+      ...Object.keys(doc.auto?.points ?? {}),
+    ]);
+    return [...names]
+      .filter(
+        (name) => (name === "PARK" || name.endsWith("_PARK")) && name !== spot,
+      )
+      .sort();
+  }
+
+  function toggleParkChoice(name: string, on: boolean) {
+    apply(setParkChoice(on ? withTeamSpot(doc, name) : doc, name, on));
   }
 
   /** Fork: a spot named from a field click is also saved as a team spot. */
@@ -676,6 +697,29 @@
       {#if renaming?.cardId === step.cardId && renaming.problem}
         <p class="mt-1 pl-6 text-xs text-danger">{renaming.problem}</p>
       {/if}
+      {#if step.kind === "park"}
+        <!-- Fork: another park the drive team may pick at the field (types.ts parkChoices). -->
+        {@const offers = parkOffers(step.spot)}
+        {#if offers.length}
+          <div
+            class="mt-1 flex flex-wrap items-center gap-x-3 pl-6 text-xs text-body"
+            title="If a partner parks where we planned to, the drive team picks another park in INIT with the D-pad's left and right. Every park path goes there instead."
+          >
+            <span>Drive team may pick in INIT (D-pad ◀▶):</span>
+            {#each offers as name (name)}
+              <label class="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={doc.auto?.parkChoices?.includes(name) ?? false}
+                  onchange={(e) =>
+                    toggleParkChoice(name, e.currentTarget.checked)}
+                />
+                <span class="font-mono">{name}</span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      {/if}
       {#if focusedCard === step.cardId}
         {@const park = parks.get(step.cardId)!}
         {@const by = spotLeaveBy(park.lineId)}
@@ -765,7 +809,22 @@
             >{/each}
         </select>
         <label class="flex items-center gap-1">
-          at most
+          <!-- Fork: a limit since the wait began, or a time on the match clock (types.ts). -->
+          <select
+            class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+            aria-label="Time limit"
+            title="At most: counted from when the wait begins. Until: a time on the match clock, however late the robot gets there"
+            value={step.waitClock ? "clock" : "most"}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  matchClock: e.currentTarget.value === "clock",
+                }),
+              )}
+          >
+            <option value="most">at most</option>
+            <option value="clock">until the match clock reads</option>
+          </select>
           <input
             class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
             type="number"
@@ -794,6 +853,24 @@
         />
         Spin up the launcher while waiting
       </label>
+      {#if step.waitClock}
+        <label
+          class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body"
+          title="At the field the drive team enters the partner's TIP time with the D-pad's up and down; the robot waits until a moment after it. One wait per Auto."
+        >
+          <input
+            type="checkbox"
+            checked={step.waitAdjustable}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  adjustable: e.currentTarget.checked,
+                }),
+              )}
+          />
+          The drive team can change it in INIT (D-pad ▲▼, the partner's TIP time)
+        </label>
+      {/if}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
       {@const sub = { waitCardId: step.cardId }}
       <div class="mt-1.5 pl-6">
@@ -801,7 +878,9 @@
           <span
             >Otherwise<span class="text-body">
               (no {WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
-                "TIP"} in {step.waitS} s):</span
+                "TIP"}
+              {step.waitClock ? "by" : "in"}
+              {step.waitS} s):</span
             ></span
           >
           {#if step.otherwise?.length}
