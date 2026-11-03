@@ -18,7 +18,12 @@ import {
   type TimingValues,
   type VolleyEffect,
 } from "../timing/model";
-import { tipsInAuto, volleysOf, type FieldEntry } from "../timing/together";
+import {
+  robotValues,
+  tipsInAuto,
+  volleysOf,
+  type FieldEntry,
+} from "../timing/together";
 
 export type SegmentKind =
   "drive" | "volley" | "spinup" | "pick" | "gather" | "action";
@@ -67,6 +72,8 @@ export interface RobotLane {
   endTime: number;
   guard: { t: number; label: string } | null;
   stalled: boolean;
+  /** A no-show: the robot does not move. */
+  still: boolean;
   /** Seconds spent in waits. */
   waitingS: number;
   /** Seconds to spare at the end of the 30 s Auto (negative: over). */
@@ -178,7 +185,8 @@ export function matchLanes(
   colors: string[],
 ): MatchLanes {
   const span = Math.max(AUTO_LENGTH_S, ...previews.map((p) => p.endTime));
-  const history = hiveHistory(volleysOf(previews), values);
+  const loads = entries.map((e) => robotValues(e, values).volleyLoad);
+  const history = hiveHistory(volleysOf(previews, loads), values);
   const tips = history.tips;
   const links: Link[] = [];
 
@@ -266,6 +274,7 @@ export function matchLanes(
       endTime: preview.endTime,
       guard: preview.guard,
       stalled: preview.stalled,
+      still: entries[robot]?.still ?? false,
       waitingS: waits.reduce((sum, w) => sum + (w.t1 - w.t0), 0),
       spareS: AUTO_LENGTH_S - preview.endTime,
     };

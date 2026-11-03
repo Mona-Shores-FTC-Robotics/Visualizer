@@ -50,6 +50,7 @@
   import FieldRuler from "../lib/components/FieldRuler.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
   import MatchTimeline from "../lib/match/MatchTimeline.svelte";
+  import MatchControls from "../lib/match/MatchControls.svelte";
   import { linkSegmentIds } from "../lib/auto/links";
   import { createViewport } from "./viewport";
 
@@ -759,6 +760,20 @@
       seconds={matchSeconds}
       onSeek={seekMatch}
     />
+    {#if auto.matchControls}
+      <div class="max-h-[40vh] shrink-0 overflow-y-auto">
+        <MatchControls
+          robots={auto.overlayTogether.shown.map((overlay, i) => ({
+            file: overlay.filePath,
+            name: auto.matchLanes?.robots[i]?.name ?? overlay.filePath,
+            color: overlay.color,
+            auto: overlay.doc.auto!,
+          }))}
+          controls={auto.match}
+          base={auto.baseValues}
+        />
+      </div>
+    {/if}
   {/if}
   <PlaybackBar />
 </main>

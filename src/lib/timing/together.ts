@@ -15,9 +15,10 @@ import {
 } from "../auto/simulate";
 import {
   FACTS,
+  hiveHistory,
   previewTiming,
+  ROBOT_FACTS,
   TIP_CONDITIONS,
-  tipsFrom,
   VOLLEY_COMMAND,
   type Tip,
   type TimingValues,
@@ -30,6 +31,45 @@ export interface FieldEntry {
   lines: Path[];
   settings: Settings;
   scenario: Scenario;
+  /**
+   * This robot's own facts (ROBOT_FACTS: its drive speed, volley, intake, hits per volley), over
+   * the shared ones; the HIVE's facts are always shared.
+   */
+  own?: Partial<TimingValues>;
+  /** The robot does not move: a no-show partner. Its preview is an empty one. */
+  still?: boolean;
+}
+
+/** The facts one robot is previewed with: the shared ones, and its own over them. */
+export function robotValues(
+  entry: Pick<FieldEntry, "own">,
+  values: TimingValues,
+): TimingValues {
+  if (!entry.own) return values;
+  const out = { ...values };
+  for (const id of ROBOT_FACTS) {
+    const v = entry.own[id];
+    if (typeof v === "number" && Number.isFinite(v)) out[id] = v;
+  }
+  return out;
+}
+
+/** A preview of a robot that never moves. */
+export function stillPreview(): PreviewResult {
+  return {
+    timeline: [],
+    log: [{ t: 0, text: "Does not move (no-show)", kind: "end" }],
+    endTime: 0,
+    ran: new Set(),
+    taken: new Map(),
+    drives: [],
+    motions: [],
+    launches: [],
+    actions: [],
+    waits: [],
+    guard: null,
+    stalled: false,
+  };
 }
 
 export interface TogetherResult {
@@ -61,13 +101,16 @@ function atSpeed(settings: Settings, speed: number): Settings {
 
 /**
  * Every volley on the field, by robot: a LaunchAll run alongside a wait, or a LaunchAll step (the
- * simple builder's Launch all).
+ * simple builder's Launch all). `loads[i]` is what robot i's volleys land (its hits per volley).
  */
-export function volleysOf(previews: PreviewResult[]): Volley[] {
+export function volleysOf(
+  previews: PreviewResult[],
+  loads: (number | undefined)[] = [],
+): Volley[] {
   return previews.flatMap((p, robot) =>
     [...p.launches, ...p.actions]
       .filter((l) => l.command === VOLLEY_COMMAND)
-      .map((l) => ({ t: l.t1, robot })),
+      .map((l) => ({ t: l.t1, robot, load: loads[robot] })),
   );
 }
 
@@ -102,8 +145,10 @@ export function previewTogether(
   withLog = true,
   options: { tipsCome?: boolean } = {},
 ): TogetherResult {
-  const speed = values.driveSpeed ?? 1;
-  const catalogs = entries.map((e) => {
+  const own = entries.map((e) => robotValues(e, values));
+  const loads = own.map((v) => v.volleyLoad);
+  const catalogs = entries.map((e, i) => {
+    const speed = own[i].driveSpeed ?? 1;
     const catalog = buildPathCatalog(
       e.startPoint,
       e.lines,
@@ -121,19 +166,20 @@ export function previewTogether(
   let previews: PreviewResult[] = [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
     previews = entries.map((e, i) =>
-      simulateAuto(
-        e.auto,
-        catalogs[i],
-        e.startPoint,
-        e.scenario,
-        options.tipsCome
-          ? tipsCome(previewTiming(values, tips), values)
-          : previewTiming(values, tips),
-      ),
+      e.still
+        ? stillPreview()
+        : simulateAuto(
+            e.auto,
+            catalogs[i],
+            e.startPoint,
+            e.scenario,
+            options.tipsCome
+              ? tipsCome(previewTiming(own[i], tips), own[i])
+              : previewTiming(own[i], tips),
+          ),
     );
-    const next = tipsFrom(
-      volleysOf(previews).map((v) => v.t),
-      values,
+    const next = hiveHistory(volleysOf(previews, loads), values).tips.map(
+      ({ start, settled }) => ({ start, settled }),
     );
     if (sameTips(next, tips)) break;
     tips = next;

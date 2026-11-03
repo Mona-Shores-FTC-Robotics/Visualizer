@@ -112,6 +112,18 @@ export const FACTS: TimingFact[] = [
   },
 ];
 
+/**
+ * The facts that belong to one robot (how it drives, launches and intakes, and how many of its
+ * shots land); the rest are the HIVE's, shared by every robot on the field.
+ */
+export const ROBOT_FACTS: readonly string[] = [
+  "driveSpeed",
+  "spinUpS",
+  "volleyS",
+  "intakeFullS",
+  "volleyLoad",
+];
+
 /** The command whose run is a volley. */
 export const VOLLEY_COMMAND = "LaunchAll";
 /** The command that starts the launcher and finishes at once (biobuzz LaunchCards.spinUp). */
@@ -203,6 +215,8 @@ export interface Tip {
 export interface Volley {
   t: number;
   robot: number;
+  /** What it lands in the raised CELL, when its robot's differs from `volleyLoad`. */
+  load?: number;
 }
 
 /** What one volley did to the HIVE. */
@@ -238,7 +252,7 @@ export function hiveHistory(
       effects.push({ ...volley, counted: false, load, tip: null });
       continue;
     }
-    load += values.volleyLoad;
+    load += volley.load ?? values.volleyLoad;
     const effect: VolleyEffect = { ...volley, counted: true, load, tip: null };
     effects.push(effect);
     if (load < values.tipLoad - 1e-9) continue;

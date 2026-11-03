@@ -32,6 +32,7 @@ import {
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
 import { laneName, matchLanes, type MatchLanes } from "../lib/match/lanes";
+import { MatchControls } from "../lib/match/controls.svelte";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
 import {
@@ -71,6 +72,10 @@ export class AutoState {
   overlayUntaken = $state(false);
   /** With several Autos shown together: the Match timeline under the field (lib/match). */
   matchTimeline = $state(true);
+  /** With the Match timeline: its what-if controls under it. */
+  matchControls = $state(true);
+  /** The Match view's what-ifs: facts, triggers and no-shows for this look only. */
+  match = new MatchControls();
   /** How the left panel shows the Auto: the plan (good path, chapters, misses) or every card. */
   /** Fork: "simple" is the builder for our robot's steps (lib/simple); the others are advanced. */
   view = $state<"simple" | "plan" | "cards">("simple");
@@ -206,13 +211,22 @@ export class AutoState {
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole on every change
     const previews = new Map<Overlay, PreviewResult>();
     const withAuto = this.#overlays.items.filter((overlay) => overlay.doc.auto);
-    const entries = withAuto.map((overlay) =>
-      this.#entry(overlay.doc, this.#overlays.settingsFor(overlay), {}),
+    const match = this.match;
+    const entries = withAuto.map(
+      (overlay): FieldEntry => ({
+        ...this.#entry(
+          overlay.doc,
+          this.#overlays.settingsFor(overlay),
+          match.scenario[overlay.filePath] ?? {},
+        ),
+        own: match.own[overlay.filePath],
+        still: match.still[overlay.filePath] ?? false,
+      }),
     );
     let tips: Tip[] = [];
     try {
       if (this.#timingMode.current === "typical") {
-        const together = previewTogether(entries, this.#timingValues.current);
+        const together = previewTogether(entries, this.matchValues);
         tips = together.tips;
         together.previews.forEach((preview, i) =>
           previews.set(withAuto[i], preview),
@@ -236,6 +250,15 @@ export class AutoState {
     return { previews, tips, entries, shown: withAuto };
   });
 
+  /** The shared facts the Autos shown together are previewed with: the team's, and the HIVE what-ifs. */
+  get matchValues() {
+    return this.match.shared(this.#timingValues.current);
+  }
+  /** The team's facts, before any what-if. */
+  get baseValues() {
+    return this.#timingValues.current;
+  }
+
   /**
    * The Match timeline for the Autos shown together (lib/match/lanes.ts); null with fewer than two
    * or with Instant timing, where waits end at once and nothing is shared.
@@ -248,7 +271,7 @@ export class AutoState {
     return matchLanes(
       entries,
       list as PreviewResult[],
-      this.#timingValues.current,
+      this.matchValues,
       shown.map((overlay) => laneName(overlay.filePath)),
       shown.map((overlay) => overlay.color),
     );

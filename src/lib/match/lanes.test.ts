@@ -139,6 +139,57 @@ test("each robot's row holds its drives and steps in order", () => {
   assertEqual(lanes.span, 30);
 });
 
+test("a robot's own facts change only that robot", () => {
+  const pair = [entry(leftText), entry(rightText)];
+  const base = lanesOf(pair);
+  const slowRight = lanesOf([
+    pair[0],
+    { ...pair[1], own: { driveSpeed: 0.6 } },
+  ]);
+  // RIGHT drives slower: it finishes later. LEFT's own drives are the same length.
+  assert(
+    slowRight.robots[1].endTime > base.robots[1].endTime,
+    "the slow robot finishes later",
+  );
+  const driveTime = (lanes: typeof base) =>
+    lanes.robots[0].segments
+      .filter((s) => s.kind === "drive")
+      .reduce((sum, s) => sum + s.t1 - s.t0, 0);
+  assert(
+    Math.abs(driveTime(slowRight) - driveTime(base)) < 1e-6,
+    "the other robot drives as before",
+  );
+});
+
+test("a robot's hits per volley are its own: a robot that misses TIPs the HIVE later", () => {
+  const pair = [entry(leftText), entry(rightText)];
+  const base = lanesOf(pair);
+  // RIGHT lands only 1 POLLEN per volley: its preload volley (5 + 1) no longer TIPs the HIVE.
+  const misses = lanesOf([pair[0], { ...pair[1], own: { volleyLoad: 1 } }]);
+  assertEqual(base.robots[1].volleys[0].tip, 0);
+  assertEqual(misses.robots[1].volleys[0].tip, null);
+  assertEqual(misses.robots[1].volleys[0].load, values.startLoad + 1);
+});
+
+test("a no-show partner never volleys, so the wait for its TIP runs out", () => {
+  const pair = [entry(leftText), entry(rightText)];
+  const lanes = lanesOf([pair[0], { ...pair[1], still: true }]);
+  const right = lanes.robots[1];
+  assertEqual(right.still, true);
+  assertEqual(right.segments.length, 0);
+  assertEqual(right.volleys.length, 0);
+  const wait = lanes.robots[0].waits[0];
+  assertEqual(wait.ended, "time");
+});
+
+test("a trigger answered no: the wait runs to its limit", () => {
+  const pair = [entry(leftText), entry(rightText)];
+  const lanes = lanesOf([{ ...pair[0], scenario: { CellUp: false } }, pair[1]]);
+  const wait = lanes.robots[0].waits[0];
+  assertEqual(wait.ended, "time");
+  assertEqual(wait.branched, true);
+});
+
 test("a wait until a match-clock time is outlined to that time, not from when it began", () => {
   const left = entry(leftText);
   const wait = left.auto.cards.find((c) => c.kind === "firstOf")!;
