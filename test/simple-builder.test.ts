@@ -220,10 +220,10 @@ describe("the simple builder", () => {
     const end = motionPoseAt(run, back.t1)!;
     expect(end.x).toBeCloseTo(26.7, 6);
     expect(end.headingDeg).toBe(180);
-    // The dwell is the typical 1.1 s until the lane is full; the card's typical time in all
-    // (biobuzz AutoRegistration.PICK_FLOWER_TYPICAL_S), the rest split between the push and the
-    // back-out.
-    expect(dwell.t1 - dwell.t0).toBeCloseTo(1.1, 6);
+    // The dwell is FlowerPicker's 2 s cap (the slow pick the timing plans for); the card's typical
+    // time in all (biobuzz AutoRegistration.PICK_FLOWER_TYPICAL_S), the rest split between the
+    // push and the back-out.
+    expect(dwell.t1 - dwell.t0).toBeCloseTo(2, 6);
     expect(back.t1 - push.t0).toBeCloseTo(teamRegistry().typicalS!.PickFlower, 6);
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
