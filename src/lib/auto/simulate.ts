@@ -2,6 +2,7 @@ import type { BasePoint, StartPose, TimelineEvent } from "../../types";
 import {
   chainInfo,
   pointAlong,
+  timeAtFraction,
   type PathCatalog,
   type PathInfo,
 } from "./geometry";
@@ -15,7 +16,7 @@ import {
   rowLabel,
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
-import { pickFrom, pickMotions } from "../simple/flowers";
+import { LOWER_WITHIN_IN, pickFrom, pickMotions } from "../simple/flowers";
 import { gatherPlan } from "../simple/garden";
 import {
   DEFAULT_TIMEOUT_S,
@@ -453,7 +454,24 @@ export function simulateAuto(
     return runList(row.cards, guards, rowLabel(row));
   };
 
-  const runCard = (card: AutoCard, guards: Guard[]): Signal => {
+  /**
+   * Fork: the drive card right before a PickFlower card lowers the stick over its last
+   * LOWER_WITHIN_IN (biobuzz AutoKit pairs the two; FlowerPicker.approach), so the pick has no
+   * stick pause. `prev` is the card before this one in its list, as the robot pairs them: a card in
+   * between, or a block boundary, means no pairing. Returns when the stick went down on that
+   * drive, or null when the pick does not follow a drive that ran.
+   */
+  const stickDownOnDriveBefore = (prev: AutoCard | undefined): number | null => {
+    if (!prev || prev.kind !== "path") return null;
+    const drove = drives[drives.length - 1];
+    if (!drove || drove.cardId !== prev.id) return null;
+    const path = catalog.byId.get(drove.pathId);
+    if (!path) return null;
+    if (path.length <= LOWER_WITHIN_IN) return drove.t0;
+    return drove.t0 + timeAtFraction(path, 1 - LOWER_WITHIN_IN / path.length);
+  };
+
+  const runCard = (card: AutoCard, guards: Guard[], prev?: AutoCard): Signal => {
     ran.add(card.id);
     switch (card.kind) {
       case "action": {
@@ -480,9 +498,20 @@ export function simulateAuto(
         // its FLOWER's line if needed, push and back out, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
         const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
+        const stickDownAt = pick ? stickDownOnDriveBefore(prev) : null;
         if (gather) motions.push(...gather.motions);
         if (pick?.ok) {
-          motions.push(...pickMotions(card.id, { ...pos, headingDeg: heading }, pick, t, busy));
+          if (stickDownAt !== null) {
+            note(
+              `Stick down on the drive in, ${LOWER_WITHIN_IN} in from its end (the pick's wait is over when it starts)`,
+              "event",
+              card.id,
+              stickDownAt,
+            );
+          }
+          motions.push(
+            ...pickMotions(card.id, { ...pos, headingDeg: heading }, pick, t, busy, stickDownAt !== null),
+          );
         }
         stay(busy);
         // A pick that squared up ends on the FLOWER's line, where its push started.
@@ -675,7 +704,7 @@ export function simulateAuto(
       const signal =
         chain.length > 1
           ? runChain(chain, own?.parked ? outer : guards)
-          : runCard(card, guards);
+          : runCard(card, guards, list[i - 1]);
       if (signal) {
         if (signal.abortTo === own && own) {
           park(own);
