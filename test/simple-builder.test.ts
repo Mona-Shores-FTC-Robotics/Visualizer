@@ -11,7 +11,7 @@ import {
 } from "../src/io";
 import type { ProjectDoc } from "../src/io/project";
 import type { AutoCard } from "../src/lib/auto/types";
-import { TEAM_ROBOT } from "../src/lib/auto/teamRobot";
+import { TEAM_ROBOT, teamRegistry } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc, relink } from "../src/lib/auto/links";
 import { withSpotParks } from "../src/lib/simple/parkFrom";
@@ -220,10 +220,11 @@ describe("the simple builder", () => {
     const end = motionPoseAt(run, back.t1)!;
     expect(end.x).toBeCloseTo(26.7, 6);
     expect(end.headingDeg).toBe(180);
-    // The dwell is FlowerPicker's 2 s (its cap); the card's 4.5 s in all, the rest split between
-    // the push and the back-out.
-    expect(dwell.t1 - dwell.t0).toBeCloseTo(2, 6);
-    expect(back.t1 - push.t0).toBeCloseTo(4.5, 6);
+    // The dwell is the typical 1.1 s until the lane is full; the card's typical time in all
+    // (biobuzz AutoRegistration.PICK_FLOWER_TYPICAL_S), the rest split between the push and the
+    // back-out.
+    expect(dwell.t1 - dwell.t0).toBeCloseTo(1.1, 6);
+    expect(back.t1 - push.t0).toBeCloseTo(teamRegistry().typicalS!.PickFlower, 6);
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 

@@ -21,9 +21,9 @@
  *     FlowerPicker.approach, run by AutoKit for the path card right before a PickFlower card), so
  *     it is down by the time the card starts (3 Nov 2026);
  *   push: a path along the FLOWER's line to 12 in from its centre (contactStandoffIn);
- *   dwell: 2 s, the worst case: the robot's dwell ends by itself from the intake current, typically
- *     after 1.0-1.3 s, but runs to its cap (dwellMs, 2 s) while pieces keep trickling in, and an
- *     Auto's timing plans for that;
+ *   dwell: 1.1 s, until the lane is full (FlowerPicker.dwellEndsOnFull, 3 Nov 2026): in the 29 Oct
+ *     to 2 Nov logs the last piece came a median 0.64 s into the dwell and full latched 0.44 s
+ *     after it. A FLOWER that does not fill the lane dwells the whole cap (dwellMs, 2 s);
  *   back: a path straight back to where the push started. So a pick ends where it started.
  * A pick spot (approachStandoffIn, 24 in out, square to the FLOWER) is where the button lines up
  * to, and where the builder puts a spot clicked on a FLOWER's line.
@@ -76,9 +76,9 @@ const AT_APPROACH_DEG = 5;
 const STICK_ROOM_SLACK_IN = 0.5;
 /** The preview's time for a square-up that runs: a turn and a short slide, seconds. */
 const SQUARE_S = 0.6;
-/** FlowerPicker.stickDownMs, and dwellMs (the dwell's cap, its worst case), in seconds. */
+/** FlowerPicker.stickDownMs, and the typical dwell until the lane is full, in seconds. */
 const STICK_S = 0.7;
-const DWELL_S = 2.0;
+const DWELL_S = 1.1;
 
 const angleOff = (a: number, b: number) =>
   Math.abs(((a - b + 540) % 360) - 180);
