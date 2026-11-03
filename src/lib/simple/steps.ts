@@ -74,14 +74,22 @@ export interface Step {
 export type StepList = { waitCardId: string } | null;
 
 /**
- * Fork: what a Wait step can wait for, the robot's triggers (biobuzz AutoRegistration). Tip: our
- * HIVE has tipped since the wait began. LeftCellUp, RightCellUp: that CELL of our HIVE is up, as
- * our drive team sees it (already up when the wait starts ends it at once).
+ * Fork: what a Wait step waits for, the robot's triggers (biobuzz AutoRegistration). The one the
+ * builder offers is CellUp, shown as "Wait for TIP or CELL up" (mentor, 3 Nov 2026): the CELL the
+ * robot is aimed at is up, true at once if it already is, else once the camera sees it settle up
+ * after a TIP. The others are what older Autos were drawn with (Tip: our HIVE tipped since the
+ * wait began; LeftCellUp, RightCellUp: that CELL is up); a file that uses one still opens as a
+ * Wait step, but the dropdown no longer offers them.
  */
-export const WAIT_FOR: readonly { trigger: string; label: string }[] = [
-  { trigger: "Tip", label: "TIP" },
-  { trigger: "LeftCellUp", label: "Left CELL up" },
-  { trigger: "RightCellUp", label: "Right CELL up" },
+export const WAIT_FOR: readonly {
+  trigger: string;
+  label: string;
+  legacy?: boolean;
+}[] = [
+  { trigger: "CellUp", label: "TIP or CELL up" },
+  { trigger: "Tip", label: "TIP (since the wait began)", legacy: true },
+  { trigger: "LeftCellUp", label: "Left CELL up", legacy: true },
+  { trigger: "RightCellUp", label: "Right CELL up", legacy: true },
 ];
 /** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
 export const WAIT_DEFAULT_S = 7;
@@ -403,9 +411,9 @@ export function addStep(
       card = {
         id: makeCardId(),
         kind: "firstOf",
-        label: "Wait for TIP",
+        label: "Wait for TIP or CELL up",
         rows: [
-          { when: ["Tip"], cards: [] },
+          { when: ["CellUp"], cards: [] },
           { afterMs: WAIT_DEFAULT_S * 1000, cards: [] },
         ],
       };

@@ -126,9 +126,9 @@
     },
     {
       kind: "wait",
-      label: "Wait for TIP",
+      label: "Wait for TIP or CELL up",
       icon: Hourglass,
-      hint: "Wait here until our HIVE tips (or a CELL is up), at most a few seconds",
+      hint: "Wait here until the CELL in front of the robot is up (at once if it already is), at most a few seconds",
     },
     {
       kind: "park",
@@ -758,7 +758,7 @@
               }),
             )}
         >
-          {#each WAIT_FOR as w (w.trigger)}<option value={w.trigger}
+          {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option value={w.trigger}
               >{w.label}</option
             >{/each}
         </select>

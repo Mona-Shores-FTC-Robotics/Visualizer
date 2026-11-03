@@ -593,8 +593,8 @@ describe("the Wait for TIP step", () => {
     const step = stepsOf(doc)[1];
     expect(step).toMatchObject({
       kind: "wait",
-      label: "Wait for TIP",
-      waitFor: "Tip",
+      label: "Wait for TIP or CELL up",
+      waitFor: "CellUp",
       waitS: 7,
     });
     doc = setWait(doc, step.cardId, { waitFor: "LeftCellUp", seconds: 4.5 });
@@ -672,7 +672,7 @@ describe("a Wait step's Otherwise list", () => {
   it("reads back as a Wait step with its Otherwise steps, and stays Simple", () => {
     const doc = noTipFallback();
     const [wait, launch, park] = stepsOf(doc);
-    expect(wait).toMatchObject({ kind: "wait", waitFor: "Tip", waitS: 7 });
+    expect(wait).toMatchObject({ kind: "wait", waitFor: "CellUp", waitS: 7 });
     expect(wait.otherwise?.map((s) => s.label)).toEqual([
       "Drive to RIGHT_FIRE",
       "Launch all",
@@ -779,7 +779,7 @@ describe("a Wait step's Otherwise list", () => {
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (java.ok) {
-      expect(java.source).toContain('kit.when("Tip")');
+      expect(java.source).toContain('kit.when("CellUp")');
       expect(java.source).toMatch(
         /kit\.afterMs\(7000\)\.then\(\s*kit\.path\("to RIGHT_FIRE"/,
       );
@@ -938,7 +938,7 @@ describe("spinning the launcher up in Simple", () => {
     expect(card.kind === "firstOf" && card.alongside).toBe("SpinUp");
     expect(stepsOf(doc)[0]).toMatchObject({
       kind: "wait",
-      label: "Wait for TIP",
+      label: "Wait for TIP or CELL up",
       spinUp: true,
     });
     expect(isSimple(doc)).toBe(true);
@@ -980,7 +980,7 @@ describe("spinning the launcher up in Simple", () => {
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (java.ok) {
       expect(java.source).toContain('kit.command("SpinUp")');
-      expect(java.source).toContain('kit.when("Tip")');
+      expect(java.source).toContain('kit.when("CellUp")');
       expect(java.source).toContain("kit.afterMs(7000)");
     }
   });
