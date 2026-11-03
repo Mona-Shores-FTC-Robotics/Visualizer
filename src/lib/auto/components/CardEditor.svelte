@@ -339,7 +339,7 @@
         id="auto-firstof-label"
         class={FIELD_CLASS}
         value={card.label}
-        placeholder={isPlainWait(card) ? "Wait for LauncherReady" : "Did the HIVE tip?"}
+        placeholder={isPlainWait(card) ? "Wait for IntakeFull" : "Did the HIVE tip?"}
         oninput={(e) => edit((c) => { if (c.kind === "firstOf") c.label = e.currentTarget.value; }, false)}
         onchange={commitAuto}
       />
