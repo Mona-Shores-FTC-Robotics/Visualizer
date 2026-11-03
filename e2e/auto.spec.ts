@@ -214,7 +214,13 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
   await page.fill("#simple-spot-name", "wall pick");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await palette.getByRole("button", { name: "Pick flower" }).click();
-  await expect(steps.getByText("Drive to WALL_PICK")).toBeVisible();
+  await expect
+    .poll(() =>
+      steps
+        .getByLabel("Spot")
+        .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value)),
+    )
+    .toContain("WALL_PICK");
   await expect(steps.getByText("at the WALL FLOWER")).toBeVisible();
   await page.getByTitle("Undo").click();
   await expect(steps.getByText("Pick flower")).toHaveCount(0);
