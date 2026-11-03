@@ -147,8 +147,13 @@ interface RowCommon {
 
 /** The trigger fired. The file keeps a list for older files; it holds exactly one name. */
 export type WhenRow = RowCommon & { when: string[] };
-/** The wait's time limit passed. */
-export type AfterMsRow = RowCommon & { afterMs: number };
+/**
+ * The wait's time limit passed. Fork: `partnerWait` marks the one wait that waits on our partner's
+ * TIP; the export writes it as biobuzz AutoKit's `kit.partnerWait(ms)`, which ends at the match
+ * second the drive team sets in INIT (the partner's last shot plus the TIP lag), or at `afterMs`
+ * as drawn when none was entered.
+ */
+export type AfterMsRow = RowCommon & { afterMs: number; partnerWait?: true };
 
 export type AutoRow = WhenRow | AfterMsRow;
 

@@ -103,6 +103,7 @@ optional `label` (the branch's name; defaults to one made from the condition).
 |---|---|
 | `{"when": ["A"]}` | when the registered trigger is true (a list for older files; one name) |
 | `{"afterMs": 800}` | 800 ms after the card started |
+| `{"afterMs": 7000, "partnerWait": true}` | the **partner wait**: on the robot, at the match second the drive team sets in INIT (the partner's last shot plus biobuzz's `PARTNER_TIP_LAG_S`); with none entered, 7000 ms after the card started, as drawn. The editor's "Partner wait" box on a time row; one wait per Auto |
 
 Rules the editor enforces (errors block the Java export):
 
@@ -237,7 +238,8 @@ contract with the robot's `autokit` library:
   imported only when a piecewise heading is used;
 - the cards become one `kit.sequence(...)`; a `firstOf` becomes
   `kit.firstOf(label, rows...)`, or `kit.firstOf(label, kit.command(name), rows...)` with
-  `alongside`; a row with cards is `kit.when(...).then(...)` or `kit.afterMs(...).then(...)`;
+  `alongside`; a row with cards is `kit.when(...).then(...)` or `kit.afterMs(...).then(...)`, and a
+  time row marked `partnerWait` is `kit.partnerWait(ms)` in place of `kit.afterMs(ms)`;
 - a drive-through chain is one `kit.path("A → B → C", Paths.path(a, b, c))`;
 - the steps after a stop that a rejoin joins at are one local
   `Supplier<Command> after<Spot> = () -> kit.sequence(...)`, declared before the Auto and called

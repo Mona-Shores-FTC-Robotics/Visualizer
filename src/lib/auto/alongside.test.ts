@@ -65,3 +65,19 @@ test("the export runs the command alongside the wait", () => {
   if (!result.ok) return;
   assert(result.source.includes('kit.firstOf("Did the HIVE tip?", kit.command("ShootAll"),'), result.source);
 });
+
+test("a time row marked as the partner wait survives a save and reload, and exports as kit.partnerWait", () => {
+  const auto = sampleWith((card) => {
+    const row = card.rows.find((r) => "afterMs" in r)!;
+    (row as { partnerWait?: true }).partnerWait = true;
+  });
+  const { auto: reread, problems } = normalizeAuto(JSON.parse(JSON.stringify(serializeAuto(auto))));
+  assertEqual(problems, []);
+  const card = findCard(reread!.cards, "did-tip") as FirstOfCard;
+  const row = card.rows.find((r) => "afterMs" in r) as { afterMs: number; partnerWait?: true };
+  assertEqual(row.partnerWait, true);
+  const result = generateAutoJava({ ...loadSample(), auto: reread!, sourceFileName: "hive-rush.pp" });
+  assert(result.ok, JSON.stringify(result));
+  if (!result.ok) return;
+  assert(result.source.includes(`kit.partnerWait(${row.afterMs})`), result.source);
+});

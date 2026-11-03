@@ -120,6 +120,24 @@ test("the trunk is guarded when it holds a park card", () => {
   assert(source.includes('kit.path("CollectNear", collectNear, '), source);
 });
 
+test("a time row marked as the partner wait exports as kit.partnerWait", () => {
+  const auto = clone(loadSample().auto);
+  auto.cards = [
+    {
+      id: "w",
+      kind: "firstOf",
+      label: "Wait for TIP",
+      rows: [
+        { when: ["LauncherReady"], cards: [] },
+        { afterMs: 7000, partnerWait: true, cards: [] },
+      ],
+    },
+  ];
+  const source = sourceOf(auto);
+  assert(source.includes("kit.partnerWait(7000)"), source);
+  assert(!source.includes("kit.afterMs(7000)"), source);
+});
+
 test("a wait exports as a trigger row and a time row, each with its route", () => {
   const auto = clone(loadSample().auto);
   auto.cards = [

@@ -414,7 +414,11 @@ function normalizeRow(
     }
     return { ...common, when: names.slice(0, 1) };
   }
-  if (finite(raw.afterMs) && raw.afterMs >= 0) return { ...common, afterMs: raw.afterMs };
+  if (finite(raw.afterMs) && raw.afterMs >= 0) {
+    return raw.partnerWait === true
+      ? { ...common, afterMs: raw.afterMs, partnerWait: true }
+      : { ...common, afterMs: raw.afterMs };
+  }
   problems.push(`${where}: afterMs must be a number ≥ 0; dropped the row.`);
   return null;
 }

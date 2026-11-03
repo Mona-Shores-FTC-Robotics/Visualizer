@@ -408,6 +408,11 @@
                   oninput={(e) => editRow(rowIndex, (r) => { if ("afterMs" in r) r.afterMs = numberOr(e.currentTarget.value, r.afterMs); }, false)}
                   onchange={commitAuto} />
               </label>
+              <label class="col-span-2 flex items-center gap-2" title="The robot ends this wait at the partner's last shot plus the TIP lag, as the drive team enters it in INIT; with none entered, at the milliseconds above. One wait per Auto.">
+                <input type="checkbox" checked={(row as { partnerWait?: true }).partnerWait === true}
+                  onchange={(e) => editRow(rowIndex, (r) => { if ("afterMs" in r) { if (e.currentTarget.checked) r.partnerWait = true; else delete r.partnerWait; } })} />
+                <span class="text-body">Partner wait: ends at the partner's last shot + TIP lag</span>
+              </label>
             {/if}
           </div>
           {#if kind === "when"}

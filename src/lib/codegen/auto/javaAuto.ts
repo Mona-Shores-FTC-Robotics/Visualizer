@@ -569,7 +569,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const condition =
       "when" in row
         ? `kit.when(${row.when.map(javaString).join(", ")})`
-        : `kit.afterMs(${javaNumber(row.afterMs)})`;
+        : row.partnerWait
+          ? `kit.partnerWait(${javaNumber(row.afterMs)})`
+          : `kit.afterMs(${javaNumber(row.afterMs)})`;
     if (row.cards.length === 0) return condition;
     return {
       head: `${condition}.then`,
