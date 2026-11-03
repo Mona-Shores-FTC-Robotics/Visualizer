@@ -26,7 +26,6 @@ import { buildPathCatalog } from "../lib/auto/geometry";
 import { validateAuto } from "../lib/auto/validate";
 import {
   motionPoseAt,
-  simulateAuto,
   worstCase,
   type PreviewResult,
 } from "../lib/auto/simulate";
@@ -43,7 +42,7 @@ import {
 } from "../lib/team/teamSpots";
 import { editSpot, teamSpots, unlockedSpots } from "../lib/team/spotsStore";
 import { ladderInfo } from "../lib/ladder/compile";
-import { timingMode, timingValues } from "../lib/timing/store";
+import { timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
 import {
   cardTimes,
@@ -88,7 +87,6 @@ export class AutoState {
   #getSettings: () => Settings;
   #overlays: Overlays;
   #scenario = fromStore(previewScenario);
-  #timingMode = fromStore(timingMode);
   #timingValues = fromStore(timingValues);
   #selection = fromStore(selectedCardId);
   /** Fork: the team's spots and which are unlocked (lib/team/spotsStore.ts). */
@@ -125,29 +123,21 @@ export class AutoState {
       ? validateAuto(this.auto, this.catalog, this.#project.doc.startPoint)
       : [],
   );
-  /** The Auto being edited, previewed alone (its own volleys TIP the HIVE with Typical timing). */
+  /** The Auto being edited, previewed alone (its own volleys TIP the HIVE). */
   together = $derived.by(
     (): { previews: PreviewResult[]; tips: Tip[] } | null => {
       const auto = this.auto;
       const catalog = this.catalog;
       if (!auto || !catalog) return null;
       const doc = this.#project.doc;
-      if (this.#timingMode.current === "typical") {
-        // Alone, nothing models the partner's Auto, so a tip we wait for is
-        // taken to come; the plan view's good path depends on it.
-        return previewTogether(
-          [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
-          this.#timingValues.current,
-          true,
-          { tipsCome: true },
-        );
-      }
-      return {
-        previews: [
-          simulateAuto(auto, catalog, doc.startPoint, this.#scenario.current),
-        ],
-        tips: [],
-      };
+      // Alone, nothing models the partner's Auto, so a tip we wait for is
+      // taken to come; the plan view's good path depends on it.
+      return previewTogether(
+        [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
+        this.#timingValues.current,
+        true,
+        { tipsCome: true },
+      );
     },
   );
   preview = $derived(this.together?.previews[0] ?? null);
@@ -204,7 +194,7 @@ export class AutoState {
   });
 
   /**
-   * The overlays' Autos previewed together: with Typical timing their volleys
+   * The overlays' Autos previewed together: their volleys
    * share one HIVE, so one robot's wait for its CELL ends on the other's TIP.
    */
   overlayTogether = $derived.by(() => {
@@ -225,25 +215,11 @@ export class AutoState {
     );
     let tips: Tip[] = [];
     try {
-      if (this.#timingMode.current === "typical") {
-        const together = previewTogether(entries, this.matchValues);
-        tips = together.tips;
-        together.previews.forEach((preview, i) =>
-          previews.set(withAuto[i], preview),
-        );
-      } else {
-        entries.forEach((entry, i) =>
-          previews.set(
-            withAuto[i],
-            simulateAuto(
-              entry.auto,
-              buildPathCatalog(entry.startPoint, entry.lines, entry.settings),
-              entry.startPoint,
-              entry.scenario,
-            ),
-          ),
-        );
-      }
+      const together = previewTogether(entries, this.matchValues);
+      tips = together.tips;
+      together.previews.forEach((preview, i) =>
+        previews.set(withAuto[i], preview),
+      );
     } catch (error) {
       console.error("Could not preview the shown Autos:", error);
     }
@@ -260,12 +236,33 @@ export class AutoState {
   }
 
   /**
-   * The Match timeline for the Autos shown together (lib/match/lanes.ts); null with fewer than two
-   * or with Instant timing, where waits end at once and nothing is shared.
+   * The Match timeline for the Autos shown together (lib/match/lanes.ts); null with fewer than two.
    */
+  /** The Match view's robots, as its what-ifs name them: `matchRobots[i]` is the i-th Auto shown. */
+  matchRobots = $derived(
+    this.overlayTogether.shown.map((overlay, i) => ({
+      file: overlay.filePath,
+      name: this.matchLanes?.robots[i]?.name ?? overlay.filePath,
+      color: overlay.color,
+      auto: overlay.doc.auto!,
+    })),
+  );
+  /**
+   * Fork: two Autos in the Match view with its what-ifs on: each robot's sliders take a side panel
+   * (ours on the left, the other on the right), in place of the builder and the path inspector.
+   */
+  matchSides = $derived.by(
+    () =>
+      this.#overlays.active &&
+      this.matchTimeline &&
+      this.matchControls &&
+      this.matchLanes !== null &&
+      this.overlayTogether.shown.length === 2,
+  );
+
   matchLanes = $derived.by((): MatchLanes | null => {
     const { previews, entries, shown } = this.overlayTogether;
-    if (shown.length < 2 || this.#timingMode.current !== "typical") return null;
+    if (shown.length < 2) return null;
     const list = shown.map((overlay) => previews.get(overlay));
     if (list.some((p) => !p)) return null;
     return matchLanes(
@@ -478,14 +475,12 @@ export class AutoState {
     if (!auto || !catalog || !plan) return [];
     const doc = this.#project.doc;
     const run = (scenario: Record<string, boolean>) =>
-      this.#timingMode.current === "typical"
-        ? previewTogether(
-            [this.#entry(doc, this.#getSettings(), scenario)],
-            this.#timingValues.current,
-            false,
-            { tipsCome: true },
-          ).previews[0]
-        : simulateAuto(auto, catalog, doc.startPoint, scenario);
+      previewTogether(
+        [this.#entry(doc, this.#getSettings(), scenario)],
+        this.#timingValues.current,
+        false,
+        { tipsCome: true },
+      ).previews[0];
     return [
       { label: "Every tip comes", step: null, k: 0, preview: run(GOOD_PATH) },
       ...plan.branches.flatMap((step) => {

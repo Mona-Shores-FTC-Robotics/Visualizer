@@ -3,6 +3,9 @@
    * The Match view's controls: the first Auto's facts on the left, the HIVE's in the middle, the
    * others' on the right, as they sit on the timeline. What-ifs for this look only
    * (controls.svelte.ts): the team's facts are never changed from here.
+   *
+   * Fork: with two Autos, each robot's sliders go in a side panel (`show` is its index) and only
+   * the What-if bar and the HIVE stay under the field (`show="middle"`); with more, `show="all"`.
    */
   import type { AutoSection } from "../auto/types";
   import { previewQuestions } from "../auto/simulate";
@@ -17,7 +20,8 @@
   } from "./controls.svelte";
   import { checkboxClass, labelClass } from "../components/ui/styles";
   import type { FieldEntry } from "../timing/together";
-  import { knobBreaks, type Knob, type KnobBreaks } from "./breakpoints";
+  import { knobBreaks, type Knob } from "./breakpoints";
+  import { tipping } from "./tipping.svelte";
 
   interface RobotInfo {
     file: string;
@@ -35,31 +39,35 @@
     entries: FieldEntry[];
     /** The shared facts previewed now (the team's, with the HIVE what-ifs). */
     values: TimingValues;
+    /** Every panel, the What-if bar and the HIVE only, or one robot's panel by index. */
+    show?: "all" | "middle" | number;
   }
 
-  let { robots, controls, base, entries, values }: Props = $props();
+  let {
+    robots,
+    controls,
+    base,
+    entries,
+    values,
+    show: part = "all",
+  }: Props = $props();
 
-  /** Tipping points found for the what-ifs as they are now, by slider. */
-  let ticks = $state<Record<string, KnobBreaks>>({});
-  let searching = $state(false);
-  let searched = $state(false);
-  /** Bumped by every change, so a search that is overtaken stops. */
-  let generation = 0;
   const keyOf = (knob: Knob) => `${knob.robot ?? "hive"}:${knob.id}`;
+  /** In a side panel: each slider under its name, so it fits a narrow panel. */
+  let stacked = $derived(typeof part === "number");
+  /** The panel that runs the search also clears it; a robot's panel only reads it. */
+  let searches = $derived(typeof part !== "number");
 
   // Any change to what is previewed makes the ticks stale.
   $effect(() => {
     void entries;
     void values;
-    generation += 1;
-    ticks = {};
-    searched = false;
-    searching = false;
+    if (searches) tipping.clear();
   });
 
   /** Searches every slider, one per tick of the clock, so the page stays live. */
   function findTicks() {
-    const run = ++generation;
+    const run = ++tipping.generation;
     const names = robots.map((r) => r.name);
     const knobs: Knob[] = [
       ...HIVE_FACT_LIST.map((f): Knob => ({ robot: null, id: f.id })),
@@ -70,13 +78,13 @@
       ),
     ];
     const snapshot = { entries, values };
-    ticks = {};
-    searching = true;
+    tipping.ticks = {};
+    tipping.searching = true;
     const step = (i: number) => {
-      if (run !== generation) return;
+      if (run !== tipping.generation) return;
       if (i >= knobs.length) {
-        searching = false;
-        searched = true;
+        tipping.searching = false;
+        tipping.searched = true;
         return;
       }
       try {
@@ -86,7 +94,7 @@
           knobs[i],
           names,
         );
-        ticks = { ...ticks, [keyOf(knobs[i])]: found };
+        tipping.ticks = { ...tipping.ticks, [keyOf(knobs[i])]: found };
       } catch (error) {
         console.error("Tipping point search failed:", error);
       }
@@ -100,8 +108,8 @@
     ((v - fact.range[0]) / (fact.range[1] - fact.range[0])) * 100;
 
   let width = $state(900);
-  /** Narrow: one panel at a time, picked by tab. */
-  let narrow = $derived(width < 720);
+  /** Narrow: one panel at a time, picked by tab (only when every panel is here). */
+  let narrow = $derived(part === "all" && width < 720);
   let tab = $state<string>("hive");
 
   /** Short names for the sliders; FACTS' labels say it in full, in the tooltip. */
@@ -169,9 +177,14 @@
   set: (v: number | null) => void,
   knob: Knob,
 )}
-  {@const found = ticks[keyOf(knob)]}
+  {@const found = tipping.ticks[keyOf(knob)]}
   <label
-    class="grid grid-cols-[6.5rem_1fr_3.5rem] items-center gap-2 text-[11px]"
+    class={[
+      "grid items-center text-[11px]",
+      stacked
+        ? "grid-cols-[1fr_auto] gap-x-2 gap-y-0.5"
+        : "grid-cols-[6.5rem_1fr_3.5rem] gap-2",
+    ]}
     title={`${fact.label}. Times: ${fact.times}. Team value ${show(fact, base[fact.id])}.`}
   >
     <span
@@ -179,7 +192,7 @@
     >
       {SHORT[fact.id] ?? fact.label}
     </span>
-    <span class="relative block">
+    <span class={["relative block", stacked && "col-span-2 row-start-2"]}>
       <input
         type="range"
         class="w-full accent-primary"
@@ -224,7 +237,10 @@
     </span>
     {#if found && (found.down || found.up)}
       <span
-        class="col-span-3 -mt-0.5 truncate text-[10px] text-warning"
+        class={[
+          "-mt-0.5 truncate text-[10px] text-warning",
+          stacked ? "col-span-2" : "col-span-3",
+        ]}
         title={[found.down, found.up]
           .filter((t) => t)
           .map((t) => `${show(fact, t!.value)}: ${t!.change}`)
@@ -319,108 +335,116 @@
   </section>
 {/snippet}
 
-{#snippet hivePanel()}
+{#snippet hivePanel(wide: boolean)}
   <section
     class="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-base/60 p-2"
   >
     <header class="text-xs font-semibold text-heading">
       HIVE <span class="font-normal text-body">· shared</span>
     </header>
-    {#each HIVE_FACT_LIST as fact (fact.id)}
-      {@render slider(
-        fact,
-        hiveValue(fact),
-        controls.hive[fact.id] !== undefined,
-        (v) => controls.setHive(fact.id, v),
-        { robot: null, id: fact.id },
-      )}
-    {/each}
+    <div class={wide ? "grid grid-cols-2 gap-x-6 gap-y-1.5" : "contents"}>
+      {#each HIVE_FACT_LIST as fact (fact.id)}
+        {@render slider(
+          fact,
+          hiveValue(fact),
+          controls.hive[fact.id] !== undefined,
+          (v) => controls.setHive(fact.id, v),
+          { robot: null, id: fact.id },
+        )}
+      {/each}
+    </div>
     <p class="mt-auto text-[10px] text-body">
       What-ifs for this look only. The team's facts are in Timing → Facts.
     </p>
   </section>
 {/snippet}
 
-<div class="flex flex-col gap-2" bind:clientWidth={width}>
-  <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-    <span class={labelClass}>What if</span>
-    {#each MATCH_PRESETS as preset (preset.id)}
-      <button
-        type="button"
-        class={[
-          "rounded-md border px-2 py-0.5 transition",
-          controls.preset === preset.id
-            ? "border-primary bg-primary/15 text-heading"
-            : "border-border text-body hover:text-heading",
-        ]}
-        title={preset.title}
-        onclick={() =>
-          controls.apply(
-            preset,
-            robots.map((r) => r.file),
-            base,
-          )}>{preset.label}</button
-      >
-    {/each}
-    <button
-      type="button"
-      class="ml-auto rounded-md border border-warning/60 px-2 py-0.5 text-heading hover:bg-warning/10 disabled:opacity-50"
-      disabled={searching}
-      title="For every slider, the nearest value up and down where the match comes out differently: TIPs by 30 s, how a wait ends, or the endgame guard parking a robot. Marked on the slider; everything else held where it is."
-      onclick={findTicks}
-      >{searching
-        ? `Searching… ${Object.keys(ticks).length}`
-        : searched
-          ? "Tipping points ✓"
-          : "Find tipping points"}</button
-    >
-    <button
-      type="button"
-      class="rounded-md border border-border px-2 py-0.5 text-body hover:text-heading disabled:opacity-40"
-      disabled={!controls.changed}
-      title="Back to the team's timing.json, every trigger coming and every robot moving"
-      onclick={() => controls.reset()}>Team values</button
-    >
-  </div>
-  {#if narrow}
-    <div class="flex gap-1 text-[11px]" role="tablist">
-      {#each [...first.map( (r) => ({ key: r.file, label: r.name, color: r.color }) ), { key: "hive", label: "HIVE", color: "" }, ...rest.map( (r) => ({ key: r.file, label: r.name, color: r.color }) )] as t (t.key)}
+{#if typeof part === "number"}
+  {#if robots[part]}{@render robotPanel(robots[part])}{/if}
+{:else}
+  <div class="flex flex-col gap-2" bind:clientWidth={width}>
+    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span class={labelClass}>What if</span>
+      {#each MATCH_PRESETS as preset (preset.id)}
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === t.key}
           class={[
-            "flex min-w-0 items-center gap-1 rounded-md border px-2 py-0.5",
-            tab === t.key
+            "rounded-md border px-2 py-0.5 transition",
+            controls.preset === preset.id
               ? "border-primary bg-primary/15 text-heading"
-              : "border-border text-body",
+              : "border-border text-body hover:text-heading",
           ]}
-          onclick={() => (tab = t.key)}
+          title={preset.title}
+          onclick={() =>
+            controls.apply(
+              preset,
+              robots.map((r) => r.file),
+              base,
+            )}>{preset.label}</button
         >
-          {#if t.color}<span
-              class="inline-block size-2 shrink-0 rounded-full"
-              style={`background: ${t.color}`}
-            ></span>{/if}
-          <span class="truncate">{t.label}</span>
-        </button>
       {/each}
+      <button
+        type="button"
+        class="ml-auto rounded-md border border-warning/60 px-2 py-0.5 text-heading hover:bg-warning/10 disabled:opacity-50"
+        disabled={tipping.searching}
+        title="For every slider, the nearest value up and down where the match comes out differently: TIPs by 30 s, how a wait ends, or the endgame guard parking a robot. Marked on the slider; everything else held where it is."
+        onclick={findTicks}
+        >{tipping.searching
+          ? `Searching… ${Object.keys(tipping.ticks).length}`
+          : tipping.searched
+            ? "Tipping points ✓"
+            : "Find tipping points"}</button
+      >
+      <button
+        type="button"
+        class="rounded-md border border-border px-2 py-0.5 text-body hover:text-heading disabled:opacity-40"
+        disabled={!controls.changed}
+        title="Back to the team's timing.json, every trigger coming and every robot moving"
+        onclick={() => controls.reset()}>Team values</button
+      >
     </div>
-    {#if tab === "hive" || !robots.some((r) => r.file === tab)}
-      {@render hivePanel()}
+    {#if part === "middle"}
+      {@render hivePanel(true)}
+    {:else if narrow}
+      <div class="flex gap-1 text-[11px]" role="tablist">
+        {#each [...first.map( (r) => ({ key: r.file, label: r.name, color: r.color }) ), { key: "hive", label: "HIVE", color: "" }, ...rest.map( (r) => ({ key: r.file, label: r.name, color: r.color }) )] as t (t.key)}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            class={[
+              "flex min-w-0 items-center gap-1 rounded-md border px-2 py-0.5",
+              tab === t.key
+                ? "border-primary bg-primary/15 text-heading"
+                : "border-border text-body",
+            ]}
+            onclick={() => (tab = t.key)}
+          >
+            {#if t.color}<span
+                class="inline-block size-2 shrink-0 rounded-full"
+                style={`background: ${t.color}`}
+              ></span>{/if}
+            <span class="truncate">{t.label}</span>
+          </button>
+        {/each}
+      </div>
+      {#if tab === "hive" || !robots.some((r) => r.file === tab)}
+        {@render hivePanel(false)}
+      {:else}
+        {#each robots.filter((r) => r.file === tab) as robot (robot.file)}
+          {@render robotPanel(robot)}
+        {/each}
+      {/if}
     {:else}
-      {#each robots.filter((r) => r.file === tab) as robot (robot.file)}
-        {@render robotPanel(robot)}
-      {/each}
+      <div class="grid grid-cols-3 gap-2">
+        {#each first as robot (robot.file)}
+          {@render robotPanel(robot)}
+        {/each}
+        {@render hivePanel(false)}
+        {#each rest as robot (robot.file)}
+          {@render robotPanel(robot)}
+        {/each}
+      </div>
     {/if}
-  {:else}
-    <div class="grid grid-cols-3 gap-2">
-      {#each first as robot (robot.file)}
-        {@render robotPanel(robot)}
-      {/each}
-      {@render hivePanel()}
-      {#each rest as robot (robot.file)}
-        {@render robotPanel(robot)}
-      {/each}
-    </div>
-  {/if}
-</div>
+  </div>
+{/if}

@@ -4,7 +4,6 @@
    * Auto waits on, the timing model, and whether to draw the other branches.
    */
   import { previewScenario } from "../lib/auto/store";
-  import { timingMode } from "../lib/timing/store";
   import AutoPreviewSwitches from "../lib/auto/components/AutoPreviewSwitches.svelte";
   import TimingControl from "../lib/timing/TimingControl.svelte";
   import { checkboxClass, labelClass } from "../lib/components/ui/styles";
@@ -56,10 +55,7 @@
       />
       Other branches
     </label>
-    {#if auto.overlayTogether.shown.length >= 2 && $timingMode !== "typical"}
-      <!-- The match timeline and its what-ifs need real times (auto.svelte.ts matchLanes). -->
-      <span class={labelClass}>Match timeline: set Timing to Typical</span>
-    {:else if auto.overlayTogether.shown.length >= 2}
+    {#if auto.overlayTogether.shown.length >= 2}
       <label
         class={[labelClass, "flex items-center gap-1.5"]}
         title="Under the field: what each Auto does when, the HIVE between them, and which volley's TIP ends which wait"

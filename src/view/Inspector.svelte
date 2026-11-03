@@ -9,6 +9,8 @@
   import ObstacleInspector from "./inspector/ObstacleInspector.svelte";
   import PathInspector from "./inspector/PathInspector.svelte";
   import SelectionInspector from "./inspector/SelectionInspector.svelte";
+  import { useAuto } from "../state/auto.svelte";
+  import MatchSide from "../lib/match/MatchSide.svelte";
 
   interface Props {
     prefs: Prefs;
@@ -19,21 +21,25 @@
   let { prefs, hidden = false, onHide }: Props = $props();
 
   const editor = useEditor();
+  const auto = useAuto();
 
   let selectedGroup = $derived(
     editor.selectedPath?.kind === "compound" ? editor.selectedPath : null,
   );
   let several = $derived(editor.selectedPathIds.length > 1);
   let title = $derived(
-    editor.selectedShape
-      ? "Obstacle"
-      : several
-        ? "Selection"
-        : selectedGroup
-          ? "Group"
-          : editor.selectedLine
-            ? "Path"
-            : "Project",
+    // Fork: in the Match view with two Autos, the right panel is the second robot's what-ifs.
+    auto.matchSides
+      ? "Match"
+      : editor.selectedShape
+        ? "Obstacle"
+        : several
+          ? "Selection"
+          : selectedGroup
+            ? "Group"
+            : editor.selectedLine
+              ? "Path"
+              : "Project",
   );
 </script>
 
@@ -53,7 +59,9 @@
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto px-1 pb-1">
-    {#if editor.selectedShape}
+    {#if auto.matchSides}
+      <MatchSide index={1} />
+    {:else if editor.selectedShape}
       <ObstacleInspector shape={editor.selectedShape} />
     {:else if several}
       <SelectionInspector />
