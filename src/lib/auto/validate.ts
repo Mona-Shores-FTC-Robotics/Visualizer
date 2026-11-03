@@ -1,7 +1,7 @@
 import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { rowKind, type AutoCard, type AutoSection, type PathCard } from "./types";
-import { allCards, rejoinTail } from "./tree";
+import { allCards, parkSpots, rejoinTail } from "./tree";
 import { isUsed, pointUses } from "./pins";
 
 export type IssueLevel = "error" | "warning";
@@ -171,6 +171,17 @@ export function validateAuto(
         `${card.kind === "firstOf" && card.label ? card.label : "This wait"} is marked as the partner wait, but another wait already is: an Auto has one.`,
       ),
     );
+  for (const card of allCards(auto.cards)) {
+    if (
+      card.kind === "firstOf" &&
+      card.partnerWait &&
+      card.rows.some((row) => "afterMs" in row && row.matchClock)
+    )
+      error(
+        card.id,
+        `${card.label || "This wait"} is the partner wait, so its time limit counts from when the wait starts, not the match clock.`,
+      );
+  }
 
   for (const [name, point] of Object.entries(auto.points)) {
     if (!/^[A-Za-z][A-Za-z0-9 _-]*$/.test(name)) {
@@ -178,6 +189,27 @@ export function validateAuto(
     }
     if (!point.every(Number.isFinite)) error(null, `Point "${name}" has a coordinate that is not a number.`);
   }
+  // Fork: what the drive team may change in INIT (types.ts parkChoices, AfterMsRow.adjustable).
+  if (auto.parkChoices?.length) {
+    const drawn = parkSpots(auto, catalog);
+    if (drawn.size === 0)
+      error(null, "The Auto offers other parks in INIT but has no park step.");
+    else if (drawn.size > 1)
+      error(null, `The Auto offers other parks in INIT, but its parks end on different spots (${[...drawn].join(", ")}).`);
+    for (const name of auto.parkChoices) {
+      if (!auto.points[name]) error(null, `The park offered in INIT, ${name}, is not one of this Auto's spots.`);
+      else if (drawn.has(name)) error(null, `${name} is the park step's own spot; offer another one in INIT.`);
+    }
+  }
+  const adjustable = allCards(auto.cards).filter(
+    (card) =>
+      card.kind === "firstOf" &&
+      card.rows.some((row) => "afterMs" in row && row.adjustable),
+  );
+  if (adjustable.length > 1)
+    for (const card of adjustable)
+      error(card.id, "Only one wait per Auto can be changed in INIT (the D-pad's up and down).");
+
   const uses = pointUses(auto);
   for (const name of Object.keys(auto.points)) {
     if (!isUsed(uses.get(name))) {

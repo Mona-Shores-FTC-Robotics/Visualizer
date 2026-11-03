@@ -10,7 +10,11 @@ import type {
   PathExpr,
   PoseDecl,
 } from "../types";
-import { buildPathCatalog, type PathCatalog } from "../../auto/geometry";
+import {
+  buildPathCatalog,
+  withEndAt,
+  type PathCatalog,
+} from "../../auto/geometry";
 import { parkSeconds } from "../../auto/simulate";
 import { validateAuto } from "../../auto/validate";
 import { relink } from "../../auto/links";
@@ -20,6 +24,8 @@ import {
   isPlainWait,
   listLabel,
   locateCard,
+  parkLineIds,
+  parkSpots,
   rejoinTail,
   parkCardOf,
   rowLabel,
@@ -373,6 +379,34 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   }
   const usedIndices = [...referenced].sort((a, b) => a - b);
 
+  // Fork: the PARK spot the drive team may change in INIT (types.ts parkChoices). Every park
+  // path ends on the picked one, and the guard reserves that one's time.
+  const drawnPark = [...parkSpots(auto, catalog)][0];
+  const parkChoices = drawnPark
+    ? (auto.parkChoices ?? []).filter(
+        (name) => name !== drawnPark && auto.points[name],
+      )
+    : [];
+  const parkIds = parkChoices.length ? parkLineIds(auto) : new Set<string>();
+  const parkVar = parkChoices.length ? names.take("park") : null;
+  /** A park line's seconds with its end moved to each choice, the drawing's first. */
+  const parkChoiceSeconds = (lineId: string): number[] => {
+    const drawn = catalog.byId.get(lineId)!.seconds;
+    return [
+      drawn,
+      ...parkChoices.map((name) => {
+        const [x, y] = auto.points[name];
+        const moved = lines.map((line) =>
+          line.id === lineId ? withEndAt(line, x, y) : line,
+        );
+        return (
+          buildPathCatalog(startPoint, moved, settings).byId.get(lineId)
+            ?.seconds ?? drawn
+        );
+      }),
+    ];
+  };
+
   const usedVars = new Set<string>();
   const headingVars = new Set<string>();
   usedIndices.forEach((index) =>
@@ -429,7 +463,14 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const varName = names.take(names.has(base) ? `${base}Path` : base);
     pathVars.set(index, varName);
     const decl = model.paths[index];
-    const expression = renameExpr(decl.expression, renamePose);
+    let expression = renameExpr(decl.expression, renamePose);
+    if (parkVar && parkIds.has(info.id)) {
+      // Ends on the park the drive team picked, whichever spot that is.
+      const end = lastEndVar(expression);
+      expression = renameExpr(expression, (name) =>
+        name === end ? parkVar : name,
+      );
+    }
     if (usesPiecewise(expression)) usesInterpolator = true;
     const note = decl.note ? `        // ${decl.note}\n` : "";
     pathDecls.push(
@@ -441,11 +482,25 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const info = catalog.byId.get(lineId)!;
     return { info, varName: pathVars.get(info.index)! };
   };
+  /** A park path's seconds: a number, or the drive team's pick of one per park choice. */
+  const parkSecondsOf = (lineId: string): string => {
+    if (!parkIds.has(lineId))
+      return javaNumber(parkSeconds(catalog.byId.get(lineId)!.seconds));
+    const each = parkChoiceSeconds(lineId).map((s) =>
+      javaDouble(parkSeconds(s)),
+    );
+    return `kit.pick(AutoOption.PARK, ${each.join(", ")})`;
+  };
   // Fork: each drive carries its time, so the endgame guard does not set off on one that it and
   // the park after it no longer fit (biobuzz AutoKit.path(label, path, seconds)).
   const pathNode = (lineId: string): JNode => {
     const { info, varName } = pathOf(lineId);
-    return `kit.path(${javaString(info.name)}, ${varName}, ${javaNumber(parkSeconds(info.seconds))})`;
+    // The drive to the park says which park it drives to, in the trace and the match log.
+    const label =
+      parkIds.has(lineId) && info.name === `to ${drawnPark}`
+        ? `kit.pick(AutoOption.PARK, ${[drawnPark!, ...parkChoices].map((name) => javaString(`to ${name}`)).join(", ")})`
+        : javaString(info.name);
+    return `kit.path(${label}, ${varName}, ${parkSecondsOf(lineId)})`;
   };
   /** A drive-through chain: one Pedro path, so the robot does not stop between them. */
   const chainNode = (lineIds: string[]): JNode => {
@@ -467,7 +522,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         if (parkId && catalog.byId.has(parkId)) {
           const { info, varName } = pathOf(card.lineId);
           const park = pathOf(parkId);
-          return `kit.path(${javaString(info.name)}, ${varName}, ${javaNumber(parkSeconds(info.seconds))}, ${park.varName}, ${javaNumber(parkSeconds(park.info.seconds))})`;
+          return `kit.path(${javaString(info.name)}, ${varName}, ${parkSecondsOf(card.lineId)}, ${park.varName}, ${parkSecondsOf(parkId)})`;
         }
         return pathNode(card.lineId);
       }
@@ -480,7 +535,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
                 `kit.command(${javaString(card.alongside)})`,
               ]
             : [javaString(firstOfLabel(card))],
-          children: card.rows.map((r) => rowNode(r, card.partnerWait === true)),
+          children: card.rows.map((row) => rowNode(row, card)),
         };
       case "rejoin": {
         // Joining a drive-through: one Pedro path on through the rest of its chain.
@@ -551,29 +606,29 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     }
     const park = parkCardOf(list);
     if (!park) return nodes;
-    const { info, varName } = pathOf(park.lineId);
+    const { varName } = pathOf(park.lineId);
     return [
       {
         head: "kit.guarded",
-        args: [
-          javaString(label),
-          varName,
-          javaNumber(parkSeconds(info.seconds)),
-        ],
+        args: [javaString(label), varName, parkSecondsOf(park.lineId)],
         children: nodes,
       },
     ];
   };
 
-  const rowNode = (row: AutoRow, partnerWait = false): JNode => {
+  const rowNode = (row: AutoRow, card: FirstOfCard): JNode => {
     // The partner wait's time limit is set from the drive team's "partner's last preload leaves at N s"
     // (biobuzz AutoKit.partnerWaitMs); the card's own time stays in the Java as the default.
     const condition =
       "when" in row
         ? `kit.when(${row.when.map(javaString).join(", ")})`
-        : partnerWait
-          ? `kit.afterMs(kit.partnerWaitMs(${javaNumber(row.afterMs)}))`
-          : `kit.afterMs(${javaNumber(row.afterMs)})`;
+        : !row.matchClock
+          ? card.partnerWait
+            ? `kit.afterMs(kit.partnerWaitMs(${javaNumber(row.afterMs)}))`
+            : `kit.afterMs(${javaNumber(row.afterMs)})`
+          : row.adjustable
+            ? `kit.atMatchSeconds(kit.seconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)}))`
+            : `kit.atMatchSeconds(${javaNumber(row.afterMs / 1000)})`;
     if (row.cards.length === 0) return condition;
     return {
       head: `${condition}.then`,
@@ -583,6 +638,21 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   };
 
   const used = usedNames(auto);
+
+  // Fork: what the drive team may change in INIT (biobuzz AutoOption), the drawing's first.
+  const options: string[] = [];
+  if (parkVar)
+    options.push(
+      `AutoOption.park(${[drawnPark!, ...parkChoices].map(javaString).join(", ")})`,
+    );
+  for (const card of cards) {
+    if (card.kind !== "firstOf") continue;
+    for (const row of card.rows)
+      if ("afterMs" in row && row.matchClock && row.adjustable)
+        options.push(
+          `AutoOption.matchSeconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)})`,
+        );
+  }
   const sortedList = (values: Iterable<string>) =>
     `{${[...new Set(values)].sort().map(javaString).join(", ")}}`;
 
@@ -599,7 +669,12 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   if (usesInterpolator)
     out.push("import com.pedropathing.paths.interpolator.Interpolator;");
   if (tailDecls.length > 0) out.push("", "import java.util.function.Supplier;");
-  out.push("", "import org.firstinspires.ftc.teamcode.autokit.AutoKit;", "");
+  out.push(
+    "",
+    "import org.firstinspires.ftc.teamcode.autokit.AutoKit;",
+    "import org.firstinspires.ftc.teamcode.autokit.AutoOption;",
+    "",
+  );
   out.push(
     "/**",
     ` * Generated by the Auto Builder from ${javadocSafe(sourceFileName)}. Do not edit: change the .pp and export again.`,
@@ -622,6 +697,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     "",
     '    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */',
     `    public static final String DRAWN_FOR = ${javaString(auto.drawnFor)};`,
+    "",
+    "    /** What the drive team may change during INIT, on gamepad 1's D-pad; nothing changed, the Auto runs as drawn. */",
+    `    public static final AutoOption[] OPTIONS = {${options.join(", ")}};`,
     "",
     "    /** Where the robot starts, for the given alliance. */",
     "    public static Pose startPose(boolean rotated) {",
@@ -646,6 +724,13 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       out.push(
         `        Pose ${varName} = ${pose(point[0], point[1], point[2] ?? 0)};`,
       ),
+    );
+  }
+  if (parkVar) {
+    out.push(
+      "",
+      `        // The park the drive team picked in INIT (OPTIONS); ${javadocSafe(drawnPark!)} as drawn.`,
+      `        Pose ${parkVar} = kit.pick(AutoOption.PARK, ${[drawnPark!, ...parkChoices].map((name) => pointVars.get(name)!).join(", ")});`,
     );
   }
   if (poseDecls.length > 0) {
@@ -711,6 +796,19 @@ export function firstOfLabel(card: FirstOfCard): string {
     return when ? `Wait for ${when.when.join(" or ")}` : "Wait";
   }
   return "Decision";
+}
+
+/** A Java double literal, so a list of them never mixes `1` with `2.2`. */
+function javaDouble(value: number): string {
+  const text = javaNumber(value);
+  return /[.eE]/.test(text) ? text : `${text}.0`;
+}
+
+/** The pose variable a path expression ends on: its last segment's end. */
+function lastEndVar(expr: PathExpr): string {
+  return expr.kind === "group"
+    ? lastEndVar(expr.children[expr.children.length - 1])
+    : expr.endPoseVar;
 }
 
 /**

@@ -75,7 +75,10 @@
       step.condition && NOT_SENSED_YET.includes(step.condition)
         ? " · timed on the robot for now"
         : "";
-    return `${until}${until ? ", " : ""}up to ${step.limitS} s${notYet}`;
+    const limit = step.limitOnMatchClock
+      ? `until ${step.limitS} s on the match clock`
+      : `up to ${step.limitS} s`;
+    return `${until}${until ? ", " : ""}${limit}${notYet}`;
   }
 
   const seconds = (step: PlanStep) => {

@@ -14,7 +14,8 @@ import type { AtomicPath } from "../../types";
 import { createSegment } from "../../utils/normalize";
 import type { PathCatalog } from "../auto/geometry";
 import { commandSeconds } from "../auto/simulate";
-import { isSimple } from "./steps";
+import { isSimple, unfold } from "./steps";
+import { timeRowFiresAt, type AutoCard, type AutoSection } from "../auto/types";
 
 /** A spot's park, for the builder: the path card it parks after, the path, and when it leaves. */
 export interface SpotPark {
@@ -34,15 +35,18 @@ export function withSpotParks(
 ): ProjectDoc {
   const auto = doc.auto;
   if (!auto || !catalog || !isSimple(doc)) return doc;
-  const wanted = parkedSpots(doc);
-  const parkCard = auto.cards.find((c) => c.kind === "path" && c.park);
+  // The builder's view: a wait that parks instead of going on has the steps below it in line.
+  const view = structuredClone(auto);
+  unfold(view);
+  const wanted = parkedSpots(view);
+  const parkCard = view.cards.find((c) => c.kind === "path" && c.park);
   const parkSpot =
     parkCard?.kind === "path" ? auto.pathEnds[parkCard.lineId] : undefined;
   const parkPoint = parkSpot ? auto.points[parkSpot] : undefined;
 
   const current = auto.parkFrom ?? {};
   const lines = new Map(doc.lines.map((line) => [line.id, line]));
-  const cards = new Map(auto.cards.map((c) => [c.id, c]));
+  const cards = new Map(everyCard(view.cards).map((c) => [c.id, c]));
   const spotOf = (cardId: string) => {
     const card = cards.get(cardId);
     return card?.kind === "path" ? auto.pathEnds[card.lineId] : undefined;
@@ -160,52 +164,80 @@ export function isSpotPark(doc: ProjectDoc, lineId: string): boolean {
 // --- inside -------------------------------------------------------------------------------------
 
 /**
- * Drive card id → its spot, for every drive before Park: the robot may run behind its plan and
- * reach any of them late, so each has its own park. The last drive before Park needs none.
+ * Drive card id → its spot, for every drive the guard could park after: the robot may run behind
+ * its plan and reach any of them late, so each has its own park. In each route (the main list, and
+ * an Otherwise that parks instead of going on), the last drive before its Park needs none: the
+ * Park step's own path starts there. A drive inside an Otherwise that goes on afterwards always
+ * has one: more steps follow it. `auto` is the builder's view (steps.ts unfold).
  */
-function parkedSpots(doc: ProjectDoc): Map<string, string> {
-  const auto = doc.auto!;
+function parkedSpots(auto: AutoSection): Map<string, string> {
   const out = new Map<string, string>();
-  const parkIndex = auto.cards.findIndex((c) => c.kind === "path" && c.park);
-  if (parkIndex < 0) return out;
-  // The last drive before Park: Park's own path starts on its spot.
-  let lastBefore: string | null = null;
-  for (let i = parkIndex - 1; i >= 0; i--) {
-    if (auto.cards[i].kind === "path") {
-      lastBefore = auto.cards[i].id;
-      break;
-    }
-  }
-  for (const card of auto.cards.slice(0, parkIndex)) {
-    if (card.kind !== "path" || card.id === lastBefore) continue;
+  const add = (card: AutoCard) => {
+    if (card.kind !== "path" || card.park) return;
     const spot = auto.pathEnds[card.lineId];
     if (spot) out.set(card.id, spot);
-  }
+  };
+  const route = (list: AutoCard[]) => {
+    const parkIndex = list.findIndex((c) => c.kind === "path" && c.park);
+    if (parkIndex < 0) return;
+    let lastBefore: string | null = null;
+    for (let i = parkIndex - 1; i >= 0; i--) {
+      if (list[i].kind === "path") {
+        lastBefore = list[i].id;
+        break;
+      }
+    }
+    for (const card of list.slice(0, parkIndex)) {
+      if (card.kind === "path" && card.id !== lastBefore) add(card);
+      if (card.kind !== "firstOf") continue;
+      for (const row of card.rows) {
+        if (row.cards.some((c) => c.kind === "path" && c.park))
+          route(row.cards);
+        else everyCard(row.cards).forEach(add);
+      }
+    }
+  };
+  route(auto.cards);
   return out;
 }
 
 /**
  * Drive card id → the latest the robot leaves its spot: when the next drive starts, every step
- * taking its typical time (the builder's steps have no waits, so that is the worst case).
+ * taking its typical time and a wait's trigger coming at once; an Otherwise from the wait's limit.
  */
 function leaveTimes(
   doc: ProjectDoc,
   catalog: PathCatalog,
 ): Map<string, number> {
-  const auto = doc.auto!;
+  const view = structuredClone(doc.auto!);
+  unfold(view);
   const out = new Map<string, number>();
-  let t = 0;
-  let at: string | null = null;
-  for (const card of auto.cards) {
-    if (card.kind === "action") t += commandSeconds(auto, card);
-    else if (card.kind === "path") {
-      if (at) out.set(at, t);
-      t += catalog.byId.get(card.lineId)?.seconds ?? 0;
-      at = card.id;
+  const walk = (cards: AutoCard[], start: number, from: string | null) => {
+    let t = start;
+    let at = from;
+    for (const card of cards) {
+      if (card.kind === "action") t += commandSeconds(view, card);
+      else if (card.kind === "path") {
+        if (at && !out.has(at)) out.set(at, t);
+        t += catalog.byId.get(card.lineId)?.seconds ?? 0;
+        at = card.id;
+      } else if (card.kind === "firstOf") {
+        for (const row of card.rows)
+          if ("afterMs" in row) walk(row.cards, timeRowFiresAt(row, t), null);
+      }
     }
-  }
-  if (at) out.set(at, t);
+    if (at && !out.has(at)) out.set(at, t);
+  };
+  walk(view.cards, 0, null);
   return out;
+}
+
+function everyCard(cards: AutoCard[]): AutoCard[] {
+  return cards.flatMap((card) =>
+    card.kind === "firstOf"
+      ? [card, ...card.rows.flatMap((row) => everyCard(row.cards))]
+      : [card],
+  );
 }
 
 /** Whether a student bent the path: it no longer is the straight line it was made as. */

@@ -76,6 +76,7 @@ A complete example that uses every card kind is
 | `startAt` | string, optional | The named point the start pose is on. |
 | `cards` | card[] | The Auto, top to bottom (the "trunk"). |
 | `plays` | `{ id: play }`, optional | The plays this Auto's ladders use, copied in so the file stands alone (see "Ladders"). |
+| `parkChoices` | string[], optional | Fork: other PARK spots the drive team may pick during INIT instead of the park step's own (gamepad 1's D-pad left and right; see "Options the drive team changes in INIT"). Each is one of `points`, usually a team spot. |
 
 ### Cards
 
@@ -103,13 +104,20 @@ optional `label` (the branch's name; defaults to one made from the condition).
 |---|---|
 | `{"when": ["A"]}` | when the registered trigger is true (a list for older files; one name) |
 | `{"afterMs": 800}` | 800 ms after the card started |
+| `{"afterMs": 8000, "matchClock": true}` | Fork: once the match clock reads 8 s, however late the card started (at once if it already does) |
+
+A match-clock time row may also carry `"adjustable": true`: the drive team may move it during
+INIT. Only one wait per Auto may (see below).
 
 Rules the editor enforces (errors block the Java export):
 
 - every `firstOf` has exactly one trigger row and one time row, so nothing can wait forever;
 - every action and condition name used anywhere is in the registry;
 - a path card names a top-level path that exists;
-- a list of cards has at most one park card.
+- a list of cards has at most one park card;
+- each of `parkChoices` is a named point other than the park's own, and every park path ends on
+  the same spot;
+- at most one wait is `adjustable`.
 
 Warnings (shown, not blocking): a path that starts more than 2 in from where
 the robot can be when it starts; a park card that is not last in its branch; a
@@ -249,7 +257,41 @@ contract with the robot's `autokit` library:
 - a list that directly contains a park card is wrapped
   `kit.guarded(label, parkPath, seconds, cards...)`, where `seconds` is the
   park path's drive time by the preview's motion model, rounded **up** to
-  0.1 s; the trunk's guard label is `"Auto"`, a branch's is its row label.
+  0.1 s; the trunk's guard label is `"Auto"`, a branch's is its row label;
+- a match-clock time row is `kit.atMatchSeconds(s)`; an adjustable one is
+  `kit.atMatchSeconds(kit.seconds(label, s))`, the wait's label naming it;
+- `OPTIONS`, always written (`{}` with none), lists what the drive team may change in INIT (see
+  below).
+
+### The simple builder's Otherwise: go on, or park
+
+A Wait step's Otherwise is its time row's cards. With **then: go on with the steps below** (the
+default) the wait has no cards on its trigger row, and both outcomes go on with the cards after
+the wait. With **then: park** the Otherwise ends with its own park card, and the wait is the
+main list's last card: the steps below it, Park included, are its trigger row's cards, so each
+outcome holds the rest of its own route and each is guarded with its own park. The builder shows
+both forms the same way, the steps below the wait in the main list (`unfold`/`refold` in
+`lib/simple/steps.ts`). Every Park step is on the Auto's one PARK spot.
+
+Every drive the guard could park after has a park from its spot (`parkFrom`): in each route all
+but the last drive before its Park, and every drive in an Otherwise that goes on.
+
+### Options the drive team changes in INIT
+
+A partner says in the queue where they park, or when they tip. The robot's INIT page shows each
+option on one line, and gamepad 1's D-pad changes it (biobuzz `InitOptions`); nothing touched,
+the Auto runs as drawn. The drawing's value is always the default.
+
+- **The park.** With `parkChoices`, the export declares
+  `Pose park = kit.pick(AutoOption.PARK, leftPark, rightPark)` (the drawn park first) and every
+  park path (the park step's, each guard's, each spot's) ends on `park`: the same path with its
+  end moved, control points kept. Each park's reserved time is
+  `kit.pick(AutoOption.PARK, 1.9, 2.1)`, the second timed with the end moved, so the endgame
+  guard reserves the picked park's time. `OPTIONS` holds `AutoOption.park("LEFT_PARK", "RIGHT_PARK")`.
+  The preview and the simulator drive the drawn park.
+- **The TIP wait.** An adjustable match-clock limit is `AutoOption.matchSeconds(label, s)`. On
+  the robot the drive team enters the partner's TIP time and the wait gives up a measured margin
+  after it; the preview uses the drawn time.
 
 ### Robot settings belong to the file
 
