@@ -520,7 +520,8 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its
   time from the distance at the robot's speed caps. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
-  steps, the plan view otherwise; Advanced and ← Simple switch. `src/state/files.svelte.ts` — a new
+  steps (every file in biobuzz `TeamCode/autos`), the plan view otherwise; "← Simple" goes back
+  only when the file is simple, and there is no way in from the builder to the card list. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
   goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside
   the field; spot names show near the mouse (`fieldHover`). An Auto that lists no commands gets

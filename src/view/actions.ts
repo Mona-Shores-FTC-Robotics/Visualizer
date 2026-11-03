@@ -20,6 +20,7 @@ import type { Prefs } from "../state/prefs.svelte";
 import type { ProjectStore } from "../state/project.svelte";
 import { fieldMapSource } from "./fieldMap";
 import { forkActions } from "./forkActions";
+import { confirmSaveWithUnsavedSpots } from "../lib/team/spotsStore";
 import type { SharedLinks } from "../state/links.svelte";
 import {
   cycleGrid,
@@ -127,7 +128,10 @@ export function createActions(deps: ActionDeps): Action[] {
       group: "File",
       title: "Save to computer…",
       keys: ["mod+shift+s"],
-      run: () => void files.saveAs(),
+      // Fork: says first when the Auto's team spots are only in this browser.
+      run: () => {
+        if (confirmSaveWithUnsavedSpots(project.doc.auto)) void files.saveAs();
+      },
     },
     {
       id: "file.mirror",

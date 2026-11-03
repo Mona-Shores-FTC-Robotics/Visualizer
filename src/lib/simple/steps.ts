@@ -83,12 +83,14 @@ export interface Step {
 export type StepList = { waitCardId: string } | null;
 
 /**
- * Fork: what a Wait step waits for, the robot's triggers (biobuzz AutoRegistration). The one the
- * builder offers is CellUp, shown as "Wait for TIP or CELL up" (mentor, 3 Nov 2026): the CELL the
- * robot is aimed at is up, true at once if it already is, else once the camera sees it settle up
- * after a TIP. The others are what older Autos were drawn with (Tip: our HIVE tipped since the
- * wait began; LeftCellUp, RightCellUp: that CELL is up); a file that uses one still opens as a
- * Wait step, but the dropdown no longer offers them.
+ * Fork: what a Wait step waits for, the robot's triggers (biobuzz AutoRegistration). The builder
+ * offers CellUp, shown as "Wait for TIP or CELL up" (mentor, 3 Nov 2026): the CELL the robot is
+ * aimed at is up, true at once if it already is, else once the camera sees it settle up after a
+ * TIP; and IntakeFull, a FLOWER pick topped up until the intake holds four (r-solo-staging). The
+ * others are what older Autos and the partner stand-ins were drawn with (Tip: our HIVE tipped
+ * since the wait began; LeftCellUp, RightCellUp: that CELL is up; CameraBlind: the stand-ins'
+ * hold, which in the simulator runs to its time limit); a file that uses one still opens as a
+ * Wait step, so no team file needs the card editor, but the dropdown no longer offers them.
  */
 export const WAIT_FOR: readonly {
   trigger: string;
@@ -96,9 +98,11 @@ export const WAIT_FOR: readonly {
   legacy?: boolean;
 }[] = [
   { trigger: "CellUp", label: "TIP or CELL up" },
+  { trigger: "IntakeFull", label: "intake full" },
   { trigger: "Tip", label: "TIP (since the wait began)", legacy: true },
   { trigger: "LeftCellUp", label: "Left CELL up", legacy: true },
   { trigger: "RightCellUp", label: "Right CELL up", legacy: true },
+  { trigger: "CameraBlind", label: "camera blind", legacy: true },
 ];
 /** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
 export const WAIT_DEFAULT_S = 7;
