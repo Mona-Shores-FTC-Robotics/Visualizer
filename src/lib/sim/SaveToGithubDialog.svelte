@@ -2,7 +2,6 @@
   import Modal from "../components/ui/Modal.svelte";
   import { showToast } from "../toast";
   import { generateAutoJavaFromText } from "../codegen/auto/fromFile";
-  import { autoClassName } from "../codegen/auto/javaAuto";
   import { gitHash, gitLinkFor } from "../../utils/gitLink";
   import { teamView } from "../team/teamView";
   import {
@@ -26,29 +25,35 @@
   } from "../github/api";
   import {
     DEFAULT_BRANCH,
-    DEFAULT_DESIGN,
     FAST_LANE_BASE,
     PP_DIRS,
+    SAVE_SEEDS,
     SIM_RESULTS_BRANCH,
     SIM_WORKFLOW,
     baseName,
     generatedPathFor,
-    currentDesigns,
-    isCurrentDesign,
     laneBranch,
+    parseSimRequest,
     ppPathProblem,
     protectedBranch,
     robotProblems,
+    runKey,
+    runLabel,
     runProblems,
     simLatestPath,
     simLogPath,
+    simOwnRequestPath,
+    simPlanSentence,
     simRequestText,
     simRequestPath,
     simResultPath,
+    simRuns,
     simSpec,
     suggestPpPath,
     tally,
+    type SimRequest,
     type SimResult,
+    type SimRunPlan,
   } from "./biobuzz";
 
   interface Props {
@@ -88,8 +93,6 @@
   }: Props = $props();
 
   const OPTIONS_KEY = "githubSimOptions";
-  // A new key on 31 Oct 2026: the old one holds the simulator's 88 what-if designs, which it no longer has.
-  const DESIGNS_KEY = "githubSimDesignsReal";
   const PENDING_KEY = "githubSimPending";
 
   let token = $state<string | null>(savedToken());
@@ -100,16 +103,14 @@
   let branch = $state(DEFAULT_BRANCH);
   let path = $state("");
   let files = $state<string[]>([]);
-  let partner = $state("");
-  let design = $state(DEFAULT_DESIGN);
-  let partnerDesign = $state("");
-  let speed = $state(50);
-  let seeds = $state(10);
-  let alliance = $state<"RED" | "BLUE">("RED");
-  // Only the simulator's current designs: a list saved from an old result (the 88 what-if designs) is dropped.
-  let designs = $state<string[]>(
-    currentDesigns(loadJson<string[]>(DESIGNS_KEY, [DEFAULT_DESIGN])),
-  );
+
+  /**
+   * What a save will simulate: the runs in the Auto's request on biobuzz (alone, and one per partner
+   * stand-in a mentor curated), or the Auto alone when it has no request yet.
+   */
+  let plan = $state<SimRunPlan[]>([{ partner: null }]);
+  /** The branch the request was read from, or null when biobuzz has none for this Auto. */
+  let planFrom = $state<string | null>(null);
 
   let saving = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
@@ -119,13 +120,16 @@
     branch.trim() === FAST_LANE_BASE || branch.trim().startsWith("auto/"),
   );
   let blocked = $state<string[]>([]);
-  /** The commit being simulated, or the one whose result is shown. */
+  /** The commit being simulated, or the one whose results are shown. */
   let commit = $state<string | null>(null);
-  let commitPath = "";
+  let commitPath = $state("");
   let run = $state<WorkflowRun | null>(null);
-  let result = $state<SimResult | null>(null);
-  /** The newest earlier result for this file, shown before anything is saved. */
-  let latest = $state<SimResult | null>(null);
+  /** The saved commit's results, one per run of the plan (its key), once published. */
+  let resultByRun = $state<Record<string, SimResult>>({});
+  /** The newest earlier results for this file, one per run, shown before anything is saved. */
+  let latestByRun = $state<Record<string, SimResult>>({});
+  /** The run whose seeds are open (its key), and the seed whose timeline is. */
+  let selected = $state<string | null>(null);
   let expanded = $state<number | null>(null);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let polls = 0;
@@ -143,11 +147,22 @@
   );
   /** Saving would create a file biobuzz does not have yet. */
   let isNew = $derived(files.length > 0 && !ppFiles.includes(path.trim()));
-  let partners = $derived(ppFiles.filter((f) => f !== path.trim()));
-  let shown = $derived(result ?? latest);
-  let runs = $derived(shown?.runs ?? []);
-  let summary = $derived(tally(runs));
-  let waiting = $derived(commit !== null && result === null);
+  let hasResult = $derived(Object.keys(resultByRun).length > 0);
+  let waiting = $derived(commit !== null && !hasResult);
+  /** One row per run of the plan: what to show for it (this save's result, else the last one). */
+  let rows = $derived(
+    plan.map((r) => {
+      const key = runKey(r);
+      const shown = resultByRun[key] ?? latestByRun[key] ?? null;
+      return { key, run: r, shown, summary: tally(shown?.runs ?? []) };
+    }),
+  );
+  let anyShown = $derived(rows.some((row) => row.shown !== null));
+  /** The row whose seeds are open: the chosen one, or the only one. */
+  let selectedRow = $derived(
+    rows.find((row) => row.key === selected) ??
+      (rows.length === 1 && rows[0].shown ? rows[0] : null),
+  );
 
   $effect(() => {
     if (isOpen) void opened();
@@ -173,17 +188,6 @@
 
   async function opened() {
     const saved = loadJson<Record<string, unknown>>(OPTIONS_KEY, {});
-    if (typeof saved.design === "string" && isCurrentDesign(saved.design))
-      design = saved.design;
-    if (
-      typeof saved.partnerDesign === "string" &&
-      (saved.partnerDesign === "" || isCurrentDesign(saved.partnerDesign))
-    )
-      partnerDesign = saved.partnerDesign;
-    if (typeof saved.speed === "number") speed = saved.speed;
-    if (typeof saved.seeds === "number") seeds = saved.seeds;
-    if (saved.alliance === "RED" || saved.alliance === "BLUE")
-      alliance = saved.alliance;
     const fromBranch =
       source?.ref &&
       !protectedBranch(source.ref) &&
@@ -203,8 +207,7 @@
       }
     }
     await loadBranch();
-    const partners = (saved.partners ?? {}) as Record<string, string>;
-    partner = ppFiles.includes(partners[path]) ? partners[path] : "";
+    await loadPlan();
 
     // A save still being simulated when the dialog was closed: pick it up again.
     const pending = loadJson<{ path: string; commit: string } | null>(
@@ -214,7 +217,7 @@
     if (pending && pending.path === path) {
       commit = pending.commit;
       commitPath = pending.path;
-      result = null;
+      resultByRun = {};
       void poll();
     } else if (!commit) {
       void loadLatest();
@@ -239,57 +242,77 @@
     path = suggestPpPath(fileName, source?.path ?? null, ppFiles);
   }
 
-  async function loadLatest() {
-    latest = null;
-    try {
-      const text = await readText(
-        token,
-        simLatestPath(path),
-        SIM_RESULTS_BRANCH,
-      );
-      const parsed = text ? (JSON.parse(text) as SimResult) : null;
-      // latest.json is per file name; only show it for this file.
-      if (parsed && parsed.pp === path) {
-        latest = parsed;
-        rememberDesigns(parsed);
-        adoptSettings(parsed);
-      }
-    } catch {
-      // No earlier result: nothing to show.
-    }
+  /** The file changed: what biobuzz will run for it, and what it last ran. */
+  async function pathChanged() {
+    await loadPlan();
+    await loadLatest();
   }
 
   /**
-   * Simulate the same way as last time unless chosen otherwise, so a changed
-   * Auto is compared like for like: its partner, robots, seeds and alliance.
+   * The Auto's request as biobuzz has it, at `ref` (a branch or a commit), else on master; null
+   * when it has none yet. Where it was found comes back too.
    */
-  function adoptSettings(r: SimResult) {
-    const [autos, at] = (r.spec ?? "").split("@");
-    const partnerClass = autos?.split(",")[1];
-    if (partnerClass) {
-      partner =
-        ppFiles.find((f) => autoClassName(baseName(f)) === partnerClass) ??
-        partner;
-    }
-    // A result from before the simulator's real-robot designs: its numbers are shown, its design is not reused.
-    if (!isCurrentDesign(r.design)) return;
-    design = r.design!;
-    partnerDesign =
-      r.partnerDesign &&
-      r.partnerDesign !== r.design &&
-      isCurrentDesign(r.partnerDesign)
-        ? r.partnerDesign
-        : "";
-    if (Number(at) > 0) speed = Number(at);
-    if (r.runs?.length) seeds = r.runs.length;
-    if (r.alliance === "RED" || r.alliance === "BLUE") alliance = r.alliance;
+  async function existingRequest(
+    ppPath: string,
+    ref: string,
+  ): Promise<{ request: SimRequest; from: string } | null> {
+    const own = simOwnRequestPath(ppPath);
+    const onRef = parseSimRequest(await readText(token, own, ref));
+    if (onRef) return { request: onRef, from: ref };
+    if (ref === FAST_LANE_BASE) return null;
+    const onMaster = parseSimRequest(
+      await readText(token, own, FAST_LANE_BASE),
+    );
+    return onMaster ? { request: onMaster, from: FAST_LANE_BASE } : null;
   }
 
-  function rememberDesigns(r: SimResult) {
-    if ((r.designs ?? []).some(isCurrentDesign)) {
-      designs = currentDesigns(r.designs!);
-      saveJson(DESIGNS_KEY, designs);
+  /** The branch a save of `path` lands on, as it stands now: the lane branch while it exists, else master. */
+  async function saveRef(ppPath: string): Promise<string> {
+    if (!viaFastLane) return branch.trim();
+    const lane = laneBranch(ppPath);
+    return (await branchHeadOrNull(token, lane)) === null
+      ? FAST_LANE_BASE
+      : lane;
+  }
+
+  async function loadPlan() {
+    const ppPath = path.trim();
+    plan = [{ partner: null }];
+    planFrom = null;
+    selected = null;
+    if (!ppPath || ppPathProblem(ppPath)) return;
+    try {
+      const found = await existingRequest(ppPath, await saveRef(ppPath));
+      if (found && path.trim() === ppPath) {
+        plan = simRuns(found.request);
+        planFrom = found.from;
+      }
+    } catch {
+      // No request to read (offline, or a rate limit): the Auto alone, which is what biobuzz would run.
     }
+  }
+
+  async function loadLatest() {
+    latestByRun = {};
+    const ppPath = path.trim();
+    const found: Record<string, SimResult> = {};
+    await Promise.all(
+      plan.map(async (r) => {
+        try {
+          const text = await readText(
+            token,
+            simLatestPath(ppPath, r.partner),
+            SIM_RESULTS_BRANCH,
+          );
+          const parsed = text ? (JSON.parse(text) as SimResult) : null;
+          // latest.json is per file name; only show it for this file.
+          if (parsed && parsed.pp === ppPath) found[runKey(r)] = parsed;
+        } catch {
+          // No earlier result: nothing to show.
+        }
+      }),
+    );
+    if (path.trim() === ppPath) latestByRun = found;
   }
 
   async function useToken() {
@@ -302,7 +325,7 @@
       saveToken(t);
       tokenInput = "";
       await loadBranch();
-      void loadLatest();
+      void pathChanged();
     } catch (error) {
       showToast((error as Error).message, "error");
     } finally {
@@ -371,39 +394,24 @@
         }
       }
       const existing = await listFiles(token, head);
-      let partnerClass: string | null = null;
-      if (partner) {
-        const partnerText = await readText(token, partner, head);
-        const exportName = partnerText
-          ? JSON.parse(partnerText)?.auto?.exportName
-          : null;
-        partnerClass = autoClassName(exportName || baseName(partner));
-        if (
-          !existing.some((f) => f.endsWith(`/generated/${partnerClass}.java`))
-        ) {
-          blocked = [
-            `${baseName(partner)} has no exported Java on ${target} yet: save it to GitHub first.`,
-          ];
-          return;
-        }
-      }
       const javaPath = generatedPathFor(ppPath, exported.fileName, existing);
-      const spec = simSpec(exported.className, partnerClass, speed);
+      const spec = simSpec(exported.className);
+      // biobuzz's request for this Auto, as of the commit being built on: its runs are kept.
+      const previous = await existingRequest(ppPath, head);
+      plan = simRuns(previous?.request ?? null);
+      planFrom = previous?.from ?? null;
       const files = {
         [ppPath]: text,
         [javaPath]: exported.source,
         [simRequestPath(ppPath, viaFastLane)]: simRequestText({
           ppPath,
           spec,
-          design,
-          partnerDesign: partner && partnerDesign ? partnerDesign : null,
-          partnerSpeed: null,
-          seeds,
-          alliance,
           savedBy: login,
+          existing: previous?.request ?? null,
         }),
       };
-      const message = `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${spec}.`;
+      const simulates = `${spec} ${plan.map(runLabel).join(", ")}`;
+      const message = `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${simulates}.`;
       let sha: string;
       try {
         sha = await commitFiles(token, target, head, files, message);
@@ -427,25 +435,13 @@
             target,
             FAST_LANE_BASE,
             `Auto: ${baseName(ppPath)}`,
-            `Saved from the Visualizer by ${login}: \`${ppPath}\`, its generated Java and its simulation request (simulates ${spec}).\n\n` +
+            `Saved from the Visualizer by ${login}: \`${ppPath}\`, its generated Java and its simulation request (simulates ${simulates}).\n\n` +
               "Fast lane: an Auto-only change, so it needs no issue or review. Try it on the robot; merge it here if it is better than master's. Simulated points are shown, never enforced.",
           );
         }
         pull = { url: open.html_url, number: open.number };
       }
-      saveJson(OPTIONS_KEY, {
-        design,
-        partnerDesign,
-        speed,
-        seeds,
-        alliance,
-        branch,
-        partners: {
-          ...(loadJson<Record<string, unknown>>(OPTIONS_KEY, {}).partners ??
-            {}),
-          [ppPath]: partner,
-        },
-      });
+      saveJson(OPTIONS_KEY, { branch });
       saveJson(PENDING_KEY, { path: ppPath, commit: sha });
       exported.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
       showToast(
@@ -457,7 +453,7 @@
       onSaved(target, ppPath, text);
       commit = sha;
       commitPath = ppPath;
-      result = null;
+      resultByRun = {};
       run = null;
       polls = 0;
       void poll();
@@ -481,14 +477,19 @@
       const runs = await runsFor(token, commit);
       run = runs.find((r) => r.name === SIM_WORKFLOW) ?? null;
       if (run?.status === "completed") {
-        const text = await readText(
-          token,
-          simResultPath(commitPath, commit),
-          SIM_RESULTS_BRANCH,
+        const found: Record<string, SimResult> = {};
+        await Promise.all(
+          plan.map(async (r) => {
+            const text = await readText(
+              token,
+              simResultPath(commitPath, commit!, r.partner),
+              SIM_RESULTS_BRANCH,
+            );
+            if (text) found[runKey(r)] = JSON.parse(text) as SimResult;
+          }),
         );
-        if (text) {
-          result = JSON.parse(text) as SimResult;
-          rememberDesigns(result);
+        if (Object.keys(found).length) {
+          resultByRun = found;
           saveJson(PENDING_KEY, null);
           return;
         }
@@ -569,10 +570,14 @@
 
   const secs = (t: number) => t.toFixed(1);
   const yesNo = (b: boolean) => (b ? "yes" : "no");
-  /** A published log's button label: which run it is. */
-  function logLabel(seed: number): string {
-    const best = seed === (shown?.bestSeed ?? summary.best?.seed);
-    const typical = seed === shown?.typicalSeed;
+  /** The seed a result calls its best: its own word, else the tally's. */
+  function bestSeed(row: (typeof rows)[number]): number | null {
+    return row.shown?.bestSeed ?? row.summary.best?.seed ?? null;
+  }
+  /** A published log's button label: which seed it is. */
+  function logLabel(row: (typeof rows)[number], seed: number): string {
+    const best = seed === bestSeed(row);
+    const typical = seed === row.shown?.typicalSeed;
     const what =
       best && typical
         ? "best and typical"
@@ -667,73 +672,19 @@
       bind:value={path}
       list="gh-files"
       class="console-input px-2 py-1"
-      onchange={loadLatest}
+      onchange={pathChanged}
     />
     <span></span>
-
-    <label for="gh-partner">Partner Auto</label>
-    <select
-      id="gh-partner"
-      bind:value={partner}
-      class="console-input px-2 py-1"
-    >
-      <option value="">none: our robot alone</option>
-      {#each partners as f (f)}
-        <option value={f}>{baseName(f)}</option>
-      {/each}
-    </select>
-    <span></span>
-
-    <label for="gh-design">Our robot</label>
-    <select id="gh-design" bind:value={design} class="console-input px-2 py-1">
-      {#each designs.includes(design) ? designs : [design, ...designs] as d (d)}
-        <option value={d}>{d}</option>
-      {/each}
-    </select>
-    <label class="flex items-center gap-2"
-      ><input
-        type="number"
-        min="10"
-        max="100"
-        bind:value={speed}
-        class="console-input w-16 px-2 py-1"
-      /> in/s</label
-    >
-
-    {#if partner}
-      <label for="gh-partner-design">Partner robot</label>
-      <select
-        id="gh-partner-design"
-        bind:value={partnerDesign}
-        class="console-input px-2 py-1"
-      >
-        <option value="">same as ours</option>
-        {#each designs as d (d)}
-          <option value={d}>{d}</option>
-        {/each}
-      </select>
-      <span></span>
-    {/if}
-
-    <label for="gh-seeds">Seeds</label>
-    <span class="flex items-center gap-3">
-      <input
-        id="gh-seeds"
-        type="number"
-        min="1"
-        max="50"
-        bind:value={seeds}
-        class="console-input w-16 px-2 py-1"
-      />
-      <label class="flex items-center gap-1"
-        ><input type="radio" bind:group={alliance} value="RED" /> RED</label
-      >
-      <label class="flex items-center gap-1"
-        ><input type="radio" bind:group={alliance} value="BLUE" /> BLUE</label
-      >
-    </span>
-    <span></span>
   </div>
+  <p class="text-xs text-body mt-2" data-testid="gh-plan">
+    {simPlanSentence(plan)}{#if planFrom}
+      — the runs in <code>{simOwnRequestPath(path.trim())}</code> on {planFrom}.
+      Every run is the real robot, turret locked forward, POLLEN only, {SAVE_SEEDS}
+      seeds, RED.{:else}
+      — biobuzz has no simulation request for this Auto yet, so it runs alone
+      (the real robot, turret locked forward, POLLEN only, {SAVE_SEEDS} seeds, RED).
+      A mentor curates the partners in biobuzz.{/if}
+  </p>
   <datalist id="gh-files">
     {#each ppFiles as f (f)}
       <option value={f}></option>
@@ -756,9 +707,10 @@
           <code>{path}</code>
           {#if isNew}<strong class="text-warning">(a new file)</strong
             >{:else}(updated){/if}, its Java, and the simulation request. GitHub
-          then runs
-          {seeds} seed{seeds === 1 ? "" : "s"}, usually in 1–6 minutes; you can
-          keep working meanwhile.
+          then runs {SAVE_SEEDS} seeds {plan.length === 1
+            ? "of the Auto alone"
+            : `of each of the ${plan.length} runs`}, usually in 1–6 minutes; you
+          can keep working meanwhile.
         {/if}
       </p>
       <button
@@ -851,7 +803,7 @@
         {:else if run.status !== "completed"}
           Simulating ({run.status.replace("_", " ")})…
         {:else}
-          The run finished ({run.conclusion}); fetching its result…
+          The run finished ({run.conclusion}); fetching its results…
         {/if}
         {#if run}<a
             class="underline"
@@ -863,175 +815,275 @@
     </div>
   {/if}
 
-  {#if shown}
+  {#if anyShown}
     <div class="mt-5 border-t border-border pt-4 text-sm text-heading">
       <p class="mb-2">
-        {result ? "Simulated" : "Last simulated"}
-        <code>{shown.spec ?? shown.auto}</code>
-        at
-        <a
-          class="underline"
-          href={commitUrl(shown.commit)}
-          target="_blank"
-          rel="noreferrer"><code>{shown.commit.slice(0, 7)}</code></a
-        >
-        on {shown.branch}, {when(shown.finishedAt)} ·
-        <a
-          class="underline"
-          href={shown.runUrl}
-          target="_blank"
-          rel="noreferrer">run</a
-        >
-        ·
-        <button class="underline" onclick={() => copyVersionLink(shown!)}
-          >copy a link to this version</button
-        >
-        {#if !result && latest}<br /><span class="text-xs text-body"
+        {hasResult ? "Simulated" : "Last simulated"}
+        <code>{commitPath || path.trim()}</code>: one row per run, the Auto
+        alone and with each partner stand-in.
+        {#if rows.length > 1}Click a row for its seeds.{/if}
+        {#if !hasResult}<br /><span class="text-xs text-body"
             >From before your changes on screen: Save to GitHub to simulate
             them.</span
           >{/if}
       </p>
-
-      {#if shown.error}
-        <p class="text-danger mb-2">{shown.error}</p>
-      {/if}
-
-      {#if runs.length}
-        {#if summary.best}
-          <p class="mb-1 text-base">
-            Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
-              .best.seed}),
-            {summary.best.autoTips} TIP{summary.best.autoTips === 1
-              ? ""
-              : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
-                .slice(0, summary.best.autoTips)
-                .map(secs)
-                .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
-              .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
-              .join(" · ")}.
-          </p>
-        {/if}
-        <p class="mb-3 text-body">
-          Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on average.
-          {summary.tips
-            .map(
-              (tip, i) =>
-                `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
-            )
-            .join(" ")}
-          LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
-          {#if summary.withProblems}<span class="text-warning"
-              >Problems in {summary.withProblems} of {summary.runs} seeds.</span
-            >{/if}
-        </p>
-        <div class="flex flex-wrap gap-2 mb-3">
-          {#each Object.entries(shown.logs) as [seed, file] (seed)}
-            <button
-              class="console-action {Number(seed) ===
-              (shown.bestSeed ?? summary.best?.seed)
-                ? 'console-action--accent'
+      <table class="w-full text-xs" data-testid="gh-runs">
+        <thead class="text-body text-left">
+          <tr>
+            <th class="py-1">Run</th>
+            <th>Best</th>
+            <th>Average</th>
+            <th>TIPs at (s)</th>
+            <th>LEAVE / PARK</th>
+            <th>Simulated</th>
+            <th>Log</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rows as row (row.key)}
+            <tr
+              class="border-t border-border cursor-pointer hover:bg-white/5 {selectedRow ===
+              row
+                ? 'bg-white/5'
                 : ''}"
-              onclick={() => download(shown!, file)}
-              title={file}>Download WPILOG ({logLabel(Number(seed))})</button
+              onclick={() => {
+                selected = selected === row.key ? null : row.key;
+                expanded = null;
+              }}
             >
-          {/each}
-        </div>
-        <p class="text-xs text-body mb-3">
-          Then drag the file onto AdvantageScope's window (or File → Open
-          Logs…). A web page cannot open AdvantageScope by itself, so it is
-          download, then drag.
-        </p>
-        <table class="w-full text-xs">
-          <thead class="text-body text-left">
-            <tr>
-              <th class="py-1">Seed</th>
-              <th>Points</th>
-              <th>TIPs at (s)</th>
-              <th>LEAVE / PARK</th>
-              <th>Problems</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each runs as r (r.seed)}
-              <tr
-                class="border-t border-border cursor-pointer hover:bg-white/5"
-                onclick={() => (expanded = expanded === r.seed ? null : r.seed)}
-              >
-                <td class="py-1"
-                  >{r.seed}{r.seed === (shown.bestSeed ?? summary.best?.seed)
-                    ? " ▲"
-                    : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
+              <td class="py-1 font-semibold">{runLabel(row.run)}</td>
+              {#if row.shown === null}
+                <td colspan="4" class="text-body"
+                  >{waiting ? "simulating…" : "not simulated yet"}</td
                 >
-                <td>{r.points}</td>
-                <td
-                  >{r.tipsAt.length
-                    ? r.tipsAt.map(secs).join(", ")
-                    : "none"}</td
-                >
-                <td
-                  >{r.robots
-                    .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
-                    .join(" · ")}</td
-                >
-                <td class="text-warning">{runProblems(r).join("; ")}</td>
-              </tr>
-              {#if expanded === r.seed}
-                <tr>
-                  <td colspan="5" class="pb-2">
-                    {#each r.robots as robot (robot.auto)}
-                      <p class="mt-2 font-semibold">
-                        {robot.auto}: launched {robot.launched},
-                        {robot.finishedAt === null
-                          ? "still running at 30 s"
-                          : `finished at ${secs(robot.finishedAt)} s`}
-                        {#each robotProblems(robot) as p, i (i)}<span
-                            class="text-warning">; {p}</span
-                          >{/each}
-                      </p>
-                      <pre
-                        class="whitespace-pre-wrap text-body">{robot.timeline.join(
-                          "\n",
-                        )}</pre>
-                    {/each}
-                  </td>
-                </tr>
+                <td></td>
+                <td></td>
+              {:else}
+                {#if row.shown.error}
+                  <td colspan="4" class="text-danger">{row.shown.error}</td>
+                {:else if row.summary.best}
+                  <td><strong>{row.summary.best.points}</strong> pts</td>
+                  <td
+                    >{row.summary.meanPoints.toFixed(1)} over {row.summary.runs}
+                    seeds{#if row.summary.withProblems}<span
+                        class="text-warning"
+                        >, problems in {row.summary.withProblems}</span
+                      >{/if}</td
+                  >
+                  <td
+                    >{row.summary.best.autoTips
+                      ? row.summary.best.tipsAt
+                          .slice(0, row.summary.best.autoTips)
+                          .map(secs)
+                          .join(", ")
+                      : "none"}</td
+                  >
+                  <td
+                    >{row.summary.best.robots
+                      .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+                      .join(" · ")}</td
+                  >
+                {:else}
+                  <td colspan="4" class="text-body">no seed ran</td>
+                {/if}
+                <td class="whitespace-nowrap">
+                  <a
+                    class="underline"
+                    href={commitUrl(row.shown.commit)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onclick={(e) => e.stopPropagation()}
+                    ><code>{row.shown.commit.slice(0, 7)}</code></a
+                  >
+                  on {row.shown.branch}, {when(row.shown.finishedAt)} ·
+                  <a
+                    class="underline"
+                    href={row.shown.runUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onclick={(e) => e.stopPropagation()}>run</a
+                  >
+                </td>
+                <td class="whitespace-nowrap">
+                  {#each Object.entries(row.shown.logs) as [seed, file] (seed)}
+                    {#if Number(seed) === bestSeed(row)}
+                      <button
+                        class="console-action console-action--accent text-xs"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          void download(row.shown!, file);
+                        }}
+                        title={file}>WPILOG (best)</button
+                      >
+                    {/if}
+                  {/each}
+                </td>
               {/if}
-            {/each}
-          </tbody>
-        </table>
-        <p class="text-xs text-body mt-3">
-          ▲ the best seed, ★ the median one: both logs are published. AUTO
-          starts 10 s into the log; its Metadata tab names the commit and .pp it
-          simulated.
-        </p>
-        <details class="text-xs text-body mt-3">
-          <summary class="cursor-pointer text-heading"
-            >Set up AdvantageScope on this laptop (once)</summary
-          >
-          <ol class="list-decimal ml-5 mt-2 flex flex-col gap-1">
-            <li>
-              Install <a
-                class="underline"
-                href="https://github.com/Mechanical-Advantage/AdvantageScope/releases"
-                target="_blank"
-                rel="noreferrer">AdvantageScope</a
-              > (v27 alpha 6 or newer).
-            </li>
-            <li>
-              <button class="underline" onclick={downloadLayout}
-                >Download the team layout</button
-              >, then in AdvantageScope File → Import Layout… and pick it. It is
-              the same layout as for the robot's real match logs, so a simulated
-              run and a real one look alike.
-            </li>
-            <li>
-              The team's robot model (optional): in your biobuzz checkout,
-              double-click <code
-                >tools/advantagescope/setup-advantagescope.cmd</code
-              >, then restart AdvantageScope.
-            </li>
-          </ol>
-        </details>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+
+      {#if selectedRow?.shown}
+        {@const shown = selectedRow.shown}
+        {@const summary = selectedRow.summary}
+        {@const runs = shown.runs ?? []}
+        <div class="mt-4 border-t border-border pt-3">
+          <p class="mb-2">
+            <strong>{runLabel(selectedRow.run)}</strong>:
+            <code>{shown.spec ?? shown.auto}</code>
+            {#if shown.partner}with <code>{shown.partner}</code>{/if}
+            on {shown.design ?? "the usual robot"} ·
+            <button class="underline" onclick={() => copyVersionLink(shown)}
+              >copy a link to this version</button
+            >
+          </p>
+          {#if shown.error}
+            <p class="text-danger mb-2">{shown.error}</p>
+          {/if}
+          {#if runs.length}
+            {#if summary.best}
+              <p class="mb-1 text-base">
+                Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
+                  .best.seed}),
+                {summary.best.autoTips} TIP{summary.best.autoTips === 1
+                  ? ""
+                  : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
+                    .slice(0, summary.best.autoTips)
+                    .map(secs)
+                    .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
+                  .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+                  .join(" · ")}.
+              </p>
+            {/if}
+            <p class="mb-3 text-body">
+              Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on
+              average.
+              {summary.tips
+                .map(
+                  (tip, i) =>
+                    `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
+                )
+                .join(" ")}
+              LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
+              {#if summary.withProblems}<span class="text-warning"
+                  >Problems in {summary.withProblems} of {summary.runs} seeds.</span
+                >{/if}
+            </p>
+            <div class="flex flex-wrap gap-2 mb-3">
+              {#each Object.entries(shown.logs) as [seed, file] (seed)}
+                <button
+                  class="console-action {Number(seed) === bestSeed(selectedRow)
+                    ? 'console-action--accent'
+                    : ''}"
+                  onclick={() => download(shown, file)}
+                  title={file}
+                  >Download WPILOG ({logLabel(
+                    selectedRow,
+                    Number(seed),
+                  )})</button
+                >
+              {/each}
+            </div>
+            <p class="text-xs text-body mb-3">
+              Then drag the file onto AdvantageScope's window (or File → Open
+              Logs…). A web page cannot open AdvantageScope by itself, so it is
+              download, then drag.
+            </p>
+            <table class="w-full text-xs">
+              <thead class="text-body text-left">
+                <tr>
+                  <th class="py-1">Seed</th>
+                  <th>Points</th>
+                  <th>TIPs at (s)</th>
+                  <th>LEAVE / PARK</th>
+                  <th>Problems</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each runs as r (r.seed)}
+                  <tr
+                    class="border-t border-border cursor-pointer hover:bg-white/5"
+                    onclick={() =>
+                      (expanded = expanded === r.seed ? null : r.seed)}
+                  >
+                    <td class="py-1"
+                      >{r.seed}{r.seed === bestSeed(selectedRow)
+                        ? " ▲"
+                        : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
+                    >
+                    <td>{r.points}</td>
+                    <td
+                      >{r.tipsAt.length
+                        ? r.tipsAt.map(secs).join(", ")
+                        : "none"}</td
+                    >
+                    <td
+                      >{r.robots
+                        .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+                        .join(" · ")}</td
+                    >
+                    <td class="text-warning">{runProblems(r).join("; ")}</td>
+                  </tr>
+                  {#if expanded === r.seed}
+                    <tr>
+                      <td colspan="5" class="pb-2">
+                        {#each r.robots as robot (robot.auto)}
+                          <p class="mt-2 font-semibold">
+                            {robot.auto}: launched {robot.launched},
+                            {robot.finishedAt === null
+                              ? "still running at 30 s"
+                              : `finished at ${secs(robot.finishedAt)} s`}
+                            {#each robotProblems(robot) as p, i (i)}<span
+                                class="text-warning">; {p}</span
+                              >{/each}
+                          </p>
+                          <pre
+                            class="whitespace-pre-wrap text-body">{robot.timeline.join(
+                              "\n",
+                            )}</pre>
+                        {/each}
+                      </td>
+                    </tr>
+                  {/if}
+                {/each}
+              </tbody>
+            </table>
+            <p class="text-xs text-body mt-3">
+              ▲ the best seed, ★ the median one: both logs are published. AUTO
+              starts 10 s into the log; its Metadata tab names the commit and
+              .pp it simulated.
+            </p>
+            <details class="text-xs text-body mt-3">
+              <summary class="cursor-pointer text-heading"
+                >Set up AdvantageScope on this laptop (once)</summary
+              >
+              <ol class="list-decimal ml-5 mt-2 flex flex-col gap-1">
+                <li>
+                  Install <a
+                    class="underline"
+                    href="https://github.com/Mechanical-Advantage/AdvantageScope/releases"
+                    target="_blank"
+                    rel="noreferrer">AdvantageScope</a
+                  > (v27 alpha 6 or newer).
+                </li>
+                <li>
+                  <button class="underline" onclick={downloadLayout}
+                    >Download the team layout</button
+                  >, then in AdvantageScope File → Import Layout… and pick it.
+                  It is the same layout as for the robot's real match logs, so a
+                  simulated run and a real one look alike.
+                </li>
+                <li>
+                  The team's robot model (optional): in your biobuzz checkout,
+                  double-click <code
+                    >tools/advantagescope/setup-advantagescope.cmd</code
+                  >, then restart AdvantageScope.
+                </li>
+              </ol>
+            </details>
+          {/if}
+        </div>
       {/if}
     </div>
   {/if}

@@ -36,28 +36,13 @@ export const DEFAULT_BRANCH = "master";
 export const FAST_LANE_BASE = "master";
 
 /**
- * The robot design a save asks for, until a result lists the simulator's own: the real robot.
- * biobuzz's simulator offers only it and its variants (turret locked forward, POLLEN only) since
- * 31 Oct 2026, when its what-if designs went.
+ * What every save asks the simulator to run (mentor, 3 Nov 2026): the one robot the team has, its
+ * turret locked forward and POLLEN only, over ten seeds, as RED. The dialog offers no choice: a
+ * student presses Save, and like is compared with like.
  */
-export const DEFAULT_DESIGN = "real robot";
-
-/**
- * Whether `design` is one the simulator offers now: the real robot or a variant of it. Results and
- * remembered choices from before 31 Oct 2026 name the old what-if designs ("rigid V"), which the
- * simulator no longer knows, so they are shown but never copied into a new request.
- */
-export function isCurrentDesign(design: string | null | undefined): boolean {
-  return typeof design === "string" && design.startsWith(DEFAULT_DESIGN);
-}
-
-/** `designs` without the old ones, and never empty: the real robot at least. */
-export function currentDesigns(designs: unknown): string[] {
-  const current = Array.isArray(designs)
-    ? designs.filter((d): d is string => isCurrentDesign(d))
-    : [];
-  return current.length ? current : [DEFAULT_DESIGN];
-}
+export const SAVE_DESIGN = "real robot, turret locked forward, POLLEN only";
+export const SAVE_SEEDS = 10;
+export const SAVE_ALLIANCE = "RED";
 
 /** Why `path` is not a .pp that "Save to GitHub" may write, or null if it is. */
 export function ppPathProblem(path: string): string | null {
@@ -82,11 +67,17 @@ export function laneBranch(ppPath: string): string {
   return `auto/${simAutoName(ppPath).replace(/[^A-Za-z0-9._-]+/g, "-")}`;
 }
 
+/**
+ * The Auto's own request, TeamCode/sim-requests/<name>.json: where biobuzz keeps its runs (the
+ * partners a mentor curated), whichever file a save writes.
+ */
+export function simOwnRequestPath(ppPath: string): string {
+  return `${SIM_REQUESTS_DIR}/${simAutoName(ppPath)}.json`;
+}
+
 /** Where a save's simulation request goes: the Auto's own file on the fast lane, else the shared one. */
 export function simRequestPath(ppPath: string, viaFastLane: boolean): string {
-  return viaFastLane
-    ? `${SIM_REQUESTS_DIR}/${simAutoName(ppPath)}.json`
-    : SIM_REQUEST_PATH;
+  return viaFastLane ? simOwnRequestPath(ppPath) : SIM_REQUEST_PATH;
 }
 
 /** The branches "Save to GitHub" never writes to: work reaches them by pull request. */
@@ -118,13 +109,13 @@ export function generatedPathFor(
   return `${dir}/${javaFileName}`;
 }
 
-/** The run in AutoStudyTest's terms: `OursAuto[,PartnerAuto]@speed`. */
-export function simSpec(
-  autoClass: string,
-  partnerClass: string | null,
-  speed: number,
-): string {
-  return `${autoClass}${partnerClass ? `,${partnerClass}` : ""}@${speed}`;
+/**
+ * The run in AutoStudyTest's terms: our Auto's class. No "@speed": the simulator's default (50 in/s)
+ * is the Visualizer's preview speed. The partner, when there is one, is each run's own
+ * ({@link SimRunPlan}), never part of the spec the Visualizer writes.
+ */
+export function simSpec(autoClass: string): string {
+  return autoClass;
 }
 
 /**
@@ -147,32 +138,136 @@ export function suggestPpPath(
 export interface SimRequestOptions {
   ppPath: string;
   spec: string;
-  design: string;
-  partnerDesign: string | null;
-  partnerSpeed: number | null;
-  seeds: number;
-  alliance: "RED" | "BLUE";
   savedBy: string;
+  /**
+   * The Auto's request as biobuzz has it (TeamCode/sim-requests/<name>.json on the branch, else
+   * master), or null for an Auto with none yet. Its `runs` (the partners a mentor curated) and any
+   * other field the Visualizer does not own are kept as they are.
+   */
+  existing?: SimRequest | null;
 }
 
-/** TeamCode/sim-request.json's text: SimRunTest's request, and what to stamp on each log. */
+/**
+ * One run of an Auto in biobuzz's request: alone (`partner` null) or with a partner stand-in, a
+ * generated class from `TeamCode/autos/partners/` (`"PartnerLStillAuto"`). `label` is optional, the
+ * words the mentor chose for the stand-in ("L just parks"); without one the class name is read.
+ */
+export interface SimRunPlan {
+  partner: string | null;
+  label?: string;
+}
+
+/** TeamCode/sim-requests/<name>.json as biobuzz holds it; only the fields the Visualizer reads. */
+export interface SimRequest {
+  pp?: string;
+  spec?: string;
+  design?: string;
+  seeds?: number[];
+  alliance?: string;
+  runs?: unknown;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** The fields of a request the Visualizer writes; everything else in it is biobuzz's. */
+const OWN_FIELDS = ["pp", "spec", "design", "seeds", "alliance", "metadata"];
+/** The old per-save partner choice (gone 3 Nov 2026): a run's partner is in `runs` now. */
+const RETIRED_FIELDS = ["partnerDesign", "partnerSpeed"];
+
+/**
+ * The request's text: the Auto's own fields (what to run, on which robot, how often, as whom, and
+ * what to stamp on each log), then whatever biobuzz's copy had besides, its `runs` first of all.
+ */
 export function simRequestText(o: SimRequestOptions, now = new Date()): string {
-  const count = Math.min(50, Math.max(1, Math.round(o.seeds)));
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(o.existing ?? {})) {
+    if (!OWN_FIELDS.includes(key) && !RETIRED_FIELDS.includes(key))
+      kept[key] = value;
+  }
   const request = {
     pp: o.ppPath,
     spec: o.spec,
-    design: o.design,
-    partnerDesign: o.partnerDesign,
-    partnerSpeed: o.partnerSpeed,
-    seeds: Array.from({ length: count }, (_, i) => i + 1),
-    alliance: o.alliance,
+    design: SAVE_DESIGN,
+    seeds: Array.from({ length: SAVE_SEEDS }, (_, i) => i + 1),
+    alliance: SAVE_ALLIANCE,
     metadata: {
       AutoSource: baseName(o.ppPath),
       SavedBy: o.savedBy,
       SavedAt: now.toISOString(),
     },
+    ...kept,
   };
   return `${JSON.stringify(request, null, 2)}\n`;
+}
+
+/** Reads a request's text; null when it is not one. */
+export function parseSimRequest(text: string | null): SimRequest | null {
+  if (text === null) return null;
+  try {
+    const data = JSON.parse(text);
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? (data as SimRequest)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A Java class name, as a run's partner must be. */
+const NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * The runs a request asks for: its `runs` that name a partner class or none, in order, the Auto
+ * alone when it lists none (or has none). A run is never added by the Visualizer: a mentor curates
+ * the partners in biobuzz.
+ */
+export function simRuns(request: SimRequest | null): SimRunPlan[] {
+  const out: SimRunPlan[] = [];
+  if (Array.isArray(request?.runs)) {
+    for (const run of request.runs) {
+      if (!run || typeof run !== "object") continue;
+      const partner = (run as { partner?: unknown }).partner;
+      if (
+        partner !== null &&
+        !(typeof partner === "string" && NAME.test(partner))
+      )
+        continue;
+      if (out.some((r) => r.partner === (partner ?? null))) continue;
+      const label = (run as { label?: unknown }).label;
+      out.push(
+        typeof label === "string" && label.trim()
+          ? { partner: partner ?? null, label: label.trim() }
+          : { partner: partner ?? null },
+      );
+    }
+  }
+  return out.length ? out : [{ partner: null }];
+}
+
+/** A run's words: "alone", or "with L just parks" (the label, else the class name in words). */
+export function runLabel(run: SimRunPlan): string {
+  if (run.partner === null) return "alone";
+  return `with ${run.label ?? partnerWords(run.partner)}`;
+}
+
+/** "PartnerLStillAuto" → "L Still": the class name as words, without the parts every stand-in has. */
+export function partnerWords(partnerClass: string): string {
+  const stem = partnerClass.replace(/^Partner/, "").replace(/Auto$/, "");
+  const words = stem
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
+    .trim();
+  return words || partnerClass;
+}
+
+/** "Will simulate: alone, with L just parks, with L does nothing". */
+export function simPlanSentence(runs: SimRunPlan[]): string {
+  return `Will simulate: ${runs.map(runLabel).join(", ")}`;
+}
+
+/** The key a run is filed under in a map: "" alone, else the partner's class. */
+export function runKey(run: SimRunPlan): string {
+  return run.partner ?? "";
 }
 
 /** The Auto's name on sim-results: its .pp file name without ".pp". */
@@ -180,12 +275,33 @@ export function simAutoName(ppPath: string): string {
   return baseName(ppPath).replace(/\.pp$/, "");
 }
 
-export function simResultPath(ppPath: string, commit: string): string {
-  return `${simAutoName(ppPath)}/${commit}/result.json`;
+/**
+ * Where a run's results sit on sim-results: the Auto's folder for the Auto alone, and
+ * `<auto>/partners/<PartnerClass>` for a run with that partner (layout agreed with biobuzz's
+ * "Simulate Auto" workflow, 3 Nov 2026). Each holds `latest.json` and `<commit>/result.json`
+ * with that commit's logs beside it.
+ */
+export function simRunFolder(
+  ppPath: string,
+  partner: string | null = null,
+): string {
+  const auto = simAutoName(ppPath);
+  return partner === null ? auto : `${auto}/partners/${partner}`;
 }
 
-export function simLatestPath(ppPath: string): string {
-  return `${simAutoName(ppPath)}/latest.json`;
+export function simResultPath(
+  ppPath: string,
+  commit: string,
+  partner: string | null = null,
+): string {
+  return `${simRunFolder(ppPath, partner)}/${commit}/result.json`;
+}
+
+export function simLatestPath(
+  ppPath: string,
+  partner: string | null = null,
+): string {
+  return `${simRunFolder(ppPath, partner)}/latest.json`;
 }
 
 /** What the simulator writes for one robot in one run (SimRunTest). */
@@ -223,8 +339,11 @@ export interface SimResult {
   designs?: string[];
   spec?: string;
   design?: string;
-  partnerDesign?: string | null;
   alliance?: string;
+  /** The partner stand-in this result ran with, null or absent for the Auto alone. */
+  partner?: string | null;
+  /** The folder on sim-results its files are in (`r-solo/partners/PartnerLStillAuto`); the Auto's when absent. */
+  folder?: string;
   runs?: SimRun[];
   error?: string;
   auto: string;
@@ -242,7 +361,7 @@ export interface SimResult {
 
 /** A published log's path on sim-results. */
 export function simLogPath(result: SimResult, file: string): string {
-  return `${result.auto}/${result.commit}/${file}`;
+  return `${result.folder ?? result.auto}/${result.commit}/${file}`;
 }
 
 /** What went wrong for a robot in a run, in words; empty if nothing did. */

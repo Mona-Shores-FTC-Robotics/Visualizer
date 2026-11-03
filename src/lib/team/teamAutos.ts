@@ -3,7 +3,8 @@
  *
  * A team link `#team=<branch>/<a>.pp,<b>.pp` (up to 4 files, or a pair's name from
  * `pairs.json`, e.g. `#team=claude/simulator/recycle3`) fetches those files from
- * `TeamCode/autos/` on that branch, keeps a copy of each in the browser's file list (named
+ * `TeamCode/autos/` on that branch (a partner stand-in from its `partners/` subfolder is named
+ * with it: `#team=master/partners/partner-l-still.pp`), keeps a copy of each in the browser's file list (named
  * `biobuzz-<file>`, replaced on every open, so the viewer's own files are never touched) and
  * shows them together in multi-path mode. Opening the same link again, or Reload in the
  * Team Autos dialog, picks up whatever was pushed since.
@@ -24,8 +25,37 @@ export const MAX_FILES = 4;
 /** Prefix of the copies kept in the browser's file list. */
 export const COPY_PREFIX = "biobuzz-";
 
+/**
+ * The subfolders of TeamCode/autos a link may name a file in: `partners/`, the partner stand-ins
+ * the simulator runs beside an Auto. The Team Autos list shows the folder's own files only; a
+ * stand-in opens when its path is typed.
+ */
+export const TEAM_SUBDIRS = ["partners"] as const;
+
 const FILE = /^[A-Za-z0-9._ -]+\.pp$/;
 const NAME = /^[A-Za-z0-9._-]+$/;
+
+/** A plain file name, or one in a known subfolder (`partners/partner-l-still.pp`). */
+export function isTeamFile(file: string): boolean {
+  const slash = file.indexOf("/");
+  if (slash < 0) return FILE.test(file);
+  return (
+    (TEAM_SUBDIRS as readonly string[]).includes(file.slice(0, slash)) &&
+    FILE.test(file.slice(slash + 1))
+  );
+}
+
+/** Whether `tail` (what follows the branch in a link) names files or a pair this code can open. */
+function readableTail(tail: string): boolean {
+  const parts = tail
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0 || parts.length > MAX_FILES) return false;
+  if (parts.length === 1 && !parts[0].endsWith(".pp"))
+    return NAME.test(parts[0]);
+  return parts.every(isTeamFile);
+}
 const REF = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 
 /** What a team link asks for: the branch, and either files or a pair's name. */
@@ -54,15 +84,23 @@ export function parseTeamHash(
   } catch {
     return { error: "This team link is damaged." };
   }
-  const slash = body.lastIndexOf("/");
-  if (slash <= 0) {
+  // The branch may have slashes (claude/simulator) and so may a file (partners/x.pp): the branch
+  // is the shortest prefix after which the rest reads as files or a pair, so `master/partners/x.pp`
+  // is master's partners/x.pp, not a branch called master/partners. When nothing reads, the last
+  // slash splits it, and the checks below say what is wrong.
+  const segments = body.split("/");
+  let split = segments.findIndex(
+    (_, i) => i > 0 && readableTail(segments.slice(i).join("/")),
+  );
+  if (split < 0) split = segments.length - 1;
+  if (split <= 0) {
     return {
       error:
         "A team link names a branch, then the files: #team=<branch>/<file>.pp,<file>.pp",
     };
   }
-  const ref = body.slice(0, slash);
-  const tail = body.slice(slash + 1);
+  const ref = segments.slice(0, split).join("/");
+  const tail = segments.slice(split).join("/");
   if (!REF.test(ref) || ref.split("/").includes("..")) {
     return { error: `"${ref}" is not a branch or commit.` };
   }
@@ -82,7 +120,8 @@ export function parseTeamHash(
     };
   }
   for (const file of parts) {
-    if (!FILE.test(file)) return { error: `"${file}" is not a .pp file name.` };
+    if (!isTeamFile(file))
+      return { error: `"${file}" is not a .pp file name.` };
   }
   return { ref, files: parts, pair: null };
 }
@@ -95,10 +134,11 @@ export function teamHash(ref: string, filesOrPair: string[] | string): string {
   return `${TEAM_HASH_PREFIX}${ref}/${tail}`;
 }
 
-/** A raw file in the team's Autos folder on GitHub. */
+/** A raw file in the team's Autos folder on GitHub (or its `partners/` subfolder). */
 export function teamRawUrl(ref: string, file: string): string {
   const r = ref.split("/").map(encodeURIComponent).join("/");
-  return `https://raw.githubusercontent.com/${TEAM_REPO}/${r}/${TEAM_DIR}/${encodeURIComponent(file)}`;
+  const f = file.split("/").map(encodeURIComponent).join("/");
+  return `https://raw.githubusercontent.com/${TEAM_REPO}/${r}/${TEAM_DIR}/${f}`;
 }
 
 /** GitHub's listing of the team's Autos folder on a branch. */
@@ -106,9 +146,9 @@ export function teamListUrl(ref: string): string {
   return `https://api.github.com/repos/${TEAM_REPO}/contents/${TEAM_DIR}?ref=${encodeURIComponent(ref)}`;
 }
 
-/** The name of the browser copy of a team file. */
+/** The name of the browser copy of a team file: `biobuzz-partners-x.pp` for `partners/x.pp`. */
 export function copyName(file: string): string {
-  return `${COPY_PREFIX}${file}`;
+  return `${COPY_PREFIX}${file.replace(/\//g, "-")}`;
 }
 
 /** Reads pairs.json: the pairs that name only plain .pp files, in order. */
@@ -171,7 +211,10 @@ export async function loadPairs(
   return text === null ? [] : parsePairs(text);
 }
 
-/** The .pp files in the team's Autos folder on a branch, sorted. */
+/**
+ * The .pp files in the team's Autos folder on a branch, sorted. The folder's own files only: the
+ * `partners/` stand-ins are the simulator's, not Autos the robot runs, so the list leaves them out.
+ */
 export async function listTeamFiles(
   ref: string,
   get: FetchText = fetchText,
