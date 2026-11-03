@@ -8,7 +8,12 @@
  */
 import type { ProjectDoc } from "../../io/project";
 import { findCollisions, type Collision } from "../../model/collision";
-import type { PathCatalog } from "../auto/geometry";
+import {
+  buildPathCatalog,
+  withEndAt,
+  type PathCatalog,
+} from "../auto/geometry";
+import { allCards, parkLineIds } from "../auto/tree";
 
 /** Contact at a drive's start that ends sooner than this, seconds, is the spot's, not the drive's. */
 const LEAVES_WITHIN_S = 0.75;
@@ -28,30 +33,67 @@ export function stepCollisions(
   const auto = doc.auto;
   if (!auto) return out;
   const cache = new Map<string, string[]>();
-  const hitsOf = (lineId: string): string[] => {
-    const known = cache.get(lineId);
+  const hitsOf = (
+    lineId: string,
+    within = { catalog, doc },
+    key = lineId,
+  ): string[] => {
+    const known = cache.get(key);
     if (known) return known;
-    const info = catalog.byId.get(lineId);
+    const info = within.catalog.byId.get(lineId);
     // Contact already there where the drive begins, and left at once, is where the step before
     // left the robot (a start's back on the wall, a spot close by a FLOWER), not this drive's
     // doing; a spot truly inside something is the drive that went there's hit.
     const names = info
       ? [
           ...new Set(
-            findCollisions(doc, info.travel)
+            findCollisions(within.doc, info.travel)
               .filter((c) => c.start > 1e-3 || c.end > LEAVES_WITHIN_S)
               .map((c) => what(doc, c)),
           ),
         ]
       : [];
-    cache.set(lineId, names);
+    cache.set(key, names);
     return names;
   };
-  for (const card of auto.cards) {
+  // Fork: each other park the drive team may pick in INIT: every park path with its end there.
+  const parks = parkLineIds(auto);
+  const choices = (auto.parkChoices ?? []).flatMap((name) => {
+    const point = auto.points[name];
+    if (!point) return [];
+    const lines = catalog.lines.map((line) =>
+      parks.has(line.id) ? withEndAt(line, point[0], point[1]) : line,
+    );
+    return [
+      {
+        name,
+        // The collision check reads each path's shape from the document's lines.
+        within: {
+          catalog: buildPathCatalog(
+            catalog.startPoint,
+            lines,
+            catalog.settings,
+          ),
+          doc: { ...doc, lines },
+        },
+      },
+    ];
+  });
+  /** A park path's hits, to the drawn park and to each other one ("the wall (to LEFT_PARK)"). */
+  const parkHits = (lineId: string): string[] => [
+    ...hitsOf(lineId),
+    ...choices.flatMap((choice) =>
+      hitsOf(lineId, choice.within, `${lineId}→${choice.name}`).map(
+        (hit) => `${hit} (to ${choice.name})`,
+      ),
+    ),
+  ];
+  // Every drive, an Otherwise's too.
+  for (const card of allCards(auto.cards)) {
     if (card.kind !== "path") continue;
-    const drive = hitsOf(card.lineId);
+    const drive = card.park ? parkHits(card.lineId) : hitsOf(card.lineId);
     const parkId = auto.parkFrom?.[card.id];
-    const park = parkId ? hitsOf(parkId) : [];
+    const park = parkId ? parkHits(parkId) : [];
     if (drive.length || park.length) out.set(card.id, { drive, park });
   }
   return out;

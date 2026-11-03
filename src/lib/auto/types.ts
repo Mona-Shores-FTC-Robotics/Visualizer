@@ -147,8 +147,20 @@ interface RowCommon {
 
 /** The trigger fired. The file keeps a list for older files; it holds exactly one name. */
 export type WhenRow = RowCommon & { when: string[] };
-/** The wait's time limit passed. */
-export type AfterMsRow = RowCommon & { afterMs: number };
+/**
+ * The wait's time limit passed: `afterMs` after the wait began, or, with `matchClock`, once the
+ * match clock reads `afterMs` (at once if it already does), however late the drive before it ended.
+ */
+export type AfterMsRow = RowCommon & {
+  afterMs: number;
+  /** Fork: `afterMs` is a time on the match clock, not a time since the wait began. */
+  matchClock?: boolean;
+  /**
+   * Fork: the drive team may move it during INIT (biobuzz InitOptions: the partner's TIP time on
+   * the D-pad). Only on a match-clock limit, and on one wait per Auto.
+   */
+  adjustable?: boolean;
+};
 
 export type AutoRow = WhenRow | AfterMsRow;
 
@@ -192,6 +204,12 @@ export interface AutoSection {
    * (lib/team/teamSpots.ts).
    */
   teamSpots?: string[];
+  /**
+   * Fork: the other PARK spots the drive team may pick during INIT instead of the park step's own
+   * (biobuzz InitOptions, the D-pad). Each is a named point, usually a team spot; the robot drives
+   * every park path to the one picked, so a partner parking where we planned to is no problem.
+   */
+  parkChoices?: string[];
   /** The plays this Auto's ladders use, by id (see `FirstOfCard.ladder`). */
   plays?: Record<string, Play>;
   cards: AutoCard[];
@@ -204,4 +222,17 @@ export function rowKind(row: AutoRow): RowKind {
 /** The time-limit row, which every wait needs so it cannot hang. */
 export function isTimeRow(row: AutoRow): boolean {
   return rowKind(row) === "afterMs";
+}
+
+/** When a time row fires, in seconds since the match began, for a wait that began at `t0`. */
+export function timeRowFiresAt(row: AfterMsRow, t0: number): number {
+  return row.matchClock
+    ? Math.max(t0, row.afterMs / 1000)
+    : t0 + row.afterMs / 1000;
+}
+
+/** "7 s" or "until 8.5 s": a time row's limit, as the editor and the plan show it. */
+export function timeRowText(row: AfterMsRow): string {
+  const s = Math.round(row.afterMs / 100) / 10;
+  return row.matchClock ? `until ${s} s` : `${s} s`;
 }
