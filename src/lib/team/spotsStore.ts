@@ -7,7 +7,7 @@
  * Auto that uses it. Unsaved changes survive a reload; which spots are unlocked does not.
  */
 import { derived, get, writable } from "svelte/store";
-import type { NamedPoint } from "../auto/types";
+import type { AutoSection, NamedPoint } from "../auto/types";
 import { repoSpotsText } from "../repo/repoStore";
 import {
   loadTeamSpots,
@@ -124,4 +124,34 @@ function readEdits(): TeamSpots {
   } catch {
     return {};
   }
+}
+
+/**
+ * Team spots the open Auto uses that biobuzz does not have yet: changed here and not saved, or
+ * in the file but missing from the list as read.
+ */
+export function unsavedSpotsIn(auto: AutoSection | null | undefined): string[] {
+  const team = get(teamSpots);
+  const missing =
+    get(spotsStatus) === "ok"
+      ? (auto?.teamSpots ?? []).filter(
+          (name) => !team[name] && auto?.points[name],
+        )
+      : [];
+  return [...new Set([...Object.keys(get(spotEdits)), ...missing])].sort();
+}
+
+/** Before Save to computer: says when team spots are only in this browser; false to stop. */
+export function confirmSaveWithUnsavedSpots(
+  auto: AutoSection | null | undefined,
+): boolean {
+  const unsaved = unsavedSpotsIn(auto);
+  return (
+    !unsaved.length ||
+    confirm(
+      `Team spots ${unsaved.join(", ")} are only in this browser, not in biobuzz. ` +
+        "The file keeps their numbers, but nobody else gets them until someone presses " +
+        "Save team spots. Save the file anyway?",
+    )
+  );
 }

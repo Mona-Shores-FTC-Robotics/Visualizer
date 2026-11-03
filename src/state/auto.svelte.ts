@@ -98,6 +98,8 @@ export class AutoState {
   #pinned: PinState | null = null;
 
   auto = $derived.by(() => this.#project.doc.auto ?? null);
+  /** Fork: the Auto is all simple-builder steps, so "← Simple" can show it there. */
+  simple = $derived.by(() => isSimple(this.#project.doc));
   /**
    * The open project's preview, while it is what plays: other files shown
    * together take over the clock and the field.

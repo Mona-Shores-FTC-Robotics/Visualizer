@@ -2,6 +2,7 @@
   import {
     CloudUpload,
     Download,
+    Link2,
     Redo2,
     Settings,
     Undo2,
@@ -61,6 +62,8 @@
       "export.gif",
     ),
   );
+  // Fork: every way to save the Auto, behind one button.
+  let saveEntries = $derived(items("github.save", "repo.save", "file.saveAs"));
   let undo = $derived(menuItem(action("edit.undo")));
   let redo = $derived(menuItem(action("edit.redo")));
 </script>
@@ -76,29 +79,49 @@
         class="size-6"
         draggable="false"
       />
-      <span class="text-sm font-semibold whitespace-nowrap text-heading">
-        Visualizer
-      </span>
-      <span class="text-xs whitespace-nowrap text-body">
-        BIOBUZZ Auto Builder fork
+      <span
+        class="text-sm font-semibold whitespace-nowrap text-heading"
+        title="BIOBUZZ Auto Builder: Mona Shores' fork of the Pedro Pathing Visualizer"
+      >
+        Auto Builder
       </span>
     </div>
     <Menu label="File" entries={fileEntries} />
-    <button
-      type="button"
-      class="truncate rounded-md px-2 py-1 text-sm text-body transition hover:bg-base hover:text-heading"
-      title={$currentFilePath
-        ? `${$currentFilePath} (click to rename)`
-        : "Not saved yet (click to save with a name)"}
-      onclick={$currentFilePath
-        ? action("file.rename").run
-        : action("file.save").run}
-    >
-      {basename($currentFilePath) || "Untitled"}
-      {#if project.dirty}
-        <span class="text-primary" title="Unsaved changes">•</span>
-      {/if}
-    </button>
+    {#if links.githubFile}
+      <!-- Fork: a file from biobuzz. Edits are kept as a draft until Save to GitHub. -->
+      <button
+        type="button"
+        class="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-sm text-heading transition hover:bg-base"
+        title="From biobuzz. Your edits are kept in this browser as a draft; Save to GitHub when it is ready."
+        onclick={action("github.save").run}
+      >
+        <span class="truncate">{links.githubFile.name}</span>
+        <span
+          class={[
+            "rounded px-1.5 py-0.5 text-xs whitespace-nowrap",
+            links.githubFile.changed
+              ? "bg-warning/15 text-warning"
+              : "bg-base text-body",
+          ]}>{links.githubFile.label}</span
+        >
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="truncate rounded-md px-2 py-1 text-sm text-body transition hover:bg-base hover:text-heading"
+        title={$currentFilePath
+          ? `${$currentFilePath} (click to rename)`
+          : "Not saved yet (click to save with a name)"}
+        onclick={$currentFilePath
+          ? action("file.rename").run
+          : action("file.save").run}
+      >
+        {basename($currentFilePath) || "Untitled"}
+        {#if project.dirty}
+          <span class="text-primary" title="Unsaved changes">•</span>
+        {/if}
+      </button>
+    {/if}
   </div>
 
   <div class="flex items-center gap-1">
@@ -123,31 +146,11 @@
         onclick={() => links.close()}>Close</button
       >
     {/if}
-    {#if links.githubFile}
-      <!-- A file from biobuzz: edits are kept as a draft until Save to GitHub. -->
-      <button
-        type="button"
-        class="rounded-md px-2 py-1 text-xs whitespace-nowrap text-body transition hover:bg-base hover:text-heading"
-        title="From biobuzz. Your edits are kept in this browser as a draft; Save to GitHub when it is ready."
-        onclick={action("github.save").run}
-      >
-        {links.githubFile.name} ·
-        <span class={[links.githubFile.changed && "text-warning"]}>
-          {links.githubFile.label}
-        </span>
-      </button>
-    {/if}
     <IconButton
       label="Team Autos: the latest from biobuzz, together"
       onclick={action("team.autos").run}
     >
       <Users />
-    </IconButton>
-    <IconButton
-      label="Save to GitHub and simulate"
-      onclick={action("github.save").run}
-    >
-      <CloudUpload />
     </IconButton>
     <div class="mx-1.5 h-5 w-px bg-border"></div>
     <IconButton
@@ -165,6 +168,18 @@
       <Redo2 />
     </IconButton>
     <div class="mx-1.5 h-5 w-px bg-border"></div>
+    <button
+      type="button"
+      class="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-body transition outline-none hover:bg-body/10 hover:text-heading focus-visible:ring-2 focus-visible:ring-primary/40 [&_svg]:size-4"
+      title="A link that opens this Auto: paste it in the GitHub issue or send it to a mentor"
+      onclick={action("export.shareLink").run}
+    >
+      <Link2 />
+      Share
+    </button>
+    <Menu label="Save" entries={saveEntries} align="end">
+      {#snippet icon()}<CloudUpload />{/snippet}
+    </Menu>
     <Menu label="Export" entries={exportEntries} align="end">
       {#snippet icon()}<Download />{/snippet}
     </Menu>
