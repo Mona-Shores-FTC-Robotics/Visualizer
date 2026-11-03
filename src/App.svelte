@@ -30,6 +30,7 @@
   import { SharedLinks, provideLinks } from "./state/links.svelte";
   import { layOutDoc } from "./lib/auto/links";
   import { refreshTeamSpots } from "./lib/team/spotsStore";
+  import { loadRepoFolder } from "./lib/repo/repoStore";
 
   const project = new ProjectStore(
     createDefaultProject(
@@ -111,7 +112,8 @@
 
   onMount(() => links.start());
   // Fork: the team's spots, from biobuzz master (lib/team/spotsStore.ts).
-  onMount(() => void refreshTeamSpots());
+  // The checkout first: when GitHub is out of reach, the spots come from it.
+  onMount(() => void loadRepoFolder().then(() => refreshTeamSpots()));
 
   onMount(() => {
     const updateMobile = () => (isMobileBlocked = isMobileDevice());
@@ -159,6 +161,7 @@
         onSave={() => actionById(actions, "file.saveAs").run()}
         onShare={() => actionById(actions, "export.shareLink").run()}
         onGithub={() => (dialogs.github = true)}
+        onRepo={() => (dialogs.repo = true)}
       />
 
       <PanelDivider

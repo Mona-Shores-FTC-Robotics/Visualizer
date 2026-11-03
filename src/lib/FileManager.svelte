@@ -40,6 +40,8 @@
   import { DEFAULT_REF, TEAM_DIR, listTeamFiles } from "./team/teamAutos";
   import { gitHash, gitLinkFor } from "../utils/gitLink";
   import { TEAM_ROBOT } from "./auto/teamRobot";
+  import { listRepoAutos, readRepoAuto, REPO_PP_DIR } from "./repo/repoFolder";
+  import { allowRepoFolder, canPickFolder, repoFolder } from "./repo/repoStore";
   import { blankAuto } from "./simple/steps";
 
   interface Props {
@@ -88,6 +90,67 @@
   $effect(() => {
     if (isOpen && !teamLoaded) void loadTeamFiles();
   });
+
+  /**
+   * The checkout on this laptop (lib/repo): its TeamCode/autos, so the Autos open from the
+   * laptop when GitHub is out of reach. Opened like a file from disk: a copy under its own name
+   * in this browser, which Save to GitHub and Save to repo folder then save back by that name.
+   */
+  let repoFiles: string[] = $state([]);
+  let repoError = $state("");
+  let repoBusy = $state(false);
+
+  async function loadRepoFiles() {
+    const folder = $repoFolder;
+    repoFiles = [];
+    repoError = "";
+    if (!folder || folder.permission !== "granted") return;
+    try {
+      repoFiles = await listRepoAutos(folder.folder);
+    } catch (error) {
+      repoError = getErrorMessage(error);
+    }
+  }
+
+  $effect(() => {
+    if (isOpen && $repoFolder) void loadRepoFiles();
+  });
+
+  async function allowRepo() {
+    repoBusy = true;
+    try {
+      await allowRepoFolder();
+    } finally {
+      repoBusy = false;
+    }
+  }
+
+  async function openRepoFile(name: string) {
+    const folder = $repoFolder;
+    if (!folder) return;
+    try {
+      const text = await readRepoAuto(folder.folder, name);
+      if (text === null) {
+        showToast(`${folder.name} has no ${REPO_PP_DIR}/${name}`, "error");
+        return;
+      }
+      const result = parseProject(text, currentProject().robot);
+      if (!result.ok) {
+        showToast(result.error, "error");
+        return;
+      }
+      result.warnings.forEach((warning) => showToast(warning, "warning"));
+      applyProject(result.doc);
+      await browserFileStore.writeFile(name, serializeProject(result.doc));
+      await refreshDirectory();
+      currentFilePath.set(name);
+      project.markSaved();
+      showToast(`Opened ${name} from ${folder.name}`, "success");
+      isOpen = false;
+    } catch (error) {
+      showToast(`Could not open ${name}: ${getErrorMessage(error)}`, "error");
+    }
+  }
 
   function openTeamFile(file: string) {
     const hash = gitHash(gitLinkFor(DEFAULT_REF, `${TEAM_DIR}/${file}`));
@@ -428,6 +491,51 @@
           </div>
         {/if}
       </div>
+      {#if canPickFolder()}
+        <div class="mb-3 border-b border-border pb-3">
+          <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
+            biobuzz checkout
+            {#if $repoFolder}<span class="font-mono font-normal text-body"
+                >{$repoFolder.name}</span
+              >{/if}
+          </h3>
+          {#if !$repoFolder}
+            <p class="px-2 pb-1 text-xs text-body">
+              The Autos in the checkout on this laptop, no internet needed. Pick
+              the folder once in File → Save to repo folder….
+            </p>
+          {:else if $repoFolder.permission !== "granted"}
+            <p class="px-2 pb-1 text-xs text-body">
+              <button class="underline" onclick={allowRepo} disabled={repoBusy}
+                >Allow reading {$repoFolder.name}</button
+              > to list its Autos.
+            </p>
+          {:else if repoError}
+            <p class="px-2 text-xs text-danger">
+              {repoError}
+              <button class="underline" onclick={loadRepoFiles}
+                >Try again</button
+              >
+            </p>
+          {:else if repoFiles.length === 0}
+            <p class="px-2 text-xs text-body">No Autos in {REPO_PP_DIR} yet.</p>
+          {:else}
+            <p class="px-2 pb-2 text-xs text-body">
+              Open one to edit it; Save to repo folder writes it back.
+            </p>
+            <div class="flex flex-col gap-px">
+              {#each repoFiles as file (file)}
+                <button
+                  type="button"
+                  class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
+                  title={`Open ${REPO_PP_DIR}/${file} from ${$repoFolder.name}`}
+                  onclick={() => openRepoFile(file)}>{file}</button
+                >
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
       <h3 class="px-2 pb-1 text-xs font-semibold text-heading">This browser</h3>
       {#if loading}
         <div class="flex flex-col items-center gap-2 py-10 text-xs text-body">

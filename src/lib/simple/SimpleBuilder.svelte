@@ -78,10 +78,12 @@
     onShare: () => void;
     /** The mentors' Save to GitHub and simulate. */
     onGithub: () => void;
+    /** Save to repo folder: the biobuzz checkout on this laptop. */
+    onRepo: () => void;
     onExport: () => void;
   }
 
-  let { onSave, onShare, onGithub, onExport }: Props = $props();
+  let { onSave, onShare, onGithub, onRepo, onExport }: Props = $props();
 
   const project = useProject();
   const auto = useAuto();
@@ -758,8 +760,8 @@
               }),
             )}
         >
-          {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option value={w.trigger}
-              >{w.label}</option
+          {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
+              value={w.trigger}>{w.label}</option
             >{/each}
         </select>
         <label class="flex items-center gap-1">
@@ -959,6 +961,13 @@
       class="text-xs text-body underline"
       onclick={onGithub}
       title="Save to GitHub and simulate (mentors)">GitHub…</button
+    >
+    <button
+      type="button"
+      class="text-xs text-body underline"
+      onclick={onRepo}
+      title="Save into the biobuzz checkout on this laptop, then Sloth Load (mentors)"
+      >Folder…</button
     >
     <button
       type="button"

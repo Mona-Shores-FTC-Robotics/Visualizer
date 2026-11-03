@@ -32,6 +32,7 @@
     onSave: () => void;
     onShare: () => void;
     onGithub: () => void;
+    onRepo: () => void;
   }
 
   let {
@@ -42,6 +43,7 @@
     onSave,
     onShare,
     onGithub,
+    onRepo,
   }: Props = $props();
 
   const project = useProject();
@@ -105,7 +107,13 @@
           >
         {/if}
         {#if auto.view === "simple"}
-          <SimpleBuilder {onSave} {onShare} {onGithub} onExport={exportAuto} />
+          <SimpleBuilder
+            {onSave}
+            {onShare}
+            {onGithub}
+            {onRepo}
+            onExport={exportAuto}
+          />
         {:else if auto.view === "plan" && auto.plan}
           <PlanPanel
             onExport={exportAuto}

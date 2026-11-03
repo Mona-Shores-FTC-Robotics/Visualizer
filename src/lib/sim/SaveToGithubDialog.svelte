@@ -77,6 +77,8 @@
     } | null;
     /** Throws the draft away and loads GitHub's version. */
     onDiscard?: () => void;
+    /** Opens Save to repo folder instead: the save that works with GitHub out of reach. */
+    onRepoSave?: () => void;
     /** After a save: the project now is that file on that branch, exactly `text`. */
     onSaved: (branch: string, path: string, text: string) => void;
   }
@@ -90,6 +92,7 @@
     draft = null,
     onDiscard,
     onSaved,
+    onRepoSave,
   }: Props = $props();
 
   const OPTIONS_KEY = "githubSimOptions";
@@ -113,6 +116,8 @@
   let planFrom = $state<string | null>(null);
 
   let saving = $state(false);
+  /** Why GitHub could not be read when the dialog opened, if it could not (offline, or a blocked network). */
+  let unreachable = $state<string | null>(null);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
   let pull = $state<{ url: string; number: number } | null>(null);
   /** Master, or a fast-lane branch: the save goes to master through a pull request that merges itself. */
@@ -232,8 +237,10 @@
           (await branchHead(token, FAST_LANE_BASE)))
         : await branchHead(token, branch);
       files = await listFiles(token, at);
+      unreachable = null;
     } catch (error) {
       files = [];
+      unreachable = (error as Error).message;
       showToast(
         `Could not read ${branch}: ${(error as Error).message}`,
         "error",
@@ -641,6 +648,23 @@
           >
         {/each}
       </div>
+    </div>
+  {/if}
+
+  {#if unreachable}
+    <div
+      class="text-sm text-warning border border-warning/40 rounded p-3 my-3 flex items-center justify-between gap-3"
+    >
+      <p>
+        GitHub cannot be reached ({unreachable}). <b>Save to repo folder</b>
+        still works: it writes the <code>.pp</code> and its Java into the biobuzz
+        checkout on this laptop, then Sloth Load.
+      </p>
+      {#if onRepoSave}
+        <button class="console-action shrink-0" onclick={onRepoSave}
+          >Save to repo folder…</button
+        >
+      {/if}
     </div>
   {/if}
 

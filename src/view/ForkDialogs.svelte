@@ -12,6 +12,7 @@
   import TeamAutosDialog from "../lib/team/TeamAutosDialog.svelte";
   import ShareLinkDialog from "../lib/components/ShareLinkDialog.svelte";
   import SaveToGithubDialog from "../lib/sim/SaveToGithubDialog.svelte";
+  import SaveToRepoDialog from "../lib/repo/SaveToRepoDialog.svelte";
   import SharedCopyBanner from "../lib/components/SharedCopyBanner.svelte";
   import SaveSpotsDialog from "../lib/team/SaveSpotsDialog.svelte";
   import { saveSpotsOpen } from "../lib/team/spotsStore";
@@ -72,6 +73,17 @@
     : null}
   onDiscard={() => void links.discardDraft()}
   onSaved={(branch, path, text) => links.savedToGithub(branch, path, text)}
+  onRepoSave={() => {
+    dialogs.github = false;
+    dialogs.repo = true;
+  }}
+/>
+
+<SaveToRepoDialog
+  bind:isOpen={dialogs.repo}
+  fileName={basename($currentFilePath)}
+  source={links.sourceOnScreen}
+  projectText={() => serializeProject(files.current(), { pretty: true })}
 />
 
 <!-- A shared copy says so in the top bar; this shows a link that failed to open. -->

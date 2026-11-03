@@ -41,6 +41,7 @@
       "file.mirror",
       "separator",
       "github.save",
+      "repo.save",
       "team.autos",
       "separator",
       "app.palette",

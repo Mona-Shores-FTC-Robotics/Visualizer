@@ -55,6 +55,12 @@ export function forkActions(
       run: () => (dialogs.github = true),
     },
     {
+      id: "repo.save",
+      group: "File",
+      title: "Save to repo folder…",
+      run: () => (dialogs.repo = true),
+    },
+    {
       id: "team.autos",
       group: "View",
       title: "Team Autos: the latest from biobuzz, together…",

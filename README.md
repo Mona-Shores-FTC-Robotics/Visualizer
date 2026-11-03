@@ -53,6 +53,11 @@ What the fork adds:
   AdvantageScope. Links may name any `.pp` in biobuzz by its whole path
   (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing results needs
   nothing; saving needs a fine-grained GitHub token, kept in the browser.
+- **Save to repo folder.** The same two files, written straight into the biobuzz checkout on the
+  laptop (Chrome or Edge; the folder is picked once), then Sloth Load. For an event: no internet,
+  nothing to drop into `generated/` by hand. With a folder chosen the Files panel opens the
+  checkout's Autos, and the team's spots come from it when GitHub is out of reach. See
+  [`docs/auto-format.md`](docs/auto-format.md#save-to-repo-folder).
 
 Built on upstream **v2.5** (merged 2026-10-28). The fork's code sits in its own folders, and the
 hooks it needs in upstream's files are listed in
