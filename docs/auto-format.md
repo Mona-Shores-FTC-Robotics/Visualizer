@@ -289,9 +289,11 @@ the Auto runs as drawn. The drawing's value is always the default.
   `kit.pick(AutoOption.PARK, 1.9, 2.1)`, the second timed with the end moved, so the endgame
   guard reserves the picked park's time. `OPTIONS` holds `AutoOption.park("LEFT_PARK", "RIGHT_PARK")`.
   The preview and the simulator drive the drawn park.
-- **The TIP wait.** An adjustable match-clock limit is `AutoOption.matchSeconds(label, s)`. On
-  the robot the drive team enters the partner's TIP time and the wait gives up a measured margin
-  after it; the preview uses the drawn time.
+- **The partner wait.** An adjustable match-clock limit is `AutoOption.matchSeconds(label, s)`. On
+  the robot the drive team enters the partner's last shot, their answer to "when does your last
+  preload leave?", and the wait gives up the TIP lag after it (biobuzz
+  `AutoRegistration.PARTNER_TIP_LAG_S`, 4 s; the Driver Station shows both numbers); the preview
+  uses the drawn time.
 
 ### Robot settings belong to the file
 
