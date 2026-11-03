@@ -85,13 +85,20 @@
 
   const fmt = (t: number) => `${t.toFixed(1)} s`;
 
+  /** A trigger that ended a wait, in words. */
+  const CONDITION: Record<string, string> = {
+    IntakeFull: "intake full",
+    Empty: "launcher empty",
+    CameraBlind: "camera blind",
+  };
+
   function waitText(wait: WaitBar): string {
     if (wait.ended === "guard") return "cut by endgame";
     if (wait.atOnce) return "up already";
     if (wait.tip !== null) return `TIP ${wait.tip + 1}`;
     if (wait.ended === "time")
       return wait.branched ? "timed out → Otherwise" : "timed out";
-    return wait.condition ?? "";
+    return CONDITION[wait.condition ?? ""] ?? wait.condition ?? "";
   }
 
   function waitTitle(wait: WaitBar): string {
