@@ -20,6 +20,8 @@
   import { useProject } from "../state/project.svelte";
   import { useEditor } from "../state/editor.svelte";
   import { usePlayback } from "../state/playback.svelte";
+  import { Pause, Play, Repeat } from "@lucide/svelte";
+  import IconButton from "../lib/components/ui/IconButton.svelte";
   import type { Overlays } from "../state/overlays.svelte";
   import ContextMenu from "../lib/components/ui/ContextMenu.svelte";
   import type { MenuEntry } from "../lib/components/ui/menu";
@@ -759,8 +761,40 @@
       lanes={auto.matchLanes}
       seconds={matchSeconds}
       onSeek={seekMatch}
-    />
-    {#if auto.matchControls}
+      compact={auto.matchSides}
+      hiveChanged={Object.keys(auto.match.hive).length > 0}
+    >
+      {#snippet hive()}
+        <MatchControls
+          robots={auto.matchRobots}
+          controls={auto.match}
+          base={auto.baseValues}
+          entries={auto.overlayTogether.entries}
+          values={auto.matchValues}
+          show="hive"
+        />
+      {/snippet}
+      {#snippet controls()}
+        <!-- Fork: the timeline is the clock in the Match view, so play and loop sit on it. -->
+        <IconButton
+          size="sm"
+          label={playback.playing ? "Pause (Space)" : "Play (Space)"}
+          onclick={() => playback.toggle()}
+          class="text-primary!"
+        >
+          {#if playback.playing}<Pause />{:else}<Play />{/if}
+        </IconButton>
+        <IconButton
+          size="sm"
+          label={playback.loop ? "Looping" : "Loop"}
+          active={playback.loop}
+          onclick={() => (playback.loop = !playback.loop)}
+        >
+          <Repeat />
+        </IconButton>
+      {/snippet}
+    </MatchTimeline>
+    {#if auto.matchControls && !auto.matchSides}
       <div class="max-h-[40vh] shrink-0 overflow-y-auto">
         <!-- Fork: with two Autos each robot's sliders are in a side panel; the HIVE stays here. -->
         <MatchControls
@@ -769,12 +803,14 @@
           base={auto.baseValues}
           entries={auto.overlayTogether.entries}
           values={auto.matchValues}
-          show={auto.matchSides ? "middle" : "all"}
+          show="all"
         />
       </div>
     {/if}
   {/if}
-  <PlaybackBar />
+  {#if !auto.matchSides}
+    <PlaybackBar />
+  {/if}
 </main>
 
 {#if menu}

@@ -72,7 +72,9 @@
   aria-label="Layers"
 >
   <div class="flex items-center justify-between px-1 pb-1">
-    <h2 class="text-sm font-semibold text-heading">Layers</h2>
+    <h2 class="text-sm font-semibold text-heading">
+      {auto.matchSides ? "Match" : "Layers"}
+    </h2>
     <IconButton label="Hide layers" size="sm" onclick={onHide}>
       <PanelLeft />
     </IconButton>

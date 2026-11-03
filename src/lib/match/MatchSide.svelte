@@ -5,6 +5,7 @@
    */
   import { useAuto } from "../../state/auto.svelte";
   import MatchControls from "./MatchControls.svelte";
+  import { robotSummary } from "./lanes";
 
   interface Props {
     /** Which Auto shown: 0 on the left, 1 on the right. */
@@ -24,11 +25,15 @@
     entries={auto.overlayTogether.entries}
     values={auto.matchValues}
     show={index}
+    summary={auto.matchLanes?.robots[index]
+      ? robotSummary(auto.matchLanes.robots[index])
+      : undefined}
   />
   {#if index === 0}
     <p class="px-1 text-[11px] text-body">
-      Match view: each robot's what-ifs are beside the field, the HIVE's under
-      it. To edit an Auto again, untick the Autos under Overlays.
+      Match view: each robot's what-ifs are beside the field; the HIVE's open
+      from its label on the timeline. To edit an Auto again, untick the Autos
+      under Overlays.
     </p>
   {/if}
 </div>
