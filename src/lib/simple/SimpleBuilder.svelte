@@ -670,7 +670,7 @@
         <label class="flex items-center gap-1">
           facing
           <input
-            class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+            class={[fieldClass, "!w-20 !py-0.5 text-xs"]}
             type="number"
             step="5"
             value={point[2] ?? 0}
@@ -847,7 +847,7 @@
           title="Spin up the launcher while waiting, so the next Launch all fires at once"
           onclick={() =>
             apply(setWait(doc, step.cardId, { spinUp: !step.spinUp }))}
-          >Spin up while waiting</button
+          >{step.spinUp ? "✓ " : ""}Spin up while waiting</button
         >
         {#if step.waitClock}
           <button
@@ -863,7 +863,8 @@
                 setWait(doc, step.cardId, {
                   adjustable: !step.waitAdjustable,
                 }),
-              )}>Set in INIT (partner's last shot)</button
+              )}
+            >{step.waitAdjustable ? "✓ " : ""}Set in INIT (partner's last shot)</button
           >
         {/if}
       </div>
@@ -1267,7 +1268,8 @@
   .simple-option--on {
     border-color: var(--primary);
     color: var(--heading);
-    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--primary) 35%, transparent);
   }
   .simple-otherwise {
     border-left: 2px solid color-mix(in srgb, var(--warning) 60%, transparent);
