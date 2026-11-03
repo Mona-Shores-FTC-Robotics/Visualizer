@@ -76,13 +76,54 @@ test("CELL up, Tip and IntakeFull answer from the TIPs and the robot's state", (
   assertEqual(t.trueAt("IntakeFull", 5), 5 + values.intakeFullS);
   t.becameTrue?.("IntakeFull", 6.5);
   assertEqual(t.trueAt("IntakeFull", 7), 7, "full stays full");
-  assertEqual(t.actionSeconds("LaunchAll"), values.volleyS);
+  assertEqual(
+    t.actionSeconds("LaunchAll", 4 + values.spinUpS),
+    values.volleyS,
+    "the launcher has been spinning since the LaunchAll at 4 s",
+  );
   assertEqual(t.actionSeconds("Unknown"), undefined);
   assertEqual(
     t.trueAt("Unknown", 3),
     undefined,
     "unknown triggers stay instant",
   );
+});
+
+test("SpinUp finishes at once; the first LaunchAll waits out the rest of the spin-up", () => {
+  const v = { ...values, spinUpS: 1.1, volleyS: 4 };
+  const fromRest = previewTiming(v, []);
+  assertEqual(fromRest.actionSeconds("LaunchAll", 0), 5.1, "from rest: all of it");
+  const t = previewTiming(v, []);
+  assertEqual(t.actionSeconds("SpinUp", 0), 0);
+  t.commandRan?.("SpinUp", 0, 0);
+  assert(
+    Math.abs(t.actionSeconds("LaunchAll", 0.3)! - 4.8) < 1e-9,
+    "0.8 s of spin-up left at 0.3 s",
+  );
+  assertEqual(t.actionSeconds("LaunchAll", 3), 4, "spun up during the drive: no wait");
+  t.commandRan?.("LaunchAll", 3, 7);
+  assertEqual(t.actionSeconds("LaunchAll", 9), 4, "left spinning after a launch");
+});
+
+test("the facts are the current robot's: no catapult or removed-card facts", () => {
+  assertEqual(
+    FACTS.map((f) => f.id).sort(),
+    [
+      "driveSpeed",
+      "intakeFullS",
+      "spinUpS",
+      "startLoad",
+      "tipLoad",
+      "tipStartS",
+      "tipSwingS",
+      "volleyLoad",
+      "volleyS",
+    ],
+  );
+  const file = parseTimingFile(
+    JSON.stringify({ version: 1, facts: { launcherReadyS: { value: 0.8 }, setDownS: 1 } }),
+  );
+  assertEqual(Object.keys(file.facts), [], "an old file's removed facts are dropped");
 });
 
 test("timing.json: bad values are dropped, changed values marked estimates, notes kept", () => {
@@ -114,9 +155,11 @@ test("timing.json: bad values are dropped, changed values marked estimates, note
 test("recycle5 together: the left robot's first volley waits on the right robot's TIP 1", () => {
   const pair = [entry(rightText), entry(leftText)];
   const { tips, previews } = previewTogether(pair, values);
+  // The right robot fires its preloads at PLAY with no SpinUp before: spin-up, volley, flight, swing.
+  const tip1 = values.spinUpS + values.volleyS + values.tipStartS + values.tipSwingS;
   assert(
-    Math.abs(tips[0].settled - 2.1) < 0.05,
-    `TIP 1 settles at about 2.1 s, not ${tips[0].settled}`,
+    Math.abs(tips[0].settled - tip1) < 0.05,
+    `TIP 1 settles at about ${tip1.toFixed(1)} s, not ${tips[0].settled}`,
   );
   assert(
     tipsInAuto(tips) >= 3,

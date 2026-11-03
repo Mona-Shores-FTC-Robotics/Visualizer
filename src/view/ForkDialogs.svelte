@@ -41,7 +41,12 @@
       return;
     }
     result.warnings.forEach((warning) => showToast(warning, "warning"));
-    files.open(result.doc, { saved: true });
+    // Opening sets the overlays from the file's own list (a .pp's is empty), so the team's others
+    // go in after it, or only the first Auto would be drawn.
+    files.open(
+      { ...result.doc, activePaths: request.overlays },
+      { saved: true },
+    );
     currentFilePath.set(request.path);
   });
 </script>

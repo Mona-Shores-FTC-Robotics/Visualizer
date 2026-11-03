@@ -31,16 +31,18 @@ import {
 } from "./types";
 
 /**
- * How long a command step keeps the robot busy in the preview: the command's typical time from
- * the robot's list, else an older file's preview time, else instant; never past its timeout.
+ * How long a command step keeps the robot busy in the preview, started at `t0`: the timing model's
+ * answer, else the command's typical time from the robot's list, else an older file's preview
+ * time, else instant; never past its timeout.
  */
 export function commandSeconds(
   auto: AutoSection,
   card: ActionCard,
   timing?: PreviewTiming,
+  t0?: number,
 ): number {
   const typical =
-    timing?.actionSeconds(card.name) ??
+    timing?.actionSeconds(card.name, t0) ??
     auto.registry.typicalS?.[card.name] ??
     (card.previewMs ?? 0) / 1000;
   return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
@@ -54,10 +56,11 @@ export function alongsideSeconds(
   auto: AutoSection,
   card: FirstOfCard,
   timing?: PreviewTiming,
+  t0?: number,
 ): number {
   if (!card.alongside) return 0;
   const typical =
-    timing?.actionSeconds(card.alongside) ??
+    timing?.actionSeconds(card.alongside, t0) ??
     auto.registry.typicalS?.[card.alongside] ??
     0;
   return Math.min(typical, DEFAULT_TIMEOUT_S);
@@ -68,8 +71,8 @@ export function alongsideSeconds(
  * true, and how long commands take. Without it a ✓ trigger is true the moment it is asked.
  */
 export interface PreviewTiming {
-  /** Seconds a command typically takes, or undefined to use the robot's list. */
-  actionSeconds(name: string): number | undefined;
+  /** Seconds a command started at `t0` typically takes, or undefined to use the robot's list. */
+  actionSeconds(name: string, t0?: number): number | undefined;
   /** The first time at or after `t0` that `condition` is true (Infinity: never), or undefined for "at once". */
   trueAt(condition: string, t0: number): number | undefined;
   /** Told when a command runs (from t0 to t1), so state such as a full intake can change. */
@@ -330,7 +333,7 @@ export function simulateAuto(
   const fireTime = (card: FirstOfCard, row: AutoRow, t0: number): number => {
     const causes = !!card.alongside && card.alongside !== "SpinUp";
     const alongEnd = causes
-      ? t0 + alongsideSeconds(auto, card, timing)
+      ? t0 + alongsideSeconds(auto, card, timing, t0)
       : Infinity;
     if ("when" in row) {
       let soonest = Infinity;
@@ -415,7 +418,7 @@ export function simulateAuto(
       return null;
     }
     if (card.alongside) {
-      const along = alongsideSeconds(auto, card, timing);
+      const along = alongsideSeconds(auto, card, timing, t0);
       launches.push({
         cardId: card.id,
         command: card.alongside,
@@ -483,11 +486,11 @@ export function simulateAuto(
           card.name === "GardenGather"
             ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
             : null;
-        const busy = gather ? gather.seconds : commandSeconds(auto, card, timing);
+        const busy = gather ? gather.seconds : commandSeconds(auto, card, timing, t);
         if (GRAB_COMMANDS.has(card.name)) {
           // Never cut, so not started unless its typical time and the park both fit; else the
           // guard parks now, from the spot the robot is on.
-          if (deadline && deadline.deadline < t + commandSeconds(auto, card, timing)) {
+          if (deadline && deadline.deadline < t + commandSeconds(auto, card, timing, t)) {
             note(`${card.name}: not started, it and the park no longer fit`, "guard", card.id);
             return { abortTo: deadline };
           }
