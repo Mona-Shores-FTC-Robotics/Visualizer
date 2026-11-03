@@ -73,8 +73,15 @@ export function alongsideSeconds(
 export interface PreviewTiming {
   /** Seconds a command started at `t0` typically takes, or undefined to use the robot's list. */
   actionSeconds(name: string, t0?: number): number | undefined;
-  /** The first time at or after `t0` that `condition` is true (Infinity: never), or undefined for "at once". */
-  trueAt(condition: string, t0: number): number | undefined;
+  /**
+   * The first time at or after `t0` that `condition` is true (Infinity: never), or undefined for
+   * "at once". `at` is where the robot is when it asks (CellUp is the CELL at its end).
+   */
+  trueAt(
+    condition: string,
+    t0: number,
+    at?: { x: number; y: number },
+  ): number | undefined;
   /** Told when a command runs (from t0 to t1), so state such as a full intake can change. */
   commandRan?(name: string, t0: number, t1: number): void;
   /** Told when a wait ends because `condition` became true at `t`. */
@@ -185,6 +192,30 @@ export interface LaunchRecord {
   t1: number;
 }
 
+/** An action card that ran (a LaunchAll step is a volley), from its start until it finished. */
+export interface ActionRecord {
+  cardId: string;
+  command: string;
+  t0: number;
+  t1: number;
+}
+
+/** A wait (a firstOf card), and how it ended. */
+export interface WaitRecord {
+  cardId: string;
+  label: string;
+  t0: number;
+  t1: number;
+  /** When its time row would have ended it (its "at most"), or null with no time row. */
+  limitAt: number | null;
+  /** "trigger": a condition came true; "time": a time row; "guard": the endgame guard cut it. */
+  ended: "trigger" | "time" | "guard";
+  /** The condition that ended it, for "trigger". */
+  condition: string | null;
+  /** Its Otherwise (time) row's cards ran: a branch, not a plain wait. */
+  branched: boolean;
+}
+
 /** A drive that is not a project path (routine pattern, exit, goTo). */
 export interface MotionRecord {
   cardId: string;
@@ -210,6 +241,10 @@ export interface PreviewResult {
   motions: MotionRecord[];
   /** Commands run alongside a wait (a volley is LaunchAll), for the timing model's TIPs. */
   launches: LaunchRecord[];
+  /** Action cards that ran, in order (a LaunchAll step is a volley too). */
+  actions: ActionRecord[];
+  /** Waits, in order, and how each ended. */
+  waits: WaitRecord[];
   /** Set when the endgame guard cut a branch short. */
   guard: { t: number; label: string } | null;
   /** True when a wait had no row that could ever fire. */
@@ -273,6 +308,8 @@ export function simulateAuto(
   const drives: DriveRecord[] = [];
   const motions: MotionRecord[] = [];
   const launches: LaunchRecord[] = [];
+  const actions: ActionRecord[] = [];
+  const waits: WaitRecord[] = [];
   let guardFired: PreviewResult["guard"] = null;
   let stalled = false;
 
@@ -340,7 +377,7 @@ export function simulateAuto(
       for (const name of row.when) {
         if (!answerFor(scenario, card, name)) continue;
         const at = Math.max(
-          timing?.trueAt(name, t0) ?? t0,
+          timing?.trueAt(name, t0, pos) ?? t0,
           causes ? alongEnd : t0,
         );
         soonest = Math.min(soonest, at);
@@ -402,9 +439,26 @@ export function simulateAuto(
       }
     });
     const label = card.label || "Wait";
+    let limitAt: number | null = null;
+    for (const row of card.rows) {
+      if (!("when" in row)) {
+        const end = timeRowFiresAt(row, t0);
+        limitAt = limitAt === null ? end : Math.min(limitAt, end);
+      }
+    }
     const deadline = pendingDeadline(guards);
     if (deadline && deadline.deadline < at) {
       stay(Math.max(0, deadline.deadline - t0));
+      waits.push({
+        cardId: card.id,
+        label,
+        t0,
+        t1: t,
+        limitAt,
+        ended: "guard",
+        condition: null,
+        branched: false,
+      });
       note(`${label}: cut short by the endgame guard`, "warn", card.id);
       return { abortTo: deadline };
     }
@@ -437,16 +491,28 @@ export function simulateAuto(
     const row = card.rows[winner];
     taken.set(card.id, winner);
     if (card.alongside) timing?.commandRan?.(card.alongside, t0, at);
+    let fired: string | null = null;
     if ("when" in row) {
       for (const name of row.when) {
         if (
           answerFor(scenario, card, name) &&
           fireTime(card, { ...row, when: [name] }, t0) <= at + 1e-9
         ) {
+          fired ??= name;
           timing?.becameTrue?.(name, at);
         }
       }
     }
+    waits.push({
+      cardId: card.id,
+      label,
+      t0,
+      t1: at,
+      limitAt,
+      ended: "when" in row ? "trigger" : "time",
+      condition: fired,
+      branched: !("when" in row) && row.cards.length > 0,
+    });
     const hasCards = card.rows.some((r) => r.cards.length > 0);
     note(
       hasCards
@@ -518,6 +584,7 @@ export function simulateAuto(
           );
         }
         stay(busy);
+        actions.push({ cardId: card.id, command: card.name, t0: t - busy, t1: t });
         // A pick that squared up ends on the FLOWER's line, where its push started.
         if (pick?.ok && pick.squares) {
           pos = { x: pick.start.x, y: pick.start.y };
@@ -740,6 +807,8 @@ export function simulateAuto(
     drives,
     motions,
     launches,
+    actions,
+    waits,
     guard: guardFired,
     stalled,
   };

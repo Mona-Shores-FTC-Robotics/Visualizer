@@ -8,14 +8,16 @@
  * (paths, cards, and how long each wait may last); this says how the world behaves. Nothing here
  * changes what the robot does or what the exporter writes.
  *
- * TIPs come from the Autos themselves: every volley (a wait with LaunchAll alongside) that ends
- * while the HIVE is settled lands `volleyLoad` in the raised CELL. Once that CELL holds `tipLoad`
+ * TIPs come from the Autos themselves: every volley (a Launch all step, or a wait with LaunchAll
+ * alongside) that ends while the HIVE is settled lands `volleyLoad` in the raised CELL. Once that CELL holds `tipLoad`
  * (the one raised at the start begins with `startLoad`, its 3 NECTAR), the HIVE starts to swing
  * `tipStartS` after the volley ends and settles the other way `tipSwingS` later; the CELL it raises
  * starts empty. With several Autos on the field together their volleys share one HIVE, so
- * the left robot's "our CELL up" waits on the right robot's volley.
+ * the left robot's "our CELL up" waits on the right robot's volley. `CellUp` (the simple builder's
+ * wait) is the CELL at the robot's end of the field, as on the robot.
  */
 import type { PreviewTiming } from "../auto/simulate";
+import { FIELD_SIZE } from "../../config/defaults";
 
 /** One fact the team estimates, then measures. */
 export interface TimingFact {
@@ -197,29 +199,81 @@ export interface Tip {
   settled: number;
 }
 
+/** A volley on the field's clock: when it ended, and which robot (its index in the entries) fired it. */
+export interface Volley {
+  t: number;
+  robot: number;
+}
+
+/** What one volley did to the HIVE. */
+export interface VolleyEffect extends Volley {
+  /** False when it landed mid-swing, so its pieces did not count. */
+  counted: boolean;
+  /** Weight in the raised CELL just after it landed (before the TIP it may start). */
+  load: number;
+  /** The TIP it started, by index in `tips`, or null. */
+  tip: number | null;
+}
+
+/** A TIP and the volley that started it (index in `volleys`). */
+export interface CausedTip extends Tip {
+  cause: number;
+}
+
+/**
+ * The HIVE over the Auto: each volley ending on a settled HIVE adds to the raised CELL, and the one
+ * that brings it to `tipLoad` TIPs it. Volleys come back sorted by time.
+ */
+export function hiveHistory(
+  volleys: Volley[],
+  values: TimingValues,
+): { volleys: VolleyEffect[]; tips: CausedTip[] } {
+  const tips: CausedTip[] = [];
+  const effects: VolleyEffect[] = [];
+  let settledAt = -Infinity;
+  let load = values.startLoad;
+  for (const volley of [...volleys].sort((a, b) => a.t - b.t)) {
+    if (volley.t < settledAt - 1e-9) {
+      // Mid-swing: the pieces do not count.
+      effects.push({ ...volley, counted: false, load, tip: null });
+      continue;
+    }
+    load += values.volleyLoad;
+    const effect: VolleyEffect = { ...volley, counted: true, load, tip: null };
+    effects.push(effect);
+    if (load < values.tipLoad - 1e-9) continue;
+    load = 0;
+    const start = Math.max(0, volley.t + values.tipStartS);
+    const settled = start + Math.max(0, values.tipSwingS);
+    effect.tip = tips.length;
+    tips.push({ start, settled, cause: effects.length - 1 });
+    settledAt = settled;
+  }
+  return { volleys: effects, tips };
+}
+
 /**
  * The TIPs a set of volley end times makes: each volley ending on a settled HIVE adds to the raised
  * CELL, and the one that brings it to `tipLoad` TIPs it.
  */
 export function tipsFrom(volleyEnds: number[], values: TimingValues): Tip[] {
-  const tips: Tip[] = [];
-  let settledAt = -Infinity;
-  let load = values.startLoad;
-  for (const end of [...volleyEnds].sort((a, b) => a - b)) {
-    if (end < settledAt - 1e-9) continue; // mid-swing: the pieces do not count
-    load += values.volleyLoad;
-    if (load < values.tipLoad - 1e-9) continue;
-    load = 0;
-    const start = Math.max(0, end + values.tipStartS);
-    const settled = start + Math.max(0, values.tipSwingS);
-    tips.push({ start, settled });
-    settledAt = settled;
-  }
-  return tips;
+  return hiveHistory(
+    volleyEnds.map((t) => ({ t, robot: 0 })),
+    values,
+  ).tips.map(({ start, settled }) => ({ start, settled }));
+}
+
+/**
+ * Whether a robot at `y` (Pedro frame, inches) is aimed at its LEFT CELL with the turret at home:
+ * the CELL at its end of the field. The Visualizer draws RED, whose LEFT is the scoring end, past
+ * the field's centre (biobuzz `AutoRegistration.aimedLeft`).
+ */
+export function aimedLeft(y: number): boolean {
+  return y >= FIELD_SIZE / 2;
 }
 
 /** Which CELL is settled up at `t`, counting TIPs; null while one swings. The match starts right up. */
-function cellUpAt(tips: Tip[], t: number): "right" | "left" | null {
+export function cellUpAt(tips: Tip[], t: number): "right" | "left" | null {
   let done = 0;
   for (const tip of tips) {
     if (t >= tip.settled - 1e-9) done += 1;
@@ -238,8 +292,11 @@ function cellUpFrom(tips: Tip[], t0: number, cell: "right" | "left"): number {
   return Infinity;
 }
 
-/** Conditions that mean "a CELL tipped". `Tip` is the camera's; the others are the tracker's. */
-export const TIP_CONDITIONS = ["Tip", "LeftCellUp", "RightCellUp"];
+/**
+ * Conditions that mean "a CELL tipped". `Tip` is the camera's; the others are the tracker's, and
+ * `CellUp` is the CELL the robot is aimed at (the simple builder's one wait).
+ */
+export const TIP_CONDITIONS = ["Tip", "LeftCellUp", "RightCellUp", "CellUp"];
 
 /**
  * The preview's answers for one robot, for these values and TIPs. It keeps that robot's state (is
@@ -275,8 +332,11 @@ export function previewTiming(
       }
       return undefined;
     },
-    trueAt(condition, t0) {
+    trueAt(condition, t0, at) {
       switch (condition) {
+        case "CellUp":
+          // With no pose (never in a preview), the robot's end is taken to be RIGHT's.
+          return cellUpFrom(tips, t0, at && aimedLeft(at.y) ? "left" : "right");
         case "RightCellUp":
           return cellUpFrom(tips, t0, "right");
         case "LeftCellUp":

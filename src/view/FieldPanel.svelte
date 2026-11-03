@@ -49,6 +49,7 @@
   import { ladderInfo } from "../lib/ladder/compile";
   import FieldRuler from "../lib/components/FieldRuler.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
+  import MatchTimeline from "../lib/match/MatchTimeline.svelte";
   import { linkSegmentIds } from "../lib/auto/links";
   import { createViewport } from "./viewport";
 
@@ -86,6 +87,39 @@
         : undefined,
     ),
   );
+  /**
+   * Fork: with several Autos shown together, each draws only the branch its preview takes; the
+   * others are hidden, or faint with "Other branches". Segment ids of the paths it does not drive.
+   */
+  let overlayUntaken = $derived(
+    overlays.items.map((overlay) => {
+      const preview = auto.overlayTogether.previews.get(overlay);
+      if (!preview) return new Set<string>();
+      const driven = new Set(preview.drives.map((drive) => drive.pathId));
+      return new Set(
+        overlay.doc.lines
+          .filter((line) => !driven.has(line.id))
+          .flatMap((line) => atomicSegments([line]).map((segment) => segment.id)),
+      );
+    }),
+  );
+  let overlayTaken = $derived(
+    overlays.items.map((overlay, index) => {
+      const untaken = overlayUntaken[index];
+      return new Set(
+        overlay.doc.lines
+          .flatMap((line) => atomicSegments([line]).map((segment) => segment.id))
+          .filter((id) => !untaken.has(id)),
+      );
+    }),
+  );
+  const union = (a: ReadonlySet<string> | undefined, b: ReadonlySet<string>) =>
+    a ? new Set([...a, ...b]) : b;
+  let matchSeconds = $derived(playback.seconds);
+  function seekMatch(seconds: number) {
+    if (playback.duration > 0)
+      playback.seek(Math.min(100, (seconds / playback.duration) * 100));
+  }
 
   let stageWidth = $state(FIELD_SIZE);
   let stageHeight = $state(FIELD_SIZE);
@@ -623,6 +657,19 @@
           {/if}
 
           {#if overlays.active}
+            {#if auto.overlayUntaken}
+              {#each overlays.items as overlay, index (overlay.filePath)}
+                <PathStrokes
+                  startPoint={overlay.doc.startPoint}
+                  lines={overlay.doc.lines}
+                  idPrefix={`additional-path-${index}-untaken`}
+                  color={overlay.color}
+                  opacity={(settings.pathOpacity || 1) * 0.25}
+                  honorLocked={false}
+                  hidden={union(overlayLinks[index], overlayTaken[index])}
+                />
+              {/each}
+            {/if}
             {#each overlays.items as overlay, index (overlay.filePath)}
               <PathStrokes
                 startPoint={overlay.doc.startPoint}
@@ -631,14 +678,16 @@
                 color={overlay.color}
                 opacity={(settings.pathOpacity || 1) * (1 - index * 0.1)}
                 honorLocked={false}
-                hidden={overlayLinks[index]}
+                hidden={union(overlayLinks[index], overlayUntaken[index])}
               />
             {/each}
             {#each overlays.items as overlay, index (overlay.filePath)}
               <PathMarkers
                 startPoint={overlay.doc.startPoint}
                 lines={overlay.doc.lines}
-                hidden={overlayLinks[index]}
+                hidden={auto.overlayUntaken
+                  ? overlayLinks[index]
+                  : union(overlayLinks[index], overlayUntaken[index])}
                 idPrefix={`additional-path-${index}-point`}
                 color={overlay.color}
                 radiusScale={0.9}
@@ -704,6 +753,13 @@
     </div>
   </div>
 
+  {#if overlays.active && auto.matchTimeline && auto.matchLanes}
+    <MatchTimeline
+      lanes={auto.matchLanes}
+      seconds={matchSeconds}
+      onSeek={seekMatch}
+    />
+  {/if}
   <PlaybackBar />
 </main>
 

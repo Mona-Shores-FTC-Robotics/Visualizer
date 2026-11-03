@@ -43,6 +43,32 @@
           ]
         : []}
   />
+  {#if overlays.active}
+    <label
+      class={[labelClass, "flex items-center gap-1.5"]}
+      title="Draw the branches these Autos do not take in this preview, faint"
+    >
+      <input
+        type="checkbox"
+        class={checkboxClass}
+        bind:checked={auto.overlayUntaken}
+      />
+      Other branches
+    </label>
+    {#if auto.overlayTogether.shown.length >= 2}
+      <label
+        class={[labelClass, "flex items-center gap-1.5"]}
+        title="Under the field: what each Auto does when, the HIVE between them, and which volley's TIP ends which wait"
+      >
+        <input
+          type="checkbox"
+          class={checkboxClass}
+          bind:checked={auto.matchTimeline}
+        />
+        Match timeline
+      </label>
+    {/if}
+  {/if}
   {#if !overlays.active && auto.view === "cards"}
     <label
       class={[labelClass, "flex items-center gap-1.5"]}
