@@ -263,6 +263,19 @@ contract with the robot's `autokit` library:
 - `OPTIONS`, always written (`{}` with none), lists what the drive team may change in INIT (see
   below).
 
+### The simple builder's Otherwise: go on, or park
+
+A Wait step's Otherwise is its time row's cards. With **then: go on with the steps below** (the
+default) the wait has no cards on its trigger row, and both outcomes go on with the cards after
+the wait. With **then: park** the Otherwise ends with its own park card, and the wait is the
+main list's last card: the steps below it, Park included, are its trigger row's cards, so each
+outcome holds the rest of its own route and each is guarded with its own park. The builder shows
+both forms the same way, the steps below the wait in the main list (`unfold`/`refold` in
+`lib/simple/steps.ts`). Every Park step is on the Auto's one PARK spot.
+
+Every drive the guard could park after has a park from its spot (`parkFrom`): in each route all
+but the last drive before its Park, and every drive in an Otherwise that goes on.
+
 ### Options the drive team changes in INIT
 
 A partner says in the queue where they park, or when they tip. The robot's INIT page shows each

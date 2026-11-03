@@ -63,6 +63,7 @@
     setStepSpot,
     setWait,
     setParkChoice,
+    setWaitRejoin,
     sideSpot,
     renameSpot,
     WAIT_FOR,
@@ -883,6 +884,29 @@
               {step.waitS} s):</span
             ></span
           >
+          <!-- Fork: after the Otherwise, go on with the steps below the wait, or park (steps.ts). -->
+          <label
+            class="flex items-center gap-1 text-body"
+            title="Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
+          >
+            then
+            <select
+              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+              aria-label="After the Otherwise"
+              value={step.rejoin === false ? "park" : "goOn"}
+              onchange={(e) =>
+                apply(
+                  setWaitRejoin(
+                    doc,
+                    step.cardId,
+                    e.currentTarget.value !== "park",
+                  ),
+                )}
+            >
+              <option value="goOn">go on with the steps below</option>
+              <option value="park">park</option>
+            </select>
+          </label>
           {#if step.otherwise?.length}
             <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->
             <span

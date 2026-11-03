@@ -13,7 +13,7 @@ import {
   withEndAt,
   type PathCatalog,
 } from "../auto/geometry";
-import { parkLineIds } from "../auto/tree";
+import { allCards, parkLineIds } from "../auto/tree";
 
 /** Contact at a drive's start that ends sooner than this, seconds, is the spot's, not the drive's. */
 const LEAVES_WITHIN_S = 0.75;
@@ -88,7 +88,8 @@ export function stepCollisions(
       ),
     ),
   ];
-  for (const card of auto.cards) {
+  // Every drive, an Otherwise's too.
+  for (const card of allCards(auto.cards)) {
     if (card.kind !== "path") continue;
     const drive = card.park ? parkHits(card.lineId) : hitsOf(card.lineId);
     const parkId = auto.parkFrom?.[card.id];
