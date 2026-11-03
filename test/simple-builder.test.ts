@@ -666,6 +666,52 @@ describe("the Wait for TIP step", () => {
       waitS: 7,
     });
   });
+
+  // Every file in biobuzz TeamCode/autos opens in Simple, so none needs the card editor.
+  it("reads R-Solo-Staging's IntakeFull wait as a Wait step, and offers IntakeFull", () => {
+    let doc = fresh();
+    doc = add(doc, "wait");
+    const step = stepsOf(doc)[0];
+    doc = setWait(doc, step.cardId, { waitFor: "IntakeFull", seconds: 3 });
+    expect(stepsOf(doc)[0]).toMatchObject({
+      kind: "wait",
+      label: "Wait for intake full",
+      waitFor: "IntakeFull",
+      waitS: 3,
+    });
+    expect(isSimple(doc)).toBe(true);
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "staging.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) expect(java.source).toContain('kit.when("IntakeFull")');
+  });
+
+  it("reads a partner stand-in's CameraBlind hold as a Wait step", () => {
+    const doc = fresh();
+    const auto = structuredClone(doc.auto!);
+    auto.cards.push({
+      id: "still",
+      kind: "firstOf",
+      label: "Stays on the start",
+      rows: [
+        { when: ["CameraBlind"], cards: [] },
+        { afterMs: 30000, cards: [] },
+      ],
+    });
+    const next = { ...doc, auto };
+    expect(stepsOf(next)[0]).toMatchObject({
+      kind: "wait",
+      waitFor: "CameraBlind",
+      waitS: 30,
+    });
+    expect(isSimple(next)).toBe(true);
+  });
 });
 
 describe("a Wait step's Otherwise list", () => {

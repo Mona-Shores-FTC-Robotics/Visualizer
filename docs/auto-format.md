@@ -289,9 +289,11 @@ the Auto runs as drawn. The drawing's value is always the default.
   `kit.pick(AutoOption.PARK, 1.9, 2.1)`, the second timed with the end moved, so the endgame
   guard reserves the picked park's time. `OPTIONS` holds `AutoOption.park("LEFT_PARK", "RIGHT_PARK")`.
   The preview and the simulator drive the drawn park.
-- **The TIP wait.** An adjustable match-clock limit is `AutoOption.matchSeconds(label, s)`. On
-  the robot the drive team enters the partner's TIP time and the wait gives up a measured margin
-  after it; the preview uses the drawn time.
+- **The partner wait.** An adjustable match-clock limit is `AutoOption.matchSeconds(label, s)`. On
+  the robot the drive team enters the partner's last shot, their answer to "when does your last
+  preload leave?", and the wait gives up the TIP lag after it (biobuzz
+  `AutoRegistration.PARTNER_TIP_LAG_S`, 4 s; the Driver Station shows both numbers); the preview
+  uses the drawn time.
 
 ### Robot settings belong to the file
 
@@ -520,7 +522,8 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its
   time from the distance at the robot's speed caps. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
-  steps, the plan view otherwise; Advanced and ← Simple switch. `src/state/files.svelte.ts` — a new
+  steps (every file in biobuzz `TeamCode/autos`), the plan view otherwise; "← Simple" goes back
+  only when the file is simple, and there is no way in from the builder to the card list. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
   goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside
   the field; spot names show near the mouse (`fieldHover`). An Auto that lists no commands gets

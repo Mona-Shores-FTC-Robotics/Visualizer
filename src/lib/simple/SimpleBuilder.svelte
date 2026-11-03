@@ -73,19 +73,6 @@
     type StepList,
   } from "./steps";
 
-  interface Props {
-    /** Downloads the .pp file. */
-    onSave: () => void;
-    /** Makes a link that opens this Auto. */
-    onShare: () => void;
-    /** The mentors' Save to GitHub and simulate. */
-    onGithub: () => void;
-    /** Save to repo folder: the biobuzz checkout on this laptop. */
-    onRepo: () => void;
-    onExport: () => void;
-  }
-
-  let { onSave, onShare, onGithub, onRepo, onExport }: Props = $props();
 
   const project = useProject();
   const auto = useAuto();
@@ -226,23 +213,6 @@
 
   function addMissingSpots() {
     for (const name of missingSpots) editSpot(name, doc.auto!.points[name]);
-  }
-
-  /** Save to computer, saying first when team spots are only in this browser. */
-  function saveFile() {
-    const unsaved = [
-      ...new Set([...Object.keys($spotEdits), ...missingSpots]),
-    ].sort();
-    if (
-      unsaved.length &&
-      !confirm(
-        `Team spots ${unsaved.join(", ")} are only in this browser, not in biobuzz. ` +
-          "The file keeps their numbers, but nobody else gets them until someone presses " +
-          "Save team spots. Save the file anyway?",
-      )
-    )
-      return;
-    onSave();
   }
 
   /**
@@ -857,7 +827,7 @@
       {#if step.waitClock}
         <label
           class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body"
-          title="At the field the drive team enters the partner's TIP time with the D-pad's up and down; the robot waits until a moment after it. One wait per Auto."
+          title="At the field the drive team enters the partner's last shot (when their last preload leaves) with the D-pad's up and down; the robot waits until the TIP lag after it (biobuzz PARTNER_TIP_LAG_S, 4 s) and shows both numbers. One wait per Auto."
         >
           <input
             type="checkbox"
@@ -869,7 +839,7 @@
                 }),
               )}
           />
-          The drive team can change it in INIT (D-pad ▲▼, the partner's TIP time)
+          The drive team can change it in INIT (D-pad ▲▼, the partner's last shot)
         </label>
       {/if}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
@@ -1035,48 +1005,6 @@
         ? `Worst case ${fmt(worst)} s`
         : "The preview's time"}
       >{fmt(end)} s <span class="text-body">of {AUTO_LENGTH_S}</span></span
-    >
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button
-      type="button"
-      class="simple-tile flex-1 justify-center"
-      title="Download this Auto's .pp file, to keep or to give to a mentor"
-      onclick={saveFile}>Save to computer</button
-    >
-    <button
-      type="button"
-      class="simple-tile flex-1 justify-center"
-      title="A link that opens this Auto: paste it in the GitHub issue or send it to a mentor"
-      onclick={onShare}>Share link</button
-    >
-  </div>
-  <div class="-mt-2 flex items-center justify-end gap-3">
-    <button
-      type="button"
-      class="text-xs text-body underline"
-      onclick={onExport}
-      title="Download the Java for the robot (mentors)">Java</button
-    >
-    <button
-      type="button"
-      class="text-xs text-body underline"
-      onclick={onGithub}
-      title="Save to GitHub and simulate (mentors)">GitHub…</button
-    >
-    <button
-      type="button"
-      class="text-xs text-body underline"
-      onclick={onRepo}
-      title="Save into the biobuzz checkout on this laptop, then Sloth Load (mentors)"
-      >Folder…</button
-    >
-    <button
-      type="button"
-      class="text-xs text-body underline"
-      onclick={() => (auto.view = "cards")}
-      title="Waits, decisions, rejoins and the plan view">Advanced</button
     >
   </div>
 
