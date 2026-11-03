@@ -21,6 +21,7 @@ import {
   VOLLEY_COMMAND,
   type Tip,
   type TimingValues,
+  type Volley,
 } from "./model";
 
 export interface FieldEntry {
@@ -58,9 +59,15 @@ function atSpeed(settings: Settings, speed: number): Settings {
   return { ...settings, ...scaled };
 }
 
-function volleyEnds(previews: PreviewResult[]): number[] {
-  return previews.flatMap((p) =>
-    p.launches.filter((l) => l.command === VOLLEY_COMMAND).map((l) => l.t1),
+/**
+ * Every volley on the field, by robot: a LaunchAll run alongside a wait, or a LaunchAll step (the
+ * simple builder's Launch all).
+ */
+export function volleysOf(previews: PreviewResult[]): Volley[] {
+  return previews.flatMap((p, robot) =>
+    [...p.launches, ...p.actions]
+      .filter((l) => l.command === VOLLEY_COMMAND)
+      .map((l) => ({ t: l.t1, robot })),
   );
 }
 
@@ -124,7 +131,10 @@ export function previewTogether(
           : previewTiming(values, tips),
       ),
     );
-    const next = tipsFrom(volleyEnds(previews), values);
+    const next = tipsFrom(
+      volleysOf(previews).map((v) => v.t),
+      values,
+    );
     if (sameTips(next, tips)) break;
     tips = next;
   }

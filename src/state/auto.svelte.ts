@@ -31,6 +31,7 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
+import { laneName, matchLanes, type MatchLanes } from "../lib/match/lanes";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
 import {
@@ -66,6 +67,10 @@ import type { ProjectStore } from "./project.svelte";
 export class AutoState {
   /** Draw the branches the preview does not take, dashed. */
   showUntaken = $state(true);
+  /** With several Autos shown together: draw the branches their previews do not take, faint. */
+  overlayUntaken = $state(false);
+  /** With several Autos shown together: the Match timeline under the field (lib/match). */
+  matchTimeline = $state(true);
   /** How the left panel shows the Auto: the plan (good path, chapters, misses) or every card. */
   /** Fork: "simple" is the builder for our robot's steps (lib/simple); the others are advanced. */
   view = $state<"simple" | "plan" | "cards">("simple");
@@ -226,7 +231,25 @@ export class AutoState {
     } catch (error) {
       console.error("Could not preview the shown Autos:", error);
     }
-    return { previews, tips, entries };
+    return { previews, tips, entries, shown: withAuto };
+  });
+
+  /**
+   * The Match timeline for the Autos shown together (lib/match/lanes.ts); null with fewer than two
+   * or with Instant timing, where waits end at once and nothing is shared.
+   */
+  matchLanes = $derived.by((): MatchLanes | null => {
+    const { previews, entries, shown } = this.overlayTogether;
+    if (shown.length < 2 || this.#timingMode.current !== "typical") return null;
+    const list = shown.map((overlay) => previews.get(overlay));
+    if (list.some((p) => !p)) return null;
+    return matchLanes(
+      entries,
+      list as PreviewResult[],
+      this.#timingValues.current,
+      shown.map((overlay) => laneName(overlay.filePath)),
+      shown.map((overlay) => overlay.color),
+    );
   });
 
   constructor(
