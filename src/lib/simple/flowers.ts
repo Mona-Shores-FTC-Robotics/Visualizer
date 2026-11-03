@@ -16,7 +16,10 @@
  *     FLOWER's centre the drive stopped at, kept between 18 in (minAutoStartIn, room for the stick)
  *     and 24 in (approachStandoffIn). Skipped when already within 1.5 in and 5 degrees of that
  *     (atApproachIn, atApproachDeg), so a drive that ends lined up costs nothing;
- *   stick: 0.7 s for the stick to come down (stickDownMs);
+ *   stick: 0.7 s for the stick to come down (stickDownMs). After a drive card there is no such
+ *     pause: the robot lowers the stick over the last 18 in of that drive (lowerWithinIn,
+ *     FlowerPicker.approach, run by AutoKit for the path card right before a PickFlower card), so
+ *     it is down by the time the card starts (3 Nov 2026);
  *   push: a path along the FLOWER's line to 12 in from its centre (contactStandoffIn);
  *   dwell: 2 s, the worst case: the robot's dwell ends by itself from the intake current, typically
  *     after 1.0-1.3 s, but runs to its cap (dwellMs, 2 s) while pieces keep trickling in, and an
@@ -61,6 +64,11 @@ export const AUTO_MAX_OFF_IN = 12;
 export const AUTO_MAX_OFF_DEG = 30;
 /** FlowerPicker.minAutoStartIn: the square-up keeps at least this far from the FLOWER's centre. */
 export const MIN_AUTO_START_IN = 18;
+/**
+ * FlowerPicker.lowerWithinIn: on the drive before a pick, the stick comes down once the robot is
+ * this close to the drive's end, inches (the robot's approach; see pickMotions).
+ */
+export const LOWER_WITHIN_IN = 18;
 /** FlowerPicker.atApproachIn and atApproachDeg: this close to the square-up point, it is skipped. */
 const AT_APPROACH_IN = 1.5;
 const AT_APPROACH_DEG = 5;
@@ -218,7 +226,9 @@ export function flowerLinedUp(x: number, y: number): Flower | null {
 /**
  * The preview's picture of an Auto's pick lasting `busy` seconds from `t0`, from `from` (where the
  * drive stopped): the square-up to `start` when it runs, the stick coming down, the push along the
- * FLOWER's line to `contact`, the dwell, and the back-out to `start`, where it ends.
+ * FLOWER's line to `contact`, the dwell, and the back-out to `start`, where it ends. With
+ * `stickDownOnWayIn` (the card follows a drive card, which lowered the stick over its last
+ * LOWER_WITHIN_IN) there is no stick pause: the push follows the square-up at once.
  */
 export function pickMotions(
   cardId: string,
@@ -230,14 +240,16 @@ export function pickMotions(
   },
   t0: number,
   busy: number,
+  stickDownOnWayIn = false,
 ): MotionRecord[] {
   // The square-up, the stick and the dwell take their own times; the push and back-out share
   // what is left.
   const square = pick.squares ? SQUARE_S : 0;
-  const fixed = square + STICK_S + DWELL_S;
+  const stickS = stickDownOnWayIn ? 0 : STICK_S;
+  const fixed = square + stickS + DWELL_S;
   const scale = busy < fixed + 0.4 ? busy / (fixed + 0.4) : 1;
   const squareS = square * scale;
-  const stick = STICK_S * scale;
+  const stick = stickS * scale;
   const dwell = DWELL_S * scale;
   const leg = (busy - squareS - stick - dwell) / 2;
   const home: BasePoint = { x: pick.start.x, y: pick.start.y };
@@ -251,7 +263,7 @@ export function pickMotions(
   };
   if (squareS > 0)
     add(squareS, easedLine({ x: from.x, y: from.y }, home, squareS, h));
-  add(stick, easedLine(home, home, stick, h));
+  if (stick > 0) add(stick, easedLine(home, home, stick, h));
   add(leg, easedLine(home, at, leg, h));
   add(dwell, easedLine(at, at, dwell, h));
   add(leg, easedLine(at, home, leg, h));

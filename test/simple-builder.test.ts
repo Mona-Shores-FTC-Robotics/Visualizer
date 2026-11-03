@@ -209,24 +209,21 @@ describe("the simple builder", () => {
   it("parks by 30 s, and shows each pick as the robot's FlowerPicker does it", () => {
     const run = preview(rQualsV2());
     expect(run.endTime).toBeLessThan(30);
-    // Each pick: stick, push, dwell, back.
-    expect(run.motions).toHaveLength(8);
-    const [stick, push, dwell, back] = run.motions;
+    // Each pick, after a drive: push, dwell, back (the stick came down on the drive in).
+    expect(run.motions).toHaveLength(6);
+    const [push, dwell, back] = run.motions;
     const wall = FLOWERS[0];
     const mid = (dwell.t0 + dwell.t1) / 2;
     expect(motionPoseAt(run, mid)!.x).toBeCloseTo(contactPose(wall).x, 6);
-    expect(motionPoseAt(run, (stick.t0 + stick.t1) / 2)!.x).toBeCloseTo(
-      26.7,
-      1,
-    );
+    expect(motionPoseAt(run, push.t0)!.x).toBeCloseTo(26.7, 1);
     // It ends exactly where it started: WALL_PICK, facing the FLOWER.
     const end = motionPoseAt(run, back.t1)!;
     expect(end.x).toBeCloseTo(26.7, 6);
     expect(end.headingDeg).toBe(180);
-    // The stick and the dwell are FlowerPicker's 0.7 s and 2 s (the dwell's cap); the card's 4.5 s in all.
-    expect(stick.t1 - stick.t0).toBeCloseTo(0.7, 6);
+    // The dwell is FlowerPicker's 2 s (its cap); the card's 4.5 s in all, the rest split between
+    // the push and the back-out.
     expect(dwell.t1 - dwell.t0).toBeCloseTo(2, 6);
-    expect(back.t1 - stick.t0).toBeCloseTo(4.5, 6);
+    expect(back.t1 - push.t0).toBeCloseTo(4.5, 6);
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 
@@ -237,14 +234,14 @@ describe("the simple builder", () => {
     doc = add(doc, "pick");
     expect(stepsOf(doc)[1]).toMatchObject({ problem: null, squares: true });
     const run = preview(doc);
-    expect(run.motions).toHaveLength(5); // square-up, stick, push, dwell, back
+    expect(run.motions).toHaveLength(4); // square-up, push, dwell, back (the stick came down on the drive)
     const contact = motionPoseAt(
       run,
-      (run.motions[3].t0 + run.motions[3].t1) / 2,
+      (run.motions[2].t0 + run.motions[2].t1) / 2,
     )!;
     expect(contact.y).toBeCloseTo(47.36, 6); // on the FLOWER's line
     expect(contact.x).toBeCloseTo(2.71 + 12, 6);
-    const end = motionPoseAt(run, run.motions[4].t1)!;
+    const end = motionPoseAt(run, run.motions[3].t1)!;
     expect(end.x).toBeCloseTo(2.71 + 24, 6); // 27.3 in out, kept to 24
     expect(end.y).toBeCloseTo(47.36, 6);
   });
@@ -429,6 +426,38 @@ describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () 
     expect(
       pickMotions("p", { x: 26.71, y: 47.36, headingDeg: 180 }, lined, 0, 4.5),
     ).toHaveLength(4);
+  });
+
+  it("has no stick pause after a drive: the stick came down on the way in", () => {
+    const lined = startOf(26.71, 47.36, 180);
+    const from = { x: 26.71, y: 47.36, headingDeg: 180 };
+    const after = pickMotions("p", from, lined, 0, 4.5, true);
+    expect(after).toHaveLength(3); // push, dwell, back: no pause at the spot first
+    expect(after[0].motion.length).toBeGreaterThan(0);
+    expect(after[0].t0).toBe(0);
+    expect(after[after.length - 1].t1).toBeCloseTo(4.5, 6);
+    // The time the pause took goes to the push and the back-out.
+    const alone = pickMotions("p", from, lined, 0, 4.5);
+    expect(after[0].t1 - after[0].t0).toBeGreaterThan(alone[1].t1 - alone[1].t0);
+  });
+
+  it("previews the stick coming down 18 in before the end of the drive to a pick", () => {
+    const doc = settled(rQualsV2());
+    const result = preview(doc);
+    const picks = doc.auto!.cards.filter((c) => c.kind === "action" && c.name === "PickFlower");
+    expect(picks.length).toBeGreaterThan(0);
+    for (const pick of picks) {
+      const down = result.log.find((e) => e.cardId === pick.id && /Stick down on the drive in/.test(e.text));
+      const started = result.log.find((e) => e.cardId === pick.id && e.kind === "card");
+      expect(down, pick.id).toBeDefined();
+      expect(started, pick.id).toBeDefined();
+      // On the drive before the card, and within the last two seconds of it.
+      expect(down!.t).toBeLessThan(started!.t);
+      expect(started!.t - down!.t).toBeLessThan(2);
+      // The pick's motions start with a move, not a pause at the spot.
+      const first = result.motions.find((m) => m.cardId === pick.id)!;
+      expect(first.motion.length).toBeGreaterThan(0);
+    }
   });
 });
 
