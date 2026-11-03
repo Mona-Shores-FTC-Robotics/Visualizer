@@ -36,11 +36,11 @@ export const DEFAULT_BRANCH = "master";
 export const FAST_LANE_BASE = "master";
 
 /**
- * What every save asks the simulator to run (mentor, 3 Nov 2026): the one robot the team has, its
- * turret locked forward and POLLEN only, over ten seeds, as RED. The dialog offers no choice: a
- * student presses Save, and like is compared with like.
+ * What a request with no design of its own asks for: the one robot the team has, over ten seeds, as
+ * RED. A request that names a design (or seeds, or an alliance) keeps its own: the Visualizer's
+ * dialog has no choice of robot or partner, a mentor curates the request in biobuzz.
  */
-export const SAVE_DESIGN = "real robot, turret locked forward, POLLEN only";
+export const DEFAULT_SIM_DESIGN = "real robot";
 export const SAVE_SEEDS = 10;
 export const SAVE_ALLIANCE = "RED";
 
@@ -141,20 +141,21 @@ export interface SimRequestOptions {
   savedBy: string;
   /**
    * The Auto's request as biobuzz has it (TeamCode/sim-requests/<name>.json on the branch, else
-   * master), or null for an Auto with none yet. Its `runs` (the partners a mentor curated) and any
-   * other field the Visualizer does not own are kept as they are.
+   * master), or null for an Auto with none yet. Everything in it that the save does not own
+   * (`partners`, `partnerSeeds`, `design`, `seeds`, `alliance`, `title`, anything else) is kept as
+   * it is, in the order it was in.
    */
   existing?: SimRequest | null;
 }
 
-/**
- * One run of an Auto in biobuzz's request: alone (`partner` null) or with a partner stand-in, a
- * generated class from `TeamCode/autos/partners/` (`"PartnerLStillAuto"`). `label` is optional, the
- * words the mentor chose for the stand-in ("L just parks"); without one the class name is read.
- */
-export interface SimRunPlan {
-  partner: string | null;
-  label?: string;
+/** One run beside a partner stand-in, as a mentor curated it in the request's `partners`. */
+export interface SimPartnerEntry {
+  /** The row's name in the results; SimRunTest falls back to the timing's own words. */
+  name?: string;
+  /** The stand-in's generated class (`PartnerLLaunchParkAuto`, from `TeamCode/autos/partners/`). */
+  partner: string;
+  timing?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 /** TeamCode/sim-requests/<name>.json as biobuzz holds it; only the fields the Visualizer reads. */
@@ -163,40 +164,45 @@ export interface SimRequest {
   spec?: string;
   design?: string;
   seeds?: number[];
+  partnerSeeds?: number[];
   alliance?: string;
-  runs?: unknown;
+  partners?: unknown;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
-/** The fields of a request the Visualizer writes; everything else in it is biobuzz's. */
-const OWN_FIELDS = ["pp", "spec", "design", "seeds", "alliance", "metadata"];
-/** The old per-save partner choice (gone 3 Nov 2026): a run's partner is in `runs` now. */
-const RETIRED_FIELDS = ["partnerDesign", "partnerSpeed"];
+/** The fields of a request that every save writes; everything else in it is biobuzz's. */
+const OWN_FIELDS = ["pp", "spec", "metadata"];
 
 /**
- * The request's text: the Auto's own fields (what to run, on which robot, how often, as whom, and
- * what to stamp on each log), then whatever biobuzz's copy had besides, its `runs` first of all.
+ * The request's text. A save writes which Auto to run (`pp`, `spec`) and what to stamp on each log
+ * (`metadata`). Whatever biobuzz's copy had besides is carried through unchanged and in its order,
+ * above all the curation (`partners`, `partnerSeeds`): rewriting the file from the dialog alone
+ * would drop it. A request with no robot design, seeds or alliance gets the defaults.
  */
 export function simRequestText(o: SimRequestOptions, now = new Date()): string {
-  const kept: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(o.existing ?? {})) {
-    if (!OWN_FIELDS.includes(key) && !RETIRED_FIELDS.includes(key))
-      kept[key] = value;
-  }
-  const request = {
+  const own: Record<string, unknown> = {
     pp: o.ppPath,
     spec: o.spec,
-    design: SAVE_DESIGN,
-    seeds: Array.from({ length: SAVE_SEEDS }, (_, i) => i + 1),
-    alliance: SAVE_ALLIANCE,
     metadata: {
       AutoSource: baseName(o.ppPath),
       SavedBy: o.savedBy,
       SavedAt: now.toISOString(),
     },
-    ...kept,
   };
+  const defaults: Record<string, unknown> = {
+    design: DEFAULT_SIM_DESIGN,
+    seeds: Array.from({ length: SAVE_SEEDS }, (_, i) => i + 1),
+    alliance: SAVE_ALLIANCE,
+  };
+  const request: Record<string, unknown> = {};
+  // The file's own keys first, in its order (a small diff), then what it lacks.
+  for (const [key, value] of Object.entries(o.existing ?? {})) {
+    request[key] = OWN_FIELDS.includes(key) ? own[key] : value;
+  }
+  for (const key of ["pp", "spec", "design", "seeds", "alliance", "metadata"]) {
+    if (!(key in request)) request[key] = own[key] ?? defaults[key];
+  }
   return `${JSON.stringify(request, null, 2)}\n`;
 }
 
@@ -216,38 +222,36 @@ export function parseSimRequest(text: string | null): SimRequest | null {
 /** A Java class name, as a run's partner must be. */
 const NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-/**
- * The runs a request asks for: its `runs` that name a partner class or none, in order, the Auto
- * alone when it lists none (or has none). A run is never added by the Visualizer: a mentor curates
- * the partners in biobuzz.
- */
-export function simRuns(request: SimRequest | null): SimRunPlan[] {
-  const out: SimRunPlan[] = [];
-  if (Array.isArray(request?.runs)) {
-    for (const run of request.runs) {
-      if (!run || typeof run !== "object") continue;
-      const partner = (run as { partner?: unknown }).partner;
-      if (
-        partner !== null &&
-        !(typeof partner === "string" && NAME.test(partner))
-      )
-        continue;
-      if (out.some((r) => r.partner === (partner ?? null))) continue;
-      const label = (run as { label?: unknown }).label;
-      out.push(
-        typeof label === "string" && label.trim()
-          ? { partner: partner ?? null, label: label.trim() }
-          : { partner: partner ?? null },
-      );
-    }
-  }
-  return out.length ? out : [{ partner: null }];
+/** One run the request asks for, for the words before a save: the Auto alone, or beside a stand-in. */
+export interface SimPlanRun {
+  /** The stand-in's class, null for the Auto alone. */
+  partner: string | null;
+  /** The row's name: "alone", else the request's `name`, else the stand-in in words. */
+  name: string;
 }
 
-/** A run's words: "alone", or "with L just parks" (the label, else the class name in words). */
-export function runLabel(run: SimRunPlan): string {
-  if (run.partner === null) return "alone";
-  return `with ${run.label ?? partnerWords(run.partner)}`;
+/**
+ * The runs a request asks for, as SimRunTest reads them: the Auto alone first, then each of its
+ * `partners` that names a stand-in class, in order. The Visualizer never adds one: a mentor curates
+ * the partners in biobuzz.
+ */
+export function simPlan(request: SimRequest | null): SimPlanRun[] {
+  const out: SimPlanRun[] = [{ partner: null, name: "alone" }];
+  if (Array.isArray(request?.partners)) {
+    for (const entry of request.partners) {
+      if (!entry || typeof entry !== "object") continue;
+      const { partner, name } = entry as { partner?: unknown; name?: unknown };
+      if (typeof partner !== "string" || !NAME.test(partner)) continue;
+      out.push({
+        partner,
+        name:
+          typeof name === "string" && name.trim()
+            ? name.trim()
+            : partnerWords(partner),
+      });
+    }
+  }
+  return out;
 }
 
 /** "PartnerLStillAuto" → "L Still": the class name as words, without the parts every stand-in has. */
@@ -260,14 +264,15 @@ export function partnerWords(partnerClass: string): string {
   return words || partnerClass;
 }
 
-/** "Will simulate: alone, with L just parks, with L does nothing". */
-export function simPlanSentence(runs: SimRunPlan[]): string {
-  return `Will simulate: ${runs.map(runLabel).join(", ")}`;
-}
-
-/** The key a run is filed under in a map: "" alone, else the partner's class. */
-export function runKey(run: SimRunPlan): string {
-  return run.partner ?? "";
+/** "Will simulate: alone; L Launch Park (lands at 2 s), …". */
+export function simPlanSentence(runs: SimPlanRun[]): string {
+  return `Will simulate: ${runs
+    .map((r) =>
+      r.partner === null || r.name === partnerWords(r.partner)
+        ? r.name
+        : `${partnerWords(r.partner)}, ${r.name}`,
+    )
+    .join("; ")}`;
 }
 
 /** The Auto's name on sim-results: its .pp file name without ".pp". */
@@ -276,32 +281,34 @@ export function simAutoName(ppPath: string): string {
 }
 
 /**
- * Where a run's results sit on sim-results: the Auto's folder for the Auto alone, and
- * `<auto>/partners/<PartnerClass>` for a run with that partner (layout agreed with biobuzz's
- * "Simulate Auto" workflow, 3 Nov 2026). Each holds `latest.json` and `<commit>/result.json`
- * with that commit's logs beside it.
+ * Where the Auto's results sit on sim-results: `<auto>/<commit>/result.json` (with the Auto alone's
+ * logs beside it, and `entries`, a row for every run), `<auto>/latest.json` for the newest. A
+ * partner run's own result and logs are in {@link simEntryFolder}.
  */
-export function simRunFolder(
-  ppPath: string,
-  partner: string | null = null,
-): string {
-  const auto = simAutoName(ppPath);
-  return partner === null ? auto : `${auto}/partners/${partner}`;
+export function simResultPath(ppPath: string, commit: string): string {
+  return `${simAutoName(ppPath)}/${commit}/result.json`;
 }
 
-export function simResultPath(
-  ppPath: string,
-  commit: string,
-  partner: string | null = null,
-): string {
-  return `${simRunFolder(ppPath, partner)}/${commit}/result.json`;
+export function simLatestPath(ppPath: string): string {
+  return `${simAutoName(ppPath)}/latest.json`;
 }
 
-export function simLatestPath(
-  ppPath: string,
-  partner: string | null = null,
+/**
+ * Where an entry's own result and logs sit: `<auto>/<commit>/<partner>/<timing>/`
+ * (`r-solo/abc123/partner-l-still/default/`); the commit's own folder for the Auto alone, whose
+ * entry has no folder. The newest of a partner run is `<auto>/with/<partner>/<timing>/latest.json`.
+ */
+export function simEntryFolder(result: SimResult, entry: SimEntry): string {
+  return [result.auto, result.commit, entry.folder].filter(Boolean).join("/");
+}
+
+/** A published log's path on sim-results, for the entry (or the Auto alone, without one). */
+export function simLogPath(
+  result: SimResult,
+  file: string,
+  entry?: SimEntry,
 ): string {
-  return `${simRunFolder(ppPath, partner)}/latest.json`;
+  return `${entry ? simEntryFolder(result, entry) : `${result.auto}/${result.commit}`}/${file}`;
 }
 
 /** What the simulator writes for one robot in one run (SimRunTest). */
@@ -334,16 +341,65 @@ export interface SimRun {
   summary: string;
 }
 
+/** How an Auto's first "wait for" ended in one seed (SimRunTest.waits). */
+export interface SimWait {
+  label: string;
+  /** True when a trigger fired, false when the time ran out; null when AUTO ended first. */
+  fired: boolean | null;
+  /** The trigger that fired, or "timed out". */
+  outcome: string | null;
+  /** Seconds waited. */
+  after: number | null;
+  /** The match second the wait ended. */
+  at: number | null;
+}
+
+/** One seed of an entry (SimRunTest.row): the compact line of the results table. */
+export interface SimEntryRow {
+  seed: number;
+  log?: string;
+  points: number;
+  launched: number;
+  /** The partner's launches; null without a partner. */
+  partnerLaunched: number | null;
+  tipsAt: number[];
+  /** TIPs that count for AUTO; the rows before it was published count every TIP. */
+  autoTips?: number;
+  wait: SimWait | null;
+  robotsCollidedAt: number | null;
+  parked: boolean;
+  partnerParked: boolean | null;
+}
+
+/**
+ * One run in a result's `entries`: the Auto alone (first, no folder), then each partner at each
+ * timing. A partner entry's own result and logs are in {@link simEntryFolder}.
+ */
+export interface SimEntry {
+  name: string;
+  folder: string;
+  /** The stand-in's class, null for the Auto alone. */
+  partner: string | null;
+  /** The stand-in's `.pp` name (`partner-l-launch-park.pp`). */
+  partnerSource?: string | null;
+  timing?: Record<string, unknown> | null;
+  meanPoints: number | null;
+  bestSeed?: number | null;
+  typicalSeed?: number | null;
+  /** Seed → the .wpilog published for it, in the entry's folder. */
+  logs?: Record<string, string>;
+  rows: SimEntryRow[];
+  error?: string;
+}
+
 /** What the workflow publishes: SimRunTest's result.json, and where it came from. */
 export interface SimResult {
   designs?: string[];
   spec?: string;
   design?: string;
   alliance?: string;
-  /** The partner stand-in this result ran with, null or absent for the Auto alone. */
-  partner?: string | null;
-  /** The folder on sim-results its files are in (`r-solo/partners/PartnerLStillAuto`); the Auto's when absent. */
-  folder?: string;
+  /** One row per run: the Auto alone, then each partner at each timing. Absent before 3 Nov 2026. */
+  entries?: SimEntry[];
   runs?: SimRun[];
   error?: string;
   auto: string;
@@ -359,9 +415,24 @@ export interface SimResult {
   logs: Record<string, string>;
 }
 
-/** A published log's path on sim-results. */
-export function simLogPath(result: SimResult, file: string): string {
-  return `${result.folder ?? result.auto}/${result.commit}/${file}`;
+/**
+ * The entry's best and typical seeds and logs. The Auto alone's entry carries none of its own: its
+ * seeds and logs are the result's.
+ */
+export function entryLogs(
+  result: SimResult,
+  entry: SimEntry,
+): {
+  best: number | null;
+  typical: number | null;
+  logs: Record<string, string>;
+} {
+  const own = !!entry.folder;
+  return {
+    best: entry.bestSeed ?? (own ? null : (result.bestSeed ?? null)),
+    typical: entry.typicalSeed ?? (own ? null : result.typicalSeed),
+    logs: entry.logs ?? (own ? {} : result.logs),
+  };
 }
 
 /** What went wrong for a robot in a run, in words; empty if nothing did. */
@@ -453,5 +524,79 @@ export function tally(runs: SimRun[]): SimTally {
           : best,
       null,
     ),
+  };
+}
+
+/** One results row's seeds taken together (see {@link tallyEntry}). */
+export interface SimEntryTally {
+  runs: number;
+  meanPoints: number;
+  /** For TIP 1, 2, …: in how many seeds it happened, and its mean time. */
+  tips: { count: number; meanAt: number }[];
+  /** Seeds in which we parked, and (with a partner) the partner did. */
+  parked: number;
+  partnerParked: number;
+  /** Seeds whose first wait ended on a trigger, ran out its time, or was still open at the end. */
+  waitFired: number;
+  waitTimedOut: number;
+  /** Mean seconds the first wait took, over the seeds that ended it; null if none did. */
+  meanWaitAfter: number | null;
+  /** Seeds in which the two robots' bodies overlapped, and the earliest second it happened. */
+  collisions: number;
+  firstCollisionAt: number | null;
+  /** The seed's AUTO points, lowest to highest. */
+  minPoints: number;
+  maxPoints: number;
+}
+
+/** The seeds of one results row taken together: the row's cells in the Save & Simulate table. */
+export function tallyEntry(rows: SimEntryRow[]): SimEntryTally {
+  const tips: { count: number; meanAt: number }[] = [];
+  let points = 0;
+  let parked = 0;
+  let partnerParked = 0;
+  let waitFired = 0;
+  let waitTimedOut = 0;
+  let waitSum = 0;
+  let waitEnded = 0;
+  let collisions = 0;
+  let firstCollisionAt: number | null = null;
+  for (const row of rows) {
+    points += row.points;
+    row.tipsAt.slice(0, row.autoTips ?? row.tipsAt.length).forEach((t, i) => {
+      tips[i] ??= { count: 0, meanAt: 0 };
+      tips[i].meanAt =
+        (tips[i].meanAt * tips[i].count + t) / (tips[i].count + 1);
+      tips[i].count++;
+    });
+    if (row.parked) parked++;
+    if (row.partnerParked) partnerParked++;
+    if (row.wait?.fired === true) waitFired++;
+    else if (row.wait?.fired === false) waitTimedOut++;
+    if (row.wait?.after != null) {
+      waitSum += row.wait.after;
+      waitEnded++;
+    }
+    if (row.robotsCollidedAt !== null && row.robotsCollidedAt !== undefined) {
+      collisions++;
+      firstCollisionAt =
+        firstCollisionAt === null
+          ? row.robotsCollidedAt
+          : Math.min(firstCollisionAt, row.robotsCollidedAt);
+    }
+  }
+  return {
+    runs: rows.length,
+    meanPoints: rows.length ? points / rows.length : 0,
+    tips,
+    parked,
+    partnerParked,
+    waitFired,
+    waitTimedOut,
+    meanWaitAfter: waitEnded ? waitSum / waitEnded : null,
+    collisions,
+    firstCollisionAt,
+    minPoints: rows.length ? Math.min(...rows.map((r) => r.points)) : 0,
+    maxPoints: rows.length ? Math.max(...rows.map((r) => r.points)) : 0,
   };
 }
