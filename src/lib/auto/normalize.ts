@@ -44,6 +44,30 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const finite = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
+/**
+ * Fork: an Auto saved with an older copy of our robot's list (every name it lists is one the robot
+ * has) gets the names the robot has gained since, so a card the builder now makes (the Wait step's
+ * CellUp) is not "not in the robot's list". A list with a name our robot lacks is someone else's,
+ * or one loaded from a robot on purpose, and stays exactly as saved.
+ */
+function upgradeTeamRegistry(registry: AutoRegistry): void {
+  const team = teamRegistry();
+  const ours = (names: string[], all: string[]) => names.every((name) => all.includes(name));
+  if (!ours(registry.actions, team.actions) || !ours(registry.conditions, team.conditions)) return;
+  const missingActions = team.actions.filter((name) => !registry.actions.includes(name));
+  registry.actions = [...registry.actions, ...missingActions];
+  registry.conditions = [
+    ...registry.conditions,
+    ...team.conditions.filter((name) => !registry.conditions.includes(name)),
+  ];
+  if (missingActions.length && registry.typicalS) {
+    for (const name of missingActions) {
+      const seconds = team.typicalS?.[name];
+      if (seconds !== undefined) registry.typicalS[name] = seconds;
+    }
+  }
+}
+
 function nameList(value: unknown, where: string, problems: string[]): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
@@ -117,6 +141,8 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
   // are never empty (see teamRegistry).
   if (!registry.actions.length && !registry.conditions.length) {
     Object.assign(registry, teamRegistry());
+  } else {
+    upgradeTeamRegistry(registry);
   }
 
   const points: Record<string, NamedPoint> = {};
