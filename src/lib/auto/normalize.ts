@@ -378,6 +378,7 @@ function normalizeCard(
         ...(typeof raw.alongside === "string" && raw.alongside.trim()
           ? { alongside: raw.alongside.trim() }
           : {}),
+        ...(raw.partnerWait === true ? { partnerWait: true as const } : {}),
         ...ladderOf(raw.ladder, where, problems),
       };
     }
@@ -477,6 +478,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           label: c.label,
           rows: c.rows.map(row),
           ...(c.alongside ? { alongside: c.alongside } : {}),
+          ...(c.partnerWait ? { partnerWait: true as const } : {}),
           ...(c.ladder
             ? { ladder: { tries: c.ladder.tries.map((t) => ({ ...t })) } }
             : {}),

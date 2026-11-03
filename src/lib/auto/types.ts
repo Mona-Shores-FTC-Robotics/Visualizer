@@ -90,6 +90,13 @@ export interface FirstOfCard {
    */
   alongside?: string;
   /**
+   * This is **the partner wait**: the one wait whose time limit the drive team sets in init from "the
+   * partner's last preload leaves at N s" (biobuzz). At most one per Auto. The export writes its time
+   * row as `kit.afterMs(kit.partnerWaitMs(<the card's own ms>))`, so the Java keeps the card's seconds
+   * as the default; the preview keeps using them too. Only ever `true`; a stock Visualizer ignores it.
+   */
+  partnerWait?: true;
+  /**
    * What the robot tries when the trigger doesn't come: a ladder of plays, then park (see
    * lib/ladder). When set, the time-limit row's cards and the paths they drive are built from it
    * by the editor, and rebuilt after every edit; the file still holds them, so the export, the

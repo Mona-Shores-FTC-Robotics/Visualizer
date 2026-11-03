@@ -480,7 +480,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
                 `kit.command(${javaString(card.alongside)})`,
               ]
             : [javaString(firstOfLabel(card))],
-          children: card.rows.map(rowNode),
+          children: card.rows.map((r) => rowNode(r, card.partnerWait === true)),
         };
       case "rejoin": {
         // Joining a drive-through: one Pedro path on through the rest of its chain.
@@ -565,11 +565,15 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     ];
   };
 
-  const rowNode = (row: AutoRow): JNode => {
+  const rowNode = (row: AutoRow, partnerWait = false): JNode => {
+    // The partner wait's time limit is set from the drive team's "partner's last preload leaves at N s"
+    // (biobuzz AutoKit.partnerWaitMs); the card's own time stays in the Java as the default.
     const condition =
       "when" in row
         ? `kit.when(${row.when.map(javaString).join(", ")})`
-        : `kit.afterMs(${javaNumber(row.afterMs)})`;
+        : partnerWait
+          ? `kit.afterMs(kit.partnerWaitMs(${javaNumber(row.afterMs)}))`
+          : `kit.afterMs(${javaNumber(row.afterMs)})`;
     if (row.cards.length === 0) return condition;
     return {
       head: `${condition}.then`,

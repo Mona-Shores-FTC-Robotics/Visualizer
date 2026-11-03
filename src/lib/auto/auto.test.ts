@@ -207,3 +207,22 @@ test("an older copy of our robot's list gains the robot's newer names; anyone el
   other.registry = { actions: ["LaunchAll", "IntakeOff"], conditions: ["Tip"] };
   assertEqual(normalizeAuto(other).auto!.registry.conditions, ["Tip"]);
 });
+
+test("the partner wait flag round-trips; only true is kept", () => {
+  const raw = JSON.parse(JSON.stringify(loadSample().auto));
+  const waits = raw.cards.filter((c: { kind: string }) => c.kind === "firstOf");
+  waits[0].partnerWait = true;
+  waits[1].partnerWait = "yes";
+  const { auto, problems } = normalizeAuto(raw);
+  assertEqual(problems, []);
+  const flags = auto!.cards
+    .filter((c): c is FirstOfCard => c.kind === "firstOf")
+    .map((c) => c.partnerWait);
+  assertEqual(flags[0], true);
+  assertEqual(flags[1], undefined);
+  const saved = serializeAuto(auto!);
+  assertEqual(
+    saved.cards.filter((c) => c.kind === "firstOf" && c.partnerWait).length,
+    1,
+  );
+});
