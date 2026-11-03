@@ -66,7 +66,7 @@ export interface Step {
   waitS?: number;
   /** Wait: `waitS` is a time on the match clock ("until 8 s"), not since the wait began. */
   waitClock?: boolean;
-  /** Wait: the drive team may move it in INIT, as the partner's TIP time (biobuzz InitOptions). */
+  /** Wait: the drive team may move it in INIT, as the partner's last shot plus the TIP lag (biobuzz InitOptions). */
   waitAdjustable?: boolean;
   /** Wait: the launcher spins up while it waits (SpinUp alongside). */
   spinUp?: boolean;

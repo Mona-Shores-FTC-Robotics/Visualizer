@@ -857,7 +857,7 @@
       {#if step.waitClock}
         <label
           class="mt-1 flex items-center gap-1.5 pl-6 text-xs text-body"
-          title="At the field the drive team enters the partner's TIP time with the D-pad's up and down; the robot waits until a moment after it. One wait per Auto."
+          title="At the field the drive team enters the partner's last shot (when their last preload leaves) with the D-pad's up and down; the robot waits until the TIP lag after it (biobuzz PARTNER_TIP_LAG_S, 4 s) and shows both numbers. One wait per Auto."
         >
           <input
             type="checkbox"
@@ -869,7 +869,7 @@
                 }),
               )}
           />
-          The drive team can change it in INIT (D-pad ▲▼, the partner's TIP time)
+          The drive team can change it in INIT (D-pad ▲▼, the partner's last shot)
         </label>
       {/if}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
