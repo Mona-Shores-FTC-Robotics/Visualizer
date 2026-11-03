@@ -42,11 +42,17 @@ What the fork adds:
   uses the average of the forward and strafe velocities.
 
 - **Save to GitHub and simulate.** The cloud button in the top bar commits the project to biobuzz
-  (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). biobuzz's
-  "Simulate Auto" workflow runs it in the Java simulator; the dialog shows each seed's points, TIPs
-  and LEAVE/PARK and has **Download WPILOG** for AdvantageScope. Links may name any `.pp` in biobuzz
-  by its whole path (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing
-  results needs nothing; saving needs a fine-grained GitHub token, kept in the browser.
+  (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). The
+  request is always the team's one robot (turret locked forward, POLLEN only), ten seeds, RED:
+  nothing to choose, a student presses Save. Who the Auto runs beside comes from biobuzz: the
+  Auto's `TeamCode/sim-requests/<name>.json` lists its runs (alone, then one per partner stand-in a
+  mentor curated, from `TeamCode/autos/partners/`), a save keeps them, and the dialog says
+  "Will simulate: alone, with L just parks, …" before the button. biobuzz's "Simulate Auto"
+  workflow runs them in the Java simulator; the dialog shows one row per run (best and average
+  points, TIPs, LEAVE/PARK, the log), and a row opens into its seeds with **Download WPILOG** for
+  AdvantageScope. Links may name any `.pp` in biobuzz by its whole path
+  (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing results needs
+  nothing; saving needs a fine-grained GitHub token, kept in the browser.
 - **Save to repo folder.** The same two files, written straight into the biobuzz checkout on the
   laptop (Chrome or Edge; the folder is picked once), then Sloth Load. For an event: no internet,
   nothing to drop into `generated/` by hand. With a folder chosen the Files panel opens the

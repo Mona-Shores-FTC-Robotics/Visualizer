@@ -1,18 +1,26 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import {
   GENERATED_DIRS,
-  currentDesigns,
+  SAVE_DESIGN,
   generatedPathFor,
-  isCurrentDesign,
   laneBranch,
+  parseSimRequest,
+  partnerWords,
   ppPathProblem,
   protectedBranch,
+  runLabel,
+  simLatestPath,
+  simLogPath,
+  simPlanSentence,
   simRequestPath,
   simRequestText,
   simResultPath,
+  simRunFolder,
+  simRuns,
   simSpec,
   suggestPpPath,
   tally,
+  type SimResult,
   type SimRun,
 } from "./biobuzz";
 
@@ -64,12 +72,8 @@ test("the Java goes where its class already is, else by the .pp's folder", () =>
   );
 });
 
-test("builds the study spec", () => {
-  assertEqual(simSpec("Recycle5LeftAuto", null, 50), "Recycle5LeftAuto@50");
-  assertEqual(
-    simSpec("DuoLzRightAuto", "DuoLzLeftAuto", 45),
-    "DuoLzRightAuto,DuoLzLeftAuto@45",
-  );
+test("the spec is our Auto alone, at the simulator's default speed", () => {
+  assertEqual(simSpec("Recycle5LeftAuto"), "Recycle5LeftAuto");
 });
 
 test("an open file maps to the .pp it came from, else the one with its name, else nothing", () => {
@@ -164,39 +168,150 @@ test("on equal points the best run is the one whose last TIP came first", () => 
   assertEqual(tally([run(7, 20, []), run(6, 20, [])]).best?.seed, 6);
 });
 
-test("the request names the .pp, the run and what to stamp on each log", () => {
-  const path = "TeamCode/src/test/resources/auto-builder/recycle5-left.pp";
+test("the request names the .pp, the run, the one robot, ten seeds, RED and what to stamp on each log", () => {
+  const path = "TeamCode/autos/r-solo.pp";
   const text = simRequestText(
-    {
-      ppPath: path,
-      spec: "Recycle5LeftAuto,Recycle5RightAuto@50",
-      design: "real robot",
-      partnerDesign: null,
-      partnerSpeed: null,
-      seeds: 3,
-      alliance: "RED",
-      savedBy: "someone",
-    },
+    { ppPath: path, spec: "RSoloAuto", savedBy: "someone", existing: null },
     new Date("2026-10-03T12:00:00Z"),
   );
   const request = JSON.parse(text);
-  assertEqual(request.seeds, [1, 2, 3]);
-  assertEqual(request.pp, path);
-  assertEqual(request.metadata, {
-    AutoSource: "recycle5-left.pp",
-    SavedBy: "someone",
-    SavedAt: "2026-10-03T12:00:00.000Z",
+  assertEqual(request, {
+    pp: path,
+    spec: "RSoloAuto",
+    design: "real robot, turret locked forward, POLLEN only",
+    seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    alliance: "RED",
+    metadata: {
+      AutoSource: "r-solo.pp",
+      SavedBy: "someone",
+      SavedAt: "2026-10-03T12:00:00.000Z",
+    },
   });
+  assertEqual(request.design, SAVE_DESIGN);
   assert(text.endsWith("}\n"), "ends with a newline");
-  assertEqual(
-    simResultPath(path, "abc123"),
-    "recycle5-left/abc123/result.json",
-  );
+  assertEqual(simResultPath(path, "abc123"), "r-solo/abc123/result.json");
   assert(
     protectedBranch("master") &&
       protectedBranch("main") &&
       !protectedBranch("claude/simulator"),
     "not master",
+  );
+});
+
+test("a save keeps biobuzz's runs and other fields, and writes only the Auto's own", () => {
+  const existing = parseSimRequest(
+    JSON.stringify({
+      pp: "TeamCode/autos/r-solo.pp",
+      spec: "RSoloAuto@50",
+      design: "real robot",
+      partnerDesign: null,
+      partnerSpeed: null,
+      seeds: [1, 2, 3],
+      alliance: "BLUE",
+      title: "R solo",
+      runs: [
+        { partner: null },
+        { partner: "PartnerLParksAuto", label: "L just parks" },
+        { partner: "PartnerLStillAuto" },
+      ],
+      metadata: { AutoSource: "r-solo.pp", SavedBy: "before" },
+    }),
+  );
+  const request = JSON.parse(
+    simRequestText(
+      {
+        ppPath: "TeamCode/autos/r-solo.pp",
+        spec: "RSoloAuto",
+        savedBy: "someone",
+        existing,
+      },
+      new Date("2026-11-03T12:00:00Z"),
+    ),
+  );
+  // The Auto's own fields are the save's, whatever the file had.
+  assertEqual(request.spec, "RSoloAuto");
+  assertEqual(request.design, SAVE_DESIGN);
+  assertEqual(request.seeds.length, 10);
+  assertEqual(request.alliance, "RED");
+  assertEqual(request.metadata.SavedBy, "someone");
+  // biobuzz's fields stay; the old per-save partner choice goes.
+  assertEqual(request.runs, existing!.runs);
+  assertEqual(request.title, "R solo");
+  assert(!("partnerDesign" in request), "partnerDesign is gone");
+  assert(!("partnerSpeed" in request), "partnerSpeed is gone");
+  assertEqual(Object.keys(request), [
+    "pp",
+    "spec",
+    "design",
+    "seeds",
+    "alliance",
+    "metadata",
+    "title",
+    "runs",
+  ]);
+  assertEqual(parseSimRequest(null), null);
+  assertEqual(parseSimRequest("not json"), null);
+  assertEqual(parseSimRequest("[1]"), null);
+});
+
+test("the runs: alone when biobuzz lists none, else each partner once, in words", () => {
+  assertEqual(simRuns(null), [{ partner: null }]);
+  assertEqual(simRuns({ pp: "x" }), [{ partner: null }]);
+  assertEqual(simRuns({ runs: "nonsense" }), [{ partner: null }]);
+  const runs = simRuns({
+    runs: [
+      { partner: null },
+      { partner: "PartnerLParksAuto", label: "L just parks" },
+      { partner: "PartnerLStillAuto" },
+      { partner: "PartnerLStillAuto" },
+      { partner: "not a class" },
+      { partner: 7 },
+      null,
+    ],
+  });
+  assertEqual(runs, [
+    { partner: null },
+    { partner: "PartnerLParksAuto", label: "L just parks" },
+    { partner: "PartnerLStillAuto" },
+  ]);
+  assertEqual(runs.map(runLabel), [
+    "alone",
+    "with L just parks",
+    "with L Still",
+  ]);
+  assertEqual(
+    simPlanSentence(runs),
+    "Will simulate: alone, with L just parks, with L Still",
+  );
+  assertEqual(partnerWords("PartnerLDoesNothingAuto"), "L Does Nothing");
+  assertEqual(partnerWords("PartnerRPreloadTipAuto"), "R Preload Tip");
+  assertEqual(partnerWords("PartnerAuto"), "PartnerAuto");
+});
+
+test("a run's results: the Auto's folder alone, a partners subfolder with one", () => {
+  const pp = "TeamCode/autos/r-solo.pp";
+  assertEqual(simRunFolder(pp), "r-solo");
+  assertEqual(
+    simRunFolder(pp, "PartnerLStillAuto"),
+    "r-solo/partners/PartnerLStillAuto",
+  );
+  assertEqual(simLatestPath(pp), "r-solo/latest.json");
+  assertEqual(
+    simLatestPath(pp, "PartnerLStillAuto"),
+    "r-solo/partners/PartnerLStillAuto/latest.json",
+  );
+  assertEqual(
+    simResultPath(pp, "abc", "PartnerLStillAuto"),
+    "r-solo/partners/PartnerLStillAuto/abc/result.json",
+  );
+  const result = { auto: "r-solo", commit: "abc" } as SimResult;
+  assertEqual(simLogPath(result, "x.wpilog"), "r-solo/abc/x.wpilog");
+  assertEqual(
+    simLogPath(
+      { ...result, folder: "r-solo/partners/PartnerLStillAuto" },
+      "x.wpilog",
+    ),
+    "r-solo/partners/PartnerLStillAuto/abc/x.wpilog",
   );
 });
 
@@ -214,29 +329,4 @@ test("the fast lane: one branch and one simulation request per Auto", () => {
     simRequestPath("TeamCode/autos/r-quals-locked.pp", false),
     "TeamCode/sim-request.json",
   );
-});
-
-test("only the real robot's designs are current; old results' designs are not reused", () => {
-  assert(isCurrentDesign("real robot"), "real robot");
-  assert(
-    isCurrentDesign("real robot, turret locked forward, POLLEN only"),
-    "a variant",
-  );
-  assert(!isCurrentDesign("rigid V"), "an old what-if design");
-  assert(
-    !isCurrentDesign("two spring hoods, full-width intake"),
-    "the old default",
-  );
-  assert(!isCurrentDesign(undefined) && !isCurrentDesign(null), "none");
-});
-
-test("a remembered list of old designs falls back to the real robot", () => {
-  assertEqual(currentDesigns(["rigid V", "rigid V, 0.25 s shots"]), [
-    "real robot",
-  ]);
-  assertEqual(
-    currentDesigns(["rigid V", "real robot", "real robot, POLLEN only"]),
-    ["real robot", "real robot, POLLEN only"],
-  );
-  assertEqual(currentDesigns("not a list"), ["real robot"]);
 });

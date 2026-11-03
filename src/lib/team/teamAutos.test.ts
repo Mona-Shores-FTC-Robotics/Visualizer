@@ -3,6 +3,7 @@ import sampleText from "../auto/fixtures/hive-rush.pp?raw";
 import {
   copyName,
   fetchTeamFiles,
+  isTeamFile,
   listTeamFiles,
   parsePairs,
   parseTeamHash,
@@ -46,6 +47,40 @@ test("a team link names a branch, then up to 4 files or one pair", () => {
     pair: null,
   });
   assertEqual(parseTeamHash("#gh=master/solo-tunnel.pp"), null);
+});
+
+test("a partner stand-in in TeamCode/autos/partners opens by its path, on any branch", () => {
+  assertEqual(parseTeamHash("#team=master/partners/partner-l-still.pp"), {
+    ref: "master",
+    files: ["partners/partner-l-still.pp"],
+    pair: null,
+  });
+  assertEqual(
+    parseTeamHash(
+      "#team=claude/simulator/r-solo.pp,partners/partner-l-still.pp",
+    ),
+    {
+      ref: "claude/simulator",
+      files: ["r-solo.pp", "partners/partner-l-still.pp"],
+      pair: null,
+    },
+  );
+  // Only the known subfolder: anything else before the file is part of the branch.
+  assertEqual(parseTeamHash("#team=claude/simulator/x.pp"), {
+    ref: "claude/simulator",
+    files: ["x.pp"],
+    pair: null,
+  });
+  assert(isTeamFile("partners/partner-l-still.pp"), "a stand-in");
+  assert(!isTeamFile("old/x.pp") && !isTeamFile("partners/x.txt"), "others");
+  assertEqual(
+    teamRawUrl("master", "partners/partner-l-still.pp"),
+    `${RAW}/master/TeamCode/autos/partners/partner-l-still.pp`,
+  );
+  assertEqual(
+    copyName("partners/partner-l-still.pp"),
+    "biobuzz-partners-partner-l-still.pp",
+  );
 });
 
 test("a team link refuses what it cannot open, with a reason", () => {
@@ -106,7 +141,7 @@ test("pairs.json: pairs with .pp files, the rest skipped", () => {
   ]);
 });
 
-test("a pair's name opens its files; the folder lists only .pp files", async () => {
+test("a pair's name opens its files; the folder lists only its own .pp files, not partners/", async () => {
   const fake = async (url: string) => {
     if (url.endsWith("/pairs.json")) {
       return JSON.stringify({
@@ -124,6 +159,7 @@ test("a pair's name opens its files; the folder lists only .pp files", async () 
         { type: "file", name: "README.md" },
         { type: "file", name: "left-tunnel.pp" },
         { type: "dir", name: "old" },
+        { type: "dir", name: "partners" },
       ]);
     }
     return null;
