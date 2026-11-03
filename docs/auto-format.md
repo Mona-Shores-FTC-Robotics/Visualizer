@@ -381,11 +381,39 @@ branch can be up to 5 minutes stale after a push (a commit never is). A file
 that is not there, or GitHub out of reach, is refused with a message saying
 which. Code: `src/utils/gitLink.ts`.
 
+## Save to repo folder
+
+**File → Save to repo folder…** writes the Auto straight into the biobuzz checkout on the laptop:
+`TeamCode/autos/<name>.pp` and
+`TeamCode/src/main/java/org/firstinspires/ftc/teamcode/opmodes/auto/generated/<Class>Auto.java`,
+byte for byte what Save to GitHub commits (the same serializer, the same export, the same `SAVED`
+stamp). Nothing else in the checkout is touched: no simulation request, no `spots.json`. Then
+Sloth Load from Android Studio puts it on the robot. No internet, no file to drop anywhere by hand.
+
+- **The folder is picked once** (Chrome and Edge, through the File System Access API; other
+  browsers get a plain message). It must be a biobuzz checkout: the folder that holds `TeamCode`,
+  checked by `TeamCode/autos/spots.json` being there. The browser keeps the folder's handle in
+  IndexedDB, so later saves only ask to allow access again, from the Save button's click.
+- **Open from the folder.** With a folder chosen, the Files panel lists the checkout's
+  `TeamCode/autos/*.pp` under "biobuzz checkout", so the team's Autos open from the laptop, not
+  from GitHub. One opens like a file from disk: a copy under its own name in this browser, which
+  both saves then save back by that name.
+- **Offline.** The save and the open need no network. When GitHub cannot be reached, Save to
+  GitHub says so and offers this save instead, and the team's spots come from the checkout's
+  `spots.json` (`spotsFrom` in `lib/team/spotsStore.ts` says which list is in use).
+- **The record afterwards.** The folder save changes two files in the checkout; commit them on
+  an `auto/<name>` branch (or do Save to GitHub once online), so master has the Auto the robot
+  ran.
+
+Code: `src/lib/repo/repoFolder.ts` (the paths and bytes, on a plain `Folder`, tested without a
+browser), `src/lib/repo/repoStore.ts` (the directory handle, its permission and IndexedDB),
+`SaveToRepoDialog.svelte`.
+
 ## Upstream files touched
 
 New code lives in `src/lib/auto/`, `src/lib/codegen/auto/`, `src/lib/timing/`,
 `src/lib/plan/`, `src/lib/ladder/`,
-`src/lib/team/`, `src/lib/sim/`, `src/lib/github/`, `src/lib/session/`
+`src/lib/team/`, `src/lib/sim/`, `src/lib/github/`, `src/lib/repo/`, `src/lib/session/`
 (`drafts.ts`, `sharedCopy.ts`), the link helpers in `src/utils/`, and three
 fork modules in upstream's layout:
 

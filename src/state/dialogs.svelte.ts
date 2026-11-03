@@ -7,6 +7,8 @@ export class Dialogs {
   /** Fork: Team Autos, Save to GitHub, and a share link to copy (its URL). */
   teamAutos = $state(false);
   github = $state(false);
+  /** Fork: Save to repo folder (the biobuzz checkout on this laptop). */
+  repo = $state(false);
   shareLink = $state<string | null>(null);
   anyOpen = $derived(
     this.fileManager ||
@@ -15,6 +17,7 @@ export class Dialogs {
       this.exportCode ||
       this.teamAutos ||
       this.github ||
+      this.repo ||
       this.shareLink !== null,
   );
 }

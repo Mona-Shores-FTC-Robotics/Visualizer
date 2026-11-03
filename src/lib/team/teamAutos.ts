@@ -111,6 +111,13 @@ export function copyName(file: string): string {
   return `${COPY_PREFIX}${file}`;
 }
 
+/** The team file a browser copy was made from (`biobuzz-r-solo.pp` → `r-solo.pp`), or null. */
+export function teamFileOf(name: string): string | null {
+  return name.startsWith(COPY_PREFIX) && name.length > COPY_PREFIX.length
+    ? name.slice(COPY_PREFIX.length)
+    : null;
+}
+
 /** Reads pairs.json: the pairs that name only plain .pp files, in order. */
 export function parsePairs(text: string): TeamPair[] {
   const data = JSON.parse(text);

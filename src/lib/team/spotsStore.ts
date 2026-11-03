@@ -8,7 +8,13 @@
  */
 import { derived, get, writable } from "svelte/store";
 import type { NamedPoint } from "../auto/types";
-import { loadTeamSpots, samePose, type TeamSpots } from "./teamSpots";
+import { repoSpotsText } from "../repo/repoStore";
+import {
+  loadTeamSpots,
+  parseTeamSpots,
+  samePose,
+  type TeamSpots,
+} from "./teamSpots";
 
 const EDITS_KEY = "biobuzz-team-spot-edits";
 
@@ -16,6 +22,8 @@ const EDITS_KEY = "biobuzz-team-spot-edits";
 export const savedSpots = writable<TeamSpots>({});
 /** "loading", "ok", or why the list could not be read. */
 export const spotsStatus = writable<string>("loading");
+/** Where the list came from: GitHub, or the checkout on this laptop when GitHub was out of reach. */
+export const spotsFrom = writable<"github" | "folder" | null>(null);
 /** Changes made here, by name: a new or moved spot. */
 export const spotEdits = writable<TeamSpots>(readEdits());
 /** Whether the Save team spots dialog is open (it lives with the app's dialogs). */
@@ -39,28 +47,48 @@ spotEdits.subscribe((edits) => {
   }
 });
 
-/** Reads the list from biobuzz master. Changes made here that master now has are dropped. */
+/**
+ * Reads the list from biobuzz master; with GitHub out of reach, from the checkout this browser
+ * was given (lib/repo), if it may read it. Changes made here that the list now has are dropped.
+ */
 export async function refreshTeamSpots(): Promise<void> {
   spotsStatus.set("loading");
+  let spots: TeamSpots;
   try {
-    const spots = await loadTeamSpots();
-    savedSpots.set(spots);
-    spotEdits.update((edits) => {
-      const left = Object.fromEntries(
-        Object.entries(edits).filter(
-          ([name, pose]) => !samePose(spots[name], pose),
-        ),
-      );
-      return Object.keys(left).length === Object.keys(edits).length
-        ? edits
-        : left;
-    });
-    spotsStatus.set("ok");
+    spots = await loadTeamSpots();
+    spotsFrom.set("github");
   } catch (error) {
-    spotsStatus.set(
-      `Could not read the team's spots from GitHub (${error instanceof Error ? error.message : String(error)}): a school network may block raw.githubusercontent.com.`,
-    );
+    const fromFolder = await folderSpots();
+    if (!fromFolder) {
+      spotsFrom.set(null);
+      spotsStatus.set(
+        `Could not read the team's spots from GitHub (${error instanceof Error ? error.message : String(error)}): a school network may block raw.githubusercontent.com.`,
+      );
+      return;
+    }
+    spots = fromFolder;
+    spotsFrom.set("folder");
   }
+  savedSpots.set(spots);
+  spotEdits.update((edits) => {
+    const left = Object.fromEntries(
+      Object.entries(edits).filter(
+        ([name, pose]) => !samePose(spots[name], pose),
+      ),
+    );
+    return Object.keys(left).length === Object.keys(edits).length
+      ? edits
+      : left;
+  });
+  spotsStatus.set("ok");
+}
+
+/** The checkout's spots.json, parsed, when the folder is there and allowed; else null. */
+async function folderSpots(): Promise<TeamSpots | null> {
+  const text = await repoSpotsText();
+  if (text === null) return null;
+  const parsed = parseTeamSpots(text);
+  return parsed.ok ? parsed.spots : null;
 }
 
 /** Adds or moves a spot here (not saved until "Save team spots"). */
