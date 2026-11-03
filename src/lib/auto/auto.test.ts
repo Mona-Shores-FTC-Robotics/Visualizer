@@ -192,3 +192,18 @@ test("condition kinds: events round-trip, unknown names are dropped, none writes
   const plain = normalizeAuto(loadSample().data.auto).auto!;
   assert(!("events" in serializeAuto(plain).registry), "no events key for a file without events");
 });
+
+test("an older copy of our robot's list gains the robot's newer names; anyone else's stays as saved", () => {
+  const raw = clone(loadSample().data.auto);
+  raw.registry = {
+    actions: ["LaunchAll", "PickFlower", "GardenGather", "LaunchOne", "SpinUp"],
+    conditions: ["Empty", "IntakeFull", "LeftCellUp", "RightCellUp", "Tip", "CameraBlind"],
+  };
+  const { auto } = normalizeAuto(raw);
+  assert(auto!.registry.conditions.includes("CellUp"), JSON.stringify(auto!.registry.conditions));
+  assertEqual(auto!.registry.conditions.slice(0, 6), raw.registry.conditions);
+
+  const other = clone(loadSample().data.auto);
+  other.registry = { actions: ["LaunchAll", "IntakeOff"], conditions: ["Tip"] };
+  assertEqual(normalizeAuto(other).auto!.registry.conditions, ["Tip"]);
+});
