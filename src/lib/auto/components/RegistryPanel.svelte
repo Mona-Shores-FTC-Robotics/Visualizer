@@ -166,7 +166,7 @@
       {#if list === "actions"}
         <input class={FIELD_CLASS} placeholder="ShootAll" bind:value={newAction} aria-label="New action name" />
       {:else}
-        <input class={FIELD_CLASS} placeholder="LauncherReady" bind:value={newCondition} aria-label="New condition name" />
+        <input class={FIELD_CLASS} placeholder="IntakeFull" bind:value={newCondition} aria-label="New condition name" />
       {/if}
       <button type="submit" class="{ACTION_CLASS} shrink-0 text-[10px]">Add</button>
     </form>

@@ -1,7 +1,7 @@
 /**
  * Typical timing for the preview: a few facts about how the robot and the HIVE behave (how long a
- * volley takes, how soon a TIP follows it, how long a catch takes), so a wait in the preview ends
- * when it typically would instead of the moment it is asked.
+ * volley takes, how soon a TIP follows it, how soon a FLOWER pick fills the intake), so a wait in
+ * the preview ends when it typically would instead of the moment it is asked.
  *
  * The facts describe the world, not one Auto: they live in one file the team edits,
  * `TeamCode/autos/timing.json` in biobuzz, never in a `.pp`. A `.pp` says what the robot does
@@ -24,7 +24,10 @@ export interface TimingFact {
   label: string;
   /** What in an Auto it times. */
   times: string;
-  /** The value before anyone sets one: the simulator's. */
+  /**
+   * The value before the team's file sets one: the simulator's, which the tests' fixture Autos were
+   * run with. The current robot's values are in the team's `timing.json`.
+   */
   fallback: number;
   /** Negative allowed (a TIP can start before the last piece lands). */
   allowNegative?: boolean;
@@ -37,17 +40,18 @@ export interface TimingFact {
 export const FACTS: TimingFact[] = [
   {
     id: "spinUpS",
-    label: "Spin up the launcher",
-    times: "the SpinUp command",
+    label: "Launcher from rest to launch speed",
+    times:
+      "how long the first LaunchAll waits after SpinUp (SpinUp itself finishes at once; the wheels come up while the robot drives)",
     fallback: 0.1,
     range: [0, 3],
   },
   {
     id: "volleyS",
-    label: "Volley: LaunchAll starts → robot empty",
-    times: "LaunchAll (and Empty while it runs)",
+    label: "LaunchAll with the launcher at speed: settle, then the set feed",
+    times: "LaunchAll (and Empty once it ends)",
     fallback: 0.8,
-    range: [0, 5],
+    range: [0, 8],
   },
   {
     id: "tipStartS",
@@ -60,31 +64,17 @@ export const FACTS: TimingFact[] = [
   {
     id: "tipSwingS",
     label: "HIVE swing, start → other CELL settled up",
-    times: "LeftCellUp / RightCellUp / HiveTipped",
+    times: "LeftCellUp / RightCellUp",
     fallback: 0.7,
     range: [0, 4],
   },
   {
     id: "intakeFullS",
-    label: "Intake full: catching a spill or taking a FLOWER, once there",
+    label: "Intake full in a FLOWER pick: push starts → full",
     times:
-      "IntakeFull, from the start of the wait; full stays full until a volley or set-down",
+      "IntakeFull, from the start of the wait; full stays full until a volley",
     fallback: 1.5,
     range: [0, 6],
-  },
-  {
-    id: "collectSeenS",
-    label: "Collect what the webcam sees",
-    times: "the CollectSeen command",
-    fallback: 2.0,
-    range: [0, 6],
-  },
-  {
-    id: "setDownS",
-    label: "Set 4 pieces down (reversed intake)",
-    times: "the SetDown command",
-    fallback: 1.0,
-    range: [0, 4],
   },
   {
     id: "tipLoad",
@@ -118,27 +108,12 @@ export const FACTS: TimingFact[] = [
     unit: "×",
     range: [0.5, 1.5],
   },
-  {
-    id: "launcherReadyS",
-    label: "Launcher ready again",
-    times: "LauncherReady, from the start of the wait",
-    fallback: 0.8,
-    range: [0, 3],
-  },
 ];
 
 /** The command whose run is a volley. */
 export const VOLLEY_COMMAND = "LaunchAll";
-
-const ACTION_FACT: Record<string, string> = {
-  SpinUp: "spinUpS",
-  LaunchAll: "volleyS",
-  CollectSeen: "collectSeenS",
-  SetDown: "setDownS",
-};
-const WAIT_FACT: Record<string, string> = {
-  LauncherReady: "launcherReadyS",
-};
+/** The command that starts the launcher and finishes at once (biobuzz LaunchCards.spinUp). */
+export const SPIN_UP_COMMAND = "SpinUp";
 
 export type TimingValues = Record<string, number>;
 
@@ -263,15 +238,12 @@ function cellUpFrom(tips: Tip[], t0: number, cell: "right" | "left"): number {
   return Infinity;
 }
 
-/** Conditions that mean "a CELL tipped". `Tip` is the camera's; the others are placeholders today. */
+/** Conditions that mean "a CELL tipped". `Tip` is the camera's; the others are the tracker's. */
 export const TIP_CONDITIONS = ["Tip", "LeftCellUp", "RightCellUp"];
-
-/** Commands that leave the robot empty. */
-const EMPTIES = new Set([VOLLEY_COMMAND, "SetDown"]);
 
 /**
  * The preview's answers for one robot, for these values and TIPs. It keeps that robot's state (is
- * the intake full?), so make one per robot per preview.
+ * the intake full? since when has the launcher spun?), so make one per robot per preview.
  */
 export function previewTiming(
   values: TimingValues,
@@ -279,23 +251,35 @@ export function previewTiming(
 ): PreviewTiming {
   // The robot starts with its preloads: full.
   let full = true;
+  // When the launcher was first asked to spin (SpinUp or a LaunchAll); it is left spinning after.
+  let spunAt: number | null = null;
   return {
-    commandRan(name) {
-      if (EMPTIES.has(name)) full = false;
+    commandRan(name, t0) {
+      if (
+        (name === SPIN_UP_COMMAND || name === VOLLEY_COMMAND) &&
+        spunAt === null
+      )
+        spunAt = t0;
+      if (name === VOLLEY_COMMAND) full = false;
     },
     becameTrue(condition) {
       if (condition === "IntakeFull") full = true;
     },
-    actionSeconds(name) {
-      const fact = ACTION_FACT[name];
-      return fact ? values[fact] : undefined;
+    actionSeconds(name, t0 = 0) {
+      if (name === SPIN_UP_COMMAND) return 0;
+      if (name === VOLLEY_COMMAND) {
+        // A launch waits for speed first: the rest of the spin-up from when it was asked, or all
+        // of it from rest.
+        const ready = (spunAt ?? t0) + values.spinUpS;
+        return Math.max(0, ready - t0) + values.volleyS;
+      }
+      return undefined;
     },
     trueAt(condition, t0) {
       switch (condition) {
         case "RightCellUp":
           return cellUpFrom(tips, t0, "right");
         case "LeftCellUp":
-        case "HiveTipped":
           return cellUpFrom(tips, t0, "left");
         case "Tip": {
           // A TIP already under way when the wait starts counts, as on the robot.
@@ -309,8 +293,7 @@ export function previewTiming(
         case "Empty":
           return full ? undefined : t0;
       }
-      const fact = WAIT_FACT[condition];
-      return fact ? t0 + values[fact] : undefined;
+      return undefined;
     },
   };
 }
