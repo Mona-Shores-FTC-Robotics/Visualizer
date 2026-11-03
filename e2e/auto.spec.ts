@@ -15,14 +15,9 @@ async function openSample(page: Page) {
   return errors;
 }
 
-/** The plan view or the simple builder is what opens; the card list is one button away. */
+/** The sample is not simple-builder steps, so it opens in the plan view; the cards are a click away. */
 async function showCards(page: Page) {
-  const advanced = page.getByRole("button", { name: "Advanced", exact: true });
-  await expect(
-    advanced.or(page.getByRole("button", { name: "Edit as cards" })),
-  ).toBeVisible();
-  if (await advanced.isVisible()) await advanced.click();
-  else await page.getByRole("button", { name: "Edit as cards" }).click();
+  await page.getByRole("button", { name: "Edit as cards" }).click();
   await expect(page.getByText(/\d+ cards?/)).toBeVisible();
 }
 
@@ -102,13 +97,14 @@ test("a share link opens the same Auto", async ({ page, context }) => {
 
 test("the Auto survives a reload", async ({ page }) => {
   await page.goto("/");
-  await showCards(page);
-  await page.getByRole("button", { name: "+ Command" }).click();
-  const count = await cardCount(page);
+  const steps = page.getByLabel("Steps").getByRole("listitem");
+  const palette = page.locator("[aria-label='Add a step']");
+  await palette.getByRole("button", { name: "Launch all" }).click();
+  const count = await steps.count();
+  expect(count).toBeGreaterThan(0);
   await page.waitForTimeout(1200); // the session is saved after 750 ms
   await page.reload();
-  await showCards(page);
-  await expect.poll(() => cardCount(page)).toBe(count);
+  await expect.poll(() => steps.count()).toBe(count);
 });
 
 // The plan view: the good path in TIP chapters, a miss per tip, times changed with − / +.

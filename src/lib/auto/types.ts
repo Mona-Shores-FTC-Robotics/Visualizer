@@ -163,8 +163,8 @@ export type AfterMsRow = RowCommon & {
   /** Fork: `afterMs` is a time on the match clock, not a time since the wait began. */
   matchClock?: boolean;
   /**
-   * Fork: the drive team may move it during INIT (biobuzz InitOptions: the partner's TIP time on
-   * the D-pad). Only on a match-clock limit, and on one wait per Auto.
+   * Fork: the drive team may move it during INIT (biobuzz InitOptions: the partner's last shot on
+   * the D-pad, plus the TIP lag). Only on a match-clock limit, and on one wait per Auto.
    */
   adjustable?: boolean;
 };
