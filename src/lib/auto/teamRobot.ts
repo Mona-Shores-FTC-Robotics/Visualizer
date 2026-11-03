@@ -44,6 +44,7 @@ export function teamRegistry(): AutoRegistry {
       "IntakeFull",
       "LeftCellUp",
       "RightCellUp",
+      "CellUp",
       "Tip",
       "CameraBlind",
     ],
