@@ -161,6 +161,28 @@ export function validateAuto(
 
   walk(auto.cards, [startPoint], "The main sequence");
 
+  // The drive team sets one wait from the partner's last preload; a second would have no number.
+  allCards(auto.cards)
+    .filter((card) => card.kind === "firstOf" && card.partnerWait)
+    .slice(1)
+    .forEach((card) =>
+      error(
+        card.id,
+        `${card.kind === "firstOf" && card.label ? card.label : "This wait"} is marked as the partner wait, but another wait already is: an Auto has one.`,
+      ),
+    );
+  for (const card of allCards(auto.cards)) {
+    if (
+      card.kind === "firstOf" &&
+      card.partnerWait &&
+      card.rows.some((row) => "afterMs" in row && row.matchClock)
+    )
+      error(
+        card.id,
+        `${card.label || "This wait"} is the partner wait, so its time limit counts from when the wait starts, not the match clock.`,
+      );
+  }
+
   for (const [name, point] of Object.entries(auto.points)) {
     if (!/^[A-Za-z][A-Za-z0-9 _-]*$/.test(name)) {
       error(null, `Point name "${name}" must start with a letter and use letters, digits, spaces, _ or -.`);

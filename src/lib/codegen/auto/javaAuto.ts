@@ -617,11 +617,15 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   };
 
   const rowNode = (row: AutoRow, card: FirstOfCard): JNode => {
+    // The partner wait's time limit is set from the drive team's "partner's last preload leaves at N s"
+    // (biobuzz AutoKit.partnerWaitMs); the card's own time stays in the Java as the default.
     const condition =
       "when" in row
         ? `kit.when(${row.when.map(javaString).join(", ")})`
         : !row.matchClock
-          ? `kit.afterMs(${javaNumber(row.afterMs)})`
+          ? card.partnerWait
+            ? `kit.afterMs(kit.partnerWaitMs(${javaNumber(row.afterMs)}))`
+            : `kit.afterMs(${javaNumber(row.afterMs)})`
           : row.adjustable
             ? `kit.atMatchSeconds(kit.seconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)}))`
             : `kit.atMatchSeconds(${javaNumber(row.afterMs / 1000)})`;

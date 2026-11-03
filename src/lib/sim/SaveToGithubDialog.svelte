@@ -37,8 +37,6 @@
     ppPathProblem,
     protectedBranch,
     robotProblems,
-    runKey,
-    runLabel,
     runProblems,
     simLatestPath,
     simLogPath,
@@ -47,14 +45,16 @@
     simRequestText,
     simRequestPath,
     simResultPath,
-    simRuns,
+    simPlan,
     simSpec,
     suggestPpPath,
     tally,
+    type SimEntry,
+    type SimPlanRun,
     type SimRequest,
     type SimResult,
-    type SimRunPlan,
   } from "./biobuzz";
+  import SimEntries from "./SimEntries.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -109,9 +109,9 @@
 
   /**
    * What a save will simulate: the runs in the Auto's request on biobuzz (alone, and one per partner
-   * stand-in a mentor curated), or the Auto alone when it has no request yet.
+   * entry a mentor curated), or the Auto alone when it has no request yet.
    */
-  let plan = $state<SimRunPlan[]>([{ partner: null }]);
+  let plan = $state<SimPlanRun[]>(simPlan(null));
   /** The branch the request was read from, or null when biobuzz has none for this Auto. */
   let planFrom = $state<string | null>(null);
 
@@ -129,12 +129,12 @@
   let commit = $state<string | null>(null);
   let commitPath = $state("");
   let run = $state<WorkflowRun | null>(null);
-  /** The saved commit's results, one per run of the plan (its key), once published. */
-  let resultByRun = $state<Record<string, SimResult>>({});
-  /** The newest earlier results for this file, one per run, shown before anything is saved. */
-  let latestByRun = $state<Record<string, SimResult>>({});
-  /** The run whose seeds are open (its key), and the seed whose timeline is. */
-  let selected = $state<string | null>(null);
+  /** The saved commit's result, once published: its `entries` hold one row per run. */
+  let savedResult = $state<SimResult | null>(null);
+  /** The newest earlier result for this file, shown before anything is saved. */
+  let earlier = $state<SimResult | null>(null);
+  /** A result from before `entries`: its seeds are open (today's view), and the seed whose timeline is. */
+  let selected = $state(false);
   let expanded = $state<number | null>(null);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let polls = 0;
@@ -152,22 +152,19 @@
   );
   /** Saving would create a file biobuzz does not have yet. */
   let isNew = $derived(files.length > 0 && !ppFiles.includes(path.trim()));
-  let hasResult = $derived(Object.keys(resultByRun).length > 0);
+  let hasResult = $derived(savedResult !== null);
   let waiting = $derived(commit !== null && !hasResult);
-  /** One row per run of the plan: what to show for it (this save's result, else the last one). */
+  /** What to show: this save's result, else the last one. */
+  let shown = $derived(savedResult ?? earlier);
+  let withEntries = $derived(!!shown?.entries?.length);
+  /** A result without `entries` is one row, the Auto alone, as before. */
   let rows = $derived(
-    plan.map((r) => {
-      const key = runKey(r);
-      const shown = resultByRun[key] ?? latestByRun[key] ?? null;
-      return { key, run: r, shown, summary: tally(shown?.runs ?? []) };
-    }),
+    shown && !withEntries
+      ? [{ key: "", name: "alone", shown, summary: tally(shown.runs ?? []) }]
+      : [],
   );
-  let anyShown = $derived(rows.some((row) => row.shown !== null));
-  /** The row whose seeds are open: the chosen one, or the only one. */
-  let selectedRow = $derived(
-    rows.find((row) => row.key === selected) ??
-      (rows.length === 1 && rows[0].shown ? rows[0] : null),
-  );
+  let anyShown = $derived(shown !== null);
+  let selectedRow = $derived(selected || rows.length === 1 ? rows[0] : null);
 
   $effect(() => {
     if (isOpen) void opened();
@@ -222,7 +219,7 @@
     if (pending && pending.path === path) {
       commit = pending.commit;
       commitPath = pending.path;
-      resultByRun = {};
+      savedResult = null;
       void poll();
     } else if (!commit) {
       void loadLatest();
@@ -284,14 +281,14 @@
 
   async function loadPlan() {
     const ppPath = path.trim();
-    plan = [{ partner: null }];
+    plan = simPlan(null);
     planFrom = null;
-    selected = null;
+    selected = false;
     if (!ppPath || ppPathProblem(ppPath)) return;
     try {
       const found = await existingRequest(ppPath, await saveRef(ppPath));
       if (found && path.trim() === ppPath) {
-        plan = simRuns(found.request);
+        plan = simPlan(found.request);
         planFrom = found.from;
       }
     } catch {
@@ -300,26 +297,21 @@
   }
 
   async function loadLatest() {
-    latestByRun = {};
+    earlier = null;
     const ppPath = path.trim();
-    const found: Record<string, SimResult> = {};
-    await Promise.all(
-      plan.map(async (r) => {
-        try {
-          const text = await readText(
-            token,
-            simLatestPath(ppPath, r.partner),
-            SIM_RESULTS_BRANCH,
-          );
-          const parsed = text ? (JSON.parse(text) as SimResult) : null;
-          // latest.json is per file name; only show it for this file.
-          if (parsed && parsed.pp === ppPath) found[runKey(r)] = parsed;
-        } catch {
-          // No earlier result: nothing to show.
-        }
-      }),
-    );
-    if (path.trim() === ppPath) latestByRun = found;
+    try {
+      const text = await readText(
+        token,
+        simLatestPath(ppPath),
+        SIM_RESULTS_BRANCH,
+      );
+      const parsed = text ? (JSON.parse(text) as SimResult) : null;
+      // latest.json is per file name; only show it for this file.
+      if (path.trim() === ppPath && parsed && parsed.pp === ppPath)
+        earlier = parsed;
+    } catch {
+      // No earlier result: nothing to show.
+    }
   }
 
   async function useToken() {
@@ -405,7 +397,7 @@
       const spec = simSpec(exported.className);
       // biobuzz's request for this Auto, as of the commit being built on: its runs are kept.
       const previous = await existingRequest(ppPath, head);
-      plan = simRuns(previous?.request ?? null);
+      plan = simPlan(previous?.request ?? null);
       planFrom = previous?.from ?? null;
       const files = {
         [ppPath]: text,
@@ -417,7 +409,7 @@
           existing: previous?.request ?? null,
         }),
       };
-      const simulates = `${spec} ${plan.map(runLabel).join(", ")}`;
+      const simulates = `${spec}: ${plan.map((r) => r.name).join(", ")}`;
       const message = `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${simulates}.`;
       let sha: string;
       try {
@@ -460,7 +452,7 @@
       onSaved(target, ppPath, text);
       commit = sha;
       commitPath = ppPath;
-      resultByRun = {};
+      savedResult = null;
       run = null;
       polls = 0;
       void poll();
@@ -484,19 +476,13 @@
       const runs = await runsFor(token, commit);
       run = runs.find((r) => r.name === SIM_WORKFLOW) ?? null;
       if (run?.status === "completed") {
-        const found: Record<string, SimResult> = {};
-        await Promise.all(
-          plan.map(async (r) => {
-            const text = await readText(
-              token,
-              simResultPath(commitPath, commit!, r.partner),
-              SIM_RESULTS_BRANCH,
-            );
-            if (text) found[runKey(r)] = JSON.parse(text) as SimResult;
-          }),
+        const text = await readText(
+          token,
+          simResultPath(commitPath, commit!),
+          SIM_RESULTS_BRANCH,
         );
-        if (Object.keys(found).length) {
-          resultByRun = found;
+        if (text) {
+          savedResult = JSON.parse(text) as SimResult;
           saveJson(PENDING_KEY, null);
           return;
         }
@@ -532,11 +518,11 @@
     }
   }
 
-  async function download(r: SimResult, file: string) {
+  async function download(r: SimResult, file: string, entry?: SimEntry) {
     try {
       const blob = await readBytes(
         token,
-        simLogPath(r, file),
+        simLogPath(r, file, entry),
         SIM_RESULTS_BRANCH,
       );
       const url = URL.createObjectURL(blob);
@@ -552,6 +538,9 @@
       );
     }
   }
+
+  const downloadEntry = (r: SimResult, file: string, entry: SimEntry) =>
+    download(r, file, entry);
 
   async function copyVersionLink(r: SimResult) {
     const link = `${location.origin}${location.pathname}${gitHash(gitLinkFor(r.commit, r.pp))}`;
@@ -702,12 +691,10 @@
   </div>
   <p class="text-xs text-body mt-2" data-testid="gh-plan">
     {simPlanSentence(plan)}{#if planFrom}
-      — the runs in <code>{simOwnRequestPath(path.trim())}</code> on {planFrom}.
-      Every run is the real robot, turret locked forward, POLLEN only, {SAVE_SEEDS}
-      seeds, RED.{:else}
+      — the runs in <code>{simOwnRequestPath(path.trim())}</code> on {planFrom},
+      on the robot and seeds it names. A save keeps its partners as they are.{:else}
       — biobuzz has no simulation request for this Auto yet, so it runs alone
-      (the real robot, turret locked forward, POLLEN only, {SAVE_SEEDS} seeds, RED).
-      A mentor curates the partners in biobuzz.{/if}
+      (the real robot, {SAVE_SEEDS} seeds, RED). A mentor curates the partners in biobuzz.{/if}
   </p>
   <datalist id="gh-files">
     {#each ppFiles as f (f)}
@@ -731,10 +718,10 @@
           <code>{path}</code>
           {#if isNew}<strong class="text-warning">(a new file)</strong
             >{:else}(updated){/if}, its Java, and the simulation request. GitHub
-          then runs {SAVE_SEEDS} seeds {plan.length === 1
-            ? "of the Auto alone"
-            : `of each of the ${plan.length} runs`}, usually in 1–6 minutes; you
-          can keep working meanwhile.
+          then simulates {plan.length === 1
+            ? "the Auto alone"
+            : `the ${plan.length} runs`}, usually in 1–6 minutes; you can keep
+          working meanwhile.
         {/if}
       </p>
       <button
@@ -843,14 +830,21 @@
     <div class="mt-5 border-t border-border pt-4 text-sm text-heading">
       <p class="mb-2">
         {hasResult ? "Simulated" : "Last simulated"}
-        <code>{commitPath || path.trim()}</code>: one row per run, the Auto
-        alone and with each partner stand-in.
-        {#if rows.length > 1}Click a row for its seeds.{/if}
+        <code>{commitPath || path.trim()}</code>{#if withEntries}: one row per
+          run, the Auto alone and with each partner stand-in at each timing.
+          Click a row for its seeds.{:else}.{/if}
         {#if !hasResult}<br /><span class="text-xs text-body"
             >From before your changes on screen: Save to GitHub to simulate
             them.</span
           >{/if}
       </p>
+      {#if withEntries && shown}
+        <SimEntries
+          result={shown}
+          onDownload={(entry, file) => downloadEntry(shown!, file, entry)}
+        />
+      {/if}
+      {#if !withEntries}
       <table class="w-full text-xs" data-testid="gh-runs">
         <thead class="text-body text-left">
           <tr>
@@ -871,11 +865,11 @@
                 ? 'bg-white/5'
                 : ''}"
               onclick={() => {
-                selected = selected === row.key ? null : row.key;
+                selected = !selected;
                 expanded = null;
               }}
             >
-              <td class="py-1 font-semibold">{runLabel(row.run)}</td>
+              <td class="py-1 font-semibold">{row.name}</td>
               {#if row.shown === null}
                 <td colspan="4" class="text-body"
                   >{waiting ? "simulating…" : "not simulated yet"}</td
@@ -954,10 +948,9 @@
         {@const runs = shown.runs ?? []}
         <div class="mt-4 border-t border-border pt-3">
           <p class="mb-2">
-            <strong>{runLabel(selectedRow.run)}</strong>:
+            <strong>{selectedRow.name}</strong>:
             <code>{shown.spec ?? shown.auto}</code>
-            {#if shown.partner}with <code>{shown.partner}</code>{/if}
-            on {shown.design ?? "the usual robot"} ·
+                        on {shown.design ?? "the usual robot"} ·
             <button class="underline" onclick={() => copyVersionLink(shown)}
               >copy a link to this version</button
             >
@@ -1108,6 +1101,7 @@
             </details>
           {/if}
         </div>
+      {/if}
       {/if}
     </div>
   {/if}

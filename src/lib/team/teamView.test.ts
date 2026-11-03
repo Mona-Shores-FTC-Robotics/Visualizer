@@ -29,3 +29,19 @@ test("team view: one Auto opens as the project with no overlays", async () => {
   assertEqual(get(teamOpenRequest)!.overlays, []);
   teamOpenRequest.set(null);
 });
+
+test("team view: a stand-in is drawn beside an Auto and never opens as the project", async () => {
+  await showTeamView(
+    "master",
+    ["partners/partner-l-still.pp", "r-solo.pp"],
+    null,
+    fetchAll,
+  );
+  const request = get(teamOpenRequest)!;
+  assertEqual(request.path, copyName("r-solo.pp"));
+  assertEqual(request.overlays, [
+    copyName("partners/partner-l-still.pp"),
+    copyName("r-solo.pp"),
+  ]);
+  teamOpenRequest.set(null);
+});
