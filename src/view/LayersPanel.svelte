@@ -22,6 +22,7 @@
   import AutoCardList from "../lib/auto/components/AutoCardList.svelte";
   import PlanPanel from "../lib/plan/PlanPanel.svelte";
   import SimpleBuilder from "../lib/simple/SimpleBuilder.svelte";
+  import MatchSide from "../lib/match/MatchSide.svelte";
 
   interface Props {
     settings: Settings;
@@ -78,7 +79,10 @@
   </div>
 
   <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-    {#if auto.auto && auto.catalog}
+    {#if auto.matchSides}
+      <!-- Fork: the Match view with two Autos: the first robot's what-ifs, in place of the builder. -->
+      <MatchSide index={0} />
+    {:else if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
       <div
         class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}

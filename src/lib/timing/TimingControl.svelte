@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * The Field header's timing switch: Typical (waits end when they typically would, TIPs from the
-   * volleys) or Instant (every ✓ at once), and the dialog that edits the team's timing facts.
+   * The Field header's timing: the preview runs on the team's timing facts (waits end when they
+   * typically would, TIPs come from the volleys), and Facts opens the dialog that edits them.
    */
   import { onMount } from "svelte";
   import Modal from "../components/ui/Modal.svelte";
@@ -19,7 +19,6 @@
     setOverride,
     teamTiming,
     timingBranch,
-    timingMode,
     timingOverrides,
     timingValues,
   } from "./store";
@@ -109,17 +108,9 @@
 
 <div
   class="flex items-center gap-1.5 module-caption"
-  title="How long waits take in the preview"
+  title="How long things take in the preview: the team's timing facts (TeamCode/autos/timing.json), and this laptop's changes"
 >
   <span>Timing</span>
-  <select
-    class="console-input px-1 py-0.5 text-xs"
-    bind:value={$timingMode}
-    title="Typical: each wait ends when it typically would, and TIPs come from the robots' volleys (the team's timing facts). Instant: every ✓ is true the moment it is asked."
-  >
-    <option value="typical">Typical</option>
-    <option value="instant">Instant</option>
-  </select>
   <button
     class="console-action text-xs px-1.5 py-0.5"
     onclick={() => (open = true)}
@@ -141,7 +132,7 @@
     Timing facts
   </h2>
   <p class="text-sm text-body mb-3">
-    How the robot and the HIVE behave, used by the Typical preview. They
+    How the robot and the HIVE behave, used by the preview. They
     describe the world, not one Auto: the team's values live in biobuzz <code
       >TeamCode/autos/{TIMING_FILE}</code
     >

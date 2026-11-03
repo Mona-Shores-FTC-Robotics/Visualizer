@@ -762,17 +762,14 @@
     />
     {#if auto.matchControls}
       <div class="max-h-[40vh] shrink-0 overflow-y-auto">
+        <!-- Fork: with two Autos each robot's sliders are in a side panel; the HIVE stays here. -->
         <MatchControls
-          robots={auto.overlayTogether.shown.map((overlay, i) => ({
-            file: overlay.filePath,
-            name: auto.matchLanes?.robots[i]?.name ?? overlay.filePath,
-            color: overlay.color,
-            auto: overlay.doc.auto!,
-          }))}
+          robots={auto.matchRobots}
           controls={auto.match}
           base={auto.baseValues}
           entries={auto.overlayTogether.entries}
           values={auto.matchValues}
+          show={auto.matchSides ? "middle" : "all"}
         />
       </div>
     {/if}

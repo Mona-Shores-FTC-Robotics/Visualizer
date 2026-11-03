@@ -19,12 +19,9 @@ import {
 } from "./model";
 
 export const TIMING_FILE = "timing.json";
-const MODE_KEY = "previewTimingMode";
 const OVERRIDES_KEY = "previewTimingOverrides";
 /** The Team Autos dialog's remembered branch. */
 const BRANCH_KEY = "teamAutosRef";
-
-export type TimingMode = "typical" | "instant";
 
 function read(key: string): string | null {
   try {
@@ -55,11 +52,13 @@ function savedOverrides(): TimingValues {
   }
 }
 
-/** "typical": waits end when they typically would; "instant": every ✓ is true at once. */
-export const timingMode = writable<TimingMode>(
-  read(MODE_KEY) === "instant" ? "instant" : "typical",
-);
-timingMode.subscribe((mode) => write(MODE_KEY, mode));
+// Fork: there is one timing, the team's facts. "Instant" (every trigger true at once) is gone:
+// it hid the match view and was remembered across reloads.
+try {
+  localStorage.removeItem("previewTimingMode");
+} catch {
+  // No storage: nothing was remembered.
+}
 
 /** The team's facts and the branch they came from; null until loaded or if the branch has none. */
 export const teamTiming = writable<{ ref: string; file: TimingFile } | null>(
