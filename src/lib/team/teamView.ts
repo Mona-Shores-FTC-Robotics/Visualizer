@@ -11,6 +11,7 @@ import { showToast } from "../toast";
 import {
   copyName,
   fetchTeamFiles,
+  isStandIn,
   parseTeamHash,
   resolveTeamFiles,
   teamHash,
@@ -58,7 +59,13 @@ export async function showTeamView(
   for (const { file, text } of fetched) {
     await browserFileStore.writeFile(copyName(file), text);
   }
-  const [first, ...others] = fetched;
+  // The project is the first Auto of ours: a partner stand-in is only ever drawn beside one.
+  const at = Math.max(
+    0,
+    fetched.findIndex(({ file }) => !isStandIn(file)),
+  );
+  const first = fetched[at];
+  const others = fetched.filter((_, i) => i !== at);
   teamView.set({ ref, files, pair, fetchedAt: Date.now() });
   teamOpenRequest.set({
     path: copyName(first.file),

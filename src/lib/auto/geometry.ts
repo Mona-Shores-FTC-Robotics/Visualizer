@@ -284,3 +284,20 @@ export function timeAtFraction(path: PathInfo, fraction: number): number {
   }
   return (low + high) / 2;
 }
+
+/**
+ * Fork: `line` with its end (a group's last segment's end) moved to (x, y), control points kept:
+ * a park path driven to another PARK spot the drive team picked in INIT (types.ts parkChoices).
+ */
+export function withEndAt(line: Path, x: number, y: number): Path {
+  if (line.kind === "compound") {
+    const segments = [...line.segments];
+    segments[segments.length - 1] = withEndAt(
+      segments[segments.length - 1],
+      x,
+      y,
+    );
+    return { ...line, segments };
+  }
+  return { ...line, endPoint: { ...line.endPoint, x, y } };
+}

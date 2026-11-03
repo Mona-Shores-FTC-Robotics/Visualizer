@@ -204,6 +204,12 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     );
     if (names.length) auto.teamSpots = [...new Set(names)];
   }
+  if (Array.isArray(raw.parkChoices)) {
+    const names = raw.parkChoices.filter(
+      (name: unknown): name is string => typeof name === "string" && !!name,
+    );
+    if (names.length) auto.parkChoices = [...new Set(names)];
+  }
   if (isObject(raw.parkFrom)) {
     const parkFrom: Record<string, string> = {};
     for (const [cardId, lineId] of Object.entries(raw.parkFrom)) {
@@ -378,6 +384,7 @@ function normalizeCard(
         ...(typeof raw.alongside === "string" && raw.alongside.trim()
           ? { alongside: raw.alongside.trim() }
           : {}),
+        ...(raw.partnerWait === true ? { partnerWait: true as const } : {}),
         ...ladderOf(raw.ladder, where, problems),
       };
     }
@@ -440,7 +447,18 @@ function normalizeRow(
     }
     return { ...common, when: names.slice(0, 1) };
   }
-  if (finite(raw.afterMs) && raw.afterMs >= 0) return { ...common, afterMs: raw.afterMs };
+  if (finite(raw.afterMs) && raw.afterMs >= 0) {
+    // Fork: a limit on the match clock, and one the drive team may move in INIT (types.ts).
+    const matchClock = raw.matchClock === true;
+    if (raw.adjustable === true && !matchClock)
+      problems.push(`${where}: only a limit on the match clock can be changed in INIT; it no longer can.`);
+    return {
+      ...common,
+      afterMs: raw.afterMs,
+      ...(matchClock ? { matchClock: true } : {}),
+      ...(matchClock && raw.adjustable === true ? { adjustable: true } : {}),
+    };
+  }
   problems.push(`${where}: afterMs must be a number ≥ 0; dropped the row.`);
   return null;
 }
@@ -477,6 +495,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           label: c.label,
           rows: c.rows.map(row),
           ...(c.alongside ? { alongside: c.alongside } : {}),
+          ...(c.partnerWait ? { partnerWait: true as const } : {}),
           ...(c.ladder
             ? { ladder: { tries: c.ladder.tries.map((t) => ({ ...t })) } }
             : {}),
@@ -515,6 +534,7 @@ export function serializeAuto(auto: AutoSection): AutoSection {
   if (auto.parkFrom && Object.keys(auto.parkFrom).length)
     out.parkFrom = { ...auto.parkFrom };
   if (auto.teamSpots?.length) out.teamSpots = [...auto.teamSpots];
+  if (auto.parkChoices?.length) out.parkChoices = [...auto.parkChoices];
   if (auto.exportName) out.exportName = auto.exportName;
   if (auto.plays && Object.keys(auto.plays).length) {
     out.plays = Object.fromEntries(

@@ -27,10 +27,28 @@ export const COPY_PREFIX = "biobuzz-";
 
 /**
  * The subfolders of TeamCode/autos a link may name a file in: `partners/`, the partner stand-ins
- * the simulator runs beside an Auto. The Team Autos list shows the folder's own files only; a
- * stand-in opens when its path is typed.
+ * the simulator runs beside an Auto. The file list ({@link listTeamFiles}) shows the folder's own
+ * files only; Team Autos lists the stand-ins apart ({@link listPartnerFiles}), to tick as overlays.
  */
 export const TEAM_SUBDIRS = ["partners"] as const;
+/** The stand-ins' folder under {@link TEAM_DIR}. */
+export const PARTNERS_DIR = "partners";
+
+/** Whether a team file is a partner stand-in (`partners/partner-l-still.pp`), not an Auto of ours. */
+export function isStandIn(file: string): boolean {
+  return file.startsWith(`${PARTNERS_DIR}/`);
+}
+
+/**
+ * The order to open `files` in: the project is the first, so the first Auto of ours goes first and a
+ * stand-in is only ever drawn beside one. Null when every file is a stand-in (nothing of ours to
+ * open); the Team Autos dialog then offers nothing to show.
+ */
+export function openOrder(files: string[]): string[] | null {
+  const at = files.findIndex((f) => !isStandIn(f));
+  if (at < 0) return null;
+  return [files[at], ...files.filter((_, i) => i !== at)];
+}
 
 const FILE = /^[A-Za-z0-9._ -]+\.pp$/;
 const NAME = /^[A-Za-z0-9._-]+$/;
@@ -146,6 +164,11 @@ export function teamListUrl(ref: string): string {
   return `https://api.github.com/repos/${TEAM_REPO}/contents/${TEAM_DIR}?ref=${encodeURIComponent(ref)}`;
 }
 
+/** GitHub's listing of the partner stand-ins' folder on a branch. */
+export function teamPartnersListUrl(ref: string): string {
+  return `https://api.github.com/repos/${TEAM_REPO}/contents/${TEAM_DIR}/${PARTNERS_DIR}?ref=${encodeURIComponent(ref)}`;
+}
+
 /** The name of the browser copy of a team file: `biobuzz-partners-x.pp` for `partners/x.pp`. */
 export function copyName(file: string): string {
   return `${COPY_PREFIX}${file.replace(/\//g, "-")}`;
@@ -218,16 +241,8 @@ export async function loadPairs(
   return text === null ? [] : parsePairs(text);
 }
 
-/**
- * The .pp files in the team's Autos folder on a branch, sorted. The folder's own files only: the
- * `partners/` stand-ins are the simulator's, not Autos the robot runs, so the list leaves them out.
- */
-export async function listTeamFiles(
-  ref: string,
-  get: FetchText = fetchText,
-): Promise<string[]> {
-  const text = await get(teamListUrl(ref));
-  if (text === null) throw new Error(`biobuzz has no ${TEAM_DIR} on ${ref}.`);
+/** The .pp file names in a GitHub folder listing, sorted. */
+function ppNames(text: string): string[] {
   const entries = JSON.parse(text);
   if (!Array.isArray(entries))
     throw new Error("GitHub's listing was not readable.");
@@ -241,6 +256,32 @@ export async function listTeamFiles(
     )
     .map((e) => e.name as string)
     .sort();
+}
+
+/**
+ * The .pp files in the team's Autos folder on a branch, sorted. The folder's own files only: the
+ * `partners/` stand-ins are the simulator's, not Autos the robot runs, so this leaves them out
+ * (see {@link listPartnerFiles}).
+ */
+export async function listTeamFiles(
+  ref: string,
+  get: FetchText = fetchText,
+): Promise<string[]> {
+  const text = await get(teamListUrl(ref));
+  if (text === null) throw new Error(`biobuzz has no ${TEAM_DIR} on ${ref}.`);
+  return ppNames(text);
+}
+
+/**
+ * The partner stand-ins on a branch, sorted, as the paths a link names (`partners/partner-l-still.pp`).
+ * A branch without the folder has none; that is not an error.
+ */
+export async function listPartnerFiles(
+  ref: string,
+  get: FetchText = fetchText,
+): Promise<string[]> {
+  const text = await get(teamPartnersListUrl(ref));
+  return text === null ? [] : ppNames(text).map((n) => `${PARTNERS_DIR}/${n}`);
 }
 
 /** The files a link opens: its own, or its pair's from pairs.json. */

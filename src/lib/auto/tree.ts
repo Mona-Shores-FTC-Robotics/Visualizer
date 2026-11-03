@@ -102,9 +102,37 @@ export function parkCardOf(list: AutoCard[]): PathCard | null {
   );
 }
 
+/**
+ * Fork: the lines the robot may park along: every list's park card and every spot's park
+ * (`parkFrom`). The drive team's park pick in INIT moves the end of each of them.
+ */
+export function parkLineIds(auto: AutoSection): Set<string> {
+  const ids = new Set<string>(Object.values(auto.parkFrom ?? {}));
+  for (const card of allCards(auto.cards))
+    if (card.kind === "path" && card.park) ids.add(card.lineId);
+  return ids;
+}
+
+/** Fork: the spots the park lines end on; one, unless the Auto parks in different places. */
+export function parkSpots(
+  auto: AutoSection,
+  catalog: { byId: Map<string, { endSegmentId: string }> },
+): Set<string> {
+  const spots = new Set<string>();
+  for (const id of parkLineIds(auto)) {
+    const end = catalog.byId.get(id)?.endSegmentId;
+    const spot = end ? auto.pathEnds[end] : undefined;
+    if (spot) spots.add(spot);
+  }
+  return spots;
+}
+
 /** A short human description of a row's condition. */
 export function describeRow(row: AutoRow): string {
-  return "when" in row ? row.when[0] || "(no trigger)" : `${row.afterMs} ms passed`;
+  if ("when" in row) return row.when[0] || "(no trigger)";
+  return row.matchClock
+    ? `${row.afterMs / 1000} s on the match clock`
+    : `${row.afterMs} ms passed`;
 }
 
 /** The branch's name: its own label, or one made from its condition. */

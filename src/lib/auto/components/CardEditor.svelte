@@ -365,6 +365,34 @@
         {#each actions as name (name)}<option value={name}>{name}</option>{/each}
       </select>
     </div>
+    <label
+      class="flex items-start gap-2 text-[11px] text-heading"
+      title="The drive team enters 'the partner's last preload leaves at N s' in init and the robot sets this wait's time limit from it. One wait per Auto."
+    >
+      <input
+        id="auto-firstof-partner-wait"
+        type="checkbox"
+        class="mt-0.5"
+        checked={card.partnerWait === true}
+        onchange={(e) => {
+          const on = e.currentTarget.checked;
+          const id = card.id;
+          updateAuto((draft) => {
+            // One per Auto: marking this wait unmarks the one that was.
+            for (const other of allCards(draft.cards)) {
+              if (other.kind === "firstOf") delete other.partnerWait;
+            }
+            const target = findCard(draft.cards, id);
+            if (on && target?.kind === "firstOf") target.partnerWait = true;
+          });
+        }}
+      />
+      <span
+        >The partner wait: its time limit is set in init from when the
+        partner's last preload leaves (one per Auto). The time below is the
+        default.</span
+      >
+    </label>
     <div class="space-y-2">
       {#each card.rows as row, rowIndex (rowIndex)}
         {@const kind = rowKind(row)}
