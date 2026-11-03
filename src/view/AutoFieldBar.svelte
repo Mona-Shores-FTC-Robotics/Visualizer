@@ -67,6 +67,19 @@
         />
         Match timeline
       </label>
+      {#if auto.matchTimeline}
+        <label
+          class={[labelClass, "flex items-center gap-1.5"]}
+          title="Under the timeline: change each robot's facts, the HIVE's, which triggers come and who is a no-show, for this look only"
+        >
+          <input
+            type="checkbox"
+            class={checkboxClass}
+            bind:checked={auto.matchControls}
+          />
+          What-ifs{auto.match.changed ? " •" : ""}
+        </label>
+      {/if}
     {/if}
   {/if}
   {#if !overlays.active && auto.view === "cards"}

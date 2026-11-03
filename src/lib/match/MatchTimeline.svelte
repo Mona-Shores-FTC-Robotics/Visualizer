@@ -103,6 +103,7 @@
   }
 
   function summary(robot: RobotLane): string {
+    if (robot.still) return "no-show: does not move";
     const volleys = robot.volleys.length;
     const parts = [
       `${volleys} volley${volleys === 1 ? "" : "s"}`,
