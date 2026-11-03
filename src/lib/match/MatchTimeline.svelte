@@ -3,24 +3,52 @@
    * The Match view's timeline (lanes.ts): one row per Auto shown together, the shared HIVE between
    * them, and arrows for the chain the field cannot show (volley → TIP → the wait it ends). Read
    * only: click or drag to move the playback clock.
+   *
+   * Fork: `compact` is the Match view with two Autos side by side: thinner rows, the robots'
+   * results in their side panels, the HIVE's sliders behind its label, and the play controls in
+   * the corner, so the field keeps its height.
    */
-  import type { MatchLanes, RobotLane, Segment, WaitBar } from "./lanes";
+  import type { Snippet } from "svelte";
+  import {
+    robotSummary as summary,
+    type MatchLanes,
+    type Segment,
+    type WaitBar,
+  } from "./lanes";
 
   interface Props {
     lanes: MatchLanes;
     /** The playback clock, seconds. */
     seconds: number;
     onSeek: (seconds: number) => void;
+    compact?: boolean;
+    /** Compact: the HIVE's sliders, opened from its label. */
+    hive?: Snippet;
+    /** Compact: a HIVE what-if is changed (a dot on its label). */
+    hiveChanged?: boolean;
+    /** Compact: play and loop, in the corner under the labels. */
+    controls?: Snippet;
   }
 
-  let { lanes, seconds, onSeek }: Props = $props();
+  let {
+    lanes,
+    seconds,
+    onSeek,
+    compact = false,
+    hive,
+    hiveChanged = false,
+    controls,
+  }: Props = $props();
 
   const LABEL_W = 96;
-  const ROBOT_H = 30;
-  const HIVE_H = 26;
-  const GAP = 26;
-  const AXIS_H = 16;
+  let ROBOT_H = $derived(compact ? 22 : 30);
+  let HIVE_H = $derived(compact ? 20 : 26);
+  let GAP = $derived(compact ? 18 : 26);
+  let AXIS_H = $derived(compact ? 30 : 16);
   const PAD_R = 18;
+
+  let hiveOpen = $state(false);
+  let root = $state<HTMLElement>();
 
   let width = $state(600);
 
@@ -53,6 +81,7 @@
       AXIS_H +
       6,
   );
+  let hiveTop = $derived(rowTop[rows.findIndex((row) => row.kind === "hive")]);
   let plotW = $derived(Math.max(40, width - LABEL_W - PAD_R));
   const x = (t: number) =>
     LABEL_W + (Math.max(0, Math.min(t, lanes.span)) / lanes.span) * plotW;
@@ -109,24 +138,6 @@
     return `${wait.label}: ${fmt(wait.t0)} → ${fmt(wait.t1)} (${(wait.t1 - wait.t0).toFixed(1)} s${limit}) · ${waitText(wait)}`;
   }
 
-  function summary(robot: RobotLane): string {
-    if (robot.still) return "no-show: does not move";
-    const volleys = robot.volleys.length;
-    const parts = [
-      `${volleys} volley${volleys === 1 ? "" : "s"}`,
-      `waited ${robot.waitingS.toFixed(1)} s`,
-    ];
-    if (robot.stalled) parts.push("stuck in a wait");
-    else if (robot.spareS >= 0)
-      parts.push(
-        `done ${fmt(robot.endTime)}, ${robot.spareS.toFixed(1)} s spare`,
-      );
-    else parts.push(`over 30 s by ${(-robot.spareS).toFixed(1)} s`);
-    if (robot.guard)
-      parts.push(`endgame guard parked at ${fmt(robot.guard.t)}`);
-    return parts.join(" · ");
-  }
-
   function linkPath(link: MatchLanes["links"][number]): string {
     const fromTop = topOf(link.from.lane);
     const toTop = topOf(link.to.lane);
@@ -150,9 +161,19 @@
   }
 </script>
 
+<svelte:window
+  onpointerdown={(event) => {
+    if (hiveOpen && !root?.contains(event.target as Node)) hiveOpen = false;
+  }}
+  onkeydown={(event) => {
+    if (hiveOpen && event.key === "Escape") hiveOpen = false;
+  }}
+/>
+
 <div
-  class="rounded-xl border border-border bg-base/60 px-2 pt-2 pb-1.5"
+  class="relative rounded-xl border border-border bg-base/60 px-2 pt-2 pb-1.5"
   bind:clientWidth={width}
+  bind:this={root}
 >
   <svg
     {width}
@@ -227,11 +248,13 @@
     {#each rows as row, r (row.kind === "hive" ? "hive" : row.index)}
       {@const top = rowTop[r]}
       {#if row.kind === "hive"}
-        <text
-          x={4}
-          y={top + HIVE_H / 2 + 4}
-          class="fill-heading text-[11px] font-semibold">HIVE</text
-        >
+        {#if !(compact && hive)}
+          <text
+            x={4}
+            y={top + HIVE_H / 2 + 4}
+            class="fill-heading text-[11px] font-semibold">HIVE</text
+          >
+        {/if}
         {#each lanes.hive.cells as cell, i (i)}
           <rect
             x={x(cell.t0)}
@@ -430,21 +453,63 @@
     />
   </svg>
 
-  <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-[11px] text-body">
-    {#each lanes.robots as robot (robot.name)}
-      <span class="flex items-center gap-1.5">
-        <span
-          class="inline-block size-2 rounded-full"
-          style={`background: ${robot.color}`}
-        ></span>
-        <span class="font-semibold text-heading">{robot.name}</span>
-        {summary(robot)}
-      </span>
-    {/each}
-    <span>
+  {#if compact && hive}
+    {@const tips = lanes.hive.tipsInAuto}
+    <!-- The HIVE's label opens its what-ifs; their sliders are not under the field. -->
+    <button
+      type="button"
+      class={[
+        "absolute left-2 flex items-center gap-1 rounded px-1 text-left text-[11px] hover:bg-body/10",
+        hiveOpen && "bg-body/10",
+      ]}
+      style={`top: ${8 + hiveTop}px; width: ${LABEL_W - 6}px; height: ${HIVE_H}px`}
+      title={`${tips} TIP${tips === 1 ? "" : "s"} settled by 30 s. Click for the HIVE's what-ifs`}
+      aria-expanded={hiveOpen}
+      onclick={() => (hiveOpen = !hiveOpen)}
+    >
       <span class="font-semibold text-heading">HIVE</span>
-      {lanes.hive.tipsInAuto} TIP{lanes.hive.tipsInAuto === 1 ? "" : "s"} settled
-      by 30 s
-    </span>
-  </div>
+      {#if hiveChanged}<span class="text-primary" title="A HIVE what-if is set"
+          >•</span
+        >{/if}
+      <span class="text-[10px] text-body"
+        >{tips} TIP{tips === 1 ? "" : "s"}</span
+      >
+      <span class="ml-auto text-body">▾</span>
+    </button>
+    {#if hiveOpen}
+      <div
+        class="absolute left-2 z-30 w-[26rem] max-w-[calc(100%-1rem)] rounded-lg border border-border bg-surface shadow-lg"
+        style={`bottom: calc(100% - ${8 + hiveTop - 4}px)`}
+      >
+        {@render hive()}
+      </div>
+    {/if}
+  {/if}
+  {#if compact && controls}
+    <div class="absolute bottom-1.5 left-2 flex items-center gap-1">
+      {@render controls()}
+    </div>
+  {/if}
+
+  {#if !compact}
+    <div
+      class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-[11px] text-body"
+    >
+      {#each lanes.robots as robot (robot.name)}
+        <span class="flex items-center gap-1.5">
+          <span
+            class="inline-block size-2 rounded-full"
+            style={`background: ${robot.color}`}
+          ></span>
+          <span class="font-semibold text-heading">{robot.name}</span>
+          {summary(robot)}
+        </span>
+      {/each}
+      <span>
+        <span class="font-semibold text-heading">HIVE</span>
+        {lanes.hive.tipsInAuto} TIP{lanes.hive.tipsInAuto === 1 ? "" : "s"} settled
+        by 30 s
+      </span>
+    </div>
+  {/if}
 </div>

@@ -5,7 +5,8 @@
    * (controls.svelte.ts): the team's facts are never changed from here.
    *
    * Fork: with two Autos, each robot's sliders go in a side panel (`show` is its index) and only
-   * the What-if bar and the HIVE stay under the field (`show="middle"`); with more, `show="all"`.
+   * the What-if bar sits above the field (`show="bar"`) and the HIVE's sliders open from its label
+   * on the timeline (`show="hive"`); with more, `show="all"`.
    */
   import type { AutoSection } from "../auto/types";
   import { previewQuestions } from "../auto/simulate";
@@ -40,7 +41,9 @@
     /** The shared facts previewed now (the team's, with the HIVE what-ifs). */
     values: TimingValues;
     /** Every panel, the What-if bar and the HIVE only, or one robot's panel by index. */
-    show?: "all" | "middle" | number;
+    show?: "all" | "bar" | "hive" | number;
+    /** A robot's panel: its result in words, under its name (lanes.ts robotSummary). */
+    summary?: string;
   }
 
   let {
@@ -50,13 +53,14 @@
     entries,
     values,
     show: part = "all",
+    summary,
   }: Props = $props();
 
   const keyOf = (knob: Knob) => `${knob.robot ?? "hive"}:${knob.id}`;
   /** In a side panel: each slider under its name, so it fits a narrow panel. */
   let stacked = $derived(typeof part === "number");
   /** The panel that runs the search also clears it; a robot's panel only reads it. */
-  let searches = $derived(typeof part !== "number");
+  let searches = $derived(part === "all" || part === "bar");
 
   // Any change to what is previewed makes the ticks stale.
   $effect(() => {
@@ -286,6 +290,9 @@
         No-show
       </label>
     </header>
+    {#if summary}
+      <p class="-mt-1 text-[11px] text-body">{summary}</p>
+    {/if}
     <div
       class={["flex flex-col gap-1", still && "pointer-events-none opacity-40"]}
     >
@@ -335,24 +342,22 @@
   </section>
 {/snippet}
 
-{#snippet hivePanel(wide: boolean)}
+{#snippet hivePanel()}
   <section
     class="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-base/60 p-2"
   >
     <header class="text-xs font-semibold text-heading">
       HIVE <span class="font-normal text-body">· shared</span>
     </header>
-    <div class={wide ? "grid grid-cols-2 gap-x-6 gap-y-1.5" : "contents"}>
-      {#each HIVE_FACT_LIST as fact (fact.id)}
-        {@render slider(
-          fact,
-          hiveValue(fact),
-          controls.hive[fact.id] !== undefined,
-          (v) => controls.setHive(fact.id, v),
-          { robot: null, id: fact.id },
-        )}
-      {/each}
-    </div>
+    {#each HIVE_FACT_LIST as fact (fact.id)}
+      {@render slider(
+        fact,
+        hiveValue(fact),
+        controls.hive[fact.id] !== undefined,
+        (v) => controls.setHive(fact.id, v),
+        { robot: null, id: fact.id },
+      )}
+    {/each}
     <p class="mt-auto text-[10px] text-body">
       What-ifs for this look only. The team's facts are in Timing → Facts.
     </p>
@@ -361,6 +366,8 @@
 
 {#if typeof part === "number"}
   {#if robots[part]}{@render robotPanel(robots[part])}{/if}
+{:else if part === "hive"}
+  {@render hivePanel()}
 {:else}
   <div class="flex flex-col gap-2" bind:clientWidth={width}>
     <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -403,8 +410,8 @@
         onclick={() => controls.reset()}>Team values</button
       >
     </div>
-    {#if part === "middle"}
-      {@render hivePanel(true)}
+    {#if part === "bar"}
+      <!-- Only the bar: the robots are in the side panels, the HIVE behind its label. -->
     {:else if narrow}
       <div class="flex gap-1 text-[11px]" role="tablist">
         {#each [...first.map( (r) => ({ key: r.file, label: r.name, color: r.color }) ), { key: "hive", label: "HIVE", color: "" }, ...rest.map( (r) => ({ key: r.file, label: r.name, color: r.color }) )] as t (t.key)}
@@ -429,7 +436,7 @@
         {/each}
       </div>
       {#if tab === "hive" || !robots.some((r) => r.file === tab)}
-        {@render hivePanel(false)}
+        {@render hivePanel()}
       {:else}
         {#each robots.filter((r) => r.file === tab) as robot (robot.file)}
           {@render robotPanel(robot)}
@@ -440,7 +447,7 @@
         {#each first as robot (robot.file)}
           {@render robotPanel(robot)}
         {/each}
-        {@render hivePanel(false)}
+        {@render hivePanel()}
         {#each rest as robot (robot.file)}
           {@render robotPanel(robot)}
         {/each}

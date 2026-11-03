@@ -295,3 +295,22 @@ export function matchLanes(
     span,
   };
 }
+
+/** One robot's result in words: volleys, seconds waited, seconds to spare, the endgame guard. */
+export function robotSummary(robot: RobotLane): string {
+  if (robot.still) return "no-show: does not move";
+  const fmt = (t: number) => `${t.toFixed(1)} s`;
+  const volleys = robot.volleys.length;
+  const parts = [
+    `${volleys} volley${volleys === 1 ? "" : "s"}`,
+    `waited ${robot.waitingS.toFixed(1)} s`,
+  ];
+  if (robot.stalled) parts.push("stuck in a wait");
+  else if (robot.spareS >= 0)
+    parts.push(
+      `done ${fmt(robot.endTime)}, ${robot.spareS.toFixed(1)} s spare`,
+    );
+  else parts.push(`over 30 s by ${(-robot.spareS).toFixed(1)} s`);
+  if (robot.guard) parts.push(`endgame guard parked at ${fmt(robot.guard.t)}`);
+  return parts.join(" · ");
+}

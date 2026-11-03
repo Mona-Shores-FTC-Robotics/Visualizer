@@ -5,6 +5,7 @@
    */
   import { previewScenario } from "../lib/auto/store";
   import AutoPreviewSwitches from "../lib/auto/components/AutoPreviewSwitches.svelte";
+  import MatchControls from "../lib/match/MatchControls.svelte";
   import TimingControl from "../lib/timing/TimingControl.svelte";
   import { checkboxClass, labelClass } from "../lib/components/ui/styles";
   import { useProject } from "../state/project.svelte";
@@ -80,6 +81,19 @@
           What-ifs{auto.match.changed ? " •" : ""}
         </label>
       {/if}
+    {/if}
+    {#if auto.matchSides}
+      <!-- Fork: two Autos side by side: the what-if presets and searches sit up here. -->
+      <div class="ml-auto">
+        <MatchControls
+          robots={auto.matchRobots}
+          controls={auto.match}
+          base={auto.baseValues}
+          entries={auto.overlayTogether.entries}
+          values={auto.matchValues}
+          show="bar"
+        />
+      </div>
     {/if}
   {/if}
   {#if !overlays.active && auto.view === "cards"}
