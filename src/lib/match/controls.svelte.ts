@@ -67,12 +67,7 @@ export const HIVE_FACT_LIST: TimingFact[] = FACTS.filter(
   (f) => !ROBOT_FACTS.includes(f.id),
 );
 
-/** The slider step for a fact. */
-export function factStep(fact: TimingFact): number {
-  if (fact.unit === "POLLEN") return 1;
-  if (fact.unit === "×") return 0.05;
-  return 0.1;
-}
+export { factStep } from "./breakpoints";
 
 /** A value from a slider or box, kept in the fact's range; null when it is not a number. */
 export function clampFact(fact: TimingFact, raw: number): number | null {

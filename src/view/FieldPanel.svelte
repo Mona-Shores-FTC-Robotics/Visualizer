@@ -771,6 +771,8 @@
           }))}
           controls={auto.match}
           base={auto.baseValues}
+          entries={auto.overlayTogether.entries}
+          values={auto.matchValues}
         />
       </div>
     {/if}
