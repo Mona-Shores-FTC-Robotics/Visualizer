@@ -8,9 +8,11 @@
   import Modal from "../components/ui/Modal.svelte";
   import {
     DEFAULT_REF,
+    listPartnerFiles,
     listTeamFiles,
     loadPairs,
     MAX_FILES,
+    openOrder,
     TEAM_DIR,
     type TeamPair,
   } from "./teamAutos";
@@ -40,6 +42,8 @@
 
   let branch = $state(savedBranch());
   let files: string[] = $state([]);
+  /** The simulator's partner stand-ins (`partners/x.pp`): ticked as overlays beside an Auto. */
+  let standIns: string[] = $state([]);
   let pairs: TeamPair[] = $state([]);
   let selected: string[] = $state([]);
   let loading = $state(false);
@@ -53,7 +57,12 @@
     loading = true;
     errorMessage = "";
     try {
-      [files, pairs] = await Promise.all([listTeamFiles(ref), loadPairs(ref)]);
+      [files, pairs, standIns] = await Promise.all([
+        listTeamFiles(ref),
+        loadPairs(ref),
+        // The stand-ins are a convenience: a branch without them, or a failed read, shows none.
+        listPartnerFiles(ref).catch(() => [] as string[]),
+      ]);
       loadedFor = ref;
       // Remember only a branch that has Autos, so an empty one is not the next default.
       if (files.length > 0)
@@ -65,6 +74,7 @@
     } catch (error) {
       files = [];
       pairs = [];
+      standIns = [];
       errorMessage = (error as Error).message;
     } finally {
       loading = false;
@@ -99,8 +109,11 @@
     }
   }
 
-  async function show(chosen: string[], pair: string | null = null) {
-    if (chosen.length === 0) return;
+  /** What Show together opens: an Auto of ours first, the stand-ins beside it; null with no Auto ticked. */
+  let order = $derived(openOrder(selected));
+
+  async function show(chosen: string[] | null, pair: string | null = null) {
+    if (!chosen || chosen.length === 0) return;
     busy = true;
     const ok = await showTeamView(branch.trim(), chosen, pair);
     busy = false;
@@ -253,8 +266,42 @@
           <span class="text-heading">{file}</span>
         </button>
       {/each}
+      {#if standIns.length > 0}
+        <div
+          class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-body"
+        >
+          Partner stand-ins (simulator only)
+        </div>
+        <p class="px-4 pb-1 text-xs text-body">
+          What a teammate might run beside our Auto. Tick one next to an Auto
+          to draw it alongside; it is never the file you edit.
+        </p>
+        {#each standIns as file (file)}
+          {@const n = selected.indexOf(file)}
+          <button
+            class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-body/10"
+            onclick={() => toggle(file)}
+            data-testid="team-stand-in"
+          >
+            {#if n >= 0}
+              <span
+                class="size-6 console-badge bg-purple-600 text-white text-sm font-bold flex items-center justify-center"
+                >{n + 1}</span
+              >
+            {:else}
+              <span class="size-6 border-2 border-border"></span>
+            {/if}
+            <span class="text-heading">{file.slice("partners/".length)}</span>
+          </button>
+        {/each}
+      {/if}
     {/if}
   </div>
+  {#if selected.length > 0 && !order}
+    <p class="text-xs text-warning mb-2">
+      A stand-in is drawn beside an Auto: tick one of ours too.
+    </p>
+  {/if}
 
   <div class="flex justify-end gap-2">
     <button class="console-action" onclick={() => (isOpen = false)}
@@ -262,8 +309,8 @@
     >
     <button
       class="console-action console-action--accent"
-      onclick={() => show(selected)}
-      disabled={busy || selected.length === 0}
+      onclick={() => show(order)}
+      disabled={busy || !order}
     >
       Show {selected.length || ""} together
     </button>

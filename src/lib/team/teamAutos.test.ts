@@ -3,13 +3,17 @@ import sampleText from "../auto/fixtures/hive-rush.pp?raw";
 import {
   copyName,
   fetchTeamFiles,
+  isStandIn,
   isTeamFile,
+  listPartnerFiles,
   listTeamFiles,
+  openOrder,
   parsePairs,
   parseTeamHash,
   resolveTeamFiles,
   teamHash,
   teamListUrl,
+  teamPartnersListUrl,
   teamRawUrl,
 } from "./teamAutos";
 
@@ -212,4 +216,51 @@ test("fetching names the file that is missing, unreadable or not a path", async 
     fetchTeamFiles("master", ["good.pp"], offline),
     "Could not reach GitHub",
   );
+});
+
+test("the stand-ins are listed apart, as partners/<file>.pp, and never in the Autos list", async () => {
+  const fake = async (url: string) => {
+    if (url === teamListUrl("master")) {
+      return JSON.stringify([
+        { type: "file", name: "r-solo.pp" },
+        { type: "dir", name: "partners" },
+      ]);
+    }
+    if (url === teamPartnersListUrl("master")) {
+      return JSON.stringify([
+        { type: "file", name: "partner-l-still.pp" },
+        { type: "file", name: "README.md" },
+        { type: "file", name: "partner-park-1.pp" },
+      ]);
+    }
+    return null;
+  };
+  assertEqual(
+    teamPartnersListUrl("master"),
+    "https://api.github.com/repos/Mona-Shores-FTC-Robotics/biobuzz/contents/TeamCode/autos/partners?ref=master",
+  );
+  assertEqual(await listTeamFiles("master", fake), ["r-solo.pp"]);
+  assertEqual(await listPartnerFiles("master", fake), [
+    "partners/partner-l-still.pp",
+    "partners/partner-park-1.pp",
+  ]);
+  // A branch without the folder has no stand-ins, which is not an error.
+  assertEqual(await listPartnerFiles("old", fake), []);
+  // And what the list returns is what a link may name.
+  assert(isTeamFile("partners/partner-park-1.pp") && isStandIn("partners/x.pp"));
+  assert(!isStandIn("r-solo.pp"));
+});
+
+test("a stand-in is never the first file opened: an Auto of ours goes first, or nothing opens", () => {
+  assertEqual(openOrder(["r-solo.pp"]), ["r-solo.pp"]);
+  assertEqual(openOrder(["partners/partner-l-still.pp", "r-solo.pp"]), [
+    "r-solo.pp",
+    "partners/partner-l-still.pp",
+  ]);
+  assertEqual(
+    openOrder(["l-partner.pp", "partners/a.pp", "r-solo.pp"]),
+    ["l-partner.pp", "partners/a.pp", "r-solo.pp"],
+  );
+  assertEqual(openOrder(["partners/partner-l-still.pp"]), null);
+  assertEqual(openOrder([]), null);
 });
