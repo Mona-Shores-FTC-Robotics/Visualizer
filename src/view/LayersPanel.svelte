@@ -28,23 +28,9 @@
     overlays: Overlays;
     hidden?: boolean;
     onHide: () => void;
-    /** Fork: the simple builder's Save to computer, Share link and GitHub. */
-    onSave: () => void;
-    onShare: () => void;
-    onGithub: () => void;
-    onRepo: () => void;
   }
 
-  let {
-    settings,
-    overlays,
-    hidden = false,
-    onHide,
-    onSave,
-    onShare,
-    onGithub,
-    onRepo,
-  }: Props = $props();
+  let { settings, overlays, hidden = false, onHide }: Props = $props();
 
   const project = useProject();
   const editor = useEditor();
@@ -97,7 +83,7 @@
       <div
         class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}
       >
-        {#if auto.view !== "simple"}
+        {#if auto.view !== "simple" && auto.simple}
           <button
             type="button"
             class="mb-1 self-start px-1 text-xs text-body underline"
@@ -107,13 +93,7 @@
           >
         {/if}
         {#if auto.view === "simple"}
-          <SimpleBuilder
-            {onSave}
-            {onShare}
-            {onGithub}
-            {onRepo}
-            onExport={exportAuto}
-          />
+          <SimpleBuilder />
         {:else if auto.view === "plan" && auto.plan}
           <PlanPanel
             onExport={exportAuto}

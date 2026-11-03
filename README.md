@@ -8,16 +8,16 @@ Visualizer and is not endorsed by Pedro Pathing.
 
 What the fork adds:
 
-- **Auto mode.** The Auto button in the top bar turns the Path List into the whole Autonomous:
-  actions, waits, decisions with branches ("wait for the first of these rows"), path cards with
-  while-driving actions and events along the path, routines, go-to, "together", and an endgame
-  guard. "Preview as" plays any scenario against the 30 s budget.
-- **The plan view** (what opens). The Auto as students read it: the good path (every tip comes)
-  in TIP chapters, one at a time; a ◆ on the field for each wait that branches, which shows what
-  the robot does if that tip doesn't come and where it goes back to the plan; time limits changed
-  with − / +; **All outcomes** lists every way the Auto can go. **Edit as cards** shows the full
-  card list. Waits on a condition the robot registers but cannot sense yet (biobuzz
-  `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
+- **The Auto Builder** (what opens). An Auto as a short list of our robot's steps: a start, then
+  Launch all, Drive to a spot, Pick flower, Garden gather, Spin up, Wait (for TIP or CELL up, or
+  intake full, at most N s, with an Otherwise list for when it doesn't come) and Park. Each step is
+  an ordinary card, so the file, the preview and the Java export are the same as for any Auto.
+  Every Auto and partner stand-in in biobuzz opens here. Save, Share and Export are in the top bar.
+- **The plan view and the card list.** A file the builder can't read as steps (several triggers
+  racing, a ladder, a command beside a wait) opens in the plan view instead: the good path in TIP
+  chapters, a ◆ on the field for each wait that branches, **All outcomes**, and **Edit as cards**
+  for every card the engine supports. Waits on a condition the robot registers but cannot sense
+  yet (biobuzz `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
 - **Ladders.** A miss is a ladder of tries, then park: "if TIP 1 doesn't come, refill at the wall
   FLOWER and shoot again; then the GARDEN; then park". Tries are shared plays picked from a
   short BIOBUZZ list, and three fixed rules finish every route (a try that works goes back to the
@@ -41,7 +41,7 @@ What the fork adds:
 - **A robot speed cap.** `maxVelocity` in a file's robot block caps the motion profile; upstream
   uses the average of the forward and strafe velocities.
 
-- **Save to GitHub and simulate.** The cloud button in the top bar commits the project to biobuzz
+- **Save to GitHub and simulate.** Save → Save to GitHub and simulate in the top bar commits the project to biobuzz
   (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). The
   request names the Auto and stamps each log; the robot design, seeds and alliance are the
   request's own (the real robot, ten seeds, RED when it has none): nothing to choose, a student
