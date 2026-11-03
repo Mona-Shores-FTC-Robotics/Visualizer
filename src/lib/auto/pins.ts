@@ -91,6 +91,11 @@ export function pointUses(auto: AutoSection): Map<string, PointUse> {
     uses.get(name)?.ends.push(id);
   if (auto.startAt && uses.has(auto.startAt))
     uses.get(auto.startAt)!.start = true;
+  // Fork: a park the drive team may pick in INIT is used, though no path is drawn to it.
+  for (const name of auto.parkChoices ?? []) {
+    const use = uses.get(name);
+    if (use) use.cards += 1;
+  }
   return uses;
 }
 

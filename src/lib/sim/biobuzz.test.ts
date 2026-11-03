@@ -1,25 +1,28 @@
 import { assert, assertEqual, test } from "../testing/harness";
 import {
+  DEFAULT_SIM_DESIGN,
   GENERATED_DIRS,
-  SAVE_DESIGN,
+  entryLogs,
   generatedPathFor,
   laneBranch,
   parseSimRequest,
   partnerWords,
   ppPathProblem,
   protectedBranch,
-  runLabel,
+  simEntryFolder,
   simLatestPath,
   simLogPath,
+  simPlan,
   simPlanSentence,
   simRequestPath,
   simRequestText,
   simResultPath,
-  simRunFolder,
-  simRuns,
   simSpec,
   suggestPpPath,
   tally,
+  tallyEntry,
+  type SimEntry,
+  type SimEntryRow,
   type SimResult,
   type SimRun,
 } from "./biobuzz";
@@ -168,7 +171,7 @@ test("on equal points the best run is the one whose last TIP came first", () => 
   assertEqual(tally([run(7, 20, []), run(6, 20, [])]).best?.seed, 6);
 });
 
-test("the request names the .pp, the run, the one robot, ten seeds, RED and what to stamp on each log", () => {
+test("a request with none yet names the .pp, the run, the real robot, ten seeds, RED and what to stamp on each log", () => {
   const path = "TeamCode/autos/r-solo.pp";
   const text = simRequestText(
     { ppPath: path, spec: "RSoloAuto", savedBy: "someone", existing: null },
@@ -178,7 +181,7 @@ test("the request names the .pp, the run, the one robot, ten seeds, RED and what
   assertEqual(request, {
     pp: path,
     spec: "RSoloAuto",
-    design: "real robot, turret locked forward, POLLEN only",
+    design: "real robot",
     seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     alliance: "RED",
     metadata: {
@@ -187,7 +190,7 @@ test("the request names the .pp, the run, the one robot, ten seeds, RED and what
       SavedAt: "2026-10-03T12:00:00.000Z",
     },
   });
-  assertEqual(request.design, SAVE_DESIGN);
+  assertEqual(request.design, DEFAULT_SIM_DESIGN);
   assert(text.endsWith("}\n"), "ends with a newline");
   assertEqual(simResultPath(path, "abc123"), "r-solo/abc123/result.json");
   assert(
@@ -198,121 +201,225 @@ test("the request names the .pp, the run, the one robot, ten seeds, RED and what
   );
 });
 
-test("a save keeps biobuzz's runs and other fields, and writes only the Auto's own", () => {
-  const existing = parseSimRequest(
-    JSON.stringify({
-      pp: "TeamCode/autos/r-solo.pp",
-      spec: "RSoloAuto@50",
-      design: "real robot",
-      partnerDesign: null,
-      partnerSpeed: null,
-      seeds: [1, 2, 3],
-      alliance: "BLUE",
-      title: "R solo",
-      runs: [
-        { partner: null },
-        { partner: "PartnerLParksAuto", label: "L just parks" },
-        { partner: "PartnerLStillAuto" },
-      ],
-      metadata: { AutoSource: "r-solo.pp", SavedBy: "before" },
-    }),
-  );
+const CURATED = {
+  pp: "TeamCode/autos/l-partner.pp",
+  spec: "LPartnerAuto",
+  design: "real robot, turret locked forward, POLLEN only",
+  seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  partnerSeeds: [1, 2, 3, 4, 5],
+  alliance: "BLUE",
+  partners: [
+    { name: "lands at 2 s", partner: "PartnerRLaunchParkAuto", timing: { launchS: 0.3 } },
+    {
+      name: "lands at 5 s",
+      partner: "PartnerRLaunchParkAuto",
+      timing: { startDelayS: 1.5, launchS: 0.8 },
+    },
+  ],
+  title: "L partner",
+  partnerDesign: null,
+  metadata: { AutoSource: "l-partner.pp", SavedBy: "before" },
+};
+
+test("a save carries the curation (partners, partnerSeeds) and every other key through unchanged", () => {
+  const existing = parseSimRequest(JSON.stringify(CURATED));
   const request = JSON.parse(
     simRequestText(
       {
-        ppPath: "TeamCode/autos/r-solo.pp",
-        spec: "RSoloAuto",
+        ppPath: "TeamCode/autos/l-partner.pp",
+        spec: "LPartnerAuto",
         savedBy: "someone",
         existing,
       },
       new Date("2026-11-03T12:00:00Z"),
     ),
   );
-  // The Auto's own fields are the save's, whatever the file had.
-  assertEqual(request.spec, "RSoloAuto");
-  assertEqual(request.design, SAVE_DESIGN);
-  assertEqual(request.seeds.length, 10);
-  assertEqual(request.alliance, "RED");
-  assertEqual(request.metadata.SavedBy, "someone");
-  // biobuzz's fields stay; the old per-save partner choice goes.
-  assertEqual(request.runs, existing!.runs);
-  assertEqual(request.title, "R solo");
-  assert(!("partnerDesign" in request), "partnerDesign is gone");
-  assert(!("partnerSpeed" in request), "partnerSpeed is gone");
+  // What the save owns: which Auto, and the stamp on each log.
+  assertEqual(request.pp, "TeamCode/autos/l-partner.pp");
+  assertEqual(request.spec, "LPartnerAuto");
+  assertEqual(request.metadata, {
+    AutoSource: "l-partner.pp",
+    SavedBy: "someone",
+    SavedAt: "2026-11-03T12:00:00.000Z",
+  });
+  // The curation, and the robot the request names, are the request's.
+  assertEqual(request.partners, CURATED.partners);
+  assertEqual(request.partnerSeeds, [1, 2, 3, 4, 5]);
+  assertEqual(request.design, "real robot, turret locked forward, POLLEN only");
+  assertEqual(request.alliance, "BLUE");
+  assertEqual(request.title, "L partner");
+  assertEqual(request.partnerDesign, null);
+  // And in the file's own order, so a save is a small diff.
+  assertEqual(Object.keys(request), Object.keys(CURATED));
+  assertEqual(parseSimRequest(null), null);
+  assertEqual(parseSimRequest("not json"), null);
+  assertEqual(parseSimRequest("[1]"), null);
+});
+
+test("saving twice in a row leaves the curation as it was", () => {
+  const options = {
+    ppPath: "TeamCode/autos/l-partner.pp",
+    spec: "LPartnerAuto",
+    savedBy: "someone",
+  };
+  const now = new Date("2026-11-03T12:00:00Z");
+  const first = simRequestText(
+    { ...options, existing: parseSimRequest(JSON.stringify(CURATED)) },
+    now,
+  );
+  const second = simRequestText(
+    { ...options, existing: parseSimRequest(first) },
+    now,
+  );
+  assertEqual(second, first);
+});
+
+test("a request with no design, seeds or alliance gets the defaults, after what it has", () => {
+  const request = JSON.parse(
+    simRequestText({
+      ppPath: "TeamCode/autos/x.pp",
+      spec: "XAuto",
+      savedBy: "s",
+      existing: { title: "X", partners: [] },
+    }),
+  );
   assertEqual(Object.keys(request), [
+    "title",
+    "partners",
     "pp",
     "spec",
     "design",
     "seeds",
     "alliance",
     "metadata",
-    "title",
-    "runs",
   ]);
-  assertEqual(parseSimRequest(null), null);
-  assertEqual(parseSimRequest("not json"), null);
-  assertEqual(parseSimRequest("[1]"), null);
+  assertEqual(request.design, "real robot");
 });
 
-test("the runs: alone when biobuzz lists none, else each partner once, in words", () => {
-  assertEqual(simRuns(null), [{ partner: null }]);
-  assertEqual(simRuns({ pp: "x" }), [{ partner: null }]);
-  assertEqual(simRuns({ runs: "nonsense" }), [{ partner: null }]);
-  const runs = simRuns({
-    runs: [
-      { partner: null },
-      { partner: "PartnerLParksAuto", label: "L just parks" },
-      { partner: "PartnerLStillAuto" },
+test("the plan: the Auto alone, then each curated partner entry, in words", () => {
+  assertEqual(simPlan(null), [{ partner: null, name: "alone" }]);
+  assertEqual(simPlan({ partners: "nonsense" }), [
+    { partner: null, name: "alone" },
+  ]);
+  const plan = simPlan(parseSimRequest(JSON.stringify(CURATED)));
+  assertEqual(plan, [
+    { partner: null, name: "alone" },
+    { partner: "PartnerRLaunchParkAuto", name: "lands at 2 s" },
+    { partner: "PartnerRLaunchParkAuto", name: "lands at 5 s" },
+  ]);
+  const odd = simPlan({
+    partners: [
       { partner: "PartnerLStillAuto" },
       { partner: "not a class" },
       { partner: 7 },
       null,
     ],
   });
-  assertEqual(runs, [
-    { partner: null },
-    { partner: "PartnerLParksAuto", label: "L just parks" },
-    { partner: "PartnerLStillAuto" },
-  ]);
-  assertEqual(runs.map(runLabel), [
-    "alone",
-    "with L just parks",
-    "with L Still",
+  assertEqual(odd, [
+    { partner: null, name: "alone" },
+    { partner: "PartnerLStillAuto", name: "L Still" },
   ]);
   assertEqual(
-    simPlanSentence(runs),
-    "Will simulate: alone, with L just parks, with L Still",
+    simPlanSentence(plan),
+    "Will simulate: alone; R Launch Park, lands at 2 s; R Launch Park, lands at 5 s",
   );
   assertEqual(partnerWords("PartnerLDoesNothingAuto"), "L Does Nothing");
   assertEqual(partnerWords("PartnerRPreloadTipAuto"), "R Preload Tip");
   assertEqual(partnerWords("PartnerAuto"), "PartnerAuto");
 });
 
-test("a run's results: the Auto's folder alone, a partners subfolder with one", () => {
-  const pp = "TeamCode/autos/r-solo.pp";
-  assertEqual(simRunFolder(pp), "r-solo");
+function entryRow(
+  seed: number,
+  points: number,
+  over: Partial<SimEntryRow> = {},
+): SimEntryRow {
+  return {
+    seed,
+    points,
+    launched: 4,
+    partnerLaunched: 4,
+    tipsAt: [8],
+    autoTips: 1,
+    wait: { label: "w", fired: true, outcome: "CellUp", after: 5, at: 9 },
+    robotsCollidedAt: null,
+    parked: true,
+    partnerParked: true,
+    ...over,
+  };
+}
+
+const ENTRY: SimEntry = {
+  name: "lands at 12 s",
+  folder: "partner-r-launch-park/lands-at-12-s",
+  partner: "PartnerRLaunchParkAuto",
+  partnerSource: "partner-r-launch-park.pp",
+  timing: { startDelayS: 8 },
+  meanPoints: 20,
+  bestSeed: 2,
+  typicalSeed: 1,
+  logs: { "1": "a.wpilog", "2": "b.wpilog" },
+  rows: [],
+};
+
+test("an entry's seeds taken together: points, TIPs, the wait, collisions, parking", () => {
+  const t = tallyEntry([
+    entryRow(1, 30),
+    entryRow(2, 10, {
+      tipsAt: [],
+      autoTips: 0,
+      wait: { label: "w", fired: false, outcome: "timed out", after: 7, at: 7 },
+      robotsCollidedAt: 11.5,
+      parked: false,
+      partnerParked: false,
+    }),
+    entryRow(3, 20, { wait: null, robotsCollidedAt: 9, tipsAt: [8, 40], autoTips: 1 }),
+  ]);
+  assertEqual(t.runs, 3);
+  assertEqual(t.meanPoints, 20);
+  assertEqual([t.minPoints, t.maxPoints], [10, 30]);
+  // TIP 2 at 40 s is after AUTO: it does not count.
+  assertEqual(t.tips, [{ count: 2, meanAt: 8 }]);
+  assertEqual([t.parked, t.partnerParked], [2, 2]);
+  assertEqual([t.waitFired, t.waitTimedOut], [1, 1]);
+  assertEqual(t.meanWaitAfter, 6);
+  assertEqual([t.collisions, t.firstCollisionAt], [2, 9]);
+  assertEqual(tallyEntry([]).runs, 0);
+  assertEqual(tallyEntry([]).meanWaitAfter, null);
+});
+
+test("an entry's results and logs sit in its folder; the Auto alone's in the commit's", () => {
+  const pp = "TeamCode/autos/l-partner.pp";
+  assertEqual(simResultPath(pp, "abc"), "l-partner/abc/result.json");
+  assertEqual(simLatestPath(pp), "l-partner/latest.json");
+  const result = {
+    auto: "l-partner",
+    commit: "abc",
+    bestSeed: 4,
+    typicalSeed: 5,
+    logs: { "4": "alone.wpilog" },
+  } as unknown as SimResult;
+  assertEqual(simLogPath(result, "x.wpilog"), "l-partner/abc/x.wpilog");
   assertEqual(
-    simRunFolder(pp, "PartnerLStillAuto"),
-    "r-solo/partners/PartnerLStillAuto",
-  );
-  assertEqual(simLatestPath(pp), "r-solo/latest.json");
-  assertEqual(
-    simLatestPath(pp, "PartnerLStillAuto"),
-    "r-solo/partners/PartnerLStillAuto/latest.json",
+    simEntryFolder(result, ENTRY),
+    "l-partner/abc/partner-r-launch-park/lands-at-12-s",
   );
   assertEqual(
-    simResultPath(pp, "abc", "PartnerLStillAuto"),
-    "r-solo/partners/PartnerLStillAuto/abc/result.json",
+    simLogPath(result, "b.wpilog", ENTRY),
+    "l-partner/abc/partner-r-launch-park/lands-at-12-s/b.wpilog",
   );
-  const result = { auto: "r-solo", commit: "abc" } as SimResult;
-  assertEqual(simLogPath(result, "x.wpilog"), "r-solo/abc/x.wpilog");
-  assertEqual(
-    simLogPath(
-      { ...result, folder: "r-solo/partners/PartnerLStillAuto" },
-      "x.wpilog",
-    ),
-    "r-solo/partners/PartnerLStillAuto/abc/x.wpilog",
-  );
+  // The Auto alone: its entry has no folder and no seeds of its own, so the result's are used.
+  const alone = { name: "alone", folder: "", partner: null, meanPoints: 1, rows: [] };
+  assertEqual(simEntryFolder(result, alone), "l-partner/abc");
+  assertEqual(entryLogs(result, alone), {
+    best: 4,
+    typical: 5,
+    logs: { "4": "alone.wpilog" },
+  });
+  assertEqual(entryLogs(result, ENTRY), {
+    best: 2,
+    typical: 1,
+    logs: ENTRY.logs ?? {},
+  });
 });
 
 test("the fast lane: one branch and one simulation request per Auto", () => {

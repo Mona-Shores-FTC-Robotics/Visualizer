@@ -12,7 +12,7 @@ import {
   savedStamp,
 } from "./javaAuto";
 import { buildPathCatalog } from "../../auto/geometry";
-import type { AutoSection } from "../../auto/types";
+import type { AutoSection, FirstOfCard } from "../../auto/types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -187,5 +187,51 @@ test("SAVED: the .pp's save time, Michigan time, for the OpMode's name", () => {
     savedStamp("2026-01-01T00:00:00.000Z"),
     "",
     "the tests' frozen clock is no save time",
+  );
+});
+
+test("the partner wait exports its time row as kit.afterMs(kit.partnerWaitMs(default)); nothing else changes", () => {
+  const auto = clone(loadSample().auto);
+  const plain = sourceOf(auto);
+  const wait = auto.cards.find(
+    (card): card is FirstOfCard => card.kind === "firstOf",
+  )!;
+  const ms = wait.rows.find((row) => "afterMs" in row) as { afterMs: number };
+  wait.partnerWait = true;
+  const marked = sourceOf(auto);
+  const was = `kit.afterMs(${javaNumber(ms.afterMs)})`;
+  const now = `kit.afterMs(kit.partnerWaitMs(${javaNumber(ms.afterMs)}))`;
+  assert(marked.includes(now), marked);
+  assertEqual(marked.split("partnerWaitMs").length - 1, 1);
+  // The only difference from the unmarked export is that one row (the default stays in the Java).
+  assertText(marked, plain.replace(was, now));
+});
+
+test("the partner wait flag survives a load and save, and an Auto without one writes nothing", () => {
+  const sample = JSON.parse(sampleText);
+  const first = sample.auto.cards.find(
+    (card: { kind: string }) => card.kind === "firstOf",
+  );
+  first.partnerWait = true;
+  const text = JSON.stringify(sample);
+  const exported = generateAutoJavaFromText(text, "hive-rush.pp");
+  assert(exported.ok, JSON.stringify(exported));
+  assert(exported.source.includes("kit.partnerWaitMs("), exported.source);
+  assert(!sampleText.includes("partnerWait"));
+});
+
+test("two partner waits are an error: an Auto has one", () => {
+  const sample = JSON.parse(sampleText);
+  const waits = sample.auto.cards.filter(
+    (card: { kind: string }) => card.kind === "firstOf",
+  );
+  assert(waits.length >= 2, "the sample has two waits");
+  waits[0].partnerWait = true;
+  waits[1].partnerWait = true;
+  const result = generateAutoJavaFromText(JSON.stringify(sample), "hive-rush.pp");
+  assert(!result.ok);
+  assert(
+    result.errors.some((e) => e.includes("partner wait")),
+    JSON.stringify(result.errors),
   );
 });

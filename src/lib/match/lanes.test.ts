@@ -189,3 +189,32 @@ test("a trigger answered no: the wait runs to its limit", () => {
   assertEqual(wait.ended, "time");
   assertEqual(wait.branched, true);
 });
+
+test("a wait until a match-clock time is outlined to that time, not from when it began", () => {
+  const left = entry(leftText);
+  const wait = left.auto.cards.find((c) => c.kind === "firstOf")!;
+  assert(wait.kind === "firstOf", "l-partner has a wait");
+  const timed = {
+    ...wait,
+    rows: wait.rows.map((row) =>
+      "afterMs" in row ? { ...row, afterMs: 9000, matchClock: true } : row,
+    ),
+  };
+  const auto = {
+    ...left.auto,
+    cards: left.auto.cards.map((c) => (c.id === wait.id ? timed : c)),
+  };
+  // No TIP comes (one volley never fills the CELL): the wait gives up at 9 s on the match clock.
+  const lanes = lanesOf([{ ...left, auto }, entry(rightText)], {
+    ...values,
+    startLoad: 0,
+    volleyLoad: 1,
+  });
+  const bar = lanes.robots[0].waits[0];
+  assertEqual(bar.ended, "time");
+  assert(
+    bar.limitAt !== null && Math.abs(bar.limitAt - 9) < 1e-6,
+    `limit at 9 s, not ${bar.limitAt}`,
+  );
+  assert(Math.abs(bar.t1 - 9) < 1e-6, "it ends at 9 s");
+});

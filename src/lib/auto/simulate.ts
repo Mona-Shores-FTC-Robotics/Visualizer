@@ -21,6 +21,7 @@ import { gatherPlan } from "../simple/garden";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
+  timeRowFiresAt,
   type ActionCard,
   type AutoCard,
   type AutoRow,
@@ -383,7 +384,7 @@ export function simulateAuto(
       }
       return soonest;
     }
-    return t0 + row.afterMs / 1000;
+    return timeRowFiresAt(row, t0);
   };
 
   const whyRow = (card: FirstOfCard, row: AutoRow): string => {
@@ -441,7 +442,7 @@ export function simulateAuto(
     let limitAt: number | null = null;
     for (const row of card.rows) {
       if (!("when" in row)) {
-        const end = t0 + row.afterMs / 1000;
+        const end = timeRowFiresAt(row, t0);
         limitAt = limitAt === null ? end : Math.min(limitAt, end);
       }
     }
@@ -845,7 +846,7 @@ export interface WorstCase {
 function waitLimit(card: FirstOfCard, t0: number): number {
   let limit = Infinity;
   for (const row of card.rows) {
-    if ("afterMs" in row) limit = Math.min(limit, t0 + row.afterMs / 1000);
+    if ("afterMs" in row) limit = Math.min(limit, timeRowFiresAt(row, t0));
   }
   return limit;
 }
@@ -924,7 +925,7 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
         // The trigger may fire as late as the limit; a time row later than the
         // earliest one never wins (null).
         const times = card.rows.map((row) => {
-          const time = "afterMs" in row ? t + row.afterMs / 1000 : limit;
+          const time = "afterMs" in row ? timeRowFiresAt(row, t) : limit;
           return time > limit + 1e-9 ? null : time;
         });
         // The latest any row comes back to the cards after this one…

@@ -43,16 +43,25 @@ What the fork adds:
 
 - **Save to GitHub and simulate.** The cloud button in the top bar commits the project to biobuzz
   (the `.pp`, its exported Java and a simulation request, one commit, never on `master`). The
-  request is always the team's one robot (turret locked forward, POLLEN only), ten seeds, RED:
-  nothing to choose, a student presses Save. Who the Auto runs beside comes from biobuzz: the
-  Auto's `TeamCode/sim-requests/<name>.json` lists its runs (alone, then one per partner stand-in a
-  mentor curated, from `TeamCode/autos/partners/`), a save keeps them, and the dialog says
-  "Will simulate: alone, with L just parks, …" before the button. biobuzz's "Simulate Auto"
-  workflow runs them in the Java simulator; the dialog shows one row per run (best and average
-  points, TIPs, LEAVE/PARK, the log), and a row opens into its seeds with **Download WPILOG** for
-  AdvantageScope. Links may name any `.pp` in biobuzz by its whole path
-  (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing results needs
+  request names the Auto and stamps each log; the robot design, seeds and alliance are the
+  request's own (the real robot, ten seeds, RED when it has none): nothing to choose, a student
+  presses Save. Who the Auto runs beside comes from biobuzz: the Auto's
+  `TeamCode/sim-requests/<name>.json` lists its `partners` (a mentor's curation, with
+  `partnerSeeds`), a save carries them and every other key through unchanged, and the dialog says
+  "Will simulate: alone; …" before the button. biobuzz's "Simulate Auto" workflow runs them in the
+  Java simulator; the dialog shows one row per entry of the result (the Auto alone, then each
+  partner at each timing: mean points, TIPs, how the wait ended, collisions, parking, best and
+  typical logs), and a row opens into its seeds for AdvantageScope. A result from before
+  `entries` shows as the Auto alone, as it did. Links may name any `.pp` in biobuzz by its whole
+  path (`#gh=<branch>/TeamCode/…/x.pp`), and a save goes back to that file. Seeing results needs
   nothing; saving needs a fine-grained GitHub token, kept in the browser.
+- **The partner wait.** A wait card can be marked as the partner wait (one per Auto): the drive
+  team enters when the partner's last preload leaves, and the robot sets that wait's time limit
+  from it. The export writes its time row as `kit.afterMs(kit.partnerWaitMs(<default ms>))`.
+  See [`docs/auto-format.md`](docs/auto-format.md).
+- **Partner stand-ins in Team Autos.** Under the Autos, `TeamCode/autos/partners/` is listed on
+  its own; tick a stand-in beside an Auto to draw it as an overlay. It is never the project
+  that opens.
 - **Save to repo folder.** The same two files, written straight into the biobuzz checkout on the
   laptop (Chrome or Edge; the folder is picked once), then Sloth Load. For an event: no internet,
   nothing to drop into `generated/` by hand. With a folder chosen the Files panel opens the
