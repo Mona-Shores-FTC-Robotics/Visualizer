@@ -6,6 +6,7 @@ import rightText from "./fixtures/recycle5-right.pp?raw";
 import leftText from "./fixtures/recycle5-left.pp?raw";
 import o3Text from "./fixtures/qual-right-o3.pp?raw";
 import partnerRightText from "./fixtures/partner-preloads-right.pp?raw";
+import rSoloText from "./fixtures/r-solo-left-check.pp?raw";
 import { buildPathCatalog } from "../auto/geometry";
 import { layOutShown } from "../auto/links";
 import {
@@ -181,6 +182,20 @@ test("recycle5 together: the left robot's first volley waits on the right robot'
     tipsInAuto(slow.tips) <= tipsInAuto(tips),
     "slower driving does not add TIPs",
   );
+});
+
+test("alone, a CELL check at the LEFT end follows its ✓/✗ switch (r-solo, biobuzz adcc376)", () => {
+  // R-Solo's check at LEFT_LAUNCH_OFFSET waits at most 0.75 s for CellUp. After TIP 1 the LEFT
+  // CELL is up, so ✓ goes on at once; the preview used to ask about the RIGHT CELL (the position
+  // was dropped), wait out the 0.75 s and show the ✗ route whichever way the switch was set.
+  const e = entry(rSoloText);
+  const wait = e.auto.cards.find((c) => c.kind === "firstOf")!;
+  const route = (scenario: Record<string, boolean>) =>
+    previewTogether([{ ...e, scenario }], values, true, { tipsCome: true })
+      .previews[0].log.find((l) => l.kind === "row")?.text ?? "";
+  assert(route({}).includes("If CellUp"), `✓ shows the LEFT route, not: ${route({})}`);
+  const off = route({ [`wait:${wait.id}`]: false });
+  assert(off.includes("Timed out"), `✗ shows the RIGHT route, not: ${off}`);
 });
 
 // A search over many previews of two Autos: seconds, not milliseconds, when every test runs at once.

@@ -27,7 +27,6 @@ try {
     doc.auto.points[name] = team[name];
     if (!doc.auto.teamSpots.includes(name)) doc.auto.teamSpots = [...doc.auto.teamSpots, name].sort();
   }
-  const ids = () => doc.auto.cards.map((c) => c.id);
   const steps = () => S.stepsOf(doc);
   const show = (tag) => console.log(tag, JSON.stringify(steps().map((s) => s.label + (s.otherwise ? " {else: " + s.otherwise.map((o) => o.label).join(", ") + "}" : ""))));
   show("before");
@@ -94,7 +93,6 @@ try {
   const lab = new Map(); const rec = (v) => v.forEach((s) => { lab.set(s.cardId, s.label); rec(s.otherwise ?? []); }); rec(S.stepsOf(doc));
   for (const [id, hits] of stepCollisions(withPartner, cat)) console.log("HITS", lab.get(id) ?? id, JSON.stringify(hits));
 
-  doc.auto.exportName = doc.auto.exportName;
   const text = serializeProject(doc, { pretty: true });
   writeFileSync(outPp, text + "\n");
   const java = generateAutoJava({ auto: doc.auto, startPoint: doc.startPoint, lines: doc.lines, shapes: doc.shapes, settings,
