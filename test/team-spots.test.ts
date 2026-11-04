@@ -20,6 +20,7 @@ import {
   parseTeamSpots,
   reexportWithSpots,
   serializeTeamSpots,
+  sortSpotEdits,
   startSpotFollowsStart,
   teamSpotSave,
   unlinkSpot,
@@ -210,5 +211,37 @@ describe("starts as team spots", () => {
     const moved = startSpotFollowsStart(typed, new Set(["LEFT_START"]));
     expect(moved.auto!.points.LEFT_START).toEqual([63.86, 133.78, 270]);
     expect(startSpotFollowsStart(moved, new Set(["LEFT_START"]))).toBe(moved);
+  });
+});
+
+describe("sortSpotEdits", () => {
+  // A browser that kept edits from before the 3 Nov rename: three old names, and a moved RIGHT_PARK.
+  const edits: TeamSpots = {
+    RIGHT_PARK: [9.6, 95.7, 0],
+    PARK: [9.6, 95.7, 0],
+    LEFT_LAUNCH: [59.4, 129.5, 270],
+    SCORING_FLOWER: [47.2, 119.3, 90],
+  };
+  const saved: TeamSpots = {
+    RIGHT_PARK: [14.5, 95.7, 0],
+    SCORING_FLOWER_STAGING: [47.2, 119.3, 90],
+  };
+  const used = new Set(["RIGHT_PARK", "SCORING_FLOWER_STAGING"]);
+
+  it("lists this Auto's changes apart from the rest, and names the ones the team's list lacks", () => {
+    expect(sortSpotEdits(edits, used, saved)).toEqual({
+      here: ["RIGHT_PARK"],
+      elsewhere: ["LEFT_LAUNCH", "PARK", "SCORING_FLOWER"],
+      gone: ["LEFT_LAUNCH", "PARK", "SCORING_FLOWER"],
+    });
+  });
+
+  it("names none as gone while the team's list is not read", () => {
+    expect(sortSpotEdits(edits, used, null).gone).toEqual([]);
+  });
+
+  it("a change to a spot the list has, but this Auto does not use, is elsewhere and not gone", () => {
+    const result = sortSpotEdits({ RIGHT_PARK: [1, 2, 0] }, new Set(), saved);
+    expect(result).toEqual({ here: [], elsewhere: ["RIGHT_PARK"], gone: [] });
   });
 });

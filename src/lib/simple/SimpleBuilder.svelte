@@ -34,13 +34,14 @@
   import { spotParks } from "./parkFrom";
   import { stepCollisions, type StepHits } from "./collide";
   import { useEditor } from "../../state/editor.svelte";
-  import { linkSpot } from "../team/teamSpots";
+  import { linkSpot, sortSpotEdits } from "../team/teamSpots";
   import {
-    discardSpotEdits,
+    dropSpotEdits,
     editSpot,
     refreshTeamSpots,
     spotsStatus,
     saveSpotsOpen,
+    savedSpots,
     setSpotUnlocked,
     spotEdits,
     teamSpots,
@@ -175,6 +176,14 @@
       .sort(),
   );
   let spots = $derived([...ownSpots, ...teamNames]);
+  /** Fork: the team-spot changes in this browser, this Auto's apart from the rest. */
+  let pendingSpots = $derived(
+    sortSpotEdits(
+      $spotEdits,
+      linkedSpots,
+      $spotsStatus === "ok" ? $savedSpots : null,
+    ),
+  );
   let selectedId = $derived(parseSelection($selectedCardId).cardId);
   let end = $derived(auto.preview?.endTime ?? 0);
   let worst = $derived(auto.worst?.total ?? end);
@@ -1085,11 +1094,11 @@
       >
     </div>
   {/if}
-  {#if Object.keys($spotEdits).length}
+  {#if pendingSpots.here.length}
     <div class="simple-pending flex flex-col gap-1.5" role="status">
       <p class="text-xs text-heading">
         Team spots changed here, not saved:
-        <b class="font-mono">{Object.keys($spotEdits).sort().join(", ")}</b>
+        <b class="font-mono">{pendingSpots.here.join(", ")}</b>
       </p>
       <div class="flex items-center gap-1.5">
         <button
@@ -1101,10 +1110,33 @@
           type="button"
           class="text-xs text-body underline"
           onclick={() =>
-            confirm("Put the changed team spots back as the team has them?") &&
-            discardSpotEdits()}>Undo changes</button
+            confirm(
+              `Put ${pendingSpots.here.join(", ")} back as the team has them?`,
+            ) && dropSpotEdits(pendingSpots.here)}>Undo changes</button
         >
       </div>
+    </div>
+  {/if}
+  {#if pendingSpots.elsewhere.length}
+    <div class="flex flex-col gap-1 text-xs text-body" role="status">
+      <p>
+        Also changed in this browser, not used by this Auto:
+        <span class="font-mono">{pendingSpots.elsewhere.join(", ")}</span>.
+        {#if pendingSpots.gone.length}
+          The team's list has no
+          <span class="font-mono">{pendingSpots.gone.join(", ")}</span>
+          (renamed since?); Save team spots would add
+          {pendingSpots.gone.length === 1 ? "it" : "them"} back.
+        {/if}
+      </p>
+      <button
+        type="button"
+        class="self-start underline"
+        onclick={() =>
+          confirm(
+            `Drop this browser's changes to ${pendingSpots.elsewhere.join(", ")}? Those spots go back as the team has them.`,
+          ) && dropSpotEdits(pendingSpots.elsewhere)}>Clear these</button
+      >
     </div>
   {/if}
   <ol class="flex flex-col gap-1" aria-label="Steps">
