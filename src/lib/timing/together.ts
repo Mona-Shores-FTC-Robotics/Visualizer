@@ -131,8 +131,9 @@ function tipsCome(timing: PreviewTiming, values: TimingValues): PreviewTiming {
   const swing = Math.max(0, values.tipStartS) + Math.max(0, values.tipSwingS);
   return {
     ...timing,
-    trueAt(condition, t0) {
-      const modelled = timing.trueAt(condition, t0);
+    trueAt(condition, t0, at) {
+      // Pass the robot's position on: CellUp is the CELL at the robot's end of the field.
+      const modelled = timing.trueAt(condition, t0, at);
       if (!TIP_CONDITIONS.includes(condition)) return modelled;
       return Math.min(modelled ?? t0, t0 + swing);
     },
