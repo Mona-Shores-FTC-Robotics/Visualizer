@@ -4,6 +4,8 @@
  * it publishes the result (the sim-results branch), and how seeds add up.
  */
 
+import { TEAM_DIR, teamFileOf } from "../team/teamAutos";
+
 /** Folders of biobuzz that hold Auto Builder .pp files. */
 export const PP_DIRS = [
   "TeamCode/autos",
@@ -130,6 +132,9 @@ export function suggestPpPath(
 ): string {
   if (openedFrom) return openedFrom;
   if (!fileName) return "";
+  // A Team Autos copy (biobuzz-drafts-x.pp) goes back to the file it was copied from.
+  const team = teamFileOf(fileName);
+  if (team) return `${TEAM_DIR}/${team}`;
   const name = fileName.endsWith(".pp") ? fileName : `${fileName}.pp`;
   const same = known.filter((path) => baseName(path) === name);
   return same.length === 1 ? same[0] : "";

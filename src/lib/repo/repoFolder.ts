@@ -2,7 +2,7 @@
  * "Save to repo folder": the same two files "Save to GitHub" commits, written straight into the
  * biobuzz checkout on this laptop instead, so a competition-day change needs no internet and no
  * file juggling: save here, then Sloth Load from Android Studio. The .pp goes to
- * `TeamCode/autos/<name>.pp` and its Java to the robot's generated folder, byte for byte what the
+ * `TeamCode/autos/<name>.pp` (or `TeamCode/autos/drafts/<name>.pp` for a draft) and its Java to the robot's generated folder, byte for byte what the
  * GitHub save would commit (same serializer, same export, same SAVED stamp). Nothing else in the
  * checkout is touched: no simulation request, no spots.json.
  *
@@ -11,7 +11,7 @@
  * `repoStore.ts` wraps a real directory handle in one.
  */
 import { generateAutoJavaFromText } from "../codegen/auto/fromFile";
-import { TEAM_DIR } from "../team/teamAutos";
+import { DRAFTS_DIR, TEAM_DIR } from "../team/teamAutos";
 import { SPOTS_PATH } from "../team/teamSpots";
 import { baseName, generatedPathFor, ppPathProblem } from "../sim/biobuzz";
 
@@ -21,6 +21,8 @@ export const CHECKOUT_MARKER = SPOTS_PATH;
 export const REPO_PP_DIR = TEAM_DIR;
 
 const FILE = /^[A-Za-z0-9._ -]+\.pp$/;
+/** A name the folder save takes: a plain .pp name, or one in the drafts' folder (`drafts/x.pp`). */
+const SAVE_NAME = new RegExp(`^(${DRAFTS_DIR}/)?[A-Za-z0-9._ -]+\\.pp$`);
 
 /** A folder on this laptop, as much of it as the save needs. Paths are relative, with `/`. */
 export interface Folder {
@@ -38,8 +40,8 @@ export interface Folder {
 export function repoFileProblem(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return "Name the Auto's .pp file, e.g. r-solo.pp";
-  if (!FILE.test(trimmed))
-    return `${trimmed}: use letters, numbers, dots, dashes and underscores, ending in .pp`;
+  if (!SAVE_NAME.test(trimmed))
+    return `${trimmed}: use letters, numbers, dots, dashes and underscores, ending in .pp (a draft: ${DRAFTS_DIR}/name.pp)`;
   return ppPathProblem(`${REPO_PP_DIR}/${trimmed}`);
 }
 
@@ -110,6 +112,15 @@ export async function saveToFolder(
 export async function listRepoAutos(folder: Folder): Promise<string[]> {
   const names = (await folder.listFiles(REPO_PP_DIR)) ?? [];
   return names.filter((n) => FILE.test(n)).sort();
+}
+
+/** The checkout's drafts, sorted, as the names the save takes (`drafts/<name>.pp`). */
+export async function listRepoDrafts(folder: Folder): Promise<string[]> {
+  const names = (await folder.listFiles(`${REPO_PP_DIR}/${DRAFTS_DIR}`)) ?? [];
+  return names
+    .filter((n) => FILE.test(n))
+    .sort()
+    .map((n) => `${DRAFTS_DIR}/${n}`);
 }
 
 /** One Auto's text from the checkout, or null when it has none by that name. */

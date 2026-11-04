@@ -5,12 +5,15 @@ import {
   fetchTeamFiles,
   isStandIn,
   isTeamFile,
+  listDraftFiles,
   listPartnerFiles,
   listTeamFiles,
   openOrder,
   parsePairs,
   parseTeamHash,
   resolveTeamFiles,
+  teamDraftsListUrl,
+  teamFileOf,
   teamHash,
   teamListUrl,
   teamPartnersListUrl,
@@ -263,4 +266,47 @@ test("a stand-in is never the first file opened: an Auto of ours goes first, or 
   );
   assertEqual(openOrder(["partners/partner-l-still.pp"]), null);
   assertEqual(openOrder([]), null);
+});
+
+test("a draft in TeamCode/autos/drafts opens by its path beside a stand-in, and is ours, not a stand-in", async () => {
+  const link = parseTeamHash(
+    "#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp",
+  );
+  assertEqual(link, {
+    ref: "master",
+    files: ["drafts/r-solo-push.pp", "partners/partner-push-start.pp"],
+    pair: null,
+  });
+  assert(isTeamFile("drafts/r-solo-push.pp") && !isStandIn("drafts/r-solo-push.pp"));
+  assert(!isTeamFile("other/x.pp"));
+  // The draft opens as the project, the stand-in beside it.
+  assertEqual(openOrder(["partners/partner-push-start.pp", "drafts/r-solo-push.pp"]), [
+    "drafts/r-solo-push.pp",
+    "partners/partner-push-start.pp",
+  ]);
+  assertEqual(
+    teamRawUrl("master", "drafts/r-solo-push.pp"),
+    `${RAW}/master/TeamCode/autos/drafts/r-solo-push.pp`,
+  );
+  const fake = async (url: string) =>
+    url === teamDraftsListUrl("master")
+      ? JSON.stringify([
+          { type: "file", name: "r-solo-push.pp" },
+          { type: "file", name: "README.md" },
+          { type: "file", name: "l-3tip-a.pp" },
+        ])
+      : null;
+  assertEqual(await listDraftFiles("master", fake), [
+    "drafts/l-3tip-a.pp",
+    "drafts/r-solo-push.pp",
+  ]);
+  assertEqual(await listDraftFiles("old", fake), []);
+});
+
+test("a browser copy maps back to its team file, subfolder included", () => {
+  assertEqual(teamFileOf(copyName("r-solo.pp")), "r-solo.pp");
+  assertEqual(teamFileOf(copyName("drafts/r-solo-push.pp")), "drafts/r-solo-push.pp");
+  assertEqual(teamFileOf(copyName("partners/partner-still.pp")), "partners/partner-still.pp");
+  assertEqual(teamFileOf("r-solo.pp"), null);
+  assertEqual(teamFileOf("biobuzz-"), null);
 });

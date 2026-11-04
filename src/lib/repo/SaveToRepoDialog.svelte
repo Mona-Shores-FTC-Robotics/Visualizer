@@ -11,7 +11,12 @@
   import { baseName } from "../sim/biobuzz";
   import { teamFileOf } from "../team/teamAutos";
   import { refreshTeamSpots, spotsStatus } from "../team/spotsStore";
-  import { listRepoAutos, repoFileProblem, saveToFolder } from "./repoFolder";
+  import {
+    listRepoAutos,
+    listRepoDrafts,
+    repoFileProblem,
+    saveToFolder,
+  } from "./repoFolder";
   import {
     allowRepoFolder,
     canPickFolder,
@@ -67,7 +72,10 @@
     known = [];
     if (!folder || folder.permission !== "granted") return;
     try {
-      known = await listRepoAutos(folder.folder);
+      known = [
+        ...(await listRepoAutos(folder.folder)),
+        ...(await listRepoDrafts(folder.folder)),
+      ];
     } catch {
       // The list is a convenience; the save checks the folder itself.
     }

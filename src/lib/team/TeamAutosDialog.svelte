@@ -8,6 +8,8 @@
   import Modal from "../components/ui/Modal.svelte";
   import {
     DEFAULT_REF,
+    DRAFTS_DIR,
+    listDraftFiles,
     listPartnerFiles,
     listTeamFiles,
     loadPairs,
@@ -44,6 +46,8 @@
   let files: string[] = $state([]);
   /** The simulator's partner stand-ins (`partners/x.pp`): ticked as overlays beside an Auto. */
   let standIns: string[] = $state([]);
+  /** Our drafts (`drafts/x.pp`): Autos with no OpMode yet, opened and edited like the others. */
+  let drafts: string[] = $state([]);
   let pairs: TeamPair[] = $state([]);
   let selected: string[] = $state([]);
   let loading = $state(false);
@@ -57,11 +61,12 @@
     loading = true;
     errorMessage = "";
     try {
-      [files, pairs, standIns] = await Promise.all([
+      [files, pairs, standIns, drafts] = await Promise.all([
         listTeamFiles(ref),
         loadPairs(ref),
-        // The stand-ins are a convenience: a branch without them, or a failed read, shows none.
+        // The stand-ins and drafts are a convenience: a branch without them, or a failed read, shows none.
         listPartnerFiles(ref).catch(() => [] as string[]),
+        listDraftFiles(ref).catch(() => [] as string[]),
       ]);
       loadedFor = ref;
       // Remember only a branch that has Autos, so an empty one is not the next default.
@@ -75,6 +80,7 @@
       files = [];
       pairs = [];
       standIns = [];
+      drafts = [];
       errorMessage = (error as Error).message;
     } finally {
       loading = false;
@@ -266,6 +272,31 @@
           <span class="text-heading">{file}</span>
         </button>
       {/each}
+      {#if drafts.length > 0}
+        <div
+          class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-body"
+        >
+          Drafts (not on the robot yet)
+        </div>
+        {#each drafts as file (file)}
+          {@const n = selected.indexOf(file)}
+          <button
+            class="w-full px-4 py-2 flex items-center gap-3 text-left hover:bg-body/10"
+            onclick={() => toggle(file)}
+            data-testid="team-draft"
+          >
+            {#if n >= 0}
+              <span
+                class="size-6 console-badge bg-purple-600 text-white text-sm font-bold flex items-center justify-center"
+                >{n + 1}</span
+              >
+            {:else}
+              <span class="size-6 border-2 border-border"></span>
+            {/if}
+            <span class="text-heading">{file.slice(DRAFTS_DIR.length + 1)}</span>
+          </button>
+        {/each}
+      {/if}
       {#if standIns.length > 0}
         <div
           class="px-4 pt-3 pb-1 text-xs font-semibold uppercase text-body"

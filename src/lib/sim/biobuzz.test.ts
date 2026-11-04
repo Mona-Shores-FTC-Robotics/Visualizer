@@ -97,6 +97,12 @@ test("an open file maps to the .pp it came from, else the one with its name, els
   assertEqual(suggestPpPath("hive-rush", null, known), "");
   assertEqual(suggestPpPath("new-idea.pp", null, known), "");
   assertEqual(suggestPpPath("", null, known), "");
+  // A Team Autos copy goes back to the file it came from, a draft into drafts/.
+  assertEqual(
+    suggestPpPath("biobuzz-drafts-r-solo-push.pp", null, known),
+    "TeamCode/autos/drafts/r-solo-push.pp",
+  );
+  assertEqual(suggestPpPath("biobuzz-hive-rush.pp", null, known), known[0]);
 });
 
 function run(
