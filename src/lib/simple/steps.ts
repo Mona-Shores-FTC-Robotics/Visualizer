@@ -429,6 +429,26 @@ export function setSpotHeading(
 }
 
 /**
+ * Turns the start: the robot starts facing `headingDeg` (rounded to the degree), the start's named
+ * spot with it, and the first drive turns from there. A partner stand-in that never drives has no
+ * other way to say which way it faces.
+ */
+export function setStartHeading(
+  doc: ProjectDoc,
+  headingDeg: number,
+): ProjectDoc {
+  const h = Math.round(normalizeDeg(headingDeg));
+  if (!doc.auto)
+    return { ...doc, startPoint: { ...doc.startPoint, headingDeg: h } };
+  return edit(doc, (next, auto) => {
+    next.startPoint = { ...next.startPoint, headingDeg: h };
+    const point = auto.startAt ? auto.points[auto.startAt] : undefined;
+    if (auto.startAt && point)
+      auto.points[auto.startAt] = [point[0], point[1], h];
+  });
+}
+
+/**
  * Adds a step at `index` of the main list (the end when past it), or of a wait's Otherwise list
  * (`into`). A drive or park needs `spot`, a named point; its path runs from wherever the step
  * before leaves the robot. One park only: adding a park clears the others, in every list. A wait
