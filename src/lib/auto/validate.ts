@@ -137,7 +137,9 @@ export function validateAuto(
           if (card.alongside) checkAction(card.id, "The command run while waiting", card.alongside);
           const whens = card.rows.filter((row) => rowKind(row) === "when");
           const limits = card.rows.filter((row) => rowKind(row) === "afterMs");
-          if (whens.length !== 1 || limits.length !== 1 || card.rows.length !== 2) {
+          // Fork: a wait for nothing but its time (one time row, no steps of its own) is a plain wait.
+          const timeOnly = card.rows.length === 1 && limits.length === 1 && limits[0].cards.length === 0;
+          if (!timeOnly && (whens.length !== 1 || limits.length !== 1 || card.rows.length !== 2)) {
             error(card.id, `${name} needs exactly one trigger and one time limit.`);
           }
           const ends: BasePoint[] = [];

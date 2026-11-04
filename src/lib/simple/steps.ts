@@ -92,6 +92,20 @@ export type StepList = { waitCardId: string } | null;
  * hold, which in the simulator runs to its time limit); a file that uses one still opens as a
  * Wait step, so no team file needs the card editor, but the dropdown no longer offers them.
  */
+/**
+ * Fork: a Wait step that waits for nothing but its time ("until 12 s on the match clock", so a
+ * partner can park first). In the file it is a wait card with only a time row; the robot runs it as
+ * `kit.firstOf(label, kit.atMatchSeconds(12))`. It has no Otherwise: its time always runs out.
+ */
+export const TIME_ONLY = "";
+
+/** A Wait step's title: "Wait for TIP or CELL up", or "Wait until 12 s" / "Wait 2 s" when it waits for nothing. */
+export function waitTitle(trigger: string, seconds: number, matchClock: boolean): string {
+  if (trigger === TIME_ONLY)
+    return matchClock ? `Wait until ${seconds} s` : `Wait ${seconds} s`;
+  return `Wait for ${WAIT_FOR.find((w) => w.trigger === trigger)?.label ?? trigger}`;
+}
+
 export const WAIT_FOR: readonly {
   trigger: string;
   label: string;
@@ -99,6 +113,7 @@ export const WAIT_FOR: readonly {
 }[] = [
   { trigger: "CellUp", label: "TIP or CELL up" },
   { trigger: "IntakeFull", label: "intake full" },
+  { trigger: TIME_ONLY, label: "nothing, just the time" },
   { trigger: "Tip", label: "TIP (since the wait began)", legacy: true },
   { trigger: "LeftCellUp", label: "Left CELL up", legacy: true },
   { trigger: "RightCellUp", label: "Right CELL up", legacy: true },
@@ -248,9 +263,6 @@ function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
     if (card.kind === "firstOf") {
       const wait = waitOf(card);
       if (wait) {
-        const label =
-          WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ??
-          wait.trigger;
         // The Otherwise steps start where the wait is, on a copy: the list below the wait is read
         // as if the trigger came (the preview's default), so it goes on from the wait's pose too.
         const otherwise = walkSteps(doc, wait.otherwise, {
@@ -260,7 +272,7 @@ function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
         return {
           ...base,
           kind: "wait",
-          label: `Wait for ${label}`,
+          label: waitTitle(wait.trigger, wait.seconds, wait.matchClock),
           waitFor: wait.trigger,
           waitS: wait.seconds,
           waitClock: wait.matchClock,
@@ -519,6 +531,8 @@ function listOf(auto: AutoSection, into: StepList): AutoCard[] | null {
   if (!into) return auto.cards;
   const card = auto.cards.find((c) => c.id === into.waitCardId);
   if (card?.kind !== "firstOf" || !waitOf(card)) return null;
+  // A wait for nothing but its time has no Otherwise: its time always runs out.
+  if (!card.rows.some((row) => "when" in row)) return null;
   const row = card.rows.find((r) => "afterMs" in r);
   return row ? row.cards : null;
 }
@@ -657,6 +671,15 @@ export function setWait(
   return edit(doc, (_draft, auto) => {
     const card = auto.cards.find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    if (change.waitFor === TIME_ONLY) {
+      // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
+      const time = card.rows.find((row) => "afterMs" in row)!;
+      const when = card.rows.find((row) => "when" in row);
+      if (time.cards.length || when?.cards.length) return;
+      card.rows = [time];
+    } else if (change.waitFor && !card.rows.some((row) => "when" in row)) {
+      card.rows = [{ when: [change.waitFor], cards: [] }, ...card.rows];
+    }
     for (const row of card.rows) {
       if ("when" in row && change.waitFor) row.when = [change.waitFor];
       if (!("afterMs" in row)) continue;
@@ -679,7 +702,7 @@ export function setWait(
     if (change.spinUp === true) card.alongside = SPIN_UP;
     if (change.spinUp === false) delete card.alongside;
     const wait = waitOf(card)!;
-    card.label = `Wait for ${WAIT_FOR.find((w) => w.trigger === wait.trigger)?.label ?? wait.trigger}`;
+    card.label = waitTitle(wait.trigger, wait.seconds, wait.matchClock);
   });
 }
 
@@ -699,6 +722,7 @@ export function setWaitRejoin(
     const index = auto.cards.findIndex((c) => c.id === cardId);
     const card = auto.cards[index];
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    if (!card.rows.some((row) => "when" in row)) return;
     const row = card.rows.find((r) => "afterMs" in r)!;
     const isPark = (c: AutoCard) => c.kind === "path" && c.park;
     if (rejoin) {
@@ -953,7 +977,20 @@ function waitOf(
   otherwise: AutoCard[];
 } | null {
   if (card.alongside && card.alongside !== SPIN_UP) return null;
-  if (card.ladder || card.rows.length !== 2) return null;
+  if (card.ladder) return null;
+  if (card.rows.length === 1) {
+    const only = card.rows[0];
+    if (!("afterMs" in only) || only.cards.length) return null;
+    return {
+      trigger: TIME_ONLY,
+      seconds: only.afterMs / 1000,
+      matchClock: !!only.matchClock,
+      adjustable: !!only.adjustable,
+      spinUp: card.alongside === SPIN_UP,
+      otherwise: [],
+    };
+  }
+  if (card.rows.length !== 2) return null;
   const when = card.rows.find((row) => "when" in row) as
     { when: string[]; cards: AutoCard[] } | undefined;
   const time = card.rows.find((row) => "afterMs" in row) as
@@ -1002,8 +1039,8 @@ export function unfold(auto: AutoSection): Set<string> {
     const last = auto.cards[auto.cards.length - 1];
     if (last?.kind !== "firstOf" || parking.has(last.id)) break;
     if (!waitOf(last, true)) break;
-    const when = last.rows.find((r) => "when" in r)!;
-    if (!when.cards.length) break;
+    const when = last.rows.find((r) => "when" in r);
+    if (!when?.cards.length) break;
     parking.add(last.id);
     auto.cards.push(...when.cards);
     when.cards = [];

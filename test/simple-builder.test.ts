@@ -31,6 +31,7 @@ import {
   pickSpot,
 } from "../src/lib/simple/flowers";
 import {
+  TIME_ONLY,
   addSpot,
   addStep,
   blankAuto,
@@ -714,6 +715,60 @@ describe("the Wait for TIP step", () => {
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (java.ok) expect(java.source).toContain('kit.when("IntakeFull")');
+  });
+
+  it("waits for nothing but the match clock, as a Wait step with no Otherwise", () => {
+    // R-Partner-Preload: sit at the wall FLOWER until 12 s, so the partner can park first.
+    let doc = fresh();
+    doc = add(doc, "wait");
+    const id = stepsOf(doc)[0].cardId;
+    doc = setWait(doc, id, { waitFor: TIME_ONLY, seconds: 12, matchClock: true });
+    expect(stepsOf(doc)[0]).toMatchObject({
+      kind: "wait",
+      label: "Wait until 12 s",
+      waitFor: TIME_ONLY,
+      waitS: 12,
+      waitClock: true,
+      otherwise: [],
+    });
+    const card = doc.auto!.cards[0];
+    expect(card.kind === "firstOf" && card.rows).toEqual([{ afterMs: 12000, matchClock: true, cards: [] }]);
+    expect(card.kind === "firstOf" && card.label).toBe("Wait until 12 s");
+    expect(isSimple(doc)).toBe(true);
+    // It has no Otherwise to add to.
+    expect(() => addStep(doc, "launch", 0, undefined, { waitCardId: id })).toThrow();
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: doc.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "clock.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) {
+      expect(java.source).toContain('kit.firstOf("Wait until 12 s",');
+      expect(java.source).toContain("kit.atMatchSeconds(12)");
+      expect(java.source).not.toContain("kit.when(");
+    }
+    // The preview waits until 12 s whatever its answers say.
+    const catalog = buildPathCatalog(doc.startPoint, doc.lines, settings);
+    const preview = simulateAuto(doc.auto!, catalog, doc.startPoint, {});
+    expect(preview.endTime).toBeCloseTo(12, 6);
+    // Choosing a trigger again brings its row back.
+    doc = setWait(doc, id, { waitFor: "CellUp" });
+    expect(stepsOf(doc)[0]).toMatchObject({ label: "Wait for TIP or CELL up", waitFor: "CellUp", waitS: 12 });
+    const back = doc.auto!.cards[0];
+    expect(back.kind === "firstOf" && back.rows.length).toBe(2);
+  });
+
+  it("keeps a wait's trigger while its Otherwise has steps", () => {
+    let doc = fresh();
+    doc = add(doc, "wait");
+    const id = stepsOf(doc)[0].cardId;
+    doc = addStep(doc, "launch", 0, undefined, { waitCardId: id }).doc;
+    doc = setWait(doc, id, { waitFor: TIME_ONLY });
+    expect(stepsOf(doc)[0]).toMatchObject({ waitFor: "CellUp" });
   });
 
   it("reads a partner stand-in's CameraBlind hold as a Wait step", () => {

@@ -41,7 +41,7 @@
   const layout = new PanelLayout(prefs);
   const files = new ProjectFiles(project, prefs, overlays);
   const links = new SharedLinks(project, files);
-  const gif = new GifExport(project, prefs, overlays);
+  const gif = new GifExport(project, prefs, overlays, auto);
   const dialogs = new Dialogs();
   const theme = new Theme();
   provideProject(project);

@@ -11,7 +11,7 @@ import {
   FIELD_SIZE,
   LINE_WIDTH,
 } from "../../config/defaults";
-import { robotPoseAt } from "../../sim/pose";
+import { robotPoseAt, type RobotPose } from "../../sim/pose";
 import { boxCentre, featureBoxes } from "../../model/collision";
 import { exportAsGif } from "../../utils/gifExporter";
 import { pathStem } from "../../utils/filename";
@@ -34,6 +34,16 @@ export interface GifPath {
   opacity?: number;
   /** Draw locked segments dashed and dimmer. */
   honorLocked?: boolean;
+  /**
+   * Fork: the Auto's preview, when it has one. The robot follows `poseAt` (waits, picks and the
+   * route each wait takes, as the preview plays it) for `duration` seconds instead of driving every
+   * path in list order, and only the paths in `drivenLineIds` (top-level path ids) are drawn.
+   */
+  preview?: {
+    poseAt: (seconds: number) => RobotPose;
+    duration: number;
+    drivenLineIds: ReadonlySet<string>;
+  };
 }
 
 export interface GifRequest {
@@ -44,6 +54,8 @@ export interface GifRequest {
   fieldPixels: number;
   onProgress?: (progress: number) => void;
   shouldCancel?: () => boolean;
+  /** Frames per second; the app's default when unset. Fewer make a smaller file. */
+  fps?: number;
 }
 
 /**
@@ -91,14 +103,19 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
       path.sequence,
     ),
   );
-  const duration = Math.max(0, ...timelines.map((t) => t.totalTime));
+  const durations = request.paths.map(
+    (path, index) => path.preview?.duration ?? timelines[index].totalTime,
+  );
+  const duration = Math.max(0, ...durations);
+  // Fork: an Auto's preview gets the match clock in the corner.
+  const showClock = request.paths.some((path) => path.preview);
   if (duration <= 0) throw new Error("Path duration is too short to export.");
 
   return exportAsGif({
     width: size,
     height: size,
     duration: duration * 1000,
-    fps: GIF_EXPORT_FPS,
+    fps: request.fps ?? GIF_EXPORT_FPS,
     quality: GIF_EXPORT_QUALITY,
     shouldCancel: request.shouldCancel,
     onProgress: request.onProgress,
@@ -107,13 +124,15 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
       const seconds = (percent / 100) * duration;
       request.paths.forEach((path, index) => {
         const timeline = timelines[index];
-        const pose = robotPoseAt(
-          Math.min(seconds, timeline.totalTime),
-          timeline.timeline,
-          path.startPoint,
-          path.lines,
-          path.settings,
-        );
+        const pose = path.preview
+          ? path.preview.poseAt(Math.min(seconds, path.preview.duration))
+          : robotPoseAt(
+              Math.min(seconds, timeline.totalTime),
+              timeline.timeline,
+              path.startPoint,
+              path.lines,
+              path.settings,
+            );
         const centre = boxCentre(pose, path.settings);
         drawRobot(
           context,
@@ -124,6 +143,16 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
           path.settings.rWidth * pixelsPerInch,
           path.opacity ?? 1,
         );
+        // Fork: several Autos together share one robot image; each robot gets its path's colour.
+        if (path.color && path.preview)
+          drawOutline(
+            context,
+            { x: toX(centre.x), y: toY(centre.y) },
+            -pose.heading,
+            path.settings.rLength * pixelsPerInch,
+            path.settings.rWidth * pixelsPerInch,
+            path.color,
+          );
         drawFeatures(
           context,
           featureBoxes(pose, path.settings).map((box) => ({
@@ -133,8 +162,24 @@ export async function renderPathGif(request: GifRequest): Promise<Blob> {
           path.opacity ?? 1,
         );
       });
+      if (showClock) drawClock(context, seconds, size);
     },
   });
+}
+
+/** Fork: the match clock, top left, readable on either field image. */
+function drawClock(context: CanvasRenderingContext2D, seconds: number, size: number) {
+  const font = Math.max(12, Math.round(size / 26));
+  const text = `${seconds.toFixed(1)} s`;
+  context.save();
+  context.font = `600 ${font}px ui-monospace, Menlo, Consolas, monospace`;
+  const width = context.measureText(text).width;
+  context.fillStyle = "rgba(15, 18, 22, 0.72)";
+  context.fillRect(6, 6, width + font, font * 1.6);
+  context.fillStyle = "#f5f7f8";
+  context.textBaseline = "middle";
+  context.fillText(text, 6 + font / 2, 6 + font * 0.8);
+  context.restore();
 }
 
 function drawPathLayer(
@@ -146,6 +191,9 @@ function drawPathLayer(
 ) {
   const honorLocked = path.honorLocked ?? true;
   for (const segment of flattenToAtomicSegments(path.startPoint, path.lines)) {
+    // Fork: with a preview, only the paths the Auto drives (not other branches, nor a spot's park).
+    const topId = segment.ancestors[0]?.id ?? segment.line.id;
+    if (path.preview && !path.preview.drivenLineIds.has(topId)) continue;
     const locked = honorLocked && Boolean(segment.line.locked);
     context.save();
     context.globalAlpha =
@@ -180,6 +228,24 @@ function drawRobot(
   context.translate(center.x, center.y);
   context.rotate((screenHeading * Math.PI) / 180);
   context.drawImage(image, -width / 2, -height / 2, width, height);
+  context.restore();
+}
+
+/** Fork: a coloured frame round a robot, to tell several apart. */
+function drawOutline(
+  context: CanvasRenderingContext2D,
+  center: BasePoint,
+  screenHeading: number,
+  width: number,
+  height: number,
+  color: string,
+) {
+  context.save();
+  context.translate(center.x, center.y);
+  context.rotate((screenHeading * Math.PI) / 180);
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(2, width / 12);
+  context.strokeRect(-width / 2, -height / 2, width, height);
   context.restore();
 }
 
