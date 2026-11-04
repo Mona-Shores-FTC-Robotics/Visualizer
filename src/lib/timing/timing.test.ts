@@ -7,6 +7,7 @@ import leftText from "./fixtures/recycle5-left.pp?raw";
 import o3Text from "./fixtures/qual-right-o3.pp?raw";
 import partnerRightText from "./fixtures/partner-preloads-right.pp?raw";
 import rSoloText from "./fixtures/r-solo-left-check.pp?raw";
+import rPreloadText from "./fixtures/r-partner-preload-clock-wait.pp?raw";
 import { buildPathCatalog } from "../auto/geometry";
 import { layOutShown } from "../auto/links";
 import {
@@ -196,6 +197,17 @@ test("alone, a CELL check at the LEFT end follows its ✓/✗ switch (r-solo, bi
   assert(route({}).includes("If CellUp"), `✓ shows the LEFT route, not: ${route({})}`);
   const off = route({ [`wait:${wait.id}`]: false });
   assert(off.includes("Timed out"), `✗ shows the RIGHT route, not: ${off}`);
+});
+
+test("a wait for Empty with no LaunchAll alongside runs to its time limit (r-partner-preload, biobuzz adcc376)", () => {
+  // R-Partner-Preload waits at the wall FLOWER until 12 s on the match clock. Its trigger is Empty,
+  // which on the robot fires only when a LaunchAll finishes during the wait, so never here; the
+  // preview used to answer it at once (the robot was "not full" after its first volley).
+  for (const tipsCome of [true, false]) {
+    const log = previewTogether([entry(rPreloadText)], values, true, { tipsCome }).previews[0].log;
+    const row = log.find((l) => l.kind === "row" && l.text.startsWith("Wait until 12 s"));
+    assert(row && Math.abs(row.t - 12) < 1e-6, `the wait ends at 12 s, not ${row?.t} (${row?.text})`);
+  }
 });
 
 // A search over many previews of two Autos: seconds, not milliseconds, when every test runs at once.

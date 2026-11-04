@@ -375,6 +375,9 @@ export function simulateAuto(
     if ("when" in row) {
       let soonest = Infinity;
       for (const name of row.when) {
+        // Fork: Empty is "a LaunchAll finished since the wait began" (biobuzz LaunchCards), so a
+        // wait with no LaunchAll alongside never sees it: it is a plain wait for its time limit.
+        if (name === "Empty" && card.alongside !== "LaunchAll") continue;
         if (!answerFor(scenario, card, name)) continue;
         const at = Math.max(
           timing?.trueAt(name, t0, pos) ?? t0,
