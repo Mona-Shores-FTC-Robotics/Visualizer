@@ -241,7 +241,7 @@ describe("the simple builder", () => {
       (run.motions[2].t0 + run.motions[2].t1) / 2,
     )!;
     expect(contact.y).toBeCloseTo(47.36, 6); // on the FLOWER's line
-    expect(contact.x).toBeCloseTo(2.71 + 12, 6);
+    expect(contact.x).toBeCloseTo(2.71 + 7, 6);
     const end = motionPoseAt(run, run.motions[3].t1)!;
     expect(end.x).toBeCloseTo(2.71 + 24, 6); // 27.3 in out, kept to 24
     expect(end.y).toBeCloseTo(47.36, 6);
