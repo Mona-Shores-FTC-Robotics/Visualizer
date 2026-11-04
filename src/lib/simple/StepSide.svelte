@@ -192,8 +192,10 @@
         {#if team}
           A team spot, {unlocked
             ? "unlocked: changes here move it for every Auto once saved"
-            : "locked. Unlock it to move it"}.{#if changed}{" "}
-            Changed, not saved.
+            : "locked. Unlock it to move it"}.{changed
+            ? " Changed, not saved."
+            : ""}
+          {#if changed}
             <button
               type="button"
               class="text-primary underline"
