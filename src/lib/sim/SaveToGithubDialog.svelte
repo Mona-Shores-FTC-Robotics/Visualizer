@@ -118,6 +118,8 @@
   let saving = $state(false);
   /** Why GitHub could not be read when the dialog opened, if it could not (offline, or a blocked network). */
   let unreachable = $state<string | null>(null);
+  /** True when GitHub answered but refused the saved token (401): GitHub is reachable, the token is not good. */
+  let tokenRefused = $state(false);
   /** The fast-lane pull request the last save went into, and whether GitHub will merge it by itself. */
   let pull = $state<{ url: string; number: number } | null>(null);
   /** Master, or a fast-lane branch: the save goes to master through a pull request that merges itself. */
@@ -235,9 +237,11 @@
         : await branchHead(token, branch);
       files = await listFiles(token, at);
       unreachable = null;
+      tokenRefused = false;
     } catch (error) {
       files = [];
       unreachable = (error as Error).message;
+      tokenRefused = error instanceof GitHubError && error.status === 401;
       showToast(
         `Could not read ${branch}: ${(error as Error).message}`,
         "error",
@@ -645,7 +649,13 @@
       class="text-sm text-warning border border-warning/40 rounded p-3 my-3 flex items-center justify-between gap-3"
     >
       <p>
-        GitHub cannot be reached ({unreachable}). <b>Save to repo folder</b>
+        {#if tokenRefused}
+          Your GitHub token stopped working: GitHub refused it (it may have
+          expired or been revoked). Paste a new one below.
+        {:else}
+          GitHub cannot be reached ({unreachable}).
+        {/if}
+        <b>Save to repo folder</b>
         still works: it writes the <code>.pp</code> and its Java into the biobuzz
         checkout on this laptop, then Sloth Load.
       </p>
