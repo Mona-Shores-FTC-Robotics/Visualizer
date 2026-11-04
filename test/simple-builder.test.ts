@@ -39,6 +39,7 @@ import {
   removeStep,
   setSpotHeading,
   setStart,
+  setStartHeading,
   setWait,
   renameSpot,
   startName,
@@ -191,6 +192,28 @@ describe("the simple builder", () => {
       startDeg: 170,
       endDeg: 270,
     });
+  });
+
+  it("turns the start: the robot, its start spot and the first drive", () => {
+    const doc = rQualsV2();
+    const turned = setStartHeading(doc, 45);
+    expect(turned.startPoint.headingDeg).toBe(45);
+    const start = turned.auto!.startAt!;
+    expect(turned.auto!.points[start][2]).toBe(45);
+    const first = turned
+      .auto!.cards.filter((c) => c.kind === "path")
+      .map((c) =>
+        turned.lines.find((l) => c.kind === "path" && l.id === c.lineId)!,
+      )[0];
+    expect(first.kind === "atomic" && first.heading).toEqual({
+      type: "linear",
+      startDeg: 45,
+      endDeg: 180,
+    });
+    // Rounded to the degree and kept in 0..360, and a project with no Auto still turns.
+    expect(setStartHeading(doc, -30.4).startPoint.headingDeg).toBe(330);
+    const plain = { ...doc, auto: undefined } as ProjectDoc;
+    expect(setStartHeading(plain, 90).startPoint.headingDeg).toBe(90);
   });
 
   it("ends each drive facing its spot", () => {
