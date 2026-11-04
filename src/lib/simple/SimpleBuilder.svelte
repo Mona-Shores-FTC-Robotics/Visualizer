@@ -68,6 +68,7 @@
     sideSpot,
     renameSpot,
     WAIT_FOR,
+    TIME_ONLY,
     stepsOf,
     type Step,
     type StepKind,
@@ -812,7 +813,11 @@
             )}
         >
           {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
-              value={w.trigger}>{w.label}</option
+              value={w.trigger}
+              disabled={w.trigger === TIME_ONLY && !!step.otherwise?.length}
+              title={w.trigger === TIME_ONLY && step.otherwise?.length
+                ? "Remove the Otherwise steps first: a wait for nothing always runs to its time"
+                : undefined}>{w.label}</option
             >{/each}
         </select>
         <!-- Fork: a limit since the wait began, or a time on the match clock (types.ts). -->
@@ -877,6 +882,7 @@
           >
         {/if}
       </div>
+      {#if step.waitFor !== TIME_ONLY}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
       {@const sub = { waitCardId: step.cardId }}
       <div class="simple-otherwise mt-1.5 ml-6">
@@ -966,6 +972,7 @@
           </select>
         </label>
       </div>
+      {/if}
     {:else if step.kind === "gather"}
       <div class="mt-1 pl-6 text-xs">
         {#if step.garden}

@@ -139,7 +139,6 @@ test("unregistered names are errors", () => {
 test("a wait needs exactly one trigger and one time limit", () => {
   for (const rows of [
     [{ when: ["LauncherReady"], cards: [] }],
-    [{ afterMs: 500, cards: [] }],
     [{ when: ["LauncherReady"], cards: [] }, { afterMs: 500, cards: [] }, { afterMs: 900, cards: [] }],
   ]) {
     const auto = clone(loadSample().auto);
@@ -150,6 +149,17 @@ test("a wait needs exactly one trigger and one time limit", () => {
       JSON.stringify(issues),
     );
   }
+});
+
+test("a wait for nothing but its time is a plain wait; with steps of its own it is not", () => {
+  const ok = clone(loadSample().auto);
+  (findCard(ok.cards, "wait-ready") as FirstOfCard).rows = [{ afterMs: 500, cards: [] }];
+  assert(!issuesOf(ok).some((i) => i.cardId === "wait-ready" && i.level === "error"), JSON.stringify(issuesOf(ok)));
+  const bad = clone(loadSample().auto);
+  const wait = findCard(bad.cards, "wait-ready") as FirstOfCard;
+  const step = clone(loadSample().auto).cards.find((c) => c.kind === "action")!;
+  wait.rows = [{ afterMs: 500, cards: [{ ...step, id: "inside" }] }];
+  assert(issuesOf(bad).some((i) => i.cardId === "wait-ready" && i.message.includes("exactly one trigger")));
 });
 
 test("a path that starts away from the robot is a discontinuity warning", () => {
