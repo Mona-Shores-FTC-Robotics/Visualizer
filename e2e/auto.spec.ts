@@ -249,6 +249,13 @@ test("a Drive step opens the Step panel; Edit path shape opens the path editor",
   await expect(inspector.getByText("Wait after the path (ms)")).toHaveCount(0);
   await inspector.getByRole("button", { name: /Edit path shape/ }).click();
   await expect(inspector.getByText("Wait after the path (ms)")).toBeVisible();
+  // Typing in the path editor keeps it open: each edit is a new path object, not another path.
+  const endX = inspector.getByLabel("End X");
+  await endX.fill("42");
+  await expect(inspector.getByText("Wait after the path (ms)")).toBeVisible();
+  await endX.fill("43");
+  await expect(endX).toBeFocused();
+  await expect(inspector.getByText("Wait after the path (ms)")).toBeVisible();
   await inspector.getByRole("button", { name: "Step", exact: true }).click();
   await expect(inspector.getByLabel("Spot X")).toBeVisible();
 });

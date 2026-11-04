@@ -108,6 +108,20 @@ export function discardSpotEdits(): void {
   spotEdits.set({});
 }
 
+/** Drops the changes made here to `names` only, and locks them; other changes stay. */
+export function dropSpotEdits(names: readonly string[]): void {
+  unlockedSpots.update((set) => {
+    const next = new Set(set);
+    for (const name of names) next.delete(name);
+    return next;
+  });
+  spotEdits.update((edits) => {
+    const next = { ...edits };
+    for (const name of names) delete next[name];
+    return next;
+  });
+}
+
 export function setSpotUnlocked(name: string, unlocked: boolean): void {
   unlockedSpots.update((set) => {
     const next = new Set(set);

@@ -73,8 +73,11 @@
 
   /** The path editor, for control points and heading modes; back to the step on another path. */
   let shape = $state(false);
+  // Keyed on the id alone: every edit replaces `line` with a new object of the same id, and an
+  // effect that read `line.id` directly reran on each one, closing the path editor mid-typing.
+  let lineId = $derived(line.id);
   $effect(() => {
-    void line.id;
+    void lineId;
     shape = false;
   });
 

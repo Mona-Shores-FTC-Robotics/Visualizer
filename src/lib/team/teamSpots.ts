@@ -114,6 +114,27 @@ export function changedSpots(before: TeamSpots, after: TeamSpots): string[] {
 }
 
 /**
+ * The spots changed in this browser and not saved, sorted for the open Auto: the ones it uses
+ * (`here`), and the rest (`elsewhere`), of which `gone` are names the team's list does not have at
+ * all. A browser keeps its changes until they are saved or undone, so a change made before the team
+ * renamed or moved its spots lingers under the old name; listing it beside this Auto's own changes
+ * read as if this Auto had them. `gone` is empty while the list is not read (`saved` null).
+ */
+export function sortSpotEdits(
+  edits: TeamSpots,
+  used: ReadonlySet<string>,
+  saved: TeamSpots | null,
+): { here: string[]; elsewhere: string[]; gone: string[] } {
+  const names = Object.keys(edits).sort();
+  const elsewhere = names.filter((n) => !used.has(n));
+  return {
+    here: names.filter((n) => used.has(n)),
+    elsewhere,
+    gone: saved ? elsewhere.filter((n) => !saved[n]) : [],
+  };
+}
+
+/**
  * Links a named point to the team spot `name`: the Auto gets the spot as a named point (or its
  * copy is replaced) and lists it, and `lineId`'s end, when given, sits on it from now on.
  */
