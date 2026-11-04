@@ -11,6 +11,9 @@
   import SelectionInspector from "./inspector/SelectionInspector.svelte";
   import { useAuto } from "../state/auto.svelte";
   import MatchSide from "../lib/match/MatchSide.svelte";
+  import StepSide from "../lib/simple/StepSide.svelte";
+  import { isSimple, stepForLine } from "../lib/simple/steps";
+  import { useProject } from "../state/project.svelte";
 
   interface Props {
     prefs: Prefs;
@@ -22,11 +25,23 @@
 
   const editor = useEditor();
   const auto = useAuto();
+  const project = useProject();
 
   let selectedGroup = $derived(
     editor.selectedPath?.kind === "compound" ? editor.selectedPath : null,
   );
   let several = $derived(editor.selectedPathIds.length > 1);
+  /**
+   * Fork: a simple Auto's Drive or Park step that ends on a spot (or that spot's park path): the
+   * step panel, not the path editor.
+   */
+  let simpleStep = $derived.by(() => {
+    if (!editor.selectedLine || !isSimple(project.doc)) return null;
+    const found = stepForLine(project.doc, editor.selectedLine.id);
+    return found?.step.spot && project.doc.auto?.points[found.step.spot]
+      ? found
+      : null;
+  });
   let title = $derived(
     // Fork: in the Match view with two Autos, the right panel is the second robot's what-ifs.
     auto.matchSides
@@ -38,7 +53,9 @@
           : selectedGroup
             ? "Group"
             : editor.selectedLine
-              ? "Path"
+              ? simpleStep
+                ? "Step"
+                : "Path"
               : "Project",
   );
 </script>
@@ -67,6 +84,8 @@
       <SelectionInspector />
     {:else if selectedGroup}
       <GroupInspector group={selectedGroup} />
+    {:else if editor.selectedLine && simpleStep}
+      <StepSide line={editor.selectedLine} />
     {:else if editor.selectedLine}
       <PathInspector line={editor.selectedLine} />
     {:else}

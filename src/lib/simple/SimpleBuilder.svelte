@@ -451,7 +451,7 @@
     if (!park) return;
     if (focusedCard === cardId) return closePark();
     focusedCard = cardId;
-    // Shown and out for editing at once: its control point handles show, and the Path panel edits it.
+    // Shown and out for editing at once: its control point handles show, and the Step panel edits it.
     auto.focusedPark = park.lineId;
     auto.editingPark = true;
     editor.select([park.lineId]);
@@ -726,8 +726,8 @@
               ? `, leaving by ${fmt(by)} s at the latest`
               : ""}.{visits > 1
               ? ` All ${visits} drives to ${step.spot} share this park.`
-              : ""} To bend it, add a control point in the Path panel and drag it
-            on the field.</span
+              : ""} To bend it, press Edit park path shape in the Step panel, add a
+            control point and drag it on the field.</span
           >
           <button type="button" class="simple-tile" onclick={closePark}
             >Done</button

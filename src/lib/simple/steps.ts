@@ -324,6 +324,26 @@ export function isSimple(doc: ProjectDoc): boolean {
 }
 
 /**
+ * The Drive or Park step a path belongs to: the step that drives it, or, for a spot's park path
+ * (parkFrom.ts, the builder's P), the drive whose spot it parks from (`viaPark`). Null for any
+ * other path, such as a link.
+ */
+export function stepForLine(
+  doc: ProjectDoc,
+  lineId: string,
+): { step: Step; viaPark: boolean } | null {
+  const all = stepsOf(doc).flatMap((step) => [step, ...(step.otherwise ?? [])]);
+  const drives = all.filter(
+    (step) => step.kind === "drive" || step.kind === "park",
+  );
+  const own = drives.find((step) => step.lineId === lineId);
+  if (own) return { step: own, viaPark: false };
+  const parkFrom = doc.auto?.parkFrom ?? {};
+  const from = drives.find((step) => parkFrom[step.cardId] === lineId);
+  return from ? { step: from, viaPark: true } : null;
+}
+
+/**
  * The start spot the Auto begins on (…_START), or null for any other start. An older Auto (its
  * start named START, or none) whose start sits on one of `starts` counts as that one.
  */

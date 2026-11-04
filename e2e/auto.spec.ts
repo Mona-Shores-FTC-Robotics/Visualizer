@@ -225,3 +225,30 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
   await page.getByTitle("Undo").click();
   await expect(steps.getByText("Pick flower")).toHaveCount(0);
 });
+
+test("a Drive step opens the Step panel; Edit path shape opens the path editor", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^File/ }).first().click();
+  await page.getByRole("menuitem", { name: /^New project/ }).click();
+  const discard = page.getByRole("button", { name: /Discard/ });
+  if (await discard.isVisible().catch(() => false)) await discard.click();
+  const palette = page.locator("[aria-label='Add a step']");
+  await palette.getByRole("button", { name: "Drive to" }).click();
+  const field = (await page.locator("[role=application]").boundingBox())!;
+  await page.mouse.click(field.x + (40 / 141.5) * field.width, field.y + (1 - 60 / 141.5) * field.height);
+  await page.fill("#simple-spot-name", "middle");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const inspector = page.getByRole("complementary", { name: "Inspector" });
+  await expect(inspector.getByRole("heading", { name: "Step" })).toBeVisible();
+  await expect(inspector.getByText("MIDDLE")).toBeVisible();
+  const x = inspector.getByLabel("Spot X");
+  await expect(x).toHaveValue("40");
+  await x.fill("45");
+  await x.press("Enter");
+  await expect(x).toHaveValue("45");
+  await expect(inspector.getByText("Wait after the path (ms)")).toHaveCount(0);
+  await inspector.getByRole("button", { name: /Edit path shape/ }).click();
+  await expect(inspector.getByText("Wait after the path (ms)")).toBeVisible();
+  await inspector.getByRole("button", { name: "Step", exact: true }).click();
+  await expect(inspector.getByLabel("Spot X")).toBeVisible();
+});
