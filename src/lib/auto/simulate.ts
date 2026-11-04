@@ -397,6 +397,16 @@ export function simulateAuto(
     return describeRow(row);
   };
 
+  /** The park from the spot the robot last arrived at, if that spot has one (biobuzz AutoKit.spotPark). */
+  let spot: { park: PathCard; path: PathInfo } | null = null;
+
+  /** Points a guard at the spot's park, else its own, and sets its deadline to match. */
+  const parkFromHere = (guard: Guard) => {
+    guard.park = spot?.park ?? guard.ownPark;
+    guard.path = spot?.path ?? guard.ownPath;
+    guard.deadline = AUTO_LENGTH_S - guardSeconds(guard.path);
+  };
+
   const pendingDeadline = (guards: Guard[]): Guard | null => {
     let soonest: Guard | null = null;
     for (const guard of guards) {
@@ -615,18 +625,17 @@ export function simulateAuto(
         // The guard never cuts a path short (biobuzz AutoKit.guarded): a path it let start
         // runs to its end, and the check before the next card parks from there.
         drive(card, path);
-        // Fork: arriving at a spot with its own park makes that the guard's park, with its own
-        // time; arriving anywhere else, the guard's own again (types.ts parkFrom).
-        if (guard && !guard.parked) {
-          if (spotPath) {
-            guard.park = { id: `${card.id}#park`, kind: "path", lineId: spotPath.id, park: true };
-            guard.path = spotPath;
-          } else {
-            guard.park = guard.ownPark;
-            guard.path = guard.ownPath;
-          }
-          guard.deadline = AUTO_LENGTH_S - guardSeconds(guard.path);
-        }
+        // Fork: arriving at a spot with its own park makes that every guard's park, with its own
+        // time; arriving anywhere else, each guard's own again (types.ts parkFrom). The robot
+        // remembers the spot whether or not a guard is watching (biobuzz AutoKit.spotPark), so a
+        // block entered on that spot parks from it, not from where its own Park path starts.
+        spot = spotPath
+          ? {
+              park: { id: `${card.id}#park`, kind: "path", lineId: spotPath.id, park: true },
+              path: spotPath,
+            }
+          : null;
+        for (const watching of guards) if (!watching.parked) parkFromHere(watching);
         return null;
       }
       case "firstOf":
@@ -748,6 +757,9 @@ export function simulateAuto(
             parked: false,
           }
         : null;
+    // A block entered on a spot with its own park parks from it until the robot drives away
+    // (biobuzz AutoKit.guarded: watchFromHere).
+    if (own) parkFromHere(own);
     const guards = own ? [...outer, own] : outer;
 
     for (let i = 0; i < list.length; i++) {
