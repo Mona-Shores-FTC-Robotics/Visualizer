@@ -13,6 +13,7 @@ import {
   MemoryFolder,
   isCheckout,
   listRepoAutos,
+  listRepoDrafts,
   readRepoAuto,
   readRepoSpots,
   repoFileProblem,
@@ -130,6 +131,9 @@ test("only a plain .pp name in TeamCode/autos is accepted", () => {
       `${JSON.stringify(bad)} should be refused`,
     );
   }
+  // A draft goes in TeamCode/autos/drafts, and no other subfolder.
+  assertEqual(repoFileProblem("drafts/r-solo-push.pp"), null);
+  assert(repoFileProblem("partners/x.pp") !== null);
   // The same rule the GitHub save applies to the path.
   assertEqual(repoFileProblem("x.pp"), ppPathProblem("TeamCode/autos/x.pp"));
 });
@@ -156,4 +160,15 @@ test("the checkout's Autos and spots open from the folder", async () => {
   assertEqual(await readRepoAuto(folder, "../build.gradle"), null);
   assertEqual(await readRepoSpots(folder), SPOTS);
   assertEqual(await listRepoAutos(new MemoryFolder("empty")), []);
+});
+
+test("a draft saves into TeamCode/autos/drafts, its Java into the generated folder, and is listed", async () => {
+  const folder = checkout();
+  const plan = await saveToFolder(folder, "drafts/hive-rush.pp", sampleText);
+  assert(plan.ok, JSON.stringify(plan));
+  assertEqual(plan.ppPath, "TeamCode/autos/drafts/hive-rush.pp");
+  assert(plan.javaPath.startsWith(`${GENERATED_DIRS[0]}/`), plan.javaPath);
+  assertEqual(await listRepoDrafts(folder), ["drafts/hive-rush.pp"]);
+  assertEqual(await listRepoAutos(folder), ["r-solo.pp"]);
+  assertEqual(await listRepoDrafts(new MemoryFolder("empty")), []);
 });

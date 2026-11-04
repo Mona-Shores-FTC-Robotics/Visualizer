@@ -62,6 +62,10 @@ What the fork adds:
 - **Partner stand-ins in Team Autos.** Under the Autos, `TeamCode/autos/partners/` is listed on
   its own; tick a stand-in beside an Auto to draw it as an overlay. It is never the project
   that opens.
+- **Drafts in Team Autos.** `TeamCode/autos/drafts/` (Autos of ours the robot does not run yet) is
+  listed too, and a link may name one: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`.
+  A draft opens and saves like any Auto: Save to GitHub suggests its own `drafts/` path, and Save to
+  repo folder takes `drafts/<name>.pp`.
 - **Save to repo folder.** The same two files, written straight into the biobuzz checkout on the
   laptop (Chrome or Edge; the folder is picked once), then Sloth Load. For an event: no internet,
   nothing to drop into `generated/` by hand. With a folder chosen the Files panel opens the

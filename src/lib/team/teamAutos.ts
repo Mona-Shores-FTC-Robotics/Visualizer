@@ -3,8 +3,8 @@
  *
  * A team link `#team=<branch>/<a>.pp,<b>.pp` (up to 4 files, or a pair's name from
  * `pairs.json`, e.g. `#team=claude/simulator/recycle3`) fetches those files from
- * `TeamCode/autos/` on that branch (a partner stand-in from its `partners/` subfolder is named
- * with it: `#team=master/partners/partner-l-still.pp`), keeps a copy of each in the browser's file list (named
+ * `TeamCode/autos/` on that branch (a partner stand-in from its `partners/` subfolder, or a draft from
+ * `drafts/`, is named with it: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`), keeps a copy of each in the browser's file list (named
  * `biobuzz-<file>`, replaced on every open, so the viewer's own files are never touched) and
  * shows them together in multi-path mode. Opening the same link again, or Reload in the
  * Team Autos dialog, picks up whatever was pushed since.
@@ -27,12 +27,15 @@ export const COPY_PREFIX = "biobuzz-";
 
 /**
  * The subfolders of TeamCode/autos a link may name a file in: `partners/`, the partner stand-ins
- * the simulator runs beside an Auto. The file list ({@link listTeamFiles}) shows the folder's own
- * files only; Team Autos lists the stand-ins apart ({@link listPartnerFiles}), to tick as overlays.
+ * the simulator runs beside an Auto, and `drafts/`, Autos of ours that the robot does not run yet
+ * (no OpMode). The file list ({@link listTeamFiles}) shows the folder's own files only; Team Autos
+ * lists the drafts ({@link listDraftFiles}) and the stand-ins ({@link listPartnerFiles}) apart.
  */
-export const TEAM_SUBDIRS = ["partners"] as const;
+export const TEAM_SUBDIRS = ["partners", "drafts"] as const;
 /** The stand-ins' folder under {@link TEAM_DIR}. */
 export const PARTNERS_DIR = "partners";
+/** The drafts' folder under {@link TEAM_DIR}: Autos of ours, opened and edited like any other. */
+export const DRAFTS_DIR = "drafts";
 
 /** Whether a team file is a partner stand-in (`partners/partner-l-still.pp`), not an Auto of ours. */
 export function isStandIn(file: string): boolean {
@@ -169,16 +172,29 @@ export function teamPartnersListUrl(ref: string): string {
   return `https://api.github.com/repos/${TEAM_REPO}/contents/${TEAM_DIR}/${PARTNERS_DIR}?ref=${encodeURIComponent(ref)}`;
 }
 
+/** GitHub's listing of the drafts' folder on a branch. */
+export function teamDraftsListUrl(ref: string): string {
+  return `https://api.github.com/repos/${TEAM_REPO}/contents/${TEAM_DIR}/${DRAFTS_DIR}?ref=${encodeURIComponent(ref)}`;
+}
+
 /** The name of the browser copy of a team file: `biobuzz-partners-x.pp` for `partners/x.pp`. */
 export function copyName(file: string): string {
   return `${COPY_PREFIX}${file.replace(/\//g, "-")}`;
 }
 
-/** The team file a browser copy was made from (`biobuzz-r-solo.pp` → `r-solo.pp`), or null. */
+/**
+ * The team file a browser copy was made from, or null: `biobuzz-r-solo.pp` → `r-solo.pp`, and a
+ * subfolder's copy back to its path, `biobuzz-drafts-r-solo-push.pp` → `drafts/r-solo-push.pp`.
+ */
 export function teamFileOf(name: string): string | null {
-  return name.startsWith(COPY_PREFIX) && name.length > COPY_PREFIX.length
-    ? name.slice(COPY_PREFIX.length)
-    : null;
+  if (!name.startsWith(COPY_PREFIX) || name.length <= COPY_PREFIX.length)
+    return null;
+  const rest = name.slice(COPY_PREFIX.length);
+  for (const dir of TEAM_SUBDIRS) {
+    if (rest.startsWith(`${dir}-`) && rest.length > dir.length + 1)
+      return `${dir}/${rest.slice(dir.length + 1)}`;
+  }
+  return rest;
 }
 
 /** Reads pairs.json: the pairs that name only plain .pp files, in order. */
@@ -282,6 +298,18 @@ export async function listPartnerFiles(
 ): Promise<string[]> {
   const text = await get(teamPartnersListUrl(ref));
   return text === null ? [] : ppNames(text).map((n) => `${PARTNERS_DIR}/${n}`);
+}
+
+/**
+ * The drafts on a branch, sorted, as the paths a link names (`drafts/r-solo-push.pp`). A branch
+ * without the folder has none; that is not an error.
+ */
+export async function listDraftFiles(
+  ref: string,
+  get: FetchText = fetchText,
+): Promise<string[]> {
+  const text = await get(teamDraftsListUrl(ref));
+  return text === null ? [] : ppNames(text).map((n) => `${DRAFTS_DIR}/${n}`);
 }
 
 /** The files a link opens: its own, or its pair's from pairs.json. */
