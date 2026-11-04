@@ -20,7 +20,7 @@
  *     pause: the robot lowers the stick over the last 18 in of that drive (lowerWithinIn,
  *     FlowerPicker.approach, run by AutoKit for the path card right before a PickFlower card), so
  *     it is down by the time the card starts (3 Nov 2026);
- *   push: a path along the FLOWER's line to 12 in from its centre (contactStandoffIn);
+ *   push: a path along the FLOWER's line to 7 in from its centre (contactStandoffIn);
  *   dwell: 2 s, the slow pick an Auto's timing plans for (PickFlower's 4.4 s, mentor 3 Nov 2026):
  *     a FLOWER that does not fill the lane dwells the whole cap (dwellMs). One that fills it ends
  *     the dwell on full (FlowerPicker.dwellEndsOnFull) about 1.1 s in;
@@ -57,7 +57,7 @@ export const MAX_RANGE_IN = 60;
 /** FlowerPicker.approachStandoffIn: the pick spot, this far back from the FLOWER's centre. */
 export const APPROACH_STANDOFF_IN = 24;
 /** FlowerPicker.contactStandoffIn: where the push stops, from the FLOWER's centre. */
-export const CONTACT_STANDOFF_IN = 12;
+export const CONTACT_STANDOFF_IN = 7;
 /** FlowerPicker.autoMaxOffIn: an Auto's pick refuses past this far off the FLOWER's line, inches. */
 export const AUTO_MAX_OFF_IN = 12;
 /** FlowerPicker.autoMaxOffDeg: and past this far from square to it, degrees. */
