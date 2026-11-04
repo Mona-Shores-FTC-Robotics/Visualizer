@@ -47,6 +47,7 @@ import {
   startsFrom,
   pruneUnusedPaths,
   stepsOf,
+  stepForLine,
   type StepKind,
   type StepList,
 } from "../src/lib/simple/steps";
@@ -1115,5 +1116,41 @@ describe("renaming a spot", () => {
     expect(renameSpot(doc, "WALL_PICK", " !! ")).toMatchObject({
       problem: expect.stringContaining("needs a name"),
     });
+  });
+});
+
+// The Step panel (lib/simple/StepSide.svelte) finds the step a selected path belongs to.
+describe("stepForLine", () => {
+  const loaded = parseProject(
+    readFileSync(`${__dirname}/../src/lib/match/fixtures/l-partner.pp`, "utf8"),
+    robotConfigOf(settings),
+  );
+  if (!loaded.ok) throw new Error(loaded.error);
+  const doc = loaded.doc;
+  const all = stepsOf(doc).flatMap((step) => [step, ...(step.otherwise ?? [])]);
+  const drives = all.filter((s) => s.kind === "drive" || s.kind === "park");
+
+  it("finds every Drive and Park step by its own path, in the main list and in an Otherwise", () => {
+    const inOtherwise = stepsOf(doc).flatMap((s) => s.otherwise ?? []);
+    expect(inOtherwise.some((s) => s.kind === "drive")).toBe(true);
+    for (const step of drives) {
+      const found = stepForLine(doc, step.lineId!);
+      expect(found?.step.cardId).toBe(step.cardId);
+      expect(found?.viaPark).toBe(false);
+    }
+  });
+
+  it("finds the drive a spot's park path parks from", () => {
+    const parkFrom = Object.entries(doc.auto?.parkFrom ?? {});
+    expect(parkFrom.length).toBeGreaterThan(0);
+    for (const [cardId, lineId] of parkFrom) {
+      const found = stepForLine(doc, lineId);
+      expect(found?.step.cardId).toBe(cardId);
+      expect(found?.viaPark).toBe(true);
+    }
+  });
+
+  it("finds nothing for a path no step drives", () => {
+    expect(stepForLine(doc, "no-such-path")).toBeNull();
   });
 });
