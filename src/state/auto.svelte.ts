@@ -56,6 +56,7 @@ import {
 import type { EditorState } from "./editor.svelte";
 import type { Overlay, Overlays } from "./overlays.svelte";
 import type { ProjectStore } from "./project.svelte";
+import { workspaceDocument } from "../lib/repo/workspaceStore";
 
 /**
  * Fork: the Auto Builder's side of the app. The open project's Auto (kept in
@@ -65,6 +66,7 @@ import type { ProjectStore } from "./project.svelte";
  * through `Playback` and draw the Auto through the components in lib/auto.
  */
 export class AutoState {
+  #workspace = fromStore(workspaceDocument);
   /** Draw the branches the preview does not take, dashed. */
   showUntaken = $state(true);
   /** With several Autos shown together: draw the branches their previews do not take, faint. */
@@ -202,17 +204,15 @@ export class AutoState {
     const previews = new Map<Overlay, PreviewResult>();
     const withAuto = this.#overlays.items.filter((overlay) => overlay.doc.auto);
     const match = this.match;
-    const entries = withAuto.map(
-      (overlay): FieldEntry => ({
-        ...this.#entry(
-          overlay.doc,
-          this.#overlays.settingsFor(overlay),
-          match.scenario[overlay.filePath] ?? {},
-        ),
-        own: match.own[overlay.filePath],
-        still: match.still[overlay.filePath] ?? false,
-      }),
-    );
+    const entries = withAuto.map((overlay): FieldEntry => ({
+      ...this.#entry(
+        overlay.doc,
+        this.#overlays.settingsFor(overlay),
+        match.scenario[overlay.filePath] ?? {},
+      ),
+      own: match.own[overlay.filePath],
+      still: match.still[overlay.filePath] ?? false,
+    }));
     let tips: Tip[] = [];
     try {
       const together = previewTogether(entries, this.matchValues);
@@ -253,6 +253,7 @@ export class AutoState {
    */
   matchSides = $derived.by(
     () =>
+      !this.#workspace.current &&
       this.#overlays.active &&
       this.matchTimeline &&
       this.matchControls &&

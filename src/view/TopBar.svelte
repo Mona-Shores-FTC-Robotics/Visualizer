@@ -12,6 +12,13 @@
   import { currentFilePath } from "../stores";
   import { publicAsset } from "../utils/publicAsset";
   import { basename } from "../utils/filename";
+  import { repoFolder } from "../lib/repo/repoStore";
+  import {
+    workspaceDocument,
+    workspaceBusy,
+    workspaceError,
+  } from "../lib/repo/workspaceStore";
+  import { spotEdits } from "../lib/team/spotsStore";
   import { useProject } from "../state/project.svelte";
   import IconButton from "../lib/components/ui/IconButton.svelte";
   import Menu from "../lib/components/ui/Menu.svelte";
@@ -34,6 +41,7 @@
     items(
       "file.new",
       "file.open",
+      "repo.workspace",
       "file.import",
       "separator",
       "file.save",
@@ -63,7 +71,9 @@
     ),
   );
   // Fork: every way to save the Auto, behind one button.
-  let saveEntries = $derived(items("github.save", "repo.save", "file.saveAs"));
+  let saveEntries = $derived(
+    items("file.save", "repo.save", "github.save", "file.saveAs"),
+  );
   let undo = $derived(menuItem(action("edit.undo")));
   let redo = $derived(menuItem(action("edit.redo")));
 </script>
@@ -87,7 +97,30 @@
       </span>
     </div>
     <Menu label="File" entries={fileEntries} />
-    {#if links.githubFile}
+    {#if $workspaceDocument}
+      <button
+        type="button"
+        class="min-w-0 truncate text-sm text-heading"
+        onclick={action("repo.workspace").run}
+        title={`Save destination: ${$repoFolder?.name ?? "checkout"}/TeamCode/autos/${$workspaceDocument.name}`}
+        data-testid="workspace-status"
+      >
+        {$repoFolder?.name ?? "Checkout"} · {$repoFolder?.branch ??
+          "branch unavailable"} · {$workspaceDocument.name}
+        <span class="text-xs text-body"
+          >{$workspaceBusy
+            ? "Saving…"
+            : $workspaceError
+              ? "Save needs attention"
+              : $repoFolder?.id !== $workspaceDocument.checkoutId ||
+                  $repoFolder?.branch !== $workspaceDocument.branch
+                ? "Checkout changed — reopen"
+                : project.dirty || Object.keys($spotEdits).length
+                  ? "Unsaved to checkout"
+                  : "Saved to checkout"}</span
+        >
+      </button>
+    {:else if links.githubFile}
       <!-- Fork: a file from biobuzz. Edits are kept as a draft until Save to GitHub. -->
       <button
         type="button"
@@ -96,6 +129,9 @@
         onclick={action("github.save").run}
       >
         <span class="truncate">{links.githubFile.name}</span>
+        <span class="text-xs text-body"
+          >GitHub · {links.sourceOnScreen?.ref ?? "default branch"}</span
+        >
         <span
           class={[
             "rounded px-1.5 py-0.5 text-xs whitespace-nowrap",
@@ -116,7 +152,8 @@
           ? action("file.rename").run
           : action("file.save").run}
       >
-        {basename($currentFilePath) || "Untitled"}
+        <span>{basename($currentFilePath) || "Untitled"}</span>
+        <span class="text-xs">· browser copy</span>
         {#if project.dirty}
           <span class="text-primary" title="Unsaved changes">•</span>
         {/if}
@@ -125,6 +162,11 @@
   </div>
 
   <div class="flex items-center gap-1">
+    <button
+      type="button"
+      class="console-action text-sm"
+      onclick={action("repo.workspace").run}>Workspace</button
+    >
     {#if links.copy && !links.draft}
       <!-- A shared copy: the viewer's own work waits until it is closed. -->
       <span
@@ -177,9 +219,18 @@
       <Link2 />
       Share
     </button>
-    <Menu label="Save" entries={saveEntries} align="end">
-      {#snippet icon()}<CloudUpload />{/snippet}
-    </Menu>
+    {#if $workspaceDocument}
+      <button
+        type="button"
+        class="console-action console-action--accent"
+        onclick={action("file.save").run}
+        disabled={$workspaceBusy}>Save</button
+      >
+    {:else}
+      <Menu label="Save" entries={saveEntries} align="end">
+        {#snippet icon()}<CloudUpload />{/snippet}
+      </Menu>
+    {/if}
     <Menu label="Export" entries={exportEntries} align="end">
       {#snippet icon()}<Download />{/snippet}
     </Menu>

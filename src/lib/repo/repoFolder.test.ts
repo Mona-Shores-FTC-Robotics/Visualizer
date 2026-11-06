@@ -133,7 +133,7 @@ test("only a plain .pp name in TeamCode/autos is accepted", () => {
   }
   // A draft goes in TeamCode/autos/drafts, and no other subfolder.
   assertEqual(repoFileProblem("drafts/r-solo-push.pp"), null);
-  assert(repoFileProblem("partners/x.pp") !== null);
+  assertEqual(repoFileProblem("partners/x.pp"), null);
   // The same rule the GitHub save applies to the path.
   assertEqual(repoFileProblem("x.pp"), ppPathProblem("TeamCode/autos/x.pp"));
 });

@@ -1,8 +1,10 @@
 import { debounce } from "lodash";
+import { fromStore, get } from "svelte/store";
+import { workspaceDocument } from "../lib/repo/workspaceStore";
 import type { BasePoint, Settings } from "../types";
 import { parseProject, serializeProject, type ProjectDoc } from "../io";
 import { updatePoint, type PointAddress } from "../model/commands";
-import { activePaths } from "../stores";
+import { activePaths, currentFilePath } from "../stores";
 import * as browserFileStore from "../utils/browserFileStore";
 import type { ProjectStore } from "./project.svelte";
 
@@ -21,7 +23,16 @@ export interface Overlay {
  * its own robot. Their points can be dragged; edits save back to their files.
  */
 export class Overlays {
-  items = $state.raw<Overlay[]>([]);
+  #loaded = $state.raw<Overlay[]>([]);
+  #currentPath = fromStore(currentFilePath);
+  /** The primary overlay IS the editor document, never a second editable copy. */
+  items = $derived(
+    this.#loaded.map((item) =>
+      item.filePath === this.#currentPath.current
+        ? { ...item, doc: this.#project.doc }
+        : item,
+    ),
+  );
   active = $derived(this.items.length > 0);
 
   #project: ProjectStore;
@@ -31,6 +42,7 @@ export class Overlays {
   #pendingSaves = new Map<number, ReturnType<typeof debounce>>();
   /** Fork: lays an overlay's paths out as its Auto drives them (lib/auto/links.ts). */
   #layOut: (doc: ProjectDoc, settings: Settings) => ProjectDoc;
+  #loadVersion = 0;
 
   constructor(
     project: ProjectStore,
@@ -54,6 +66,9 @@ export class Overlays {
   }
 
   async load(filePaths: string[]) {
+    const version = ++this.#loadVersion;
+    for (const save of this.#pendingSaves.values()) save.cancel();
+    this.#pendingSaves.clear();
     const loaded: Overlay[] = [];
     for (const [index, filePath] of filePaths
       .slice(0, MAX_OVERLAYS)
@@ -75,17 +90,28 @@ export class Overlays {
         console.error(`Failed to load overlay ${filePath}:`, error);
       }
     }
-    this.items = loaded;
+    if (version === this.#loadVersion) this.#loaded = loaded;
   }
 
   movePoint(index: number, address: PointAddress, point: BasePoint) {
     const overlay = this.items[index];
     if (!overlay) return;
+    if (overlay.filePath === this.#currentPath.current) {
+      this.#project.preview((doc) =>
+        this.#layOut(
+          updatePoint(address, point)(doc),
+          this.settingsFor(overlay),
+        ),
+      );
+      return;
+    }
+    // Local partner comparisons are references. Open a partner explicitly to edit it.
+    if (get(workspaceDocument)) return;
     const doc = this.#layOut(
       updatePoint(address, point)(overlay.doc),
       this.settingsFor(overlay),
     );
-    this.items = this.items.map((item, i) =>
+    this.#loaded = this.#loaded.map((item, i) =>
       i === index ? { ...item, doc } : item,
     );
     this.#saveSoon(index);

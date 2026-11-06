@@ -81,4 +81,18 @@ describe("installShortcuts", () => {
     expect(addPath).not.toHaveBeenCalled();
     input.remove();
   });
+
+  it("commits a focused coordinate before an explicitly allowed save", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.focus();
+    const save = vi.fn(() => expect(document.activeElement).not.toBe(input));
+    uninstall = installShortcuts([
+      { keys: ["mod+s"], allowWhileTyping: true, run: save },
+    ]);
+    const event = press({ key: "s", ctrlKey: true }, input);
+    expect(event.defaultPrevented).toBe(true);
+    expect(save).toHaveBeenCalledOnce();
+    input.remove();
+  });
 });

@@ -25,7 +25,12 @@
   import { SharedLinks, provideLinks } from "./state/links.svelte";
   import { layOutDoc } from "./lib/auto/links";
   import { refreshTeamSpots } from "./lib/team/spotsStore";
-  import { loadRepoFolder } from "./lib/repo/repoStore";
+  import {
+    loadRepoFolder,
+    repoFolder,
+    refreshRepoBranch,
+  } from "./lib/repo/repoStore";
+  import { loadTeamTiming } from "./lib/timing/store";
 
   const project = new ProjectStore(
     createDefaultProject(
@@ -43,6 +48,9 @@
   const links = new SharedLinks(project, files);
   const gif = new GifExport(project, prefs, overlays, auto);
   const dialogs = new Dialogs();
+  files.requestRepoSave = () => {
+    dialogs.repo = true;
+  };
   const theme = new Theme();
   provideProject(project);
   provideEditor(editor);
@@ -109,6 +117,20 @@
   // Fork: the team's spots, from biobuzz master (lib/team/spotsStore.ts).
   // The checkout first: when GitHub is out of reach, the spots come from it.
   onMount(() => void loadRepoFolder().then(() => refreshTeamSpots()));
+  $effect(() => {
+    const folder = $repoFolder;
+    if (folder?.permission === "granted") {
+      void refreshTeamSpots();
+      void loadTeamTiming();
+    }
+  });
+  onMount(() => {
+    const refresh = () => {
+      void refreshRepoBranch();
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  });
 
   onMount(() => {
     const updateMobile = () => (isMobileBlocked = isMobileDevice());

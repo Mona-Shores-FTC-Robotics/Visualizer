@@ -3,6 +3,7 @@
  * this laptop's own changes to them (kept in the browser until copied into the team's file).
  */
 import { derived, get, writable } from "svelte/store";
+import { repoFolder } from "../repo/repoStore";
 import {
   DEFAULT_REF,
   fetchText,
@@ -20,6 +21,7 @@ import {
 
 export const TIMING_FILE = "timing.json";
 const OVERRIDES_KEY = "previewTimingOverrides";
+let overridesKey = OVERRIDES_KEY;
 /** The Team Autos dialog's remembered branch. */
 const BRANCH_KEY = "teamAutosRef";
 
@@ -40,7 +42,7 @@ function write(key: string, value: string) {
 
 function savedOverrides(): TimingValues {
   try {
-    const raw = JSON.parse(read(OVERRIDES_KEY) ?? "{}");
+    const raw = JSON.parse(read(overridesKey) ?? "{}");
     const out: TimingValues = {};
     for (const fact of FACTS) {
       const value = cleanValue(fact, raw?.[fact.id]);
@@ -68,8 +70,17 @@ export const teamTiming = writable<{ ref: string; file: TimingFile } | null>(
 /** This laptop's changes, by fact id. */
 export const timingOverrides = writable<TimingValues>(savedOverrides());
 timingOverrides.subscribe((values) =>
-  write(OVERRIDES_KEY, JSON.stringify(values)),
+  write(overridesKey, JSON.stringify(values)),
 );
+repoFolder.subscribe((folder) => {
+  const key = folder
+    ? `${OVERRIDES_KEY}:${folder.id}:${folder.branch ?? "unknown"}`
+    : OVERRIDES_KEY;
+  if (key === overridesKey) return;
+  overridesKey = key;
+  timingOverrides.set(savedOverrides());
+  teamTiming.set(null);
+});
 
 /** The values the preview uses: the simulator's, then the team's, then this laptop's. */
 export const timingValues = derived(
@@ -93,7 +104,30 @@ export async function loadTeamTiming(
   getText: FetchText = fetchText,
 ): Promise<string | null> {
   try {
+    const checkout = get(repoFolder);
+    if (checkout) {
+      if (checkout.permission !== "granted")
+        throw new Error("Allow the checkout to read its timing facts.");
+      const text = await checkout.folder.readText(
+        `TeamCode/autos/${TIMING_FILE}`,
+      );
+      if (
+        get(repoFolder)?.id !== checkout.id ||
+        get(repoFolder)?.branch !== checkout.branch
+      )
+        return null;
+      teamTiming.set(
+        text === null
+          ? null
+          : {
+              ref: `${checkout.name} · ${checkout.branch ?? "branch unavailable"}`,
+              file: parseTimingFile(text),
+            },
+      );
+      return null;
+    }
     const text = await getText(teamRawUrl(ref, TIMING_FILE));
+    if (get(repoFolder)) return null;
     teamTiming.set(text === null ? null : { ref, file: parseTimingFile(text) });
     return null;
   } catch (error) {

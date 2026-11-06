@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { BasePoint, Settings } from "../types";
   import { FIELD_SIZE, LINE_WIDTH, type ColorScheme } from "../config/defaults";
-  import { gridSize, showGrid, snapToGrid } from "../stores";
+  import {
+    currentFilePath,
+    gridSize,
+    showGrid,
+    snapToGrid,
+  } from "../stores";
   import { fieldHover, spotPicker } from "../lib/auto/store";
   import {
     pointAt,
@@ -695,10 +700,15 @@
                 color={overlay.color}
                 radiusScale={0.9}
                 opacity={0.8}
-                onPointDown={(address, _locked, event) => {
+                onPointDown={(address, locked, event) => {
+                  if (overlay.filePath === $currentFilePath) {
+                    onProjectPointDown(address, locked, event);
+                    return;
+                  }
                   if (editor.tool !== "select") return;
                   event.stopPropagation();
-                  beginDrag({ kind: "overlay", index, address }, event);
+                  if (!locked && event.button === 0)
+                    beginDrag({ kind: "overlay", index, address }, event);
                 }}
               />
             {/each}

@@ -22,6 +22,7 @@ import { resolveProjectHash } from "../utils/sampleLink";
 import { publicAsset } from "../utils/publicAsset";
 import { basename, pathStem } from "../utils/filename";
 import * as browserFileStore from "../utils/browserFileStore";
+import { workspaceDocument } from "../lib/repo/workspaceStore";
 import type { ProjectFiles } from "./files.svelte";
 import type { ProjectStore } from "./project.svelte";
 
@@ -64,6 +65,7 @@ export class SharedLinks {
   #project: ProjectStore;
   #files: ProjectFiles;
   #filePath = fromStore(currentFilePath);
+  #workspace = fromStore(workspaceDocument);
   #stash: { doc: ProjectDoc; filePath: string | null; dirty: boolean } | null =
     null;
   #timer: ReturnType<typeof setTimeout> | null = null;
@@ -81,7 +83,7 @@ export class SharedLinks {
   );
   /** The biobuzz file on screen and where its draft stands, for the top bar. */
   githubFile = $derived(
-    this.status && this.draft
+    !this.#workspace.current && this.status && this.draft
       ? {
           name: basename(this.draft.path),
           label: DRAFT_LABEL[this.status],
@@ -91,7 +93,8 @@ export class SharedLinks {
   );
   /** `source`, while that file (or the copy read from it) is what is on screen. */
   sourceOnScreen = $derived(
-    this.source &&
+    !this.#workspace.current &&
+      this.source &&
       (this.copy ||
         basename(this.source.path) === basename(this.#filePath.current))
       ? this.source

@@ -1,4 +1,5 @@
 import type { Settings } from "../../types";
+import type { WorkspaceDocument } from "../repo/workspaceStore";
 import { DEFAULT_SETTINGS } from "../../config/defaults";
 import {
   PROJECT_VERSION,
@@ -14,6 +15,7 @@ export interface SessionSnapshot {
   project: ProjectDoc;
   settings: Settings;
   currentFilePath: string | null;
+  workspaceDocument?: WorkspaceDocument | null;
 }
 
 /** Stored with the project's fields at the top level, like a project file. */
@@ -53,6 +55,7 @@ export function loadSessionSnapshot(): SessionSnapshot | null {
       project: primary.doc,
       settings,
       currentFilePath: parsed.currentFilePath || null,
+      workspaceDocument: parsed.workspaceDocument ?? null,
     };
   } catch (error) {
     console.error("Session restore failed:", error);

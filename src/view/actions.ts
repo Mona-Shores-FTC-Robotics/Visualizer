@@ -427,6 +427,7 @@ export function shortcutsFor(actions: Action[], deps: ActionDeps): Shortcut[] {
     !deps.dialogs.anyOpen && !get(dialogRequest) && !deps.gif.running;
   return actions.map((action) => ({
     keys: action.keys,
+    allowWhileTyping: action.id === "file.save" || action.id === "file.saveAs",
     run: action.run,
     when: () =>
       (action.id === "app.palette" || idle()) && (action.when?.() ?? true),

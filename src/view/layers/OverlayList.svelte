@@ -4,6 +4,8 @@
   import { isProjectFileName } from "../../utils/filename";
   import { MAX_OVERLAYS, type Overlays } from "../../state/overlays.svelte";
   import { checkboxClass } from "../../lib/components/ui/styles";
+  import { workspaceDocument } from "../../lib/repo/workspaceStore";
+  import { basename } from "../../utils/filename";
 
   interface Props {
     overlays: Overlays;
@@ -19,7 +21,12 @@
     browserFileStore
       .listFiles()
       .then(
-        (all) => (files = all.filter((file) => isProjectFileName(file.name))),
+        (all) =>
+          (files = all.filter(
+            (file) =>
+              isProjectFileName(file.name) &&
+              (!$workspaceDocument || $activePaths.includes(file.path)),
+          )),
       )
       .catch((error) => console.error("Couldn't list saved files:", error));
   });
@@ -36,7 +43,9 @@
 <div class="flex flex-col gap-px">
   {#if overlays.active}
     <p class="px-2 pb-1 text-xs text-body">
-      Showing overlays in place of the open project.
+      {$workspaceDocument
+        ? "Your live auto with checkout partner references. Change partners in Workspace."
+        : "Showing the open project with the selected comparison files."}
     </p>
   {/if}
   {#each files as file (file.path)}
@@ -56,10 +65,10 @@
         type="checkbox"
         class={checkboxClass}
         checked={on}
-        disabled={!on && full}
+        disabled={!!$workspaceDocument || (!on && full)}
         onchange={(event) => toggle(file.path, event.currentTarget.checked)}
       />
-      <span class="truncate">{file.name}</span>
+      <span class="truncate">{basename(file.name)}</span>
       {#if color}
         <span
           class="ml-auto size-2.5 shrink-0 rounded-full"

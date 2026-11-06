@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { repoFolder } from "../repo/repoStore";
   // Fork: "Save team spots" (lib/team/teamSpots.ts). One commit on a new branch of biobuzz:
   // spots.json with the changes made here, and every Auto in TeamCode/autos that uses a changed
   // spot, re-exported (.pp and Java). Then a pull request, since master changes only through
@@ -24,9 +25,10 @@
   interface Props {
     isOpen: boolean;
     onClose: () => void;
+    onLocalSave: () => Promise<boolean>;
   }
 
-  let { isOpen, onClose }: Props = $props();
+  let { isOpen, onClose, onLocalSave }: Props = $props();
 
   let token = $state<string | null>(savedToken());
   // The token "GitHub…" saved, read each time this opens: it may have been set up since.
@@ -111,7 +113,25 @@
     <h2 id="save-spots-title" class="text-xl font-semibold text-heading">
       Save team spots
     </h2>
-    {#if done}
+    {#if $repoFolder}
+      <p>
+        Changed here: <b>{names.join(", ") || "nothing"}</b>. Save the current
+        auto and these shared spot changes to {$repoFolder.name}, updating the
+        other affected autos in the same checkout.
+      </p>
+      <Button
+        variant="primary"
+        disabled={saving || !names.length}
+        onclick={async () => {
+          saving = true;
+          try {
+            if (await onLocalSave()) close();
+          } finally {
+            saving = false;
+          }
+        }}>Save to checkout</Button
+      >
+    {:else if done}
       <p>
         Saved on a new branch{done.autos.length
           ? `, with ${done.autos.join(", ")} re-exported`

@@ -15,7 +15,7 @@
     listRepoAutos,
     listRepoDrafts,
     repoFileProblem,
-    saveToFolder,
+    repoSaveFiles,
   } from "./repoFolder";
   import {
     allowRepoFolder,
@@ -35,6 +35,7 @@
     source: { ref: string | null; path: string } | null;
     /** The open project as it would be saved: the bytes the .pp gets. */
     projectText: () => string;
+    saveProject: (name: string) => Promise<boolean>;
   }
 
   let {
@@ -42,6 +43,7 @@
     fileName,
     source,
     projectText,
+    saveProject,
   }: Props = $props();
 
   const supported = canPickFolder();
@@ -136,13 +138,17 @@
         ];
         return;
       }
-      const result = await saveToFolder(folder.folder, name, projectText());
+      const result = repoSaveFiles(name, projectText());
       if (!result.ok) {
         blocked = result.errors;
         return;
       }
-      result.warnings.forEach((w) => showToast(`Export: ${w}`, "warning"));
-      saved = { folder: folder.name, paths: Object.keys(result.files) };
+      if (!(await saveProject(name.trim()))) return;
+      const actual = repoSaveFiles(name, projectText());
+      saved = {
+        folder: folder.name,
+        paths: Object.keys(actual.ok ? actual.files : result.files),
+      };
       showToast(
         `Saved into ${folder.name}. Sloth Load from Android Studio to put it on the robot.`,
         "success",
@@ -200,6 +206,7 @@
   {:else}
     <p class="text-xs text-body mb-3">
       Checkout: <b class="text-heading">{$repoFolder.name}</b>
+      · {$repoFolder.branch ?? "branch unavailable"}
       {#if $repoFolder.permission !== "granted"}
         · <button class="underline" onclick={allow} disabled={busy}
           >allow access</button
@@ -241,8 +248,8 @@
           Writes <code>TeamCode/autos/{name.trim()}</code>
           {#if isNew}<strong class="text-warning">(a new file)</strong
             >{:else}(replaced){/if} and its Java in
-          <code>opmodes/auto/generated/</code>. Nothing else in the checkout
-          changes.
+          <code>opmodes/auto/generated/</code>. Shared spot changes also update
+          affected autos.
         {/if}
       </p>
       <button
@@ -278,9 +285,9 @@
 
   {#if supported}
     <p class="mt-4 text-xs text-body">
-      Afterwards, commit the two changed files on an <code
-        >auto/&lt;name&gt;</code
-      > branch (or Save to GitHub once online), so master has the Auto the robot ran.
+      Later saves use this checkout directly. Preserve tested versions in
+      Workspace. Commit and push useful event checkpoints when ready; merge
+      successful changes into master afterwards.
     </p>
   {/if}
 </Modal>

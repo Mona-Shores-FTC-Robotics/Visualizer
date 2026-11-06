@@ -13,12 +13,15 @@
   import ShareLinkDialog from "../lib/components/ShareLinkDialog.svelte";
   import SaveToGithubDialog from "../lib/sim/SaveToGithubDialog.svelte";
   import SaveToRepoDialog from "../lib/repo/SaveToRepoDialog.svelte";
+  import WorkspaceDialog from "../lib/repo/WorkspaceDialog.svelte";
   import SharedCopyBanner from "../lib/components/SharedCopyBanner.svelte";
   import SaveSpotsDialog from "../lib/team/SaveSpotsDialog.svelte";
   import { saveSpotsOpen } from "../lib/team/spotsStore";
   import { teamOpenRequest } from "../lib/team/teamView";
   import { parseProject } from "../io";
   import { showToast } from "../lib/toast";
+  import { workspaceDocument } from "../lib/repo/workspaceStore";
+  import { repoFolder } from "../lib/repo/repoStore";
 
   interface Props {
     dialogs: Dialogs;
@@ -52,10 +55,12 @@
 </script>
 
 <TeamAutosDialog bind:isOpen={dialogs.teamAutos} />
+<WorkspaceDialog bind:isOpen={dialogs.workspace} {files} />
 
 <SaveSpotsDialog
   isOpen={$saveSpotsOpen}
   onClose={() => saveSpotsOpen.set(false)}
+  onLocalSave={() => files.saveWorkspace()}
 />
 
 <ShareLinkDialog
@@ -66,7 +71,12 @@
 <SaveToGithubDialog
   bind:isOpen={dialogs.github}
   fileName={basename($currentFilePath)}
-  source={links.sourceOnScreen}
+  source={$workspaceDocument
+    ? {
+        ref: $repoFolder?.branch ?? null,
+        path: `TeamCode/autos/${$workspaceDocument.name}`,
+      }
+    : links.sourceOnScreen}
   projectText={() => serializeProject(files.current(), { pretty: true })}
   baseText={links.draft?.baseText ?? null}
   draft={links.status && links.draft
@@ -86,9 +96,10 @@
 
 <SaveToRepoDialog
   bind:isOpen={dialogs.repo}
-  fileName={basename($currentFilePath)}
+  fileName={$workspaceDocument?.name ?? basename($currentFilePath)}
   source={links.sourceOnScreen}
   projectText={() => serializeProject(files.current(), { pretty: true })}
+  saveProject={(name) => files.saveWorkspace(name)}
 />
 
 <!-- A shared copy says so in the top bar; this shows a link that failed to open. -->

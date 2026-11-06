@@ -9,6 +9,8 @@
 import { derived, get, writable } from "svelte/store";
 import type { AutoSection, NamedPoint } from "../auto/types";
 import { repoSpotsText } from "../repo/repoStore";
+import { repoFolder } from "../repo/repoStore";
+import { workspaceDocument } from "../repo/workspaceStore";
 import {
   loadTeamSpots,
   parseTeamSpots,
@@ -17,6 +19,7 @@ import {
 } from "./teamSpots";
 
 const EDITS_KEY = "biobuzz-team-spot-edits";
+let editsKey = EDITS_KEY;
 
 /** The list on biobuzz master, once read. */
 export const savedSpots = writable<TeamSpots>({});
@@ -40,11 +43,23 @@ export const teamSpots = derived(
 spotEdits.subscribe((edits) => {
   try {
     if (Object.keys(edits).length)
-      localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
-    else localStorage.removeItem(EDITS_KEY);
+      localStorage.setItem(editsKey, JSON.stringify(edits));
+    else localStorage.removeItem(editsKey);
   } catch {
     // A private window: the changes last until the tab closes.
   }
+});
+
+repoFolder.subscribe((folder) => {
+  const key = folder
+    ? `${EDITS_KEY}:${folder.id}:${folder.branch ?? "unknown"}`
+    : EDITS_KEY;
+  if (key === editsKey) return;
+  editsKey = key;
+  unlockedSpots.set(new Set());
+  spotEdits.set(readEdits());
+  savedSpots.set({});
+  spotsStatus.set("loading");
 });
 
 /**
@@ -54,21 +69,52 @@ spotEdits.subscribe((edits) => {
 export async function refreshTeamSpots(): Promise<void> {
   spotsStatus.set("loading");
   let spots: TeamSpots;
-  try {
-    spots = await loadTeamSpots();
-    spotsFrom.set("github");
-  } catch (error) {
+  const checkout = get(repoFolder);
+  const binding = get(workspaceDocument);
+  if (
+    binding &&
+    checkout &&
+    (binding.checkoutId !== checkout.id || binding.branch !== checkout.branch)
+  ) {
+    spotsStatus.set(
+      "The checkout changed. Reopen the auto before using its team spots.",
+    );
+    return;
+  }
+  if (checkout) {
     const fromFolder = await folderSpots();
+    if (
+      get(repoFolder)?.id !== checkout.id ||
+      get(repoFolder)?.branch !== checkout.branch
+    )
+      return;
     if (!fromFolder) {
       spotsFrom.set(null);
       spotsStatus.set(
-        `Could not read the team's spots from GitHub (${error instanceof Error ? error.message : String(error)}): a school network may block raw.githubusercontent.com.`,
+        "Allow access to the checkout to read its team spots. GitHub spots are not substituted.",
       );
       return;
     }
     spots = fromFolder;
     spotsFrom.set("folder");
+  } else {
+    try {
+      spots = await loadTeamSpots();
+      spotsFrom.set("github");
+    } catch (error) {
+      const fromFolder = await folderSpots();
+      if (!fromFolder) {
+        spotsFrom.set(null);
+        spotsStatus.set(
+          `Could not read the team's spots from GitHub (${error instanceof Error ? error.message : String(error)}): a school network may block raw.githubusercontent.com.`,
+        );
+        return;
+      }
+      spots = fromFolder;
+      spotsFrom.set("folder");
+    }
   }
+  if (!checkout && get(repoFolder)) return;
   savedSpots.set(spots);
   spotEdits.update((edits) => {
     const left = Object.fromEntries(
@@ -133,7 +179,7 @@ export function setSpotUnlocked(name: string, unlocked: boolean): void {
 
 function readEdits(): TeamSpots {
   try {
-    const raw = localStorage.getItem(EDITS_KEY);
+    const raw = localStorage.getItem(editsKey);
     return raw ? (JSON.parse(raw) as TeamSpots) : {};
   } catch {
     return {};
