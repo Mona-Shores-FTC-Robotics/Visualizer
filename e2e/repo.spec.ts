@@ -431,7 +431,14 @@ test("dragging our comparison overlay edits the candidate that Save exports", as
   });
   await page.goto("/");
   await openEvent(page);
+  await page.keyboard.press("Escape");
+  await expect(
+    page
+      .getByRole("complementary", { name: "Inspector" })
+      .getByRole("heading", { name: "Project", exact: true }),
+  ).toBeVisible();
   const marker = page.locator("#additional-path-0-point-1-0");
+  await marker.hover();
   const box = (await marker.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
