@@ -41,8 +41,12 @@ export const PEDRO_API = {
     constant: (poseVar: string) => `Interpolator.constant(${poseVar})`,
     linear: (startPoseVar: string, endPoseVar: string) =>
       `Interpolator.linear(${startPoseVar}, ${endPoseVar})`,
+    /** From start to end the long way round: the preview's reversed linear segment. */
+    longLinear: (startPoseVar: string, endPoseVar: string) =>
+      `Interpolator.longLinear(${startPoseVar}, ${endPoseVar})`,
     tangent: () => "Interpolator.tangent",
     facingPoint: (poseVar: string) => `Interpolator.facingPoint(${poseVar})`,
+    /** Faces backwards: adds half a turn everywhere. Never for a linear segment. */
     reverse: (expression: string) => `${expression}.reverse()`,
   },
 
