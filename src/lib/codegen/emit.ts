@@ -11,7 +11,14 @@ import type {
 } from "./types";
 
 function interpolatorExpression(node: PiecewiseNode): string {
-  const base = interpolatorBase(node.interpolator);
+  const ref = node.interpolator;
+  // A reversed linear segment turns the long way round to the same end heading
+  // (utils/math.ts reversedRotation). Pedro's reverse() adds half a turn instead,
+  // which would end the robot facing the opposite way from the preview.
+  if (node.reversed && ref.kind === "linear") {
+    return PEDRO_API.interpolator.longLinear(ref.startPoseVar, ref.endPoseVar);
+  }
+  const base = interpolatorBase(ref);
   return node.reversed ? PEDRO_API.interpolator.reverse(base) : base;
 }
 
