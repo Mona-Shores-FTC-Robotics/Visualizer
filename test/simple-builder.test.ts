@@ -11,6 +11,7 @@ import {
 } from "../src/io";
 import type { ProjectDoc } from "../src/io/project";
 import type { AutoCard } from "../src/lib/auto/types";
+import type { Heading } from "../src/types";
 import { TEAM_ROBOT, teamRegistry } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc, relink } from "../src/lib/auto/links";
@@ -215,6 +216,45 @@ describe("the simple builder", () => {
     expect(setStartHeading(doc, -30.4).startPoint.headingDeg).toBe(330);
     const plain = { ...doc, auto: undefined } as ProjectDoc;
     expect(setStartHeading(plain, 90).startPoint.headingDeg).toBe(90);
+  });
+
+  it("keeps a custom piecewise heading and starts the next drive at its actual end heading", () => {
+    const doc = rQualsV2();
+    const drives = doc.auto!.cards.filter((c) => c.kind === "path");
+    const first = doc.lines.find((line) => line.id === drives[0].lineId)!;
+    if (first.kind !== "atomic") throw new Error("expected an atomic drive");
+    const heading: Heading = {
+      type: "piecewise",
+      piecewiseHeading: {
+        segments: [
+          {
+            startProgress: 0,
+            endProgress: 0.5,
+            interpolationType: "linear",
+            parameters: { startDeg: 90, endDeg: 165 },
+          },
+          {
+            startProgress: 0.5,
+            endProgress: 1,
+            interpolationType: "constant",
+            continueFromPrevious: true,
+            parameters: { degrees: 0 },
+          },
+        ],
+      },
+    };
+    first.heading = heading;
+
+    // An unrelated builder edit used to replace this with linear 90 -> 180.
+    const changed = add(doc, "spinup");
+    const kept = changed.lines.find((line) => line.id === first.id)!;
+    expect(kept.kind === "atomic" && kept.heading).toEqual(heading);
+    const next = changed.lines.find((line) => line.id === drives[1].lineId)!;
+    expect(next.kind === "atomic" && next.heading).toEqual({
+      type: "linear",
+      startDeg: 165,
+      endDeg: 270,
+    });
   });
 
   it("ends each drive facing its spot", () => {
@@ -864,6 +904,59 @@ describe("a Wait step's Otherwise list", () => {
       startDeg: 270,
       endDeg: 92,
     });
+  });
+
+  it("keeps two-part Otherwise and park headings through a wait edit, save and Java export", () => {
+    const doc = noTipFallback();
+    const [wait, , park] = stepsOf(doc);
+    const ids = [wait.otherwise![0].lineId!, park.lineId!];
+    const headings = ids.map((id, index): Heading => {
+      const heading: Heading = {
+        type: "piecewise",
+        piecewiseHeading: {
+          segments: [
+            {
+              startProgress: 0,
+              endProgress: 0.5,
+              interpolationType: "constant",
+              parameters: { degrees: 270 },
+            },
+            {
+              startProgress: 0.5,
+              endProgress: 1,
+              interpolationType: "linear",
+              continueFromPrevious: true,
+              parameters: { startDeg: 270, endDeg: index === 0 ? 92 : 0 },
+            },
+          ],
+        },
+      };
+      const line = doc.lines.find((path) => path.id === id)!;
+      if (line.kind !== "atomic") throw new Error("expected an atomic path");
+      line.heading = heading;
+      return heading;
+    });
+
+    const changed = setWait(doc, wait.cardId, { seconds: 9 });
+    const saved = serializeProject(changed);
+    const opened = parseProject(saved, robotConfigOf(settings));
+    if (!opened.ok) throw new Error(opened.error);
+    ids.forEach((id, index) => {
+      const line = opened.doc.lines.find((path) => path.id === id)!;
+      expect(line.kind === "atomic" && line.heading).toEqual(headings[index]);
+    });
+    const exported = generateAutoJava({
+      auto: opened.doc.auto!,
+      startPoint: opened.doc.startPoint,
+      lines: opened.doc.lines,
+      shapes: opened.doc.shapes,
+      settings,
+      sourceFileName: "piecewise-fallback.pp",
+    });
+    if (!exported.ok) throw new Error(exported.errors.join("; "));
+    expect(exported.source.match(/Interpolator\.piecewise\(\)/g)).toHaveLength(
+      2,
+    );
   });
 
   it("keeps one park across both lists", () => {
