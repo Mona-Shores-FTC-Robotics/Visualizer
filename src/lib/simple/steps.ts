@@ -21,6 +21,8 @@
 import type { ProjectDoc } from "../../io/project";
 import type { AtomicPath, Path } from "../../types";
 import { createSegment } from "../../utils/normalize";
+import { flattenToAtomicSegments } from "../../utils/pathTraversal";
+import { segmentHeadingAt } from "../../utils/headingInterpolation";
 import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type {
@@ -423,7 +425,7 @@ export function addSpot(
   });
 }
 
-/** Turns a spot: every drive that ends on it now ends facing `headingDeg`. */
+/** Turns a spot's automatic headings; piecewise headings remain under the path editor's control. */
 export function setSpotHeading(
   doc: ProjectDoc,
   name: string,
@@ -830,8 +832,8 @@ export function cleanSpotName(text: string): string {
 }
 
 /**
- * The document with each drive turning from the heading the step before left the robot at to its
- * spot's heading, as every edit here leaves it. For a change made elsewhere: a team spot updated
+ * Re-lays automatic headings from the preceding step to the destination spot. Piecewise headings
+ * are authored in the path editor and stay intact. Also used when team spots update elsewhere
  * (lib/team/teamSpots.ts).
  */
 export function layHeadings(doc: ProjectDoc): ProjectDoc {
@@ -880,9 +882,8 @@ export function pruneUnusedPaths(doc: ProjectDoc): ProjectDoc {
 // --- inside -------------------------------------------------------------------------------------
 
 /**
- * Applies `change` to a copy of the document, then lays each drive's heading out again: a drive
- * turns from the heading the step before left the robot at to its spot's heading, so reordering,
- * removing or turning a spot never leaves a drive starting at a stale heading.
+ * Applies `change` to a copy of the document, then re-lays automatic headings. Custom piecewise
+ * headings stay intact; the following automatic drive starts at their actual final heading.
  */
 function edit(
   doc: ProjectDoc,
@@ -906,6 +907,8 @@ function edit(
 function withHeadings(doc: ProjectDoc): Path[] {
   const auto = doc.auto!;
   const turned = new Map<string, AtomicPath["heading"]>();
+  const segments = flattenToAtomicSegments(doc.startPoint, doc.lines);
+  const byId = new Map(segments.map((segment) => [segment.line.id, segment]));
   // Returns the heading the list leaves the robot at. A wait's Otherwise is laid from the heading
   // at the wait; the list after the wait goes on from that heading too (see walkSteps).
   const lay = (cards: AutoCard[], from: number): number => {
@@ -921,6 +924,12 @@ function withHeadings(doc: ProjectDoc): Path[] {
       const spot = auto.pathEnds[card.lineId];
       const point = spot ? auto.points[spot] : undefined;
       if (!point) continue;
+      const segment = byId.get(card.lineId);
+      // A wait edit, reorder or spot refresh must not flatten a hand-authored heading.
+      if (segment?.line.heading.type === "piecewise") {
+        h = segmentHeadingAt(segments, segment.index, 1);
+        continue;
+      }
       // A spot with no heading (the parks) is reached at whatever heading the robot arrives with.
       const end = point[2] ?? h;
       turned.set(
