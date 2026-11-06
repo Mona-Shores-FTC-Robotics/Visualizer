@@ -5,6 +5,8 @@
 export type KeySpec = string;
 
 export interface Shortcut {
+  /** Save can commit a coordinate field without requiring a click elsewhere. */
+  allowWhileTyping?: boolean;
   keys?: KeySpec[];
   /** The shortcut is ignored while this returns false. */
   when?: () => boolean;
@@ -40,13 +42,17 @@ function isTyping(target: EventTarget | null): boolean {
 /** Listen for every shortcut with one handler; returns the cleanup. */
 export function installShortcuts(shortcuts: Shortcut[]): () => void {
   const onKeyDown = (event: KeyboardEvent) => {
-    if (isTyping(event.target)) return;
+    const typing = isTyping(event.target);
     const shortcut = shortcuts.find(
-      ({ keys, when }) =>
-        keys?.some((spec) => matches(event, spec)) && (when?.() ?? true),
+      ({ keys, when, allowWhileTyping }) =>
+        (!typing || allowWhileTyping) &&
+        keys?.some((spec) => matches(event, spec)) &&
+        (when?.() ?? true),
     );
     if (!shortcut) return;
     event.preventDefault();
+    // onchange-based numeric editors must commit before the save serializes the project.
+    if (typing && event.target instanceof HTMLElement) event.target.blur();
     shortcut.run();
   };
   document.addEventListener("keydown", onKeyDown);

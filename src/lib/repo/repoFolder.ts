@@ -21,8 +21,10 @@ export const CHECKOUT_MARKER = SPOTS_PATH;
 export const REPO_PP_DIR = TEAM_DIR;
 
 const FILE = /^[A-Za-z0-9._ -]+\.pp$/;
-/** A name the folder save takes: a plain .pp name, or one in the drafts' folder (`drafts/x.pp`). */
-const SAVE_NAME = new RegExp(`^(${DRAFTS_DIR}/)?[A-Za-z0-9._ -]+\\.pp$`);
+/** A local auto, draft, or explicitly opened partner stand-in. */
+const SAVE_NAME = new RegExp(
+  `^((?:${DRAFTS_DIR}|partners)/)?[A-Za-z0-9._ -]+\\.pp$`,
+);
 
 /** A folder on this laptop, as much of it as the save needs. Paths are relative, with `/`. */
 export interface Folder {
@@ -32,6 +34,8 @@ export interface Folder {
   readText(path: string): Promise<string | null>;
   /** Replaces the file's whole text, making it (and missing folders on the way) if needed. */
   writeText(path: string, text: string): Promise<void>;
+  /** Removes one file, if present. Never removes a directory. */
+  removeText(path: string): Promise<void>;
   /** The names of the files directly in `dir`, or null when there is no such folder. */
   listFiles(dir: string): Promise<string[] | null>;
 }
@@ -41,7 +45,7 @@ export function repoFileProblem(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return "Name the Auto's .pp file, e.g. r-solo.pp";
   if (!SAVE_NAME.test(trimmed))
-    return `${trimmed}: use letters, numbers, dots, dashes and underscores, ending in .pp (a draft: ${DRAFTS_DIR}/name.pp)`;
+    return `${trimmed}: use letters, numbers, dots, dashes and underscores, ending in .pp (drafts/name.pp or partners/name.pp are also supported)`;
   return ppPathProblem(`${REPO_PP_DIR}/${trimmed}`);
 }
 
@@ -172,5 +176,9 @@ export class MemoryFolder implements Folder {
       .map((p) => p.slice(prefix.length));
     const anyBelow = [...this.files.keys()].some((p) => p.startsWith(prefix));
     return anyBelow ? names : null;
+  }
+
+  async removeText(path: string): Promise<void> {
+    this.files.delete(path);
   }
 }

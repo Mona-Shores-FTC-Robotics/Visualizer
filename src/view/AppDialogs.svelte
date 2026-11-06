@@ -40,6 +40,7 @@
     bind:isOpen={dialogs.fileManager}
     currentProject={() => files.current()}
     applyProject={(doc) => files.open(doc)}
+    onOpenRepo={(name) => files.openRepo(name)}
     fieldMap={prefs.settings.fieldMap}
   />
 {/if}

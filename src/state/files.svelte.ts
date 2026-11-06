@@ -34,6 +34,30 @@ import {
 import type { Overlays } from "./overlays.svelte";
 import type { Prefs } from "./prefs.svelte";
 import type { ProjectStore } from "./project.svelte";
+import { readRepoAuto } from "../lib/repo/repoFolder";
+import { repoFolder } from "../lib/repo/repoStore";
+import {
+  workspaceDocument,
+  workspaceChanged,
+  workspaceFileKey,
+  workspaceOperation,
+  requireWorkspace,
+} from "../lib/repo/workspaceStore";
+import {
+  autoAssetPaths,
+  readFiles,
+  recoverWrite,
+  workspaceSavePlan,
+  writeTransaction,
+} from "../lib/repo/workspaceFiles";
+import {
+  dropSpotEdits,
+  refreshTeamSpots,
+  spotEdits,
+  savedSpots,
+} from "../lib/team/spotsStore";
+import { parseTeamSpots, SPOTS_PATH } from "../lib/team/teamSpots";
+import { loadTeamTiming } from "../lib/timing/store";
 
 /** Opening, saving and renaming the project, and recovering the last session. */
 export class ProjectFiles {
@@ -44,10 +68,12 @@ export class ProjectFiles {
   #project: ProjectStore;
   #prefs: Prefs;
   #overlays: Overlays;
+  #workspace = fromStore(workspaceDocument);
   /** Fork: while a shared copy is on screen the session is not autosaved over. */
   holdAutosave = $state(false);
   /** Fork: the name Save offers when the project has none (a shared copy's). */
   suggestedName = $state<string | null>(null);
+  requestRepoSave: (() => void) | null = null;
 
   constructor(project: ProjectStore, prefs: Prefs, overlays: Overlays) {
     this.#project = project;
@@ -62,6 +88,7 @@ export class ProjectFiles {
 
   /** Open a document, starting a fresh undo history. */
   open(doc: ProjectDoc, options: { saved?: boolean } = {}) {
+    workspaceDocument.set(null);
     this.#project.load(doc, options);
     activePaths.set(doc.activePaths);
   }
@@ -105,6 +132,8 @@ export class ProjectFiles {
 
   /** Save into app storage under the open file's name, asking for one if it has none. */
   async save() {
+    if (get(workspaceDocument)) return this.saveWorkspace();
+    if (get(repoFolder) && this.requestRepoSave) return this.requestRepoSave();
     const name =
       get(currentFilePath) ??
       (await askFileName({
@@ -118,17 +147,180 @@ export class ProjectFiles {
       await browserFileStore.writeFile(name, serializeProject(this.current()));
       currentFilePath.set(name);
       this.#project.markSaved();
-      showToast(`Saved ${name}`, "success");
+      showToast(`Saved ${name} in this browser`, "success");
     } catch (error) {
       console.error("Failed to save project to storage:", error);
       showToast("Couldn't save the project in the app.", "error");
     }
   }
 
+  /** Open the actual local auto, keeping its disk revision for overwrite protection. */
+  async openRepo(name: string): Promise<boolean> {
+    try {
+      return await workspaceOperation(async () => {
+        if (
+          this.#project.dirty &&
+          !(await confirmDialog({
+            title: "Open another auto?",
+            message:
+              "Keep editing to save your current changes first, or discard them and open the selected auto.",
+            confirmLabel: "Discard changes",
+            danger: true,
+          }))
+        )
+          return false;
+        const folder = await requireWorkspace();
+        await recoverWrite(folder.folder);
+        workspaceDocument.set(null);
+        await refreshTeamSpots();
+        await loadTeamTiming();
+        const text = await readRepoAuto(folder.folder, name);
+        if (text === null) throw new Error(`The checkout has no ${name}.`);
+        const doc = this.read(text);
+        if (!doc) return false;
+        doc.activePaths = [];
+        this.open(doc, { saved: true });
+        const key = workspaceFileKey(folder.id, name);
+        currentFilePath.set(key);
+        workspaceDocument.set({
+          checkoutId: folder.id,
+          branch: folder.branch,
+          name,
+          baseline: await readFiles(
+            folder.folder,
+            await autoAssetPaths(folder.folder),
+          ),
+        });
+        await browserFileStore.writeFile(key, serializeProject(doc));
+        showToast(`Opened ${name} from ${folder.name}`, "success");
+        return true;
+      });
+    } catch (error) {
+      showToast(String(error), "error");
+      return false;
+    }
+  }
+
+  /** Save a bound auto, or explicitly import the current document into the checkout. */
+  async saveWorkspace(name = get(workspaceDocument)?.name): Promise<boolean> {
+    if (!name) return false;
+    try {
+      return await workspaceOperation(async () => {
+        const binding = get(workspaceDocument);
+        const folder = await requireWorkspace(binding);
+        if (
+          (!binding || name !== binding.name) &&
+          (await readRepoAuto(folder.folder, name)) === null &&
+          this.#project.doc.auto
+        ) {
+          this.#project.apply((doc) => ({
+            ...doc,
+            auto: {
+              ...doc.auto!,
+              exportName: name!.split("/").pop()!.replace(/\.pp$/, ""),
+            },
+          }));
+        }
+        const savedDoc = this.#project.doc;
+        const text = serializeProject(
+          { ...this.current(), activePaths: [] },
+          { pretty: true },
+        );
+        const edits = get(spotEdits);
+        const plan = await workspaceSavePlan(folder.folder, name, text, edits);
+        const baseline =
+          binding?.baseline ??
+          (await readFiles(folder.folder, await autoAssetPaths(folder.folder)));
+        // A new destination must not overwrite an auto without an explicit import confirmation.
+        if (
+          (!binding || name !== binding.name) &&
+          (await folder.folder.readText(plan.ppPath)) !== null &&
+          !(await confirmDialog({
+            title: `Replace ${name} in the checkout?`,
+            message:
+              "This imports the document on screen into the selected checkout.",
+            confirmLabel: "Replace auto",
+            danger: true,
+          }))
+        )
+          return false;
+        const expected = { ...baseline };
+        for (const path of Object.keys(plan.files))
+          if (!(path in expected)) expected[path] = null;
+        await writeTransaction(folder.folder, plan.files, expected);
+        const savedSpotText = plan.files[SPOTS_PATH];
+        if (typeof savedSpotText === "string") {
+          const parsed = parseTeamSpots(savedSpotText);
+          if (parsed.ok) savedSpots.set(parsed.spots);
+        }
+        dropSpotEdits(Object.keys(edits));
+        await refreshTeamSpots();
+        const key = workspaceFileKey(folder.id, name);
+        currentFilePath.set(key);
+        workspaceDocument.set({
+          checkoutId: folder.id,
+          branch: folder.branch,
+          name,
+          baseline: { ...expected, ...plan.files },
+        });
+        if (this.#project.doc === savedDoc) this.#project.markSaved();
+        // Disk save succeeded even if browser recovery storage is full.
+        try {
+          await browserFileStore.writeFile(key, text);
+        } catch {
+          /* session recovery remains available */
+        }
+        workspaceChanged.update((n) => n + 1);
+        for (const warning of plan.warnings)
+          showToast(`Export: ${warning}`, "warning");
+        showToast(
+          `Saved ${name} to ${folder.name}${folder.branch ? ` · ${folder.branch}` : ""}. Ready for your Sloth Load.`,
+          "success",
+        );
+        return true;
+      });
+    } catch (error) {
+      showToast(String(error), "error");
+      return false;
+    }
+  }
+
+  /** Add read-only local partners around the live editor document. */
+  async compareRepo(names: string[]): Promise<void> {
+    try {
+      const binding = get(workspaceDocument);
+      if (!binding) throw new Error("Open an auto from the checkout first.");
+      const folder = await requireWorkspace(binding);
+      const primary = workspaceFileKey(folder.id, binding.name);
+      const paths = [primary];
+      for (const name of names) {
+        if (!/^partners\/[A-Za-z0-9._ -]+\.pp$/.test(name))
+          throw new Error("Choose a partner from the checkout.");
+        const text = await folder.folder.readText(`TeamCode/autos/${name}`);
+        if (!text || !this.read(text))
+          throw new Error(`Cannot open partner ${name}.`);
+        const key = workspaceFileKey(folder.id, name);
+        await browserFileStore.writeFile(key, text);
+        paths.push(key);
+      }
+      await browserFileStore.writeFile(
+        primary,
+        serializeProject(this.current()),
+      );
+      activePaths.set(names.length ? paths : []);
+    } catch (error) {
+      showToast(String(error), "error");
+    }
+  }
+
   /** Save to a file on disk through the browser's file picker. */
   async saveAs() {
     await this.#overlays.saveAll();
-    const content = serializeProject(this.current(), { pretty: true });
+    const binding = get(workspaceDocument);
+    const content = serializeProject(
+      binding ? { ...this.current(), activePaths: [] } : this.current(),
+      { pretty: true },
+    );
 
     if (!canPickSaveFile() && !canPickExistingFile()) {
       // Browsers without file pickers (e.g. Firefox) save into app storage.
@@ -147,9 +339,16 @@ export class ProjectFiles {
             basename(get(currentFilePath)) || `path${PROJECT_EXTENSION}`,
           )
         : await overwritePickedFile(content);
-      currentFilePath.set(name);
-      this.#project.markSaved();
-      showToast(`Saved to ${name}`, "success");
+      if (!binding) {
+        currentFilePath.set(name);
+        this.#project.markSaved();
+      }
+      showToast(
+        binding
+          ? `Exported a copy to ${name}. Save updates your checkout.`
+          : `Saved to ${name}`,
+        "success",
+      );
     } catch (error) {
       if (isPickerCancel(error)) return;
       console.error("Save As failed:", error);
@@ -158,6 +357,13 @@ export class ProjectFiles {
   }
 
   async rename() {
+    if (get(workspaceDocument)) {
+      showToast(
+        "Use Save to repo folder to create a separately named candidate.",
+        "info",
+      );
+      return;
+    }
     const currentPath = get(currentFilePath);
     if (!currentPath) return;
 
@@ -260,6 +466,7 @@ export class ProjectFiles {
       this.#prefs.value = snapshot.settings;
       this.open(snapshot.project, { saved: false });
       currentFilePath.set(snapshot.currentFilePath);
+      workspaceDocument.set(snapshot.workspaceDocument ?? null);
     } else {
       this.#project.load({
         ...this.#project.doc,
@@ -279,6 +486,7 @@ export class ProjectFiles {
         project: this.current(),
         settings: this.#prefs.settings,
         currentFilePath: this.#filePath.current,
+        workspaceDocument: this.#workspace.current,
       });
     });
     $effect(() => () => save.flush());

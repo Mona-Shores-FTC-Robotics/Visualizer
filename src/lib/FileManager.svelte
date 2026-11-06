@@ -40,15 +40,21 @@
   import { DEFAULT_REF, TEAM_DIR, listTeamFiles } from "./team/teamAutos";
   import { gitHash, gitLinkFor } from "../utils/gitLink";
   import { TEAM_ROBOT } from "./auto/teamRobot";
-  import { listRepoAutos, readRepoAuto, REPO_PP_DIR } from "./repo/repoFolder";
+  import {
+    listRepoAutos,
+    listRepoDrafts,
+    REPO_PP_DIR,
+  } from "./repo/repoFolder";
   import { allowRepoFolder, canPickFolder, repoFolder } from "./repo/repoStore";
   import { blankAuto } from "./simple/steps";
+  import { workspaceDocument } from "./repo/workspaceStore";
 
   interface Props {
     isOpen?: boolean;
     currentProject: () => ProjectDoc;
     applyProject: (doc: ProjectDoc) => void;
     fieldMap: string;
+    onOpenRepo: (name: string) => Promise<boolean>;
   }
 
   let {
@@ -56,6 +62,7 @@
     currentProject,
     applyProject,
     fieldMap,
+    onOpenRepo,
   }: Props = $props();
 
   const project = useProject();
@@ -88,7 +95,7 @@
   }
 
   $effect(() => {
-    if (isOpen && !teamLoaded) void loadTeamFiles();
+    if (isOpen && !teamLoaded && !$repoFolder) void loadTeamFiles();
   });
 
   /**
@@ -106,7 +113,10 @@
     repoError = "";
     if (!folder || folder.permission !== "granted") return;
     try {
-      repoFiles = await listRepoAutos(folder.folder);
+      repoFiles = [
+        ...(await listRepoAutos(folder.folder)),
+        ...(await listRepoDrafts(folder.folder)),
+      ];
     } catch (error) {
       repoError = getErrorMessage(error);
     }
@@ -126,30 +136,7 @@
   }
 
   async function openRepoFile(name: string) {
-    const folder = $repoFolder;
-    if (!folder) return;
-    try {
-      const text = await readRepoAuto(folder.folder, name);
-      if (text === null) {
-        showToast(`${folder.name} has no ${REPO_PP_DIR}/${name}`, "error");
-        return;
-      }
-      const result = parseProject(text, currentProject().robot);
-      if (!result.ok) {
-        showToast(result.error, "error");
-        return;
-      }
-      result.warnings.forEach((warning) => showToast(warning, "warning"));
-      applyProject(result.doc);
-      await browserFileStore.writeFile(name, serializeProject(result.doc));
-      await refreshDirectory();
-      currentFilePath.set(name);
-      project.markSaved();
-      showToast(`Opened ${name} from ${folder.name}`, "success");
-      isOpen = false;
-    } catch (error) {
-      showToast(`Could not open ${name}: ${getErrorMessage(error)}`, "error");
-    }
+    if (await onOpenRepo(name)) isOpen = false;
   }
 
   function openTeamFile(file: string) {
@@ -183,7 +170,11 @@
     try {
       const stored = await browserFileStore.listFiles();
       files = stored
-        .filter((file) => OPENABLE_EXTENSIONS.includes(extension(file.name)))
+        .filter(
+          (file) =>
+            !file.path.startsWith("checkout-") &&
+            OPENABLE_EXTENSIONS.includes(extension(file.name)),
+        )
         .map((file) => ({ ...file, modified: new Date(file.modified) }));
       errorMessage = "";
     } catch (error) {
@@ -193,6 +184,7 @@
   }
 
   async function syncActiveProjectToStorage() {
+    if ($workspaceDocument) return;
     if (!$currentFilePath) return;
     await browserFileStore.writeFile(
       $currentFilePath,
@@ -461,42 +453,47 @@
     </div>
 
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
-      <div class="mb-3 border-b border-border pb-3">
-        <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
-          biobuzz <span class="font-mono font-normal text-body"
-            >{DEFAULT_REF}</span
-          >
-        </h3>
-        <p class="px-2 pb-2 text-xs text-body">
-          The team's Autos. Open one to edit it; Save to GitHub saves it back to
-          biobuzz.
-        </p>
-        {#if teamLoading}
-          <p class="px-2 text-xs text-body">Reading the list from GitHub…</p>
-        {:else if teamError}
-          <p class="px-2 text-xs text-danger">
-            {teamError}
-            <button class="underline" onclick={loadTeamFiles}>Try again</button>
+      {#if !$repoFolder}
+        <div class="mb-3 border-b border-border pb-3">
+          <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
+            GitHub reference <span class="font-mono font-normal text-body"
+              >{DEFAULT_REF}</span
+            >
+          </h3>
+          <p class="px-2 pb-2 text-xs text-body">
+            The team's Autos. Open one to edit it; Save to GitHub saves it back
+            to biobuzz.
           </p>
-        {:else}
-          <div class="flex flex-col gap-px">
-            {#each teamFiles as file (file)}
-              <button
-                type="button"
-                class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
-                title={`Open ${TEAM_DIR}/${file} from biobuzz ${DEFAULT_REF}`}
-                onclick={() => openTeamFile(file)}>{file}</button
+          {#if teamLoading}
+            <p class="px-2 text-xs text-body">Reading the list from GitHub…</p>
+          {:else if teamError}
+            <p class="px-2 text-xs text-danger">
+              {teamError}
+              <button class="underline" onclick={loadTeamFiles}
+                >Try again</button
               >
-            {/each}
-          </div>
-        {/if}
-      </div>
+            </p>
+          {:else}
+            <div class="flex flex-col gap-px">
+              {#each teamFiles as file (file)}
+                <button
+                  type="button"
+                  class="rounded-lg px-2 py-1.5 text-left text-sm text-heading transition hover:bg-base"
+                  title={`Open ${TEAM_DIR}/${file} from biobuzz ${DEFAULT_REF}`}
+                  onclick={() => openTeamFile(file)}>{file}</button
+                >
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
       {#if canPickFolder()}
         <div class="mb-3 border-b border-border pb-3">
           <h3 class="px-2 pb-1 text-xs font-semibold text-heading">
             biobuzz checkout
             {#if $repoFolder}<span class="font-mono font-normal text-body"
-                >{$repoFolder.name}</span
+                >{$repoFolder.name} · {$repoFolder.branch ??
+                  "branch unavailable"}</span
               >{/if}
           </h3>
           {#if !$repoFolder}
@@ -521,7 +518,8 @@
             <p class="px-2 text-xs text-body">No Autos in {REPO_PP_DIR} yet.</p>
           {:else}
             <p class="px-2 pb-2 text-xs text-body">
-              Open one to edit it; Save to repo folder writes it back.
+              Open one to edit it; Save writes its source and Java back to this
+              checkout.
             </p>
             <div class="flex flex-col gap-px">
               {#each repoFiles as file (file)}

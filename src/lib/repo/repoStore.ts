@@ -22,6 +22,7 @@ interface DirHandle {
     options?: { create?: boolean },
   ): Promise<FileHandle>;
   values(): AsyncIterable<DirHandle | FileHandle>;
+  removeEntry(name: string): Promise<void>;
   queryPermission(options: { mode: "read" | "readwrite" }): Promise<Permission>;
   requestPermission(options: {
     mode: "read" | "readwrite";
@@ -47,6 +48,8 @@ interface PickerWindow {
 
 /** The folder in this browser: the handle, as a Folder, and whether it may be used right now. */
 export interface RepoFolder {
+  id: string;
+  branch: string | null;
   name: string;
   folder: Folder;
   /** "granted" writes and reads at once; "prompt" needs {@link allowRepoFolder} from a click. */
@@ -62,6 +65,7 @@ const KEY = "checkout";
 const MODE = { mode: "readwrite" } as const;
 
 let handle: DirHandle | null = null;
+let checkoutId = "";
 
 export function canPickFolder(): boolean {
   return (
@@ -91,6 +95,7 @@ export async function pickRepoFolder(): Promise<RepoFolder> {
     );
   }
   handle = picked;
+  checkoutId = crypto.randomUUID();
   await remember(picked).catch(() => {
     // Storage refused (a private window): the folder lasts this page only.
   });
@@ -103,8 +108,9 @@ export async function loadRepoFolder(): Promise<RepoFolder | null> {
   try {
     const saved = await recall();
     if (!saved) return null;
-    handle = saved;
-    return publish(await saved.queryPermission(MODE));
+    handle = saved.handle;
+    checkoutId = saved.id;
+    return publish(await saved.handle.queryPermission(MODE));
   } catch {
     return null;
   }
@@ -147,10 +153,38 @@ export async function repoSpotsText(): Promise<string | null> {
   }
 }
 
-function publish(permission: Permission): RepoFolder {
-  const current = { name: handle!.name, folder: wrap(handle!), permission };
+async function publish(permission: Permission): Promise<RepoFolder> {
+  const folder = wrap(handle!);
+  const current = {
+    id: checkoutId,
+    branch: permission === "granted" ? await checkoutBranch(folder) : null,
+    name: handle!.name,
+    folder,
+    permission,
+  };
   repoFolder.set(current);
   return current;
+}
+
+/** Read-only: worktree Git pointers may be outside the browser's folder grant. */
+export async function checkoutBranch(folder: Folder): Promise<string | null> {
+  try {
+    const head = (await folder.readText(".git/HEAD"))?.trim();
+    if (head?.startsWith("ref: refs/heads/")) return head.slice(16);
+    return head && /^[a-f0-9]{40,64}$/.test(head)
+      ? `detached ${head.slice(0, 10)}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshRepoBranch(): Promise<void> {
+  const current = get(repoFolder);
+  if (!current || current.permission !== "granted") return;
+  const branch = await checkoutBranch(current.folder);
+  if (get(repoFolder)?.id === current.id && branch !== current.branch)
+    repoFolder.set({ ...current, branch });
 }
 
 function wrap(root: DirHandle): Folder {
@@ -198,6 +232,15 @@ function wrap(root: DirHandle): Folder {
         throw error;
       }
     },
+    async removeText(path) {
+      const parts = path.split("/");
+      const file = parts.pop()!;
+      try {
+        await (await dirOf(parts, false)).removeEntry(file);
+      } catch (error) {
+        if (!notFound(error)) throw error;
+      }
+    },
   };
 }
 
@@ -214,24 +257,34 @@ async function remember(dir: DirHandle): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(dir, KEY);
+    tx.objectStore(STORE).put({ handle: dir, id: checkoutId }, KEY);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
   db.close();
 }
 
-async function recall(): Promise<DirHandle | null> {
+async function recall(): Promise<{ handle: DirHandle; id: string } | null> {
   const db = await openDb();
-  const result = await new Promise<DirHandle | null>((resolve, reject) => {
-    const request = db
-      .transaction(STORE, "readonly")
-      .objectStore(STORE)
-      .get(KEY);
-    request.onsuccess = () =>
-      resolve((request.result as DirHandle | undefined) ?? null);
-    request.onerror = () => reject(request.error);
-  });
+  const result = await new Promise<{ handle: DirHandle; id: string } | null>(
+    (resolve, reject) => {
+      const request = db
+        .transaction(STORE, "readonly")
+        .objectStore(STORE)
+        .get(KEY);
+      request.onsuccess = () => {
+        const saved = request.result;
+        resolve(
+          !saved
+            ? null
+            : saved.handle
+              ? saved
+              : { handle: saved, id: "legacy-checkout" },
+        );
+      };
+      request.onerror = () => reject(request.error);
+    },
+  );
   db.close();
   return result;
 }

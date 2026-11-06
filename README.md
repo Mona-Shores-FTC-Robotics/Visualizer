@@ -8,6 +8,12 @@ Visualizer and is not endorsed by Pedro Pathing.
 
 What the fork adds:
 
+- **Local event workspace.** Open **Workspace**, connect the BIOBUZZ checkout on your event
+  branch (for example Belding), and open an auto with a partner from that same checkout.
+  Save/Ctrl+S writes its `.pp` and Java directly, without GitHub or CI. The header identifies
+  the checkout and save status; tested checkpoints preserve and restore related auto files.
+  See [Working on Belding autos](docs/local-workspace.md) for the workflow and limits.
+
 - **The Auto Builder** (what opens). An Auto as a short list of our robot's steps: a start, then
   Launch all, Drive to a spot, Pick flower, Garden gather, Spin up, Wait (for TIP or CELL up, or
   intake full, at most N s, with an Otherwise list for when it doesn't come) and Park. Each step is

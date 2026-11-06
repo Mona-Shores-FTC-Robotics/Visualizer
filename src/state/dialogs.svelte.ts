@@ -9,6 +9,7 @@ export class Dialogs {
   github = $state(false);
   /** Fork: Save to repo folder (the biobuzz checkout on this laptop). */
   repo = $state(false);
+  workspace = $state(false);
   shareLink = $state<string | null>(null);
   anyOpen = $derived(
     this.fileManager ||
@@ -18,6 +19,7 @@ export class Dialogs {
       this.teamAutos ||
       this.github ||
       this.repo ||
+      this.workspace ||
       this.shareLink !== null,
   );
 }
