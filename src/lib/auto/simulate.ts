@@ -23,6 +23,7 @@ import {
   rowKind,
   timeRowFiresAt,
   type ActionCard,
+  type AfterMsRow,
   type AutoCard,
   type AutoRow,
   type AutoSection,
@@ -80,12 +81,38 @@ export function alongsideSeconds(
 }
 
 /**
+ * When `row`, a time row of `card`, ends a wait begun at `t0`. Fork: with a feeding launch
+ * alongside, the robot holds every time limit while the feeder runs (biobuzz AutoKit.firstOf,
+ * AutoRegistry.holdTimeLimitsWhile), so a limit that falls inside the feed waits for the feed's
+ * end. A limit that passes before the feed starts (the launcher still spinning up) ends the wait
+ * on time, with nothing launched. A trigger row is not held.
+ */
+export function timeRowEndsAt(
+  auto: AutoSection,
+  card: FirstOfCard,
+  row: AfterMsRow,
+  t0: number,
+  timing?: PreviewTiming,
+): number {
+  const limit = timeRowFiresAt(row, t0);
+  if (!card.alongside || !FEEDING_LAUNCHES.has(card.alongside)) return limit;
+  const feedStart = timing?.feedStartsAt?.(card.alongside, t0) ?? t0;
+  const feedEnd = t0 + alongsideSeconds(auto, card, timing, t0);
+  return limit > feedStart - 1e-9 && limit < feedEnd ? feedEnd : limit;
+}
+
+/**
  * Typical timing for the preview (see lib/timing): when each trigger answered ✓ actually becomes
  * true, and how long commands take. Without it a ✓ trigger is true the moment it is asked.
  */
 export interface PreviewTiming {
   /** Seconds a command started at `t0` typically takes, or undefined to use the robot's list. */
   actionSeconds(name: string, t0?: number): number | undefined;
+  /**
+   * When the feeder of a feeding launch started at `t0` begins to run (the launcher is at speed),
+   * or undefined for "at once". From then no time limit ends the launch.
+   */
+  feedStartsAt?(name: string, t0: number): number | undefined;
   /**
    * The first time at or after `t0` that `condition` is true (Infinity: never), or undefined for
    * "at once". `at` is where the robot is when it asks (CellUp is the CELL at its end).
@@ -400,7 +427,7 @@ export function simulateAuto(
       }
       return soonest;
     }
-    return timeRowFiresAt(row, t0);
+    return timeRowEndsAt(auto, card, row, t0, timing);
   };
 
   const whyRow = (card: FirstOfCard, row: AutoRow): string => {
@@ -468,7 +495,7 @@ export function simulateAuto(
     let limitAt: number | null = null;
     for (const row of card.rows) {
       if (!("when" in row)) {
-        const end = timeRowFiresAt(row, t0);
+        const end = timeRowEndsAt(auto, card, row, t0, timing);
         limitAt = limitAt === null ? end : Math.min(limitAt, end);
       }
     }
@@ -871,10 +898,11 @@ export interface WorstCase {
   rows: Map<string, (number | null)[]>;
 }
 
-function waitLimit(card: FirstOfCard, t0: number): number {
+function waitLimit(auto: AutoSection, card: FirstOfCard, t0: number): number {
   let limit = Infinity;
   for (const row of card.rows) {
-    if ("afterMs" in row) limit = Math.min(limit, timeRowFiresAt(row, t0));
+    if ("afterMs" in row)
+      limit = Math.min(limit, timeRowEndsAt(auto, card, row, t0));
   }
   return limit;
 }
@@ -948,12 +976,13 @@ export function worstCase(auto: AutoSection, catalog: PathCatalog): WorstCase {
           recording,
         );
       } else {
-        const limit = waitLimit(card, t);
+        const limit = waitLimit(auto, card, t);
         if (!Number.isFinite(limit)) return Infinity;
         // The trigger may fire as late as the limit; a time row later than the
         // earliest one never wins (null).
         const times = card.rows.map((row) => {
-          const time = "afterMs" in row ? timeRowFiresAt(row, t) : limit;
+          const time =
+            "afterMs" in row ? timeRowEndsAt(auto, card, row, t) : limit;
           return time > limit + 1e-9 ? null : time;
         });
         // The latest any row comes back to the cards after this one…

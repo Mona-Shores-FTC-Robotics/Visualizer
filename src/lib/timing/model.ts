@@ -346,6 +346,11 @@ export function previewTiming(
       }
       return undefined;
     },
+    feedStartsAt(name, t0) {
+      // The feeder runs once the launcher is at speed (the settle is counted with the feed).
+      if (name !== VOLLEY_COMMAND) return undefined;
+      return Math.max(t0, (spunAt ?? t0) + values.spinUpS);
+    },
     trueAt(condition, t0, at) {
       switch (condition) {
         case "CellUp":
