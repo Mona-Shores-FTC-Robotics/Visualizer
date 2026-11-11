@@ -37,7 +37,10 @@ export interface ActionCard {
   id: string;
   kind: "action";
   name: string;
-  /** Seconds before the robot cuts the command off; unset means `DEFAULT_TIMEOUT_S`. */
+  /**
+   * Seconds before the robot cuts the command off; unset means `DEFAULT_TIMEOUT_S`. A feeding
+   * launch is never cut once it feeds: there it only limits the wait for spin-up.
+   */
   timeoutS?: number;
   /** Preview only, from older files: how long it keeps the robot busy. The robot's typical time wins. */
   previewMs?: number;

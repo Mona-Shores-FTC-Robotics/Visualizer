@@ -2,7 +2,7 @@
   import type { PathCatalog } from "../geometry";
   import type { AutoIssue } from "../validate";
   import type { PreviewResult, WorstCase } from "../simulate";
-  import { AUTO_LENGTH_S, commandSeconds } from "../simulate";
+  import { AUTO_LENGTH_S, FEEDING_LAUNCHES, commandSeconds } from "../simulate";
   import type { AutoCard, AutoSection, FirstOfCard } from "../types";
   import { allCards, cardTitle, childLists, describeRow, isPlainWait, rowLabel, rejoinTail } from "../tree";
   import { branchKey, foldedBranches, foldSummary, toggleFolded, unfoldAround } from "../fold";
@@ -215,7 +215,7 @@
       </div>
       <div class="list-item-sub">
         {#if card.kind === "action"}
-          command · ≈{seconds(commandSeconds(auto, card))} · max {seconds(card.timeoutS ?? DEFAULT_TIMEOUT_S)}
+          command · ≈{seconds(commandSeconds(auto, card))} · {FEEDING_LAUNCHES.has(card.name) ? "spin-up wait max" : "max"} {seconds(card.timeoutS ?? DEFAULT_TIMEOUT_S)}
           {#if card.name && !registeredActions.has(card.name)}<span class="auto-bad"> · not registered</span>{/if}
         {:else if card.kind === "path"}
           {@const info = catalog.byId.get(card.lineId)}

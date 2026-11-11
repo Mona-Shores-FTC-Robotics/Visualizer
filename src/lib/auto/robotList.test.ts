@@ -52,6 +52,21 @@ test("command time: the robot's typical time, capped by the step's timeout", () 
   assertEqual(commandSeconds(auto, { ...card, name: "Unknown", previewMs: undefined }), 0);
 });
 
+test("command time: a feeding launch runs its whole feed, whatever its time limit", () => {
+  const auto = clone(loadSample().auto);
+  auto.registry.typicalS = { LaunchAll: 4, LaunchOne: 0.5, PickFlower: 4.4 };
+  const launch: ActionCard = { id: "x", kind: "action", name: "LaunchAll", timeoutS: 1 };
+  assertEqual(commandSeconds(auto, launch), 4, "the limit guards the spin-up wait, not the feed");
+  assertEqual(commandSeconds(auto, { ...launch, timeoutS: 0.5 }), 4);
+  assertEqual(commandSeconds(auto, { ...launch, name: "LaunchOne", timeoutS: 0.2 }), 0.5);
+  // The what-if volley time reaches a time-limited launch, past the default timeout too.
+  const timing = { actionSeconds: (name: string) => (name === "LaunchAll" ? 6 : undefined), trueAt: () => undefined };
+  assertEqual(commandSeconds(auto, launch, timing, 0), 6);
+  assertEqual(commandSeconds(auto, { ...launch, timeoutS: undefined }, timing, 0), 6);
+  // A FLOWER pick's limit still ends it.
+  assertEqual(commandSeconds(auto, { ...launch, name: "PickFlower", timeoutS: 2 }), 2);
+});
+
 test("robot list: an Auto that lists nothing starts with our robot's, LaunchAll and PickFlower first", () => {
   const fresh = createEmptyAuto();
   assertEqual(fresh.registry.actions.slice(0, 2), ["LaunchAll", "PickFlower"]);

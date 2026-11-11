@@ -31,9 +31,19 @@ import {
 } from "./types";
 
 /**
+ * Fork: the robot's feeding launches (biobuzz LaunchCards). No time limit ends one once its feeder
+ * runs (AutoRegistry.holdTimeLimitsWhile): the limit only guards the wait for spin-up, and the feed
+ * then runs its own set time, so the preview never shortens one to its limit.
+ */
+export const FEEDING_LAUNCHES: ReadonlySet<string> = new Set([
+  "LaunchAll",
+  "LaunchOne",
+]);
+
+/**
  * How long a command step keeps the robot busy in the preview, started at `t0`: the timing model's
  * answer, else the command's typical time from the robot's list, else an older file's preview
- * time, else instant; never past its timeout.
+ * time, else instant; never past its timeout, unless it is a feeding launch.
  */
 export function commandSeconds(
   auto: AutoSection,
@@ -45,12 +55,14 @@ export function commandSeconds(
     timing?.actionSeconds(card.name, t0) ??
     auto.registry.typicalS?.[card.name] ??
     (card.previewMs ?? 0) / 1000;
+  if (FEEDING_LAUNCHES.has(card.name)) return typical;
   return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
 }
 
 /**
  * How long a wait's `alongside` command runs in the preview: its typical time, capped at the
- * default timeout (the robot runs it with `kit.command(name)`). 0 with none.
+ * default timeout (the robot runs it with `kit.command(name)`) unless it is a feeding launch.
+ * 0 with none.
  */
 export function alongsideSeconds(
   auto: AutoSection,
@@ -63,6 +75,7 @@ export function alongsideSeconds(
     timing?.actionSeconds(card.alongside, t0) ??
     auto.registry.typicalS?.[card.alongside] ??
     0;
+  if (FEEDING_LAUNCHES.has(card.alongside)) return typical;
   return Math.min(typical, DEFAULT_TIMEOUT_S);
 }
 
