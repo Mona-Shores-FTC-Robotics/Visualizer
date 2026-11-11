@@ -223,7 +223,7 @@
       </div>
       <div class={CELL_CLASS}>
         <label class={LABEL_CLASS} for="auto-command-timeout"
-          title="The robot cuts the command off after this long if it has not finished.">Timeout (s)</label>
+          title="The robot cuts the command off after this long if it has not finished. A launch that is already feeding is never cut: for a launch this only limits the wait for spin-up.">Timeout (s)</label>
         <input
           id="auto-command-timeout"
           class={FIELD_CLASS}

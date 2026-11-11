@@ -325,13 +325,13 @@ export function previewTiming(
   // When the launcher was first asked to spin (SpinUp or a LaunchAll); it is left spinning after.
   let spunAt: number | null = null;
   return {
-    commandRan(name, t0) {
+    commandRan(name, t0, _t1, fed = true) {
       if (
         (name === SPIN_UP_COMMAND || name === VOLLEY_COMMAND) &&
         spunAt === null
       )
         spunAt = t0;
-      if (name === VOLLEY_COMMAND) full = false;
+      if (name === VOLLEY_COMMAND && fed) full = false;
     },
     becameTrue(condition) {
       if (condition === "IntakeFull") full = true;
@@ -345,6 +345,11 @@ export function previewTiming(
         return Math.max(0, ready - t0) + values.volleyS;
       }
       return undefined;
+    },
+    feedStartsAt(name, t0) {
+      // The feeder runs once the launcher is at speed (the settle is counted with the feed).
+      if (name !== VOLLEY_COMMAND) return undefined;
+      return Math.max(t0, (spunAt ?? t0) + values.spinUpS);
     },
     trueAt(condition, t0, at) {
       switch (condition) {

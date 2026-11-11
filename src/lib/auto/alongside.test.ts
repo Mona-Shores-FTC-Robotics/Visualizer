@@ -46,6 +46,46 @@ test("a time limit shorter than the command stops the command, and the log says 
     JSON.stringify(result.log.filter((e) => e.cardId === "did-tip")));
 });
 
+test("a time limit inside a feeding launch's feed waits for the feed to end", () => {
+  const auto = sampleWith((card, a) => {
+    card.alongside = "LaunchAll";
+    a.registry.typicalS!.LaunchAll = 3.0;
+  });
+  const { result } = run(auto, not("HiveTipped"));
+  assertEqual(result.taken.get("did-tip"), 1); // still the 1500 ms row, held to the feed's end
+  assert(!result.log.some((e) => e.text.includes("LaunchAll stopped")), "the launch is not cut");
+  const launch = result.launches.find((l) => l.cardId === "did-tip")!;
+  assert(Math.abs(launch.t1 - launch.t0 - 3.0) < 1e-9, `${launch.t0} → ${launch.t1}`);
+  const wait = result.waits.find((w) => w.cardId === "did-tip")!;
+  assert(Math.abs(wait.t1 - wait.t0 - 3.0) < 1e-9, "3 s, not 1.5 s");
+  assert(Math.abs(wait.limitAt! - launch.t1) < 1e-9, "the timeline's limit is the held one");
+});
+
+test("a time limit that passes before the feed starts ends the wait on time, nothing launched", () => {
+  const auto = sampleWith((card, a) => {
+    card.alongside = "LaunchAll";
+    a.registry.typicalS!.LaunchAll = 3.0;
+  });
+  const sample = loadSample();
+  const catalog = buildPathCatalog(sample.startPoint, sample.lines, sample.settings);
+  // The launcher needs 2 s to reach speed: the 1500 ms limit comes first.
+  const spinning = {
+    actionSeconds: (name: string) => (name === "LaunchAll" ? 5 : undefined),
+    feedStartsAt: (_name: string, t0: number) => t0 + 2,
+    trueAt: () => undefined,
+  };
+  const result = simulateAuto(auto, catalog, sample.startPoint, not("HiveTipped"), spinning);
+  const wait = result.waits.find((w) => w.cardId === "did-tip")!;
+  assert(Math.abs(wait.t1 - wait.t0 - 1.5) < 1e-9, `${wait.t0} → ${wait.t1}`);
+  assertEqual(result.launches.find((l) => l.cardId === "did-tip")!.unfired, true);
+  // At speed after 1 s, the same limit falls inside the feed and is held to its end.
+  const ready = { ...spinning, feedStartsAt: (_name: string, t0: number) => t0 + 1 };
+  const held = simulateAuto(auto, catalog, sample.startPoint, not("HiveTipped"), ready);
+  const heldWait = held.waits.find((w) => w.cardId === "did-tip")!;
+  assert(Math.abs(heldWait.t1 - heldWait.t0 - 5) < 1e-9, `${heldWait.t0} → ${heldWait.t1}`);
+  assertEqual(held.launches.find((l) => l.cardId === "did-tip")!.unfired, undefined);
+});
+
 test("a command alongside survives a save and reload", () => {
   const auto = sampleWith((card) => {
     card.alongside = "ShootAll";
