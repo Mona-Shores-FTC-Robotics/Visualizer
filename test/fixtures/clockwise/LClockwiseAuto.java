@@ -21,7 +21,7 @@ public final class LClockwiseAuto {
     public static final String SOURCE = "l-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-11|4:46PM";
+    public static final String SAVED = "11-11|5:39PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -50,7 +50,7 @@ public final class LClockwiseAuto {
 
         // Named points (x, y in inches, heading in degrees, Pedro field frame).
         Pose leftStart = p.of(62.3, 133.8, 270);
-        Pose leftLaunchCatch = p.of(57.5, 123.5, 273.4);
+        Pose leftPairCatch = p.of(61.5, 123.5, 267.6);
         Pose rightLaunchCatch = p.of(57.5, 18, 91.9);
         Pose gardenStaging = p.of(11.5, 22.1, 270);
         Pose wallFlowerStaging = p.of(23.1, 47.2, 180);
@@ -61,7 +61,7 @@ public final class LClockwiseAuto {
         Pose point4 = p.of(58.3, 42, -90);
         Pose point4Control1 = p.of(58.7683, 101.5686, 0);
         Pose point4Control2 = p.of(65.2005, 71.9052, 0);
-        Pose point4Segment1Start = p.of(58.3, 42, 273.4);
+        Pose point4Segment1Start = p.of(58.3, 42, 267.6);
         Pose point4Segment1End = p.of(58.3, 42, 270);
         Pose point4Segment2Heading = p.of(58.3, 42, 270);
         Pose point5Start = p.of(58.3, 42, 270);
@@ -80,7 +80,7 @@ public final class LClockwiseAuto {
         Pose point12Control1 = p.of(58.7683, 101.5686, 0);
         Pose point12Control2 = p.of(65.2005, 71.9052, 0);
         Pose point12Control3 = p.of(60.6002, 40.901, 0);
-        Pose point12Segment1Start = p.of(56.1, 26, 273.4);
+        Pose point12Segment1Start = p.of(56.1, 26, 267.6);
         Pose point12Segment1End = p.of(56.1, 26, 270);
         Pose point12Segment2Heading = p.of(56.1, 26, 270);
         Pose point14 = p.of(33, 114, 90);
@@ -104,7 +104,7 @@ public final class LClockwiseAuto {
         Pose underTheHiveToTheLaneSEnd = p.of(60.5, 34, -90);
         Pose underTheHiveToTheLaneSEndControl1 = p.of(58.7683, 101.5686, 0);
         Pose underTheHiveToTheLaneSEndControl2 = p.of(65.2005, 71.9052, 0);
-        Pose underTheHiveToTheLaneSEndSegment1Start = p.of(60.5, 34, 273.4);
+        Pose underTheHiveToTheLaneSEndSegment1Start = p.of(60.5, 34, 267.6);
         Pose underTheHiveToTheLaneSEndSegment1End = p.of(60.5, 34, 270);
         Pose underTheHiveToTheLaneSEndSegment2Heading = p.of(60.5, 34, 270);
         Pose laneSEndParkToLeftParkControl1 = p.of(33, 40, 0);
@@ -131,15 +131,15 @@ public final class LClockwiseAuto {
         Pose flowerToRightLaunchOffsetControl2 = p.of(33, 22, 0);
 
         // Paths, written as the stock Visualizer export writes them.
-        Path openToLeftLaunchCatch = Paths.line(leftStart, leftLaunchCatch).linear(leftStart, leftLaunchCatch);
-        Path catchParkToLeftPark = Paths.line(leftLaunchCatch, leftPark).linear(leftLaunchCatch, leftPark);
-        Path underTheHiveToRightLaunchCatch = Paths.path(Paths.curve(leftLaunchCatch, point4Control1, point4Control2, point4).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point4Segment1Start, point4Segment1End)).until(1, Interpolator.constant(point4Segment2Heading))), Paths.line(point5Start, point5).linear(point5Start, point5), Paths.line(point5, rightLaunchCatch).constant(rightLaunchCatch));
+        Path openToLeftPairCatch = Paths.line(leftStart, leftPairCatch).linear(leftStart, leftPairCatch);
+        Path catchParkToLeftPark = Paths.line(leftPairCatch, leftPark).linear(leftPairCatch, leftPark);
+        Path underTheHiveToRightLaunchCatch = Paths.path(Paths.curve(leftPairCatch, point4Control1, point4Control2, point4).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point4Segment1Start, point4Segment1End)).until(1, Interpolator.constant(point4Segment2Heading))), Paths.line(point5Start, point5).linear(point5Start, point5), Paths.line(point5, rightLaunchCatch).constant(rightLaunchCatch));
         Path rightCatchParkToLeftPark = Paths.path(Paths.curve(rightLaunchCatch, point7Control1, point7Control2, point7).linear(rightLaunchCatch, point7), Paths.line(point7, point8).constant(point8), Paths.curve(point8, point9Control1, point9Control2, point9).constant(point9), Paths.curve(point10Start, point10Control1, point10Control2, leftPark).linear(point10Start, leftPark));
-        Path underTheHiveToGardenStaging = Paths.path(Paths.curve(leftLaunchCatch, point12Control1, point12Control2, point12Control3, point12).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point12Segment1Start, point12Segment1End)).until(1, Interpolator.constant(point12Segment2Heading))), Paths.line(point12, gardenStaging).constant(gardenStaging));
+        Path underTheHiveToGardenStaging = Paths.path(Paths.curve(leftPairCatch, point12Control1, point12Control2, point12Control3, point12).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point12Segment1Start, point12Segment1End)).until(1, Interpolator.constant(point12Segment2Heading))), Paths.line(point12, gardenStaging).constant(gardenStaging));
         Path gardenParkToLeftPark = Paths.path(Paths.curve(gardenStaging, point14Control1, point14Control2, point14).linear(gardenStaging, point14), Paths.curve(point15Start, point15Control1, point15Control2, leftPark).linear(point15Start, leftPark));
         Path gardenForwardExitToRightLaunchOffset = Paths.curve(gardenStaging, gardenForwardExitToRightLaunchOffsetControl1, gardenForwardExitToRightLaunchOffsetControl2, gardenForwardExitToRightLaunchOffsetControl3, rightLaunchOffset).tangent();
         Path outsideLaneToLeftPark = Paths.path(Paths.curve(rightLaunchOffset, point18Control1, point18Control2, point18).heading(Interpolator.piecewise().until(0.2, Interpolator.linear(point18Segment1Start, point18Segment1End)).until(1, Interpolator.constant(point18Segment2Heading))), Paths.curve(point19Start, point19Control1, point19Control2, leftPark).linear(point19Start, leftPark));
-        Path underTheHiveToTheLaneSEndPath = Paths.curve(leftLaunchCatch, underTheHiveToTheLaneSEndControl1, underTheHiveToTheLaneSEndControl2, underTheHiveToTheLaneSEnd).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(underTheHiveToTheLaneSEndSegment1Start, underTheHiveToTheLaneSEndSegment1End)).until(1, Interpolator.constant(underTheHiveToTheLaneSEndSegment2Heading)));
+        Path underTheHiveToTheLaneSEndPath = Paths.curve(leftPairCatch, underTheHiveToTheLaneSEndControl1, underTheHiveToTheLaneSEndControl2, underTheHiveToTheLaneSEnd).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(underTheHiveToTheLaneSEndSegment1Start, underTheHiveToTheLaneSEndSegment1End)).until(1, Interpolator.constant(underTheHiveToTheLaneSEndSegment2Heading)));
         Path laneSEndParkToLeftPark = Paths.curve(underTheHiveToTheLaneSEnd, laneSEndParkToLeftParkControl1, laneSEndParkToLeftParkControl2, leftPark).heading(Interpolator.piecewise().until(0.3, Interpolator.linear(laneSEndParkToLeftParkSegment1Start, laneSEndParkToLeftParkSegment1End)).until(0.8, Interpolator.constant(laneSEndParkToLeftParkSegment2Heading)).until(1, Interpolator.linear(laneSEndParkToLeftParkSegment3Start, leftPark)));
         Path toWallFlowerStaging = Paths.curve(linkNeverDriven_5, toWallFlowerStagingControl1, toWallFlowerStagingControl2, toWallFlowerStagingControl3, wallFlowerStaging).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(toWallFlowerStagingSegment1Start, wallFlowerStaging)).until(1, Interpolator.constant(wallFlowerStaging)));
         Path flowerParkToLeftPark = Paths.path(Paths.curve(wallFlowerStaging, point25Control1, point25Control2, point25).heading(Interpolator.piecewise().until(0.25, Interpolator.linear(point25Segment1Start, point25Segment1End)).until(1, Interpolator.constant(point25Segment2Heading))), Paths.curve(point26Start, point26Control1, point26Control2, leftPark).linear(point26Start, leftPark));
@@ -147,7 +147,7 @@ public final class LClockwiseAuto {
 
         return kit.sequence(
                 kit.command("SpinUp"),
-                kit.path("open to LEFT_LAUNCH_CATCH", openToLeftLaunchCatch, 1, catchParkToLeftPark, 1.9),
+                kit.path("open to LEFT_PAIR_CATCH", openToLeftPairCatch, 1, catchParkToLeftPark, 2),
                 kit.firstOf("L1: LEFT up by 9.5 s, otherwise cross and finish TIP 1 at RIGHT",
                         kit.shotLimit(kit.seconds("T1 LEFT up by", 9.5)).then(
                                 kit.guarded("Timed out", rightCatchParkToLeftPark, 3.8,
