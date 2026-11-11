@@ -75,6 +75,8 @@
       step.condition && NOT_SENSED_YET.includes(step.condition)
         ? " · timed on the robot for now"
         : "";
+    // Fork: a route choice is no wait: the drive team picks the leg in init.
+    if (step.legs) return `picked in init: ${step.legs.join(" or ")}`;
     const limit = step.limitOnMatchClock
       ? `until ${step.limitS} s on the match clock`
       : `up to ${step.limitS} s`;
@@ -166,7 +168,8 @@
             {#if step.miss}
               <span
                 class="ml-1 rounded-full border border-warning px-1.5 text-warning"
-                >if it doesn't come: {step.miss.length} steps</span
+                >{step.legs ? "the other leg" : "if it doesn't come"}: {step.miss
+                  .length} steps</span
               >
             {/if}
           </span>

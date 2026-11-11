@@ -393,6 +393,64 @@
         default.</span
       >
     </label>
+    <!-- Fork: a stop that shoots by the camera or the timer, and a route choice (types.ts). -->
+    <label
+      class="flex items-start gap-2 text-[11px] text-heading"
+      title="By the camera the trigger row is 'yes' and the match-clock row 'no'. With the INIT menu's shot trigger on the timer, the robot cannot see the HIVE: the trigger row fires at the time and the time row never does."
+    >
+      <input
+        id="auto-firstof-shot"
+        type="checkbox"
+        class="mt-0.5"
+        checked={card.shot === true}
+        onchange={(e) => {
+          const on = e.currentTarget.checked;
+          edit((c) => {
+            if (c.kind !== "firstOf") return;
+            if (on) c.shot = true;
+            else delete c.shot;
+          });
+        }}
+      />
+      <span
+        >A stop that shoots by the camera or the timer: "is this CELL up by
+        this time?" (the drive team picks which in init).</span
+      >
+    </label>
+    <label
+      class="block space-y-1 text-[11px]"
+      title="Makes this card a choice between two legs, picked on the INIT menu under this name. The trigger row's steps are the drawing's leg, the time row's the other; each row's name is its choice. Both legs end on the same spot, and the steps after this card follow either."
+    >
+      <span class="text-body">Route choice on the INIT menu (its name, or empty for a wait)</span>
+      <input
+        id="auto-firstof-choice"
+        class={FIELD_CLASS}
+        type="text"
+        placeholder="Pickup"
+        value={card.choice ?? ""}
+        onchange={(e) => {
+          const name = e.currentTarget.value.trim();
+          edit((c) => {
+            if (c.kind !== "firstOf") return;
+            if (!name) {
+              delete c.choice;
+              return;
+            }
+            c.choice = name;
+            // The legs: the trigger row names the option (the preview's switch picks the leg).
+            for (const r of c.rows) {
+              if ("when" in r) r.when = [name];
+              else {
+                r.afterMs = 0;
+                delete r.matchClock;
+                delete r.adjustable;
+                delete r.option;
+              }
+            }
+          });
+        }}
+      />
+    </label>
     <div class="space-y-2">
       {#each card.rows as row, rowIndex (rowIndex)}
         {@const kind = rowKind(row)}
@@ -438,6 +496,50 @@
               </label>
             {/if}
           </div>
+          {#if kind === "afterMs" && !card.choice}
+            {@const limit = row as { matchClock?: boolean; option?: string }}
+            <!-- Fork: a time on the match clock, and its row on the INIT menu (types.ts). -->
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <label class="flex items-center gap-2 text-heading" title="The time is a second on the match clock, however late the wait began, not a time since it began.">
+                <input
+                  type="checkbox"
+                  checked={limit.matchClock === true}
+                  onchange={(e) => {
+                    const on = e.currentTarget.checked;
+                    editRow(rowIndex, (r) => {
+                      if (!("afterMs" in r)) return;
+                      if (on) r.matchClock = true;
+                      else {
+                        delete r.matchClock;
+                        delete r.adjustable;
+                        delete r.option;
+                      }
+                    });
+                  }}
+                />
+                <span>On the match clock</span>
+              </label>
+              {#if limit.matchClock}
+                <label class="space-y-1" title="With a name, this time is a row of the INIT menu: the drive team may set it, half a second a press. Two waits with the same name share one time.">
+                  <span class="text-body">INIT menu name</span>
+                  <input
+                    class={FIELD_CLASS}
+                    type="text"
+                    placeholder="(not on the menu)"
+                    value={limit.option ?? ""}
+                    onchange={(e) => {
+                      const name = e.currentTarget.value.trim();
+                      editRow(rowIndex, (r) => {
+                        if (!("afterMs" in r)) return;
+                        if (name) r.option = name;
+                        else delete r.option;
+                      });
+                    }}
+                  />
+                </label>
+              {/if}
+            </div>
+          {/if}
           {#if kind === "when"}
             <div class="space-y-1">
               <span class="text-body">Trigger</span>

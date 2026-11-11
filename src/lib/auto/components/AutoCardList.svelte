@@ -227,7 +227,11 @@
         {:else if card.kind === "rejoin"}
           via {pathName(card.lineId)} · then the steps after that stop
         {:else if card.kind === "firstOf"}
-          {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}{#if card.partnerWait}&nbsp;· partner wait{/if}
+          {#if card.choice}
+            route choice in init, "{card.choice}": {card.rows.map((row) => row.label ?? "?").join(" or ")}
+          {:else}
+            {isPlainWait(card) ? "wait for the first of" : "first of"}: {firstOfSummary(card)}{#if card.alongside}{` · while ${card.alongside}`}{/if}{#if card.partnerWait}&nbsp;· partner wait{/if}{#if card.shot}&nbsp;· by camera or timer{/if}
+          {/if}
         {/if}
       </div>
     </button>

@@ -10,7 +10,9 @@ import { basename, dirname, join, resolve } from "node:path";
 
 const [input, checkoutArg, sub = ""] = process.argv.slice(2);
 if (!input || !checkoutArg) {
-  console.error("usage: node scripts/save-auto.mjs <file.pp> <biobuzz checkout> [drafts|partners]");
+  console.error(
+    "usage: node scripts/save-auto.mjs <file.pp> <biobuzz checkout> [drafts|partners]",
+  );
   process.exit(2);
 }
 const checkout = resolve(checkoutArg);
@@ -26,17 +28,25 @@ let code = 0;
 try {
   const load = (path) => server.ssrLoadModule(path);
   const { DEFAULT_SETTINGS } = await load("/src/config/index.ts");
-  const { projectFromJson, robotConfigOf, serializeProject } = await load("/src/io/index.ts");
+  const { projectFromJson, robotConfigOf, serializeProject } =
+    await load("/src/io/index.ts");
   const { layOutDoc } = await load("/src/lib/auto/links.ts");
-  const { generateAutoJavaFromText } = await load("/src/lib/codegen/auto/fromFile.ts");
-  const { GENERATED_DIRS, PP_DIRS, generatedPathFor } = await load("/src/lib/sim/biobuzz.ts");
+  const { generateAutoJavaFromText } = await load(
+    "/src/lib/codegen/auto/fromFile.ts",
+  );
+  const { GENERATED_DIRS, PP_DIRS, generatedPathFor } = await load(
+    "/src/lib/sim/biobuzz.ts",
+  );
 
   const name = basename(input);
   const data = JSON.parse(readFileSync(input, "utf8"));
   const loaded = projectFromJson(data, robotConfigOf(DEFAULT_SETTINGS));
   if (!loaded.ok) throw new Error(loaded.error);
   loaded.warnings.forEach((warning) => console.warn(`load: ${warning}`));
-  const doc = layOutDoc(loaded.doc, { ...DEFAULT_SETTINGS, ...loaded.doc.robot });
+  const doc = layOutDoc(loaded.doc, {
+    ...DEFAULT_SETTINGS,
+    ...loaded.doc.robot,
+  });
   const text = serializeProject(doc, { pretty: true });
   const ppPath = `${PP_DIRS[0]}${sub ? `/${sub}` : ""}/${name}`;
   const result = generateAutoJavaFromText(text, name);
@@ -54,7 +64,10 @@ try {
       }
     });
     const javaPath = generatedPathFor(ppPath, result.fileName, existing);
-    for (const [path, body] of [[ppPath, text], [javaPath, result.source]]) {
+    for (const [path, body] of [
+      [ppPath, text],
+      [javaPath, result.source],
+    ]) {
       mkdirSync(dirname(join(checkout, path)), { recursive: true });
       writeFileSync(join(checkout, path), body);
       console.log(`wrote ${path}`);

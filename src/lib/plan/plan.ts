@@ -34,6 +34,8 @@ export interface PlanStep {
   limitS?: number;
   /** Fork: `limitS` is a time on the match clock ("until 8.5 s"), not since the wait began. */
   limitOnMatchClock?: boolean;
+  /** Fork: a route choice (types.ts FirstOfCard.choice): its legs' names, the drawing's first. */
+  legs?: string[];
   /** Set on the wait that ends a chapter: "TIP 1". */
   tip?: string;
   /** Set on a wait that branches: what happens when the condition never comes. */
@@ -94,6 +96,13 @@ function waitStep(card: FirstOfCard): PlanStep {
     condition,
     limitS: time ? time.afterMs / 1000 : undefined,
     ...(time?.matchClock ? { limitOnMatchClock: true } : {}),
+    ...(card.choice
+      ? {
+          legs: [...card.rows]
+            .sort((a, b) => ("when" in a ? 0 : 1) - ("when" in b ? 0 : 1))
+            .map((row) => row.label ?? "?"),
+        }
+      : {}),
   };
 }
 
