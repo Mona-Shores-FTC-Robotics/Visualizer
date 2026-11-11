@@ -97,6 +97,23 @@ export interface FirstOfCard {
    */
   partnerWait?: true;
   /**
+   * Fork: this card is **a route choice**, not a wait: the drive team picks one of its two rows in
+   * INIT (biobuzz InitOptions), and the robot drives that row's cards, then goes on with the cards
+   * after it. The value is the option's name on the INIT menu ("Pickup"); each row's `label` is its
+   * choice's name ("WALL_FLOWER", "GARDEN"). The `when` row is the drawing's default and names the
+   * option as its trigger, so the preview's switch for it picks the leg; the `afterMs` row (0) is the
+   * other. Both legs end on the same spot. Exported as `kit.route(option, index, () -> card)` cards.
+   */
+  choice?: string;
+  /**
+   * Fork: this wait is **a stop that shoots by the camera or the timer** (biobuzz
+   * `AutoOption.SHOT_TRIGGER`): "is this CELL up by this time?". By the camera its trigger row is
+   * yes and its match-clock row is no; on the timer the robot cannot see the HIVE, so the trigger
+   * row fires at the time and the time row never does. Exported as `kit.shotWhen` and
+   * `kit.shotLimit`. Only ever `true`.
+   */
+  shot?: true;
+  /**
    * What the robot tries when the trigger doesn't come: a ladder of plays, then park (see
    * lib/ladder). When set, the time-limit row's cards and the paths they drive are built from it
    * by the editor, and rebuilt after every edit; the file still holds them, so the export, the
@@ -167,11 +184,30 @@ export type AfterMsRow = RowCommon & {
    * the D-pad, plus the TIP lag). Only on a match-clock limit, and on one wait per Auto.
    */
   adjustable?: boolean;
+  /**
+   * Fork: this match-clock time is a row of the INIT menu under this name ("T2 LEFT up by"): the
+   * drive team may set it as it is, half a second a press (biobuzz `AutoOption.time`). Any number
+   * of waits may have one; two rows with the same name are the same time. Not the partner wait.
+   */
+  option?: string;
 };
 
 export type AutoRow = WhenRow | AfterMsRow;
 
 export type RowKind = "when" | "afterMs";
+
+/**
+ * Fork: the Auto this one is drawn to run beside, shown on the robot's INIT page so the two
+ * robots' settings match (biobuzz `AutoOption.partner`).
+ */
+export interface PartnerNote {
+  /** The partner's Auto, as its drive team selects it ("L-Clockwise"). */
+  auto: string;
+  /** The route choice (`FirstOfCard.choice`) the partner's setting follows, if any. */
+  follows?: string;
+  /** What the partner's same option must be set to, for each of that choice's rows in order. */
+  settings?: string[];
+}
 
 export interface AutoSection {
   version: typeof AUTO_FORMAT_VERSION;
@@ -217,6 +253,8 @@ export interface AutoSection {
    * every park path to the one picked, so a partner parking where we planned to is no problem.
    */
   parkChoices?: string[];
+  /** Fork: the Auto this one runs beside, for the INIT page (see `PartnerNote`). */
+  partner?: PartnerNote;
   /** The plays this Auto's ladders use, by id (see `FirstOfCard.ladder`). */
   plays?: Record<string, Play>;
   cards: AutoCard[];
