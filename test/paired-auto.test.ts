@@ -83,7 +83,7 @@ describe("a paired Auto", () => {
     const java = readFileSync(`${DIR}/RClockwiseAuto.java`, "utf8");
     const options = java.split("\n").find((l) => l.includes("OPTIONS ="))!;
     expect(options).toContain(
-      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 18)',
+      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 21)',
     );
     expect(options).toContain(
       'AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")',
@@ -110,10 +110,10 @@ describe("a paired Auto", () => {
   it("writes a stop that shoots by camera or timer with both rows on its time", () => {
     const java = readFileSync(`${DIR}/RClockwiseAuto.java`, "utf8");
     expect(java).toContain(
-      'kit.shotLimit(kit.seconds("T2 LEFT up by", 18)).then(',
+      'kit.shotLimit(kit.seconds("T2 LEFT up by", 21)).then(',
     );
     expect(java).toContain(
-      'kit.shotWhen("LeftCellUp", kit.seconds("T2 LEFT up by", 18)).then(',
+      'kit.shotWhen("LeftCellUp", kit.seconds("T2 LEFT up by", 21)).then(',
     );
     // A clock gate is an ordinary wait on Always: its time is on the menu too.
     expect(java).toContain(

@@ -21,7 +21,7 @@ public final class RClockwiseAuto {
     public static final String SOURCE = "r-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-11|12:28PM";
+    public static final String SAVED = "11-11|1:20PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -33,7 +33,7 @@ public final class RClockwiseAuto {
     public static final String DRAWN_FOR = "RED";
 
     /** What the drive team may change during INIT, on gamepad 1's D-pad; nothing changed, the Auto runs as drawn. */
-    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 18), AutoOption.time("TS scoring FLOWER by", 19.4), AutoOption.time("T3 RIGHT up by", 22.3), AutoOption.time("T3b LEFT shot by", 22.8), AutoOption.time("TR park at", 26.8), AutoOption.time("T3c cross by", 17.9), AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")};
+    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 21), AutoOption.time("TS scoring FLOWER by", 19.4), AutoOption.time("T3 RIGHT up by", 22.3), AutoOption.time("T3b LEFT shot by", 22.8), AutoOption.time("TR park at", 26.8), AutoOption.time("T3c cross by", 17.9), AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")};
 
     /** Where the robot starts, for the given alliance. */
     public static Pose startPose(boolean rotated) {
@@ -102,20 +102,21 @@ public final class RClockwiseAuto {
         Pose point20Segment1Start = p.of(62, 44, 273.4);
         Pose point20Segment1End = p.of(62, 44, 270);
         Pose point20Segment2Heading = p.of(62, 44, 270);
-        Pose point21Segment1Start = p.of(63, 18, 270);
-        Pose point22 = p.of(56, 41.5, 180);
-        Pose point22Control1 = p.of(63, 34, 0);
-        Pose point22Control2 = p.of(61, 41.5, 0);
-        Pose point22Segment1Heading = p.of(56, 41.5, 99.9);
-        Pose point22Segment2Start = p.of(56, 41.5, 99.9);
-        Pose point22Segment2End = p.of(56, 41.5, 180);
-        Pose point23 = p.of(33, 41.5, 180);
-        Pose point24Control1 = p.of(30, 65, 0);
-        Pose point24Control2 = p.of(30, 87, 0);
-        Pose point24Segment1Start = p.of(14.5, 95.7, 180);
-        Pose point24Segment1End = p.of(14.5, 95.7, 90);
-        Pose point24Segment2Heading = p.of(14.5, 95.7, 90);
-        Pose point24Segment3Start = p.of(14.5, 95.7, 90);
+        Pose point21Start = p.of(62, 44, 270);
+        Pose point21 = p.of(62.8, 24, 99.9);
+        Pose point23 = p.of(56, 41.5, 180);
+        Pose point23Control1 = p.of(63, 34, 0);
+        Pose point23Control2 = p.of(61, 41.5, 0);
+        Pose point23Segment1Heading = p.of(56, 41.5, 99.9);
+        Pose point23Segment2Start = p.of(56, 41.5, 99.9);
+        Pose point23Segment2End = p.of(56, 41.5, 180);
+        Pose point24 = p.of(33, 41.5, 180);
+        Pose point25Control1 = p.of(30, 65, 0);
+        Pose point25Control2 = p.of(30, 87, 0);
+        Pose point25Segment1Start = p.of(14.5, 95.7, 180);
+        Pose point25Segment1End = p.of(14.5, 95.7, 90);
+        Pose point25Segment2Heading = p.of(14.5, 95.7, 90);
+        Pose point25Segment3Start = p.of(14.5, 95.7, 90);
 
         // Paths, written as the stock Visualizer export writes them.
         Path toWallFlowerStaging = Paths.line(rightStart, wallFlowerStaging).linear(rightStart, wallFlowerStaging);
@@ -129,8 +130,8 @@ public final class RClockwiseAuto {
         Path scoringFlowerParkToRightPark = Paths.curve(scoringFlowerStaging, scoringFlowerParkToRightParkControl1, scoringFlowerParkToRightParkControl2, rightPark).linear(scoringFlowerStaging, rightPark);
         Path forwardTurnToLeftLaunchCatch = Paths.curve(scoringFlowerStaging, forwardTurnToLeftLaunchCatchControl1, forwardTurnToLeftLaunchCatchControl2, leftLaunchCatch).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(forwardTurnToLeftLaunchCatchSegment1Start, forwardTurnToLeftLaunchCatchSegment1End)).until(1, Interpolator.linear(forwardTurnToLeftLaunchCatchSegment2Start, leftLaunchCatch)));
         Path catchParkToRightPark = Paths.path(Paths.curve(leftLaunchCatch, point16Control1, point16).linear(leftLaunchCatch, point16), Paths.line(point16, point17).constant(point17), Paths.line(point18Start, rightPark).linear(point18Start, rightPark));
-        Path underTheHiveToRightPairCatch = Paths.path(Paths.curve(leftLaunchCatch, point20Control1, point20Control2, point20).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point20Segment1Start, point20Segment1End)).until(1, Interpolator.constant(point20Segment2Heading))), Paths.line(point20, rightPairCatch).heading(Interpolator.piecewise().until(0.75, Interpolator.linear(point21Segment1Start, rightPairCatch)).until(1, Interpolator.constant(rightPairCatch))));
-        Path outsideLaneToRightPark = Paths.path(Paths.curve(rightPairCatch, point22Control1, point22Control2, point22).heading(Interpolator.piecewise().until(0.4, Interpolator.constant(point22Segment1Heading)).until(1, Interpolator.linear(point22Segment2Start, point22Segment2End))), Paths.line(point22, point23).constant(point23), Paths.curve(point23, point24Control1, point24Control2, rightPark).heading(Interpolator.piecewise().until(0.2, Interpolator.linear(point24Segment1Start, point24Segment1End)).until(0.65, Interpolator.constant(point24Segment2Heading)).until(1, Interpolator.linear(point24Segment3Start, rightPark))));
+        Path underTheHiveToRightPairCatch = Paths.path(Paths.curve(leftLaunchCatch, point20Control1, point20Control2, point20).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point20Segment1Start, point20Segment1End)).until(1, Interpolator.constant(point20Segment2Heading))), Paths.line(point21Start, point21).linear(point21Start, point21), Paths.line(point21, rightPairCatch).constant(rightPairCatch));
+        Path outsideLaneToRightPark = Paths.path(Paths.curve(rightPairCatch, point23Control1, point23Control2, point23).heading(Interpolator.piecewise().until(0.4, Interpolator.constant(point23Segment1Heading)).until(1, Interpolator.linear(point23Segment2Start, point23Segment2End))), Paths.line(point23, point24).constant(point24), Paths.curve(point24, point25Control1, point25Control2, rightPark).heading(Interpolator.piecewise().until(0.2, Interpolator.linear(point25Segment1Start, point25Segment1End)).until(0.65, Interpolator.constant(point25Segment2Heading)).until(1, Interpolator.linear(point25Segment3Start, rightPark))));
 
         return kit.sequence(
                 kit.command("SpinUp"),
@@ -141,11 +142,11 @@ public final class RClockwiseAuto {
                 kit.route("Pickup", 1, () -> kit.path("to GARDEN_STAGING", toGardenStaging, 2, gardenParkToRightPark, 2.8)),
                 kit.route("Pickup", 1, () -> kit.command("GardenGather", 5.5)),
                 kit.route("Pickup", 1, () -> kit.path("outside lane from the GARDEN to LEFT_PAIR_OFFSET", outsideLaneFromTheGardenToLeftPairOffset, 3.6, leftParkToRightPark, 1.7)),
-                kit.firstOf("R2: LEFT up by 18 s, otherwise park",
-                        kit.shotLimit(kit.seconds("T2 LEFT up by", 18)).then(
+                kit.firstOf("R2: LEFT up by 21 s, otherwise park",
+                        kit.shotLimit(kit.seconds("T2 LEFT up by", 21)).then(
                                 kit.guarded("Timed out", leftParkToRightPark, 1.7,
                                         kit.path("left park to RIGHT_PARK", leftParkToRightPark, 1.7))),
-                        kit.shotWhen("LeftCellUp", kit.seconds("T2 LEFT up by", 18)).then(
+                        kit.shotWhen("LeftCellUp", kit.seconds("T2 LEFT up by", 21)).then(
                                 kit.command("LaunchAll", 1),
                                 kit.firstOf("Time for the scoring FLOWER: before 19.4 s",
                                         kit.atMatchSeconds(kit.seconds("TS scoring FLOWER by", 19.4)).then(

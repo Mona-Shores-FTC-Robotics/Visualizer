@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-11T17:28:53.311Z",
+  "timestamp": "2026-11-11T18:20:38.222Z",
   "startPoint": {
     "x": 55.6,
     "y": 7.7,
@@ -221,7 +221,7 @@
       "segments": [
         {
           "id": "r-pickup-park-lane-garden",
-          "color": "#4e79a7",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -251,7 +251,7 @@
         },
         {
           "id": "r-pickup-park-turn-garden",
-          "color": "#edc948",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -492,7 +492,7 @@
       "segments": [
         {
           "id": "r-catch-park-clear",
-          "color": "#9c755f",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -518,7 +518,7 @@
         },
         {
           "id": "r-catch-park-lane",
-          "color": "#4e79a7",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -538,7 +538,7 @@
         },
         {
           "id": "r-catch-park-in",
-          "color": "#e15759",
+          "color": "#f28e2b",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -587,7 +587,7 @@
       "segments": [
         {
           "id": "r-cross-south",
-          "color": "#9c755f",
+          "color": "#59a14f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -635,8 +635,29 @@
           }
         },
         {
+          "id": "r-cross-turn",
+          "color": "#9c755f",
+          "name": "",
+          "locked": false,
+          "waitBeforeMs": 0,
+          "waitAfterMs": 0,
+          "waitBeforeName": "",
+          "waitAfterName": "",
+          "kind": "atomic",
+          "endPoint": {
+            "x": 62.8,
+            "y": 24
+          },
+          "controlPoints": [],
+          "heading": {
+            "type": "linear",
+            "startDeg": 270,
+            "endDeg": 99.9
+          }
+        },
+        {
           "id": "r-cross-aim",
-          "color": "#4e79a7",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -650,28 +671,8 @@
           },
           "controlPoints": [],
           "heading": {
-            "type": "piecewise",
-            "piecewiseHeading": {
-              "segments": [
-                {
-                  "startProgress": 0,
-                  "endProgress": 0.75,
-                  "interpolationType": "linear",
-                  "parameters": {
-                    "startDeg": 270,
-                    "endDeg": 99.9
-                  }
-                },
-                {
-                  "startProgress": 0.75,
-                  "endProgress": 1,
-                  "interpolationType": "constant",
-                  "parameters": {
-                    "degrees": 99.9
-                  }
-                }
-              ]
-            }
+            "type": "constant",
+            "degrees": 99.9
           }
         }
       ]
@@ -689,7 +690,7 @@
       "segments": [
         {
           "id": "r-right-park-clear",
-          "color": "#f28e2b",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -738,7 +739,7 @@
         },
         {
           "id": "r-right-park-west",
-          "color": "#9c755f",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -901,6 +902,10 @@
     },
     {
       "kind": "path",
+      "lineId": "r-cross-turn"
+    },
+    {
+      "kind": "path",
       "lineId": "r-cross-aim"
     },
     {
@@ -947,7 +952,6 @@
     "registry": {
       "actions": [
         "LaunchAll",
-        "LaunchAllFar",
         "LaunchOne",
         "SpinUp",
         "PickFlower",
@@ -968,7 +972,6 @@
       ],
       "typicalS": {
         "LaunchAll": 4,
-        "LaunchAllFar": 4,
         "LaunchOne": 0.5,
         "SpinUp": 0.1,
         "PickFlower": 4,
@@ -1104,10 +1107,10 @@
       {
         "id": "r-stop-2",
         "kind": "firstOf",
-        "label": "R2: LEFT up by 18 s, otherwise park",
+        "label": "R2: LEFT up by 21 s, otherwise park",
         "rows": [
           {
-            "afterMs": 18000,
+            "afterMs": 21000,
             "matchClock": true,
             "option": "T2 LEFT up by",
             "cards": [
