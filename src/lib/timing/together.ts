@@ -109,7 +109,7 @@ export function volleysOf(
 ): Volley[] {
   return previews.flatMap((p, robot) =>
     [...p.launches, ...p.actions]
-      .filter((l) => l.command === VOLLEY_COMMAND)
+      .filter((l) => l.command === VOLLEY_COMMAND && !l.unfired)
       .map((l) => ({ t: l.t1, robot, load: loads[robot] })),
   );
 }

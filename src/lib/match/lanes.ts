@@ -203,7 +203,7 @@ export function matchLanes(
         kind: segmentKind(a.command),
         t0: a.t0,
         t1: a.t1,
-        label: LABELS[a.command] ?? a.command,
+        label: `${LABELS[a.command] ?? a.command}${a.unfired ? " (not at speed in time: nothing launched)" : ""}`,
       })),
       ...preview.launches
         .filter((l) => l.command !== SPIN_UP_COMMAND)
@@ -211,12 +211,12 @@ export function matchLanes(
           kind: segmentKind(l.command),
           t0: l.t0,
           t1: l.t1,
-          label: `${LABELS[l.command] ?? l.command} (while waiting)`,
+          label: `${LABELS[l.command] ?? l.command} (while waiting${l.unfired ? ", nothing launched" : ""})`,
         })),
     ].sort((a, b) => a.t0 - b.t0);
 
     const volleyRuns = [...preview.launches, ...preview.actions]
-      .filter((l) => l.command === VOLLEY_COMMAND)
+      .filter((l) => l.command === VOLLEY_COMMAND && !l.unfired)
       .sort((a, b) => a.t1 - b.t1);
     const effects = history.volleys.filter((v) => v.robot === robot);
     const volleys = volleyRuns.map((run, i): VolleyMark => {

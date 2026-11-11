@@ -44,7 +44,8 @@ export const FEEDING_LAUNCHES: ReadonlySet<string> = new Set([
 /**
  * How long a command step keeps the robot busy in the preview, started at `t0`: the timing model's
  * answer, else the command's typical time from the robot's list, else an older file's preview
- * time, else instant; never past its timeout, unless it is a feeding launch.
+ * time, else instant; never past its timeout. A feeding launch is the exception: once it feeds
+ * it runs its whole time, and it ends at its timeout only when that passes before the feed starts.
  */
 export function commandSeconds(
   auto: AutoSection,
@@ -56,8 +57,24 @@ export function commandSeconds(
     timing?.actionSeconds(card.name, t0) ??
     auto.registry.typicalS?.[card.name] ??
     (card.previewMs ?? 0) / 1000;
-  if (FEEDING_LAUNCHES.has(card.name)) return typical;
-  return Math.min(typical, card.timeoutS ?? DEFAULT_TIMEOUT_S);
+  const limit = card.timeoutS ?? DEFAULT_TIMEOUT_S;
+  if (FEEDING_LAUNCHES.has(card.name))
+    return launchFeeds(card, timing, t0) ? typical : limit;
+  return Math.min(typical, limit);
+}
+
+/**
+ * Whether a feeding launch step started at `t0` gets to feed: its time limit guards the wait for
+ * spin-up, so a limit that passes before the launcher is at speed ends the step with nothing
+ * launched. With no timing model the feed starts at once.
+ */
+export function launchFeeds(
+  card: ActionCard,
+  timing?: PreviewTiming,
+  t0 = 0,
+): boolean {
+  const feedStart = timing?.feedStartsAt?.(card.name, t0) ?? t0;
+  return feedStart - t0 <= (card.timeoutS ?? DEFAULT_TIMEOUT_S) + 1e-9;
 }
 
 /**
@@ -122,8 +139,11 @@ export interface PreviewTiming {
     t0: number,
     at?: { x: number; y: number },
   ): number | undefined;
-  /** Told when a command runs (from t0 to t1), so state such as a full intake can change. */
-  commandRan?(name: string, t0: number, t1: number): void;
+  /**
+   * Told when a command runs (from t0 to t1), so state such as a full intake can change. `fed` is
+   * false for a launch whose time limit passed before its feed started: nothing left the robot.
+   */
+  commandRan?(name: string, t0: number, t1: number, fed?: boolean): void;
   /** Told when a wait ends because `condition` became true at `t`. */
   becameTrue?(condition: string, t: number): void;
 }
@@ -230,6 +250,8 @@ export interface LaunchRecord {
   command: string;
   t0: number;
   t1: number;
+  /** A launch whose time limit passed before its feed started: nothing was launched. */
+  unfired?: true;
 }
 
 /** An action card that ran (a LaunchAll step is a volley), from its start until it finished. */
@@ -238,6 +260,8 @@ export interface ActionRecord {
   command: string;
   t0: number;
   t1: number;
+  /** A launch whose time limit passed before its feed started: nothing was launched. */
+  unfired?: true;
 }
 
 /** A wait (a firstOf card), and how it ended. */
@@ -524,6 +548,11 @@ export function simulateAuto(
       stalled = true;
       return null;
     }
+    // A launch alongside that the wait ends before its feed starts launches nothing.
+    const unfed =
+      !!card.alongside &&
+      FEEDING_LAUNCHES.has(card.alongside) &&
+      at < (timing?.feedStartsAt?.(card.alongside, t0) ?? t0) - 1e-9;
     if (card.alongside) {
       const along = alongsideSeconds(auto, card, timing, t0);
       launches.push({
@@ -531,9 +560,16 @@ export function simulateAuto(
         command: card.alongside,
         t0,
         t1: Math.min(at, t0 + along),
+        ...(unfed ? { unfired: true as const } : {}),
       });
       note(`${label}: ${card.alongside} alongside`, "card", card.id);
-      if (at < t0 + along - 1e-9)
+      if (unfed)
+        note(
+          `${card.alongside}: the wait ends before the launcher is at speed; nothing launched`,
+          "warn",
+          card.id,
+        );
+      else if (at < t0 + along - 1e-9)
         note(
           `${card.alongside} stopped after ${(at - t0).toFixed(2)} s`,
           "event",
@@ -543,7 +579,7 @@ export function simulateAuto(
     stay(at - t0);
     const row = card.rows[winner];
     taken.set(card.id, winner);
-    if (card.alongside) timing?.commandRan?.(card.alongside, t0, at);
+    if (card.alongside) timing?.commandRan?.(card.alongside, t0, at, !unfed);
     let fired: string | null = null;
     if ("when" in row) {
       for (const name of row.when) {
@@ -636,14 +672,28 @@ export function simulateAuto(
             ...pickMotions(card.id, { ...pos, headingDeg: heading }, pick, t, busy, stickDownAt !== null),
           );
         }
+        const unfired =
+          FEEDING_LAUNCHES.has(card.name) && !launchFeeds(card, timing, t);
+        if (unfired)
+          note(
+            `${card.name}: its ${busy.toFixed(2)} s limit passes before the launcher is at speed; nothing launched`,
+            "warn",
+            card.id,
+          );
         stay(busy);
-        actions.push({ cardId: card.id, command: card.name, t0: t - busy, t1: t });
+        actions.push({
+          cardId: card.id,
+          command: card.name,
+          t0: t - busy,
+          t1: t,
+          ...(unfired ? { unfired: true as const } : {}),
+        });
         // A pick that squared up ends on the FLOWER's line, where its push started.
         if (pick?.ok && pick.squares) {
           pos = { x: pick.start.x, y: pick.start.y };
           heading = pick.start.headingDeg;
         }
-        timing?.commandRan?.(card.name, t - busy, t);
+        timing?.commandRan?.(card.name, t - busy, t, !unfired);
         return null;
       }
       case "path": {

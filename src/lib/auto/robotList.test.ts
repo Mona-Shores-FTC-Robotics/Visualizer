@@ -3,7 +3,7 @@ import { loadSample } from "./fixtures/load";
 import { applyRobotList, parseRobotList } from "./robotList";
 import { createEmptyAuto, normalizeAuto } from "./normalize";
 import { teamRegistry } from "./teamRobot";
-import { commandSeconds } from "./simulate";
+import { commandSeconds, launchFeeds } from "./simulate";
 import type { ActionCard } from "./types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -63,6 +63,12 @@ test("command time: a feeding launch runs its whole feed, whatever its time limi
   const timing = { actionSeconds: (name: string) => (name === "LaunchAll" ? 6 : undefined), trueAt: () => undefined };
   assertEqual(commandSeconds(auto, launch, timing, 0), 6);
   assertEqual(commandSeconds(auto, { ...launch, timeoutS: undefined }, timing, 0), 6);
+  // A limit that passes before the launcher is at speed ends the step, nothing launched.
+  const spinning = { ...timing, feedStartsAt: (_name: string, t0: number) => t0 + 2 };
+  assertEqual(commandSeconds(auto, launch, spinning, 3), 1, "1 s limit, 2 s to speed");
+  assertEqual(launchFeeds(launch, spinning, 3), false);
+  assertEqual(commandSeconds(auto, { ...launch, timeoutS: 2 }, spinning, 3), 6, "at speed just in time");
+  assertEqual(commandSeconds(auto, { ...launch, timeoutS: undefined }, spinning, 3), 6);
   // A FLOWER pick's limit still ends it.
   assertEqual(commandSeconds(auto, { ...launch, name: "PickFlower", timeoutS: 2 }), 2);
 });

@@ -77,11 +77,13 @@ test("a time limit that passes before the feed starts ends the wait on time, not
   const result = simulateAuto(auto, catalog, sample.startPoint, not("HiveTipped"), spinning);
   const wait = result.waits.find((w) => w.cardId === "did-tip")!;
   assert(Math.abs(wait.t1 - wait.t0 - 1.5) < 1e-9, `${wait.t0} → ${wait.t1}`);
+  assertEqual(result.launches.find((l) => l.cardId === "did-tip")!.unfired, true);
   // At speed after 1 s, the same limit falls inside the feed and is held to its end.
   const ready = { ...spinning, feedStartsAt: (_name: string, t0: number) => t0 + 1 };
   const held = simulateAuto(auto, catalog, sample.startPoint, not("HiveTipped"), ready);
   const heldWait = held.waits.find((w) => w.cardId === "did-tip")!;
   assert(Math.abs(heldWait.t1 - heldWait.t0 - 5) < 1e-9, `${heldWait.t0} → ${heldWait.t1}`);
+  assertEqual(held.launches.find((l) => l.cardId === "did-tip")!.unfired, undefined);
 });
 
 test("a command alongside survives a save and reload", () => {
