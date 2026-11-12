@@ -93,16 +93,42 @@ export const timingValues = derived(
   },
 );
 
-/** The branch the team's file is read from: the one Team Autos last listed. */
+/**
+ * The branch of the team Autos on screen (a `#team=` link, or Team Autos' Show together), for
+ * this page load only: the Autos are previewed with their own branch's facts. It is not written
+ * to the remembered Team Autos branch, so a link never changes what the next visit starts on.
+ */
+let shownBranch: string | null = null;
+
+/**
+ * The branch the team's file is read from: the one the Autos on screen came from, else the one
+ * Team Autos last listed.
+ */
 export function timingBranch(): string {
-  return read(BRANCH_KEY) || DEFAULT_REF;
+  return shownBranch ?? (read(BRANCH_KEY) || DEFAULT_REF);
 }
+
+/**
+ * Reads the timing facts from the branch whose Autos were just opened; returns an error message,
+ * or null. A connected checkout still reads its own file.
+ */
+export function followTimingBranch(
+  ref: string,
+  getText: FetchText = fetchText,
+): Promise<string | null> {
+  shownBranch = ref;
+  return loadTeamTiming(ref, getText);
+}
+
+/** Counts the loads, so a slow answer for an earlier branch never replaces a later one's. */
+let loads = 0;
 
 /** Fetches the team's timing.json; returns an error message, or null when it loaded (or is absent). */
 export async function loadTeamTiming(
   ref = timingBranch(),
   getText: FetchText = fetchText,
 ): Promise<string | null> {
+  const load = ++loads;
   try {
     const checkout = get(repoFolder);
     if (checkout) {
@@ -127,7 +153,7 @@ export async function loadTeamTiming(
       return null;
     }
     const text = await getText(teamRawUrl(ref, TIMING_FILE));
-    if (get(repoFolder)) return null;
+    if (get(repoFolder) || load !== loads) return null;
     teamTiming.set(text === null ? null : { ref, file: parseTimingFile(text) });
     return null;
   } catch (error) {
