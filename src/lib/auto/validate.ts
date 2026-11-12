@@ -163,7 +163,7 @@ export function validateAuto(
 
   walk(auto.cards, [startPoint], "The main sequence");
 
-  // The drive team sets one wait from the partner's last preload; a second would have no number.
+  // The drive team moves one wait's limit on the D-pad; a second would have no keys.
   allCards(auto.cards)
     .filter((card) => card.kind === "firstOf" && card.partnerWait)
     .slice(1)

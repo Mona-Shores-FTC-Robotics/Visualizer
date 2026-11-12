@@ -871,14 +871,14 @@
               step.waitAdjustable && "simple-option--on",
             ]}
             aria-pressed={step.waitAdjustable}
-            title="At the field the drive team enters the partner's last shot (when their last preload leaves) with the D-pad's up and down; the robot waits until the TIP lag after it (biobuzz PARTNER_TIP_LAG_S, 4 s) and shows both numbers. One wait per Auto."
+            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's up and down move that second. The time here is what it shows untouched. One wait per Auto."
             onclick={() =>
               apply(
                 setWait(doc, step.cardId, {
                   adjustable: !step.waitAdjustable,
                 }),
               )}
-            >{step.waitAdjustable ? "✓ " : ""}Set in INIT (partner's last shot)</button
+            >{step.waitAdjustable ? "✓ " : ""}Set in INIT (wait for partner's TIP)</button
           >
         {/if}
       </div>

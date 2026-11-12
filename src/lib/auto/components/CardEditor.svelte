@@ -367,7 +367,7 @@
     </div>
     <label
       class="flex items-start gap-2 text-[11px] text-heading"
-      title="The drive team enters 'the partner's last preload leaves at N s' in init and the robot sets this wait's time limit from it. One wait per Auto."
+      title="In init the Driver Station reads 'waiting for partner's TIP until N s', and the drive team moves that second with the D-pad. One wait per Auto."
     >
       <input
         id="auto-firstof-partner-wait"
@@ -388,9 +388,8 @@
         }}
       />
       <span
-        >The partner wait: its time limit is set in init from when the
-        partner's last preload leaves (one per Auto). The time below is the
-        default.</span
+        >The partner wait: the drive team can move its time limit in init
+        (one per Auto). The time below is the default.</span
       >
     </label>
     <div class="space-y-2">
