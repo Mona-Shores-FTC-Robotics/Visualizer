@@ -11,10 +11,18 @@
  * builder only hides what a first Auto does not need. A card the builder did not make (a decision
  * beyond a Wait's Otherwise) shows as an advanced step and is left alone.
  *
- * A Wait step may carry an **Otherwise** list: ordinary steps (no wait) that run only if the wait
- * times out, the cards of its time row. The trigger row stays empty, so when the trigger comes the
- * Auto goes straight on with the steps below the wait; after the Otherwise steps it goes on with
- * them too (AutoKit's firstOf). One level only: no wait inside an Otherwise.
+ * A Wait step may carry an **Otherwise** list: the steps that run only if the wait times out, the
+ * cards of its time row. An Otherwise is a list like the main one, so it may hold a Wait with an
+ * Otherwise of its own, to any depth. It ends one of two ways:
+ *
+ *   go on     the trigger row stays empty: when the trigger comes the Auto goes straight on with
+ *             the steps below the wait, and after the Otherwise steps it goes on with them too.
+ *   instead   the steps below the wait, in its list, run only when the trigger comes. In the file
+ *             they are the trigger row's cards and the wait is its list's last card (AutoKit's
+ *             firstOf); the builder shows them below the wait all the same (`unfold`). Where
+ *             nothing follows the list (the main list, or the Otherwise of a wait that itself
+ *             ends "instead" there) the Otherwise ends with its own Park. Inside an Otherwise that
+ *             goes on, it just ends, and the robot goes on after that Otherwise.
  *
  * Every edit returns a new document, so the caller applies it as one undo step.
  */
@@ -76,9 +84,14 @@ export interface Step {
   otherwise?: Step[];
   /**
    * Wait: after the Otherwise the robot goes on with the steps below the wait (true), or the
-   * Otherwise ends with its own Park and the steps below run only when the trigger comes (false).
+   * steps below run only when the trigger comes (false, "instead").
    */
   rejoin?: boolean;
+  /**
+   * Wait: nothing follows the list this wait is in, so an Otherwise that runs instead of the steps
+   * below ends with its own Park. False inside an Otherwise that goes on: there it just ends.
+   */
+  insteadParks?: boolean;
 }
 
 /** Where a step goes: the main list, or the Otherwise list of the wait card named. */
@@ -193,17 +206,20 @@ export function stepsOf(doc: ProjectDoc): Step[] {
   // The builder's view: a wait that does not rejoin shows the steps below it in the main list.
   const auto = structuredClone(doc.auto);
   const parking = unfold(auto);
-  const steps = walkSteps({ ...doc, auto }, auto.cards, {
-    here: {
-      x: doc.startPoint.x,
-      y: doc.startPoint.y,
-      h: doc.startPoint.headingDeg,
+  return walkSteps(
+    { ...doc, auto },
+    auto.cards,
+    {
+      here: {
+        x: doc.startPoint.x,
+        y: doc.startPoint.y,
+        h: doc.startPoint.headingDeg,
+      },
+      onSpot: auto.startAt ?? null,
     },
-    onSpot: auto.startAt ?? null,
-  });
-  for (const step of steps)
-    if (step.kind === "wait") step.rejoin = !parking.has(step.cardId);
-  return steps;
+    parking,
+    true,
+  );
 }
 
 /** Where the robot is while the steps are read: its pose, and the named spot it is on. */
@@ -213,7 +229,14 @@ interface Walk {
   onSpot: string | null;
 }
 
-function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
+function walkSteps(
+  doc: ProjectDoc,
+  cards: AutoCard[],
+  at: Walk,
+  parking: Set<string>,
+  /** Nothing follows this list: the main one, or the Otherwise of a wait that ends "instead" there. */
+  terminal: boolean,
+): Step[] {
   const auto = doc.auto!;
   return cards.map((card): Step => {
     const base = { cardId: card.id, spot: null, lineId: null };
@@ -267,10 +290,14 @@ function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
       if (wait) {
         // The Otherwise steps start where the wait is, on a copy: the list below the wait is read
         // as if the trigger came (the preview's default), so it goes on from the wait's pose too.
-        const otherwise = walkSteps(doc, wait.otherwise, {
-          here: { ...at.here },
-          onSpot: at.onSpot,
-        });
+        const rejoin = !parking.has(card.id);
+        const otherwise = walkSteps(
+          doc,
+          wait.otherwise,
+          { here: { ...at.here }, onSpot: at.onSpot },
+          parking,
+          terminal && !rejoin,
+        );
         return {
           ...base,
           kind: "wait",
@@ -281,6 +308,8 @@ function walkSteps(doc: ProjectDoc, cards: AutoCard[], at: Walk): Step[] {
           waitAdjustable: wait.adjustable,
           spinUp: wait.spinUp,
           otherwise,
+          rejoin,
+          insteadParks: terminal,
         };
       }
     }
@@ -465,8 +494,7 @@ export function setStartHeading(
 /**
  * Adds a step at `index` of the main list (the end when past it), or of a wait's Otherwise list
  * (`into`). A drive or park needs `spot`, a named point; its path runs from wherever the step
- * before leaves the robot. One park only: adding a park clears the others, in every list. A wait
- * cannot go inside an Otherwise.
+ * before leaves the robot. One park only: adding a park clears the others, in every list.
  */
 export function addStep(
   doc: ProjectDoc,
@@ -481,7 +509,6 @@ export function addStep(
     if (!list) throw new Error("No such Wait step for an Otherwise");
     let card: AutoCard;
     if (kind === "wait") {
-      if (into) throw new Error("A wait cannot go inside an Otherwise");
       card = {
         id: makeCardId(),
         kind: "firstOf",
@@ -531,7 +558,7 @@ export function addStep(
 /** The cards of the main list, or of the Otherwise (time) row of the wait `into` names. */
 function listOf(auto: AutoSection, into: StepList): AutoCard[] | null {
   if (!into) return auto.cards;
-  const card = auto.cards.find((c) => c.id === into.waitCardId);
+  const card = allCardsOf(auto.cards).find((c) => c.id === into.waitCardId);
   if (card?.kind !== "firstOf" || !waitOf(card)) return null;
   // A wait for nothing but its time has no Otherwise: its time always runs out.
   if (!card.rows.some((row) => "when" in row)) return null;
@@ -539,13 +566,36 @@ function listOf(auto: AutoSection, into: StepList): AutoCard[] | null {
   return row ? row.cards : null;
 }
 
-/** Every list a step may be in: the main one and each wait's Otherwise. */
+/** Every list a step may be in: the main one and each wait's Otherwise, however deep. */
 function allLists(auto: AutoSection): AutoCard[][] {
-  const lists = [auto.cards];
-  for (const card of auto.cards)
-    if (card.kind === "firstOf" && waitOf(card))
-      for (const row of card.rows) if ("afterMs" in row) lists.push(row.cards);
+  const lists: AutoCard[][] = [];
+  const visit = (list: AutoCard[]) => {
+    lists.push(list);
+    for (const card of list)
+      if (card.kind === "firstOf" && waitOf(card))
+        for (const row of card.rows) if ("afterMs" in row) visit(row.cards);
+  };
+  visit(auto.cards);
   return lists;
+}
+
+/**
+ * Whether nothing follows `list` (the builder's view): the main list, or the Otherwise of a wait
+ * that runs instead of the steps below it, in a list nothing follows. Such a list ends with a Park.
+ */
+function isTerminal(
+  auto: AutoSection,
+  parking: Set<string>,
+  list: AutoCard[],
+): boolean {
+  if (list === auto.cards) return true;
+  for (const outer of allLists(auto))
+    for (const card of outer)
+      if (card.kind === "firstOf" && parking.has(card.id))
+        for (const row of card.rows)
+          if ("afterMs" in row && row.cards === list)
+            return isTerminal(auto, parking, outer);
+  return false;
 }
 
 /** The list holding the card, and its index there. */
@@ -616,9 +666,7 @@ export function removeStep(doc: ProjectDoc, cardId: string): ProjectDoc {
     const [card] = found.list.splice(found.index, 1);
     // No park left, nothing to offer in its place.
     if (card.kind === "path" && card.park) dropParkChoices(auto);
-    const gone: AutoCard[] = [card];
-    if (card.kind === "firstOf")
-      for (const row of card.rows) gone.push(...row.cards);
+    const gone = allCardsOf([card]);
     const lineIds = new Set(
       gone.flatMap((c) => (c.kind === "path" ? [c.lineId] : [])),
     );
@@ -633,7 +681,7 @@ export function removeStep(doc: ProjectDoc, cardId: string): ProjectDoc {
 
 /**
  * Moves a step to `index` (as counted before the move) of the main list, or of a wait's Otherwise
- * (`into`); a step may move between the lists, but a wait never into an Otherwise.
+ * (`into`); a step may move between the lists, but a wait never into its own Otherwise.
  */
 export function moveStep(
   doc: ProjectDoc,
@@ -646,7 +694,7 @@ export function moveStep(
     const target = listOf(auto, into);
     if (!found || !target) return;
     const card = found.list[found.index];
-    if (card.kind === "firstOf" && into) return;
+    if (into && allCardsOf([card]).some((c) => c.id === into.waitCardId)) return;
     found.list.splice(found.index, 1);
     const to = target === found.list && index > found.index ? index - 1 : index;
     target.splice(Math.max(0, Math.min(to, target.length)), 0, card);
@@ -671,7 +719,7 @@ export function setWait(
   },
 ): ProjectDoc {
   return edit(doc, (_draft, auto) => {
-    const card = auto.cards.find((c) => c.id === cardId);
+    const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
     if (change.waitFor === TIME_ONLY) {
       // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
@@ -694,7 +742,7 @@ export function setWait(
       }
       if (change.adjustable === true && row.matchClock) {
         // One wait per Auto: the D-pad's up and down move only one.
-        for (const other of auto.cards)
+        for (const other of allCardsOf(auto.cards))
           if (other.kind === "firstOf" && other !== card)
             for (const r of other.rows) if ("afterMs" in r) delete r.adjustable;
         row.adjustable = true;
@@ -710,10 +758,11 @@ export function setWait(
 
 /**
  * Fork: whether a Wait's Otherwise goes on with the steps below the wait afterwards (`rejoin`), or
- * parks instead. Parking adds a Park step at the end of the Otherwise, on the Auto's PARK spot, and
- * the steps below the wait then run only when the trigger comes (in the file: the trigger row's
- * cards, the wait last in the main list). Going on again takes that Park step out. Needs a Park
- * step below the wait.
+ * runs instead of them: the steps below the wait, in its list, then run only when the trigger
+ * comes (in the file: the trigger row's cards, the wait last in its list). Where nothing follows
+ * the list, "instead" is "park": a Park step is added at the end of the Otherwise, on the Auto's
+ * PARK spot (so the Auto needs a Park step), and of each Otherwise inside it that ends the same
+ * way. Going on again takes those Park steps out.
  */
 export function setWaitRejoin(
   doc: ProjectDoc,
@@ -721,34 +770,50 @@ export function setWaitRejoin(
   rejoin: boolean,
 ): ProjectDoc {
   return edit(doc, (draft, auto, parking) => {
-    const index = auto.cards.findIndex((c) => c.id === cardId);
-    const card = auto.cards[index];
-    if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    const found = findCard(auto, cardId);
+    const card = found?.list[found.index];
+    if (!found || card?.kind !== "firstOf" || !waitOf(card)) return;
     if (!card.rows.some((row) => "when" in row)) return;
     const row = card.rows.find((r) => "afterMs" in r)!;
     const isPark = (c: AutoCard) => c.kind === "path" && c.park;
     if (rejoin) {
       parking.delete(cardId);
-      row.cards = row.cards.filter((c) => !isPark(c));
+      // The Otherwise goes on now, and so does every Otherwise inside it: none parks.
+      const strip = (list: AutoCard[]) => {
+        for (const c of list)
+          if (c.kind === "firstOf")
+            for (const r of c.rows) r.cards = strip(r.cards);
+        return list.filter((c) => !isPark(c));
+      };
+      row.cards = strip(row.cards);
       return;
     }
-    const park = auto.cards.slice(index + 1).find(isPark);
+    if (!isTerminal(auto, parking, found.list)) {
+      parking.add(cardId);
+      return;
+    }
+    const park =
+      found.list.slice(found.index + 1).find(isPark) ??
+      allCardsOf(auto.cards).find(isPark);
     const spot = park?.kind === "path" ? auto.pathEnds[park.lineId] : undefined;
     const point = spot ? auto.points[spot] : undefined;
     if (!spot || !point) return;
     parking.add(cardId);
-    if (row.cards.some(isPark)) return;
-    const path = createSegment(point[0], point[1]);
-    path.name = `to ${spot}`;
-    draft.lines = [...draft.lines, path];
-    draft.sequence = [...draft.sequence, { kind: "path", lineId: path.id }];
-    auto.pathEnds[path.id] = spot;
-    row.cards.push({
-      id: makeCardId(),
-      kind: "path",
-      lineId: path.id,
-      park: true,
-    });
+    // Nothing follows this Otherwise now: it ends with a Park, and so does each Otherwise in it
+    // that runs instead of the steps below its wait.
+    const endWithPark = (list: AutoCard[]) => {
+      for (const c of list)
+        if (c.kind === "firstOf" && parking.has(c.id))
+          for (const r of c.rows) if ("afterMs" in r) endWithPark(r.cards);
+      if (list.some(isPark)) return;
+      const path = createSegment(point[0], point[1]);
+      path.name = `to ${spot}`;
+      draft.lines = [...draft.lines, path];
+      draft.sequence = [...draft.sequence, { kind: "path", lineId: path.id }];
+      auto.pathEnds[path.id] = spot;
+      list.push({ id: makeCardId(), kind: "path", lineId: path.id, park: true });
+    };
+    endWithPark(row.cards);
   });
 }
 
@@ -1036,35 +1101,48 @@ function dropParkChoices(auto: AutoSection): void {
 }
 
 /**
- * The builder's view of a wait that parks instead of going on: in the file it is the main list's
- * last card and the steps below it are its trigger row's (each route holds the rest of itself, as
- * a decision does); here they follow it in the main list, as for any wait. Changes `auto`; returns
- * the ids of those waits, for {@link refold}. Only a wait last in the main list unfolds, so an
- * Auto drawn elsewhere, with steps after such a wait, reads as it runs.
+ * The builder's view of a wait whose Otherwise runs instead of the steps below it: in the file it
+ * is its list's last card and the steps below it are its trigger row's (each route holds the rest
+ * of itself, as a decision does); here they follow it in its list, as for any wait. Every list is
+ * read this way, the main one and each Otherwise, however deep. Changes `auto`; returns the ids of
+ * those waits, for {@link refold}. Only a wait last in its list unfolds, so an Auto drawn
+ * elsewhere, with steps after such a wait, reads as it runs.
  */
 export function unfold(auto: AutoSection): Set<string> {
   const parking = new Set<string>();
-  for (;;) {
-    const last = auto.cards[auto.cards.length - 1];
-    if (last?.kind !== "firstOf" || parking.has(last.id)) break;
-    if (!waitOf(last, true)) break;
-    const when = last.rows.find((r) => "when" in r);
-    if (!when?.cards.length) break;
-    parking.add(last.id);
-    auto.cards.push(...when.cards);
-    when.cards = [];
-  }
+  const open = (list: AutoCard[]) => {
+    for (;;) {
+      const last = list[list.length - 1];
+      if (last?.kind !== "firstOf" || parking.has(last.id)) break;
+      if (!waitOf(last, true)) break;
+      const when = last.rows.find((r) => "when" in r);
+      if (!when?.cards.length) break;
+      parking.add(last.id);
+      list.push(...when.cards);
+      when.cards = [];
+    }
+    for (const card of list)
+      if (card.kind === "firstOf" && waitOf(card))
+        for (const row of card.rows) if ("afterMs" in row) open(row.cards);
+  };
+  open(auto.cards);
   return parking;
 }
 
 /** Back to the file's form: the steps below each such wait go into its trigger row. */
 export function refold(auto: AutoSection, parking: Set<string>): void {
-  for (let i = auto.cards.length - 1; i >= 0; i--) {
-    const card = auto.cards[i];
-    if (card.kind !== "firstOf" || !parking.has(card.id)) continue;
-    const when = card.rows.find((r) => "when" in r);
-    if (when) when.cards = auto.cards.splice(i + 1);
-  }
+  const close = (list: AutoCard[]) => {
+    for (const card of list)
+      if (card.kind === "firstOf")
+        for (const row of card.rows) if ("afterMs" in row) close(row.cards);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const card = list[i];
+      if (card.kind !== "firstOf" || !parking.has(card.id)) continue;
+      const when = card.rows.find((r) => "when" in r);
+      if (when) when.cards = list.splice(i + 1);
+    }
+  };
+  close(auto.cards);
 }
 
 function allCardsOf(cards: AutoCard[]): AutoCard[] {
