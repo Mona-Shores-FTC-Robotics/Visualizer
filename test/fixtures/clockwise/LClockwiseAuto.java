@@ -21,7 +21,7 @@ public final class LClockwiseAuto {
     public static final String SOURCE = "l-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-12|3:29PM";
+    public static final String SAVED = "11-12|5:32PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -33,7 +33,7 @@ public final class LClockwiseAuto {
     public static final String DRAWN_FOR = "RED";
 
     /** What the drive team may change during INIT, on gamepad 1's D-pad; nothing changed, the Auto runs as drawn. */
-    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "GARDEN", "WALL_FLOWER"), AutoOption.shotTrigger(), AutoOption.time("T1 LEFT up by", 9.5), AutoOption.time("TLr park after the crossing at", 22.5), AutoOption.time("TF FLOWER at", 15.5), AutoOption.time("T4 RIGHT up by", 19.2), AutoOption.time("TL park at", 22.7), AutoOption.partner("R-Clockwise", "Pickup", "WALL_FLOWER", "GARDEN")};
+    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "GARDEN", "WALL_FLOWER"), AutoOption.shotTrigger(), AutoOption.time("T1 LEFT up by", 9.5), AutoOption.time("TLr park after the crossing at", 22.5), AutoOption.time("TF FLOWER at", 15.5), AutoOption.time("T4 RIGHT up by", 20.6), AutoOption.time("TL park at", 22.7), AutoOption.partner("R-Clockwise", "Pickup", "WALL_FLOWER", "GARDEN")};
 
     /** Where the robot starts, for the given alliance. */
     public static Pose startPose(boolean rotated) {
@@ -162,13 +162,13 @@ public final class LClockwiseAuto {
                                 kit.route("Pickup", 1, () -> kit.path("to WALL_FLOWER_STAGING", toWallFlowerStaging, 1.8, flowerParkToLeftPark, 3.2)),
                                 kit.route("Pickup", 1, () -> kit.command("PickFlower", 4.5)),
                                 kit.route("Pickup", 1, () -> kit.path("FLOWER to RIGHT_WALL_NEAR", flowerToRightWallNear, 1.8, outsideLaneToLeftPark, 3.9)),
-                                kit.firstOf("L2: RIGHT up by 19.2 s, otherwise keep the load",
-                                        kit.shotLimit(kit.seconds("T4 RIGHT up by", 19.2)).then(
+                                kit.firstOf("L2: RIGHT up by 20.6 s, otherwise keep the load",
+                                        kit.shotLimit(kit.seconds("T4 RIGHT up by", 20.6)).then(
                                                 kit.guarded("Timed out", outsideLaneToLeftPark, 3.9,
                                                         kit.firstOf("R has left the scoring FLOWER: park at 22.7 s",
                                                                 kit.atMatchSeconds(kit.seconds("TL park at", 22.7))),
                                                         kit.path("outside lane to LEFT_PARK", outsideLaneToLeftPark, 3.9))),
-                                        kit.shotWhen("RightCellUp", kit.seconds("T4 RIGHT up by", 19.2)).then(
+                                        kit.shotWhen("RightCellUp", kit.seconds("T4 RIGHT up by", 20.6)).then(
                                                 kit.guarded("If RightCellUp", outsideLaneToLeftPark, 3.9,
                                                         kit.command("LaunchAll", 1),
                                                         kit.firstOf("R has left the scoring FLOWER: park at 22.7 s",

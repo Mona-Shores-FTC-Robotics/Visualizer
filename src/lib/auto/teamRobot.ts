@@ -57,7 +57,7 @@ export function teamRegistry(): AutoRegistry {
     ],
     events: ["Tip"],
     typicalS: {
-      LaunchAll: 4,
+      LaunchAll: 2.5,
       PickFlower: 4.4,
       GardenGather: 6,
       LaunchOne: 0.5,
