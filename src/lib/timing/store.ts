@@ -135,6 +135,25 @@ export async function loadTeamTiming(
   }
 }
 
+/**
+ * A team link's own timing: the facts on the branch its drawings came from, so a branch that
+ * previews at different values (a study's what-if) shows them. A checkout's file still wins, and a
+ * branch without the file, or one that cannot be read, leaves the facts as they are.
+ */
+export async function loadTeamTimingFor(
+  ref: string,
+  getText: FetchText = fetchText,
+): Promise<void> {
+  if (get(repoFolder)) return;
+  try {
+    const text = await getText(teamRawUrl(ref, TIMING_FILE));
+    if (text === null || get(repoFolder)) return;
+    teamTiming.set({ ref, file: parseTimingFile(text) });
+  } catch {
+    /* the facts already loaded stay */
+  }
+}
+
 export function setOverride(id: string, value: number | null) {
   const next = { ...get(timingOverrides) };
   if (value === null) delete next[id];

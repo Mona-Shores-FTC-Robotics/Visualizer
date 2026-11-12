@@ -8,6 +8,7 @@
 import { get, writable } from "svelte/store";
 import * as browserFileStore from "../../utils/browserFileStore";
 import { showToast } from "../toast";
+import { loadTeamTimingFor } from "../timing/store";
 import {
   copyName,
   fetchTeamFiles,
@@ -67,6 +68,8 @@ export async function showTeamView(
   const first = fetched[at];
   const others = fetched.filter((_, i) => i !== at);
   teamView.set({ ref, files, pair, fetchedAt: Date.now() });
+  // The preview's timing follows the drawings' branch, not the one Team Autos last listed.
+  void loadTeamTimingFor(ref, getText);
   teamOpenRequest.set({
     path: copyName(first.file),
     text: first.text,
