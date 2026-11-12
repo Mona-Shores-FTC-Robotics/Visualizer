@@ -617,7 +617,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   };
 
   const rowNode = (row: AutoRow, card: FirstOfCard): JNode => {
-    // The partner wait's time limit is set from the drive team's "partner's last preload leaves at N s"
+    // The partner wait's time limit is the one the drive team may move in init
     // (biobuzz AutoKit.partnerWaitMs); the card's own time stays in the Java as the default.
     const condition =
       "when" in row
