@@ -21,7 +21,7 @@ public final class RClockwiseAuto {
     public static final String SOURCE = "r-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-12|3:07PM";
+    public static final String SAVED = "11-12|3:29PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -33,7 +33,7 @@ public final class RClockwiseAuto {
     public static final String DRAWN_FOR = "RED";
 
     /** What the drive team may change during INIT, on gamepad 1's D-pad; nothing changed, the Auto runs as drawn. */
-    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5), AutoOption.time("TS scoring FLOWER by", 16.9), AutoOption.time("T3c cross by", 16.2), AutoOption.time("T3b LEFT rescue by", 18.9), AutoOption.time("T3 RIGHT up by", 21.7), AutoOption.time("TR park at", 26.4), AutoOption.time("T3r RIGHT up by, at the right spot", 21.8), AutoOption.time("TRr park from the right at", 24), AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")};
+    public static final AutoOption[] OPTIONS = {AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5), AutoOption.time("TS scoring FLOWER by", 16.9), AutoOption.time("T3c cross by", 18.5), AutoOption.time("T3b LEFT rescue by", 18.9), AutoOption.time("T3 RIGHT up by", 21.7), AutoOption.time("TR park at", 26.4), AutoOption.time("T3r RIGHT up by, at the right spot", 21.8), AutoOption.time("TRr park from the right at", 24), AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")};
 
     /** Where the robot starts, for the given alliance. */
     public static Pose startPose(boolean rotated) {
@@ -133,8 +133,8 @@ public final class RClockwiseAuto {
                                         kit.when("Always").then(
                                                 kit.path("to SCORING_FLOWER_STAGING", toScoringFlowerStaging, 1.3, scoringFlowerParkToRightPark, 1.9),
                                                 kit.command("PickFlower", 4.5),
-                                                kit.firstOf("Time to cross for TIP 3: before 16.2 s",
-                                                        kit.atMatchSeconds(kit.seconds("T3c cross by", 16.2)).then(
+                                                kit.firstOf("Time to cross for TIP 3: before 18.5 s",
+                                                        kit.atMatchSeconds(kit.seconds("T3c cross by", 18.5)).then(
                                                                 kit.firstOf("Time to finish TIP 2 at LEFT: before 18.9 s",
                                                                         kit.atMatchSeconds(kit.seconds("T3b LEFT rescue by", 18.9)).then(
                                                                                 kit.guarded("Timed out", scoringFlowerParkToRightPark, 1.9,
@@ -154,8 +154,6 @@ public final class RClockwiseAuto {
                                                                                                                 kit.atMatchSeconds(kit.seconds("TR park at", 26.4))),
                                                                                                         kit.path("catch park to RIGHT_PARK", catchParkToRightPark, 2.5))))))),
                                                         kit.when("Always").then(
-                                                                kit.firstOf("Let TIP 2's spill land before backing under the HIVE",
-                                                                        kit.afterMs(2300)),
                                                                 kit.path("back under the HIVE to RIGHT_START", backUnderTheHiveToRightStart, 3.4, outsideLaneToRightPark, 3.2),
                                                                 kit.firstOf("R3: RIGHT up by 21.8 s at the right spot, otherwise park",
                                                                         kit.shotLimit(kit.seconds("T3r RIGHT up by, at the right spot", 21.8)).then(

@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-12T20:07:05.151Z",
+  "timestamp": "2026-11-12T20:29:10.287Z",
   "startPoint": {
     "x": 55.6,
     "y": 7.7,
@@ -203,7 +203,7 @@
       "segments": [
         {
           "id": "r-pickup-park-lane-garden",
-          "color": "#59a14f",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -233,7 +233,7 @@
         },
         {
           "id": "r-pickup-park-turn-garden",
-          "color": "#f28e2b",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -411,7 +411,7 @@
       "segments": [
         {
           "id": "r-to-catch-east",
-          "color": "#59a14f",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -437,7 +437,7 @@
         },
         {
           "id": "r-to-catch-wall",
-          "color": "#b07aa1",
+          "color": "#59a14f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -470,7 +470,7 @@
       "segments": [
         {
           "id": "r-catch-park-out",
-          "color": "#e15759",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -496,7 +496,7 @@
         },
         {
           "id": "r-catch-park-south",
-          "color": "#edc948",
+          "color": "#f28e2b",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -521,7 +521,7 @@
         },
         {
           "id": "r-catch-park-in",
-          "color": "#76b7b2",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -569,7 +569,7 @@
       "segments": [
         {
           "id": "r-cross-out",
-          "color": "#edc948",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -598,7 +598,7 @@
         },
         {
           "id": "r-cross-south",
-          "color": "#e15759",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -670,7 +670,7 @@
         },
         {
           "id": "r-right-park-lane",
-          "color": "#edc948",
+          "color": "#f28e2b",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -1064,10 +1064,10 @@
                       {
                         "id": "r-gate-cross",
                         "kind": "firstOf",
-                        "label": "Time to cross for TIP 3: before 16.2 s",
+                        "label": "Time to cross for TIP 3: before 18.5 s",
                         "rows": [
                           {
-                            "afterMs": 16200,
+                            "afterMs": 18500,
                             "matchClock": true,
                             "option": "T3c cross by",
                             "cards": [
@@ -1177,17 +1177,6 @@
                               "Always"
                             ],
                             "cards": [
-                              {
-                                "id": "r-spill",
-                                "kind": "firstOf",
-                                "label": "Let TIP 2's spill land before backing under the HIVE",
-                                "rows": [
-                                  {
-                                    "afterMs": 2300,
-                                    "cards": []
-                                  }
-                                ]
-                              },
                               {
                                 "id": "r-c-cross",
                                 "kind": "path",
