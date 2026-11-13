@@ -69,6 +69,8 @@ export const STICK_S = 0.7;
  */
 export const LOWER_WITHIN_IN = 24;
 export const LOWER_WITHIN_DEG = 10;
+/** GardenGather.facingHoldMs, in seconds: the facing must be held this long first, the turn over. */
+export const FACING_HOLD_S = 0.2;
 /**
  * With the stick down the robot stops this far short of the gather pose, inches: the stick is on
  * the audience wall (measured: 32 of the 36 logged gathers, 2.0 to 5.3 in, median 3.6).

@@ -20,6 +20,7 @@ import { LOWER_WITHIN_IN, pickFrom, pickMotions } from "../simple/flowers";
 import {
   gardenFor,
   gatherPlan,
+  FACING_HOLD_S as GARDEN_FACING_HOLD_S,
   LOWER_WITHIN_DEG as GARDEN_LOWER_WITHIN_DEG,
   LOWER_WITHIN_IN as GARDEN_LOWER_WITHIN_IN,
 } from "../simple/garden";
@@ -638,7 +639,8 @@ export function simulateAuto(
   /**
    * Fork: the drive card right before a GardenGather card lowers the stick over its last
    * GARDEN_LOWER_WITHIN_IN, once the robot faces the GARDEN to within GARDEN_LOWER_WITHIN_DEG and
-   * stays so to the drive's end (biobuzz GardenGather.approach). Returns when the stick went down,
+   * stays so to the drive's end, the turn over (biobuzz GardenGather.approach: never while the
+   * robot turns, which put the stick on the field wall). Returns when the stick went down,
    * or null when the gather does not follow a drive that ran or that drive never faced the GARDEN.
    * Distance is along the path here, straight to its end on the robot: the same on a straight end.
    */
@@ -660,7 +662,11 @@ export function simulateAuto(
     let from = path.length;
     for (let d = path.length - 0.5; d >= earliest && facing(d); d -= 0.5) from = d;
     if (from - earliest < 0.5 && facing(earliest)) from = earliest;
-    return drove.t0 + timeAtFraction(path, from / path.length);
+    const at = drove.t0 + timeAtFraction(path, from / path.length);
+    // A turn that ends inside the last stretch: the robot must hold the facing first
+    // (GardenGather.facingHoldMs), and a drive over before then leaves the stick to the card.
+    if (from <= earliest) return at;
+    return at + GARDEN_FACING_HOLD_S <= drove.t1 ? at + GARDEN_FACING_HOLD_S : null;
   };
 
   const runCard = (card: AutoCard, guards: Guard[], prev?: AutoCard): Signal => {
