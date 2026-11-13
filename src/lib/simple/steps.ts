@@ -88,6 +88,8 @@ export interface Step {
   waitClock?: boolean;
   /** Wait: the drive team may move it in INIT, the second its wait for the partner's TIP gives up (biobuzz InitOptions). */
   waitAdjustable?: boolean;
+  /** Wait set in INIT: which TIP it waits for, 1 to 3 (the Driver Station's row names it). */
+  waitTip?: number;
   /**
    * Clock check: its time's name on the INIT menu, when the drive team may set it there (the
    * Driver Station's row reads "<name> ◀▶: 20.7 s").
@@ -393,6 +395,7 @@ function walkSteps(
           waitS: wait.seconds,
           waitClock: wait.matchClock,
           waitAdjustable: wait.adjustable,
+          waitTip: wait.tip,
           waitOption: wait.option,
           spinUp: wait.spinUp,
           otherwise,
@@ -895,6 +898,8 @@ export function setWait(
     matchClock?: boolean;
     /** The drive team may move it in INIT; only on the match clock, one wait per Auto. */
     adjustable?: boolean;
+    /** Which TIP the wait set in INIT waits for, 1 to 3: the Driver Station's row says so. */
+    tip?: number;
     /**
      * Clock check only: its time's name on the INIT menu, so the drive team may set it there;
      * null takes it off the menu.
@@ -937,15 +942,26 @@ export function setWait(
       if (change.matchClock === false) {
         delete row.matchClock;
         delete row.adjustable;
+        delete row.tip;
       }
       if (change.adjustable === true && row.matchClock) {
         // One wait per Auto: it is one row of the INIT menu.
         for (const other of allCardsOf(auto.cards))
           if (other.kind === "firstOf" && other !== card)
             for (const r of other.rows) if ("afterMs" in r) delete r.adjustable;
+        for (const other of allCardsOf(auto.cards))
+          if (other.kind === "firstOf" && other !== card)
+            for (const r of other.rows) if ("afterMs" in r) delete r.tip;
         row.adjustable = true;
+        // A wait before the robot has launched anything waits for TIP 1; the drawing says otherwise.
+        if (!row.tip) row.tip = 1;
       }
-      if (change.adjustable === false) delete row.adjustable;
+      if (change.adjustable === false) {
+        delete row.adjustable;
+        delete row.tip;
+      }
+      if (change.tip !== undefined && row.adjustable && [1, 2, 3].includes(change.tip))
+        row.tip = change.tip;
       if (change.option !== undefined) {
         const name = change.option?.trim();
         if (name) row.option = name;
@@ -1300,10 +1316,12 @@ export function initRow(
   kind: "choice" | "partnerWait" | "time",
   name: string,
   value: string | number,
+  /** The wait set in INIT: which TIP it waits for; unset, the row says "partner's TIP". */
+  tip?: number,
 ): string {
   if (kind === "choice") return `${name} ◀▶: ${value}`;
   if (kind === "partnerWait")
-    return `waiting for partner's TIP ◀▶ until ${value} s`;
+    return `waiting for ${tip ? `TIP ${tip}` : "partner's TIP"} ◀▶ until ${value} s`;
   return `${name} ◀▶: ${value} s`;
 }
 
@@ -1342,6 +1360,8 @@ function waitOf(
   seconds: number;
   matchClock: boolean;
   adjustable: boolean;
+  /** Which TIP the adjustable wait waits for. */
+  tip?: number;
   /** A clock check's time, by name on the INIT menu. */
   option?: string;
   spinUp: boolean;
@@ -1380,6 +1400,7 @@ function waitOf(
         afterMs: number;
         matchClock?: boolean;
         adjustable?: boolean;
+        tip?: number;
         option?: string;
         cards: AutoCard[];
       }
@@ -1395,6 +1416,7 @@ function waitOf(
     seconds: time.afterMs / 1000,
     matchClock: !!time.matchClock,
     adjustable: !!time.adjustable,
+    tip: time.adjustable ? time.tip : undefined,
     option: time.option,
     spinUp: card.alongside === SPIN_UP,
     otherwise: time.cards,

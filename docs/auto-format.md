@@ -108,7 +108,10 @@ optional `label` (the branch's name; defaults to one made from the condition).
 | `{"afterMs": 8000, "matchClock": true}` | Fork: once the match clock reads 8 s, however late the card started (at once if it already does) |
 
 A match-clock time row may also carry `"adjustable": true`: the drive team may move it during
-INIT. Only one wait per Auto may (see below). Or it may carry `"option": "T2 LEFT up by"`: the time
+INIT. Only one wait per Auto may (see below). With it, `"tip": 1` (to 3) says which TIP of the
+match the wait is for; the export passes it on (`AutoOption.matchSeconds(label, seconds, tip)`) and
+the Driver Station's row reads "waiting for TIP 1 until 9 s". Without it the row reads "waiting
+for partner's TIP". The builder sets 1 when the wait is first put on the menu. Or it may carry `"option": "T2 LEFT up by"`: the time
 is a row of the INIT menu under that name, set as it is; any number of waits may, and two rows with
 one name are one time (see "A paired Auto").
 

@@ -157,7 +157,7 @@ describe("the Java", () => {
     if (!result.ok) throw new Error(result.errors.join("\n"));
     const java = result.source;
     expect(java).toContain(
-      'public static final AutoOption[] OPTIONS = {AutoOption.park("LEFT_PARK", "RIGHT_PARK"), AutoOption.matchSeconds("Wait for TIP or CELL up", 8)};',
+      'public static final AutoOption[] OPTIONS = {AutoOption.park("LEFT_PARK", "RIGHT_PARK"), AutoOption.matchSeconds("Wait for TIP or CELL up", 8, 1)};',
     );
     expect(java).toContain(
       "Pose park = kit.pick(AutoOption.PARK, leftPark, rightPark);",
