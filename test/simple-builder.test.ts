@@ -43,6 +43,7 @@ import {
   setStart,
   setStartHeading,
   setWait,
+  setWaitRejoin,
   renameSpot,
   startName,
   DEFAULT_STARTS,
@@ -51,6 +52,7 @@ import {
   pruneUnusedPaths,
   stepsOf,
   stepForLine,
+  type Step,
   type StepKind,
   type StepList,
 } from "../src/lib/simple/steps";
@@ -886,13 +888,157 @@ describe("a Wait step's Otherwise list", () => {
     expect(isSimple(doc)).toBe(true);
   });
 
-  it("refuses a wait inside an Otherwise", () => {
+  /** Every step, however deep in an Otherwise. */
+  const everyStep = (steps: Step[]): Step[] =>
+    steps.flatMap((s) => [s, ...everyStep(s.otherwise ?? [])]);
+  const stepOf = (doc: ProjectDoc, cardId: string) =>
+    everyStep(stepsOf(doc)).find((s) => s.cardId === cardId)!;
+  /** Adds a step at the end of the Otherwise of a wait, wherever that wait is. */
+  const into = (
+    doc: ProjectDoc,
+    waitCardId: string,
+    kind: Exclude<StepKind, "other">,
+    spot?: string,
+  ) =>
+    addStep(
+      doc,
+      kind,
+      stepOf(doc, waitCardId).otherwise?.length ?? 0,
+      spot,
+      { waitCardId },
+    );
+
+  /**
+   * L-NoCross's no-TIP route in small: no TIP, so cross to RIGHT_FIRE; there, fire only if the
+   * CELL is up, and come back either way.
+   */
+  function nestedFallback(): { doc: ProjectDoc; outer: string; inner: string } {
     let doc = fresh();
+    doc = setStart(doc, "LEFT_START", DEFAULT_STARTS.LEFT_START);
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "LEFT_FIRE", 57.5, 123.5, 273.4);
+    doc = addSpot(doc, "LEFT_PARK", 9.8, 117.4, 0);
     doc = add(doc, "wait");
-    const waitId = doc.auto!.cards[0].id;
-    expect(() =>
-      addStep(doc, "wait", 0, undefined, { waitCardId: waitId }),
-    ).toThrow();
+    const outer = doc.auto!.cards[0].id;
+    doc = into(doc, outer, "drive", "RIGHT_FIRE").doc;
+    const made = into(doc, outer, "wait");
+    doc = made.doc;
+    const inner = made.cardId;
+    doc = into(doc, inner, "drive", "LEFT_FIRE").doc;
+    doc = into(doc, outer, "launch").doc;
+    doc = into(doc, outer, "drive", "LEFT_FIRE").doc;
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "LEFT_PARK");
+    return { doc, outer, inner };
+  }
+
+  it("takes a wait inside an Otherwise, with an Otherwise of its own", () => {
+    const { doc, outer, inner } = nestedFallback();
+    expect(isSimple(doc)).toBe(true);
+    expect(stepOf(doc, outer).otherwise?.map((s) => s.kind)).toEqual([
+      "drive",
+      "wait",
+      "launch",
+      "drive",
+    ]);
+    expect(stepOf(doc, inner).otherwise?.map((s) => s.label)).toEqual([
+      "Drive to LEFT_FIRE",
+    ]);
+    // Both go on: the launch after the inner wait runs whether or not its trigger came.
+    expect(stepOf(doc, inner)).toMatchObject({ rejoin: true, insteadParks: false });
+  });
+
+  it("inside an Otherwise that goes on, an Otherwise run instead skips the steps below, with no Park", () => {
+    const start = nestedFallback();
+    const doc = setWaitRejoin(start.doc, start.inner, false);
+    expect(isSimple(doc)).toBe(true);
+    expect(stepOf(doc, start.inner)).toMatchObject({
+      rejoin: false,
+      insteadParks: false,
+    });
+    // The builder still shows the launch and the drive back below the inner wait.
+    expect(stepOf(doc, start.outer).otherwise?.map((s) => s.kind)).toEqual([
+      "drive",
+      "wait",
+      "launch",
+      "drive",
+    ]);
+    expect(stepOf(doc, start.inner).otherwise?.map((s) => s.kind)).toEqual([
+      "drive",
+    ]);
+    // In the file they are the inner wait's trigger row, the wait last in the outer Otherwise.
+    const outer = doc.auto!.cards[0];
+    if (outer.kind !== "firstOf") throw new Error("not a wait");
+    const otherwise = outer.rows.find((r) => "afterMs" in r)!.cards;
+    expect(otherwise.map((c) => c.kind)).toEqual(["path", "firstOf"]);
+    const inner = otherwise[1];
+    if (inner.kind !== "firstOf") throw new Error("not a wait");
+    expect(inner.rows.find((r) => "when" in r)!.cards.map((c) => c.kind)).toEqual(
+      ["action", "path"],
+    );
+    const java = generateAutoJava({
+      auto: settled(doc).auto!,
+      startPoint: settled(doc).startPoint,
+      lines: settled(doc).lines,
+      shapes: [],
+      settings,
+      sourceFileName: "nested.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    // Going on again puts them back below the wait in the file too.
+    const back = setWaitRejoin(doc, start.inner, true);
+    expect(stepsOf(back)).toEqual(stepsOf(start.doc));
+  });
+
+  it("where nothing follows, an Otherwise run instead parks, and so does each one inside it", () => {
+    const start = nestedFallback();
+    let doc = setWaitRejoin(start.doc, start.inner, false);
+    doc = setWaitRejoin(doc, start.outer, false);
+    expect(isSimple(doc)).toBe(true);
+    expect(stepOf(doc, start.outer)).toMatchObject({
+      rejoin: false,
+      insteadParks: true,
+    });
+    expect(stepOf(doc, start.inner)).toMatchObject({
+      rejoin: false,
+      insteadParks: true,
+    });
+    expect(stepOf(doc, start.outer).otherwise?.map((s) => s.kind)).toEqual([
+      "drive",
+      "wait",
+      "launch",
+      "drive",
+      "park",
+    ]);
+    expect(stepOf(doc, start.inner).otherwise?.map((s) => s.kind)).toEqual([
+      "drive",
+      "park",
+    ]);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "nested-park.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    // Each outcome parks on its own, and every list that leads to such a wait is guarded.
+    if (java.ok) expect(java.source.match(/kit\.guarded\(/g)?.length).toBe(5);
+    // Going on again takes out every Park in the Otherwise, however deep.
+    const back = setWaitRejoin(doc, start.outer, true);
+    expect(
+      everyStep(stepOf(back, start.outer).otherwise ?? []).some(
+        (s) => s.kind === "park",
+      ),
+    ).toBe(false);
+  });
+
+  it("never moves a wait into its own Otherwise", () => {
+    const { doc, outer, inner } = nestedFallback();
+    expect(moveStep(doc, outer, 0, { waitCardId: inner })).toEqual(doc);
+    expect(moveStep(doc, outer, 0, { waitCardId: outer })).toEqual(doc);
   });
 
   it("lays an Otherwise drive's heading from the heading at the wait", () => {
