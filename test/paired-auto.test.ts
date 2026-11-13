@@ -79,11 +79,11 @@ describe("a paired Auto", () => {
     });
   }
 
-  it("lists the menu in OPTIONS: the choice, the shot trigger, the times, the partner", () => {
+  it("lists the menu in OPTIONS: the choices, the shot trigger, the times, the partner", () => {
     const java = readFileSync(`${DIR}/RClockwiseAuto.java`, "utf8");
     const options = java.split("\n").find((l) => l.includes("OPTIONS ="))!;
     expect(options).toContain(
-      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5)',
+      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.choice("Priority", "THREE_TIP", "PARK"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5)',
     );
     expect(options).toContain(
       'AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")',
