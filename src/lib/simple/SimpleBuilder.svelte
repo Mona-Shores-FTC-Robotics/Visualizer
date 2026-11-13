@@ -67,6 +67,8 @@
     setWait,
     setChoice,
     everyStep,
+    initRow,
+    newTimeName,
     ALWAYS,
     LEG_KINDS,
     setParkChoice,
@@ -738,7 +740,11 @@
             class="mt-1 flex flex-wrap items-center gap-x-3 pl-6 text-xs text-body"
             title="If a partner parks where we planned to, the drive team picks another park in INIT with the D-pad's left and right. Every park path goes there instead."
           >
-            <span>Drive team may pick in INIT (D-pad ◀▶):</span>
+            <span
+              >Drive team may pick in INIT (Driver Station: <span class="font-mono"
+                >{initRow("choice", "Park", step.spot ?? "")}</span
+              >):</span
+            >
             {#each offers as name (name)}
               <label class="flex items-center gap-1">
                 <input
@@ -851,19 +857,40 @@
         </span>
         <span>the robot goes straight on with the steps below. It never waits here.</span>
       </div>
-      <div class="mt-1 flex flex-wrap items-center gap-1 pl-6">
+      <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body">
         <button
           type="button"
-          class={["simple-option", step.waitAdjustable && "simple-option--on"]}
-          aria-pressed={step.waitAdjustable}
-          title="The drive team may move this time in INIT with the D-pad. One step per Auto."
+          class={["simple-option", step.waitOption && "simple-option--on"]}
+          aria-pressed={!!step.waitOption}
+          title="The drive team may move this time in INIT: D-pad up and down pick its row, left and right change it."
           onclick={() =>
             apply(
-              setWait(doc, step.cardId, { adjustable: !step.waitAdjustable }),
+              setWait(doc, step.cardId, {
+                option: step.waitOption ? null : newTimeName(doc),
+              }),
             )}
-          >{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
+          >{step.waitOption ? "✓ " : ""}Set in INIT</button
         >
+        {#if step.waitOption}
+          <span>as</span>
+          <input
+            class={[fieldClass, "!w-32 !py-0.5 text-xs"]}
+            aria-label="Name on the INIT menu"
+            value={step.waitOption}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  option: e.currentTarget.value || step.waitOption,
+                }),
+              )}
+          />
+        {/if}
       </div>
+      {#if step.waitOption}
+        <p class="mt-1 pl-6 text-xs text-body">
+          Driver Station: <span class="font-mono">{initRow("time", step.waitOption, step.waitS ?? 0)}</span>
+        </p>
+      {/if}
       {:else}
       <!-- One sentence: wait for [trigger] [at most | until] [N] s. -->
       <div
@@ -950,6 +977,13 @@
           >
         {/if}
       </div>
+      {#if step.waitAdjustable}
+        <p class="mt-1 pl-6 text-xs text-body">
+          Driver Station: <span class="font-mono"
+            >{initRow("partnerWait", "", step.waitS ?? 0)}</span
+          >
+        </p>
+      {/if}
       {/if}
       {#if step.waitFor !== TIME_ONLY}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
@@ -1060,6 +1094,11 @@
             apply(setChoice(doc, step.cardId, { option: e.currentTarget.value }))}
         />
       </div>
+      <p class="mt-1 pl-6 text-xs text-body">
+        Driver Station: <span class="font-mono"
+          >{initRow("choice", step.option ?? "", step.legs?.[0]?.name ?? "")}</span
+        >; left and right change it.
+      </p>
       {#each step.legs ?? [] as leg, legIndex (legIndex)}
         {@const sub = { waitCardId: step.cardId, leg: legIndex as 0 | 1 }}
         {@const shown = previewsTip(step.cardId) === (legIndex === 0)}
