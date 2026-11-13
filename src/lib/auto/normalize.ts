@@ -476,6 +476,13 @@ function normalizeRow(
       afterMs: raw.afterMs,
       ...(matchClock ? { matchClock: true } : {}),
       ...(matchClock && raw.adjustable === true ? { adjustable: true } : {}),
+      // Fork: which TIP the adjustable wait waits for (types.ts AfterMsRow.tip).
+      ...(matchClock &&
+      raw.adjustable === true &&
+      typeof raw.tip === "number" &&
+      [1, 2, 3].includes(raw.tip)
+        ? { tip: raw.tip }
+        : {}),
       // Fork: a time on the INIT menu (types.ts AfterMsRow.option).
       ...(matchClock && typeof raw.option === "string" && raw.option.trim()
         ? { option: raw.option.trim() }

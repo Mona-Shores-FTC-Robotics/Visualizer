@@ -747,7 +747,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     for (const row of card.rows)
       if ("afterMs" in row && row.matchClock && row.adjustable)
         options.push(
-          `AutoOption.matchSeconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)})`,
+          `AutoOption.matchSeconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)}${row.tip ? `, ${row.tip}` : ""})`,
         );
   }
   // Fork: a paired Auto's menu: its route choices, the shot trigger, its times in the order the

@@ -1208,6 +1208,42 @@ describe("a Wait step's Otherwise list", () => {
   it("the Driver Station rows read as biobuzz InitOptions writes them", () => {
     expect(initRow("choice", "Pickup", "WALL_FLOWER")).toBe("Pickup ◀▶: WALL_FLOWER");
     expect(initRow("partnerWait", "", 9)).toBe("waiting for partner's TIP ◀▶ until 9 s");
+    expect(initRow("partnerWait", "", 23.2, 2)).toBe("waiting for TIP 2 ◀▶ until 23.2 s");
+  });
+
+  it("a wait set in INIT says which TIP it waits for", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "wait");
+    const wait = doc.auto!.cards[0].id;
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "RIGHT_PARK");
+    doc = setWait(doc, wait, { matchClock: true, seconds: 9 });
+    // Turned on, it is for TIP 1 until the drawing says otherwise.
+    doc = setWait(doc, wait, { adjustable: true });
+    expect(stepOf(doc, wait)).toMatchObject({ waitAdjustable: true, waitTip: 1 });
+    doc = setWait(doc, wait, { tip: 2 });
+    expect(stepOf(doc, wait).waitTip).toBe(2);
+    // It survives a save and a load, and the export hands it to the Driver Station.
+    const again = parseProject(serializeProject(doc), robotConfigOf(settings));
+    if (!again.ok) throw new Error(again.error);
+    expect(stepOf(again.doc, wait).waitTip).toBe(2);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "tip.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok)
+      expect(java.source).toContain(
+        'AutoOption.matchSeconds("Wait for TIP or CELL up", 9, 2)',
+      );
+    // Off the menu, the TIP goes with it.
+    expect(stepOf(setWait(doc, wait, { adjustable: false }), wait).waitTip).toBeUndefined();
   });
 
   it("a choice that ends the route lets each leg park by its own road", () => {

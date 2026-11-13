@@ -973,14 +973,37 @@
                   adjustable: !step.waitAdjustable,
                 }),
               )}
-            >{step.waitAdjustable ? "✓ " : ""}Set in INIT (wait for partner's TIP)</button
+            >{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
           >
         {/if}
       </div>
       {#if step.waitAdjustable}
+        <!-- Fork: which TIP this wait is for, so the Driver Station's row can say so (types.ts tip). -->
+        <div
+          class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+        >
+          <span>It waits for</span>
+          <select
+            class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+            aria-label="Which TIP"
+            title="Which TIP of the match this wait is for: the first, second or third time the HIVE tips"
+            value={String(step.waitTip ?? "")}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  tip: Number(e.currentTarget.value),
+                }),
+              )}
+          >
+            {#if !step.waitTip}<option value="">the partner's TIP</option>{/if}
+            <option value="1">TIP 1</option>
+            <option value="2">TIP 2</option>
+            <option value="3">TIP 3</option>
+          </select>
+        </div>
         <p class="mt-1 pl-6 text-xs text-body">
           Driver Station: <span class="font-mono"
-            >{initRow("partnerWait", "", step.waitS ?? 0)}</span
+            >{initRow("partnerWait", "", step.waitS ?? 0, step.waitTip)}</span
           >
         </p>
       {/if}

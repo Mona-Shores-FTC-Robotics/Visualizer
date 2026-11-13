@@ -188,6 +188,12 @@ export type AfterMsRow = RowCommon & {
    */
   adjustable?: boolean;
   /**
+   * Fork: which TIP the adjustable wait waits for, 1 to 3, so the Driver Station's row reads
+   * "waiting for TIP 2 until 23 s" (biobuzz `AutoOption.matchSeconds(name, seconds, tip)`).
+   * Unset, the row reads "waiting for partner's TIP". Only with `adjustable`.
+   */
+  tip?: number;
+  /**
    * Fork: this match-clock time is a row of the INIT menu under this name ("T2 LEFT up by"): the
    * drive team may set it as it is, half a second a press (biobuzz `AutoOption.time`). Any number
    * of waits may have one; two rows with the same name are the same time. Not the partner wait.
