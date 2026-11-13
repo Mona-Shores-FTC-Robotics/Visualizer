@@ -291,8 +291,10 @@ shows both forms the same way, the steps below the wait in its list (`unfold`/`r
 
 - **then: park**, where nothing follows the wait's list: the main list, or the Otherwise of a wait
   that itself parks. The Otherwise ends with its own Park, as does every Otherwise inside it that
-  runs instead, and each outcome is guarded with its own park. A list that ends in such a wait is
-  guarded too, by a park from the wait's spot, so the endgame guard watches the drives before it.
+  runs instead, and each outcome is guarded with its own park. In an Auto made of builder steps
+  only, a list that ends in such a wait is guarded too, by a park from the wait's spot, so the
+  endgame guard watches the drives before it; a paired Auto's hand-made decisions keep the guards
+  they were drawn with.
 - **then: skip the steps below**, inside an Otherwise that goes on. No Park: the Otherwise just
   ends, and the robot goes on with the steps after the Otherwise it is in.
 
