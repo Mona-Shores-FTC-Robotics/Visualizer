@@ -78,7 +78,7 @@
       ...robots.flatMap((r, robot) =>
         controls.still[r.file]
           ? []
-          : ROBOT_FACT_LIST.map((f): Knob => ({ robot, id: f.id })),
+          : robotFacts(r).map((f): Knob => ({ robot, id: f.id })),
       ),
     ];
     const snapshot = { entries, values };
@@ -156,6 +156,17 @@
     for (const q of previewQuestions(auto))
       if (!seen.includes(q.condition)) seen.push(q.condition);
     return seen;
+  }
+
+  /**
+   * A robot's sliders: the facts that time something its Auto does. "Intake full" times a wait for
+   * the intake to fill, which no Auto on master has, so it shows only for an Auto that has one.
+   */
+  function robotFacts(robot: RobotInfo): TimingFact[] {
+    const waits = triggers(robot.auto);
+    return ROBOT_FACT_LIST.filter(
+      (fact) => fact.id !== "intakeFullS" || waits.includes("IntakeFull"),
+    );
   }
 
   /** Whether a condition comes: the controls only ever answer one for every wait on it. */
@@ -296,7 +307,7 @@
     <div
       class={["flex flex-col gap-1", still && "pointer-events-none opacity-40"]}
     >
-      {#each ROBOT_FACT_LIST as fact (fact.id)}
+      {#each robotFacts(robot) as fact (fact.id)}
         {@render slider(
           fact,
           robotValue(robot, fact),

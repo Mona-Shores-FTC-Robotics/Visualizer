@@ -1079,8 +1079,8 @@ describe("a Wait step's Otherwise list", () => {
     const step = stepOf(doc, choice);
     expect(step).toMatchObject({
       kind: "choice",
-      option: "Pickup",
-      label: "Pickup: WALL_FLOWER or GARDEN",
+      option: "First pickup",
+      label: "First pickup: WALL_FLOWER or GARDEN",
     });
     expect(step.legs!.map((leg) => leg.name)).toEqual(["WALL_FLOWER", "GARDEN"]);
     expect(step.legs![0].steps.map((s) => s.kind)).toEqual(["drive", "pick", "drive"]);
@@ -1102,10 +1102,10 @@ describe("a Wait step's Otherwise list", () => {
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (!java.ok) return;
-    expect(java.source).toContain('AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN")');
-    expect(java.source.match(/kit\.route\("Pickup", 0,/g)?.length).toBe(3);
-    expect(java.source.match(/kit\.route\("Pickup", 1,/g)?.length).toBe(3);
-    expect(java.source).toContain('kit.route("Pickup", 1, () -> kit.command("GardenGather"');
+    expect(java.source).toContain('AutoOption.choice("First pickup", "WALL_FLOWER", "GARDEN")');
+    expect(java.source.match(/kit\.route\("First pickup", 0,/g)?.length).toBe(3);
+    expect(java.source.match(/kit\.route\("First pickup", 1,/g)?.length).toBe(3);
+    expect(java.source).toContain('kit.route("First pickup", 1, () -> kit.command("GardenGather"');
   });
 
   it("a choice and its legs can be renamed", () => {

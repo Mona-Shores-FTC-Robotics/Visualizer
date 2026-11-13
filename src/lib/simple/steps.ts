@@ -133,8 +133,11 @@ export const LEG_KINDS: StepKind[] = [
 /** A new clock check's time, seconds on the match clock. */
 const CHECK_DEFAULT_S = 20;
 
-/** A new choice's names: the one the team draws most, WALL FLOWER or GARDEN. */
-const CHOICE_DEFAULT = { option: "Pickup", legs: ["WALL_FLOWER", "GARDEN"] };
+/** A new choice's names: the one the team draws most, the first pickup at the WALL FLOWER or the GARDEN. */
+const CHOICE_DEFAULT = {
+  option: "First pickup",
+  legs: ["WALL_FLOWER", "GARDEN"],
+};
 
 /**
  * Fork: what a Wait step waits for, the robot's triggers (biobuzz AutoRegistration). The builder
