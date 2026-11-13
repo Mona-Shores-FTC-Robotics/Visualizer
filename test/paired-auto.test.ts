@@ -1,7 +1,9 @@
 // Fork: a paired Auto's INIT menu (types.ts FirstOfCard.choice and .shot, AfterMsRow.option,
 // AutoSection.partner): a route choice between two legs, stops that shoot by the camera or the
 // timer, times the drive team may set, and what the Auto assumes of its partner.
-// The fixtures are biobuzz's r-clockwise.pp and l-clockwise.pp with the Java they export.
+// The fixtures are the Clockwise pair as it was with that whole menu (biobuzz's backward drafts
+// still use it), with the Java they export. The pair on biobuzz master is builder steps only:
+// test/fixtures/clockwise-builder, test/clockwise-builder.test.ts.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/config/defaults";
