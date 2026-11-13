@@ -32,6 +32,7 @@ import {
   usedNames,
 } from "../../auto/tree";
 import { isUsed, pointUses } from "../../auto/pins";
+import { isBuilderAuto } from "../../simple/steps";
 import {
   type AutoCard,
   type AutoRow,
@@ -578,6 +579,44 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   }
   tailDecls.sort((a, b) => a.size - b.size);
 
+  // Only in an Auto made of builder steps: a paired Auto's hand-made decisions keep the guards
+  // they were drawn and timed with.
+  const builderAuto = isBuilderAuto(auto);
+
+  /**
+   * The park for a list whose last card is a wait that parks, from the spot that wait is on: a
+   * Park step that comes before any drive in one of the wait's outcomes (its Otherwise first),
+   * else the spot's own park (`parkFrom` of the drive that brought the robot there).
+   */
+  const parkOfLastWait = (list: AutoCard[]): string | null => {
+    const last = list[list.length - 1];
+    if (last?.kind !== "firstOf") return null;
+    const fromHere = (cards: AutoCard[]): string | null => {
+      for (const card of cards) {
+        if (card.kind === "path") return card.park ? card.lineId : null;
+        if (card.kind === "firstOf") return parkOfLastWait([card]);
+        if (card.kind === "rejoin") return null;
+      }
+      return null;
+    };
+    const rows = [...last.rows].sort(
+      (a, b) => Number("when" in a) - Number("when" in b),
+    );
+    for (const row of rows) {
+      const park = fromHere(row.cards);
+      if (park) return park;
+    }
+    if (!allCards(last.rows.flatMap((row) => row.cards)).some(
+      (card) => card.kind === "path" && card.park,
+    ))
+      return null;
+    for (let i = list.length - 2; i >= 0; i--) {
+      const card = list[i];
+      if (card.kind === "path") return auto.parkFrom?.[card.id] ?? null;
+    }
+    return null;
+  };
+
   const listNodes = (list: AutoCard[], label: string): JNode[] => {
     const nodes: JNode[] = [];
     for (let i = 0; i < list.length; i++) {
@@ -622,13 +661,17 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
         break;
       }
     }
-    const park = parkCardOf(list);
+    // A route is guarded by its park. A list whose last card is a wait that parks (each of that
+    // wait's outcomes holds its own Park) has none of its own, yet the guard must watch the drives
+    // and grabs before that wait: it takes the wait's park, which starts on the wait's spot.
+    const park =
+      parkCardOf(list)?.lineId ?? (builderAuto ? parkOfLastWait(list) : null);
     if (!park) return nodes;
-    const { varName } = pathOf(park.lineId);
+    const { varName } = pathOf(park);
     return [
       {
         head: "kit.guarded",
-        args: [javaString(label), varName, parkSecondsOf(park.lineId)],
+        args: [javaString(label), varName, parkSecondsOf(park)],
         children: nodes,
       },
     ];

@@ -276,15 +276,30 @@ contract with the robot's `autokit` library:
 - `OPTIONS`, always written (`{}` with none), lists what the drive team may change in INIT (see
   below).
 
-### The simple builder's Otherwise: go on, or park
+### The simple builder's Otherwise: go on, or instead
 
-A Wait step's Otherwise is its time row's cards. With **then: go on with the steps below** (the
-default) the wait has no cards on its trigger row, and both outcomes go on with the cards after
-the wait. With **then: park** the Otherwise ends with its own park card, and the wait is the
-main list's last card: the steps below it, Park included, are its trigger row's cards, so each
-outcome holds the rest of its own route and each is guarded with its own park. The builder shows
-both forms the same way, the steps below the wait in the main list (`unfold`/`refold` in
-`lib/simple/steps.ts`). Every Park step is on the Auto's one PARK spot.
+A Wait step's Otherwise is its time row's cards. An Otherwise is a list like the main one: it may
+hold a Wait with an Otherwise of its own, to any depth. Each ends one of two ways.
+
+With **then: go on with the steps below** (the default) the wait has no cards on its trigger row,
+and both outcomes go on with the cards after the wait.
+
+Otherwise it runs **instead of the steps below**: the wait is its list's last card and the steps
+below it are its trigger row's cards, so each outcome holds the rest of its own route. The builder
+shows both forms the same way, the steps below the wait in its list (`unfold`/`refold` in
+`lib/simple/steps.ts`), and names the second by where the wait is:
+
+- **then: park**, where nothing follows the wait's list: the main list, or the Otherwise of a wait
+  that itself parks. The Otherwise ends with its own Park, as does every Otherwise inside it that
+  runs instead, and each outcome is guarded with its own park. In an Auto made of builder steps
+  only, a list that ends in such a wait is guarded too, by a park from the wait's spot, so the
+  endgame guard watches the drives before it; a paired Auto's hand-made decisions keep the guards
+  they were drawn with.
+- **then: skip the steps below**, inside an Otherwise that goes on. No Park: the Otherwise just
+  ends, and the robot goes on with the steps after the Otherwise it is in.
+
+"Fire only if the CELL is up" is the first: Drive to the launch spot, Wait for CELL up with an
+Otherwise that parks, then Launch all. Every Park step is on the Auto's one PARK spot.
 
 Every drive the guard could park after has a park from its spot (`parkFrom`): in each route all
 but the last drive before its Park, and every drive in an Otherwise that goes on.

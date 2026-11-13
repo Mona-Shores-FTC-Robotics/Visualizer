@@ -107,7 +107,8 @@ describe("an Otherwise that parks", () => {
     });
     if (!result.ok) throw new Error(result.errors.join("\n"));
     expect(result.source).toContain('kit.when("CellUp").then(');
-    expect(result.source.match(/kit\.guarded\(/g)?.length).toBe(2);
+    // One guard per outcome, and one for the steps before the wait, with the wait's park.
+    expect(result.source.match(/kit\.guarded\(/g)?.length).toBe(3);
   });
 });
 

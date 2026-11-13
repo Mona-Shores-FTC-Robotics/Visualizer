@@ -871,7 +871,7 @@
               step.waitAdjustable && "simple-option--on",
             ]}
             aria-pressed={step.waitAdjustable}
-            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's up and down move that second. The time here is what it shows untouched. One wait per Auto."
+            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's left and right move that second. The time here is what it shows untouched. One wait per Auto."
             onclick={() =>
               apply(
                 setWait(doc, step.cardId, {
@@ -885,7 +885,7 @@
       {#if step.waitFor !== TIME_ONLY}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
       {@const sub = { waitCardId: step.cardId }}
-      <div class="simple-otherwise mt-1.5 ml-6">
+      <div class="simple-otherwise mt-1.5 ml-2">
         <div
           class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
         >
@@ -942,16 +942,18 @@
               }}
             >
               <option value="">+ add a step…</option>
-              {#each PALETTE.filter((t) => t.kind !== "wait") as tile (tile.kind)}
+              {#each PALETTE as tile (tile.kind)}
                 <option value={tile.kind}>{tile.label}</option>
               {/each}
             </select>
           </li>
         </ol>
-        <!-- Fork: after the Otherwise, go on with the steps below the wait, or park (steps.ts). -->
+        <!-- Fork: after the Otherwise, go on with the steps below the wait, or run instead of them (steps.ts). -->
         <label
           class="mt-1 flex items-center gap-1 text-xs text-body"
-          title="Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
+          title={step.insteadParks
+            ? "Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
+            : "Go on: after these steps the robot carries on with the steps below the wait. Skip: the steps below the wait, in this Otherwise, run only when the trigger comes; after these steps the robot leaves this Otherwise."}
         >
           then
           <select
@@ -968,7 +970,9 @@
               )}
           >
             <option value="goOn">go on with the steps below</option>
-            <option value="park">park</option>
+            <option value="park"
+              >{step.insteadParks ? "park" : "skip the steps below"}</option
+            >
           </select>
         </label>
       </div>
@@ -1313,6 +1317,15 @@
   .simple-otherwise {
     border-left: 2px solid color-mix(in srgb, var(--warning) 60%, transparent);
     padding-left: 0.5rem;
+  }
+  /* An Otherwise may hold a wait with an Otherwise of its own, to any depth: the steps inside one
+     give up their own indents, so each level costs the panel only the line down its left. */
+  .simple-otherwise .simple-step {
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+  }
+  .simple-otherwise :global(.pl-6) {
+    padding-left: 0.25rem;
   }
   .simple-end {
     border-radius: 0.6rem;
