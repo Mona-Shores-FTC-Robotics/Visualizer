@@ -1,7 +1,9 @@
 // Fork: a paired Auto's INIT menu (types.ts FirstOfCard.choice and .shot, AfterMsRow.option,
 // AutoSection.partner): a route choice between two legs, stops that shoot by the camera or the
 // timer, times the drive team may set, and what the Auto assumes of its partner.
-// The fixtures are biobuzz's r-clockwise.pp and l-clockwise.pp with the Java they export.
+// The fixtures are the Clockwise pair as it was with that whole menu (biobuzz's backward drafts
+// still use it), with the Java they export. The pair on biobuzz master is builder steps only:
+// test/fixtures/clockwise-builder, test/clockwise-builder.test.ts.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/config/defaults";
@@ -79,11 +81,11 @@ describe("a paired Auto", () => {
     });
   }
 
-  it("lists the menu in OPTIONS: the choice, the shot trigger, the times, the partner", () => {
+  it("lists the menu in OPTIONS: the choices, the shot trigger, the times, the partner", () => {
     const java = readFileSync(`${DIR}/RClockwiseAuto.java`, "utf8");
     const options = java.split("\n").find((l) => l.includes("OPTIONS ="))!;
     expect(options).toContain(
-      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5)',
+      'AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.choice("Priority", "THREE_TIP", "PARK"), AutoOption.shotTrigger(), AutoOption.time("T2 LEFT up by", 15.5)',
     );
     expect(options).toContain(
       'AutoOption.partner("L-Clockwise", "Pickup", "GARDEN", "WALL_FLOWER")',
@@ -117,7 +119,7 @@ describe("a paired Auto", () => {
     );
     // A clock gate is an ordinary wait on Always: its time is on the menu too.
     expect(java).toContain(
-      'kit.atMatchSeconds(kit.seconds("TS scoring FLOWER by", 16.9)).then(',
+      'kit.atMatchSeconds(kit.seconds("TS scoring FLOWER by", 17.6)).then(',
     );
   });
 
