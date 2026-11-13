@@ -76,6 +76,7 @@ A complete example that uses every card kind is
 | `startAt` | string, optional | The named point the start pose is on. |
 | `cards` | card[] | The Auto, top to bottom (the "trunk"). |
 | `plays` | `{ id: play }`, optional | The plays this Auto's ladders use, copied in so the file stands alone (see "Ladders"). |
+| `partner` | `{ auto, follows?, settings? }`, optional | Fork: the Auto this one is drawn to run beside (`"L-Clockwise"`), for the robot's INIT page. `follows` names a route choice of this Auto and `settings` says, for each of its legs in order, what the partner's same option must be set to (see "A paired Auto"). |
 | `parkChoices` | string[], optional | Fork: other PARK spots the drive team may pick during INIT instead of the park step's own (gamepad 1's D-pad left and right; see "Options the drive team changes in INIT"). Each is one of `points`, usually a team spot. |
 
 ### Cards
@@ -107,7 +108,14 @@ optional `label` (the branch's name; defaults to one made from the condition).
 | `{"afterMs": 8000, "matchClock": true}` | Fork: once the match clock reads 8 s, however late the card started (at once if it already does) |
 
 A match-clock time row may also carry `"adjustable": true`: the drive team may move it during
-INIT. Only one wait per Auto may (see below).
+INIT. Only one wait per Auto may (see below). Or it may carry `"option": "T2 LEFT up by"`: the time
+is a row of the INIT menu under that name, set as it is; any number of waits may, and two rows with
+one name are one time (see "A paired Auto").
+
+A wait may hold one time row and nothing else: it stands still until that time ("hold until
+22.7 s on the match clock"). A wait on the trigger `Always` asks only its time, since the time row
+is checked first: "is it still before 19.4 s?" takes its time row when it is not and its trigger
+row at once when it is.
 
 Rules the editor enforces (errors block the Java export):
 
@@ -117,7 +125,12 @@ Rules the editor enforces (errors block the Java export):
 - a list of cards has at most one park card;
 - each of `parkChoices` is a named point other than the park's own, and every park path ends on
   the same spot;
-- at most one wait is `adjustable`.
+- at most one wait is `adjustable`;
+- a route choice's two legs each have a name and at least one step, hold only drives, commands
+  and plain waits, and a choice used twice has the same leg names in the same order;
+- a camera-or-timer stop has a trigger and a time on the match clock;
+- one `option` name is one time, and is not also the partner wait;
+- a partner note's `follows` names a route choice of the Auto.
 
 Warnings (shown, not blocking): a path that starts more than 2 in from where
 the robot can be when it starts; a park card that is not last in its branch; a
@@ -295,6 +308,46 @@ the Auto runs as drawn. The drawing's value is always the default.
   `AutoRegistration.PARTNER_TIP_LAG_S`, 4 s; the Driver Station shows both numbers); the preview
   uses the drawn time.
 
+### A paired Auto: a route choice, shots by camera or timer, and its times
+
+Two robots that run Autos drawn as a pair must agree on a few things before PLAY. Each is a row of
+the robot's INIT menu (biobuzz `InitOptions`: D-pad up and down select a row, left and right change
+it), and the page says what it assumes of the partner.
+
+- **A route choice** is a `firstOf` with `"choice": "Pickup"`: not a wait, but two alternative
+  legs. Its `when` row is the drawing's leg and names the option as its trigger
+  (`"when": ["Pickup"]`), so the preview's switch for it picks the leg; its `afterMs` row (0) is
+  the other. Each row's `label` is its choice's name, as the menu shows it. Both legs end on the
+  same spot and the cards after the card follow either. The export writes each leg's cards one
+  after the other, each on its own choice, so the list stays flat and the endgame guard plans
+  through the picked leg as through any cards:
+
+  ```java
+  kit.route("Pickup", 0, () -> kit.path("to WALL_FLOWER_STAGING", toWallFlowerStaging, 2.1, flowerPark, 2.1)),
+  kit.route("Pickup", 0, () -> kit.command("PickFlower", 4.5)),
+  kit.route("Pickup", 1, () -> kit.path("to GARDEN_STAGING", toGardenStaging, 2, gardenPark, 2.8)),
+  kit.route("Pickup", 1, () -> kit.command("GardenGather", 5.5)),
+  ```
+
+  `OPTIONS` holds `AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN")`, the drawing's first.
+- **A stop that shoots by the camera or the timer** is a wait with `"shot": true`: "is this CELL
+  up by this time?". By the camera its trigger row is yes and its match-clock row is no. With the
+  menu's shot trigger on the timer the robot cannot see the HIVE, so the trigger row fires at the
+  time and the time row never does. Exported as `kit.shotLimit(s)` and `kit.shotWhen(trigger, s)`;
+  any such stop puts `AutoOption.shotTrigger()` in `OPTIONS`.
+- **A time on the menu** is a match-clock row with `"option": "<name>"`: exported as
+  `kit.seconds("<name>", s)` wherever the time is used, with `AutoOption.time("<name>", s)` in
+  `OPTIONS`, in the order the Auto reaches them.
+- **The partner note** (`partner`) becomes `AutoOption.partner("L-Clockwise", "Pickup", "GARDEN",
+  "WALL_FLOWER")`: with our Pickup on its first leg the partner's must read GARDEN, on its second
+  WALL_FLOWER. The INIT page shows it with the shot trigger, which must simply be the same.
+
+The preview and the simulator drive the drawing's leg and the drawn times unless told otherwise
+(biobuzz simulate requests: `"picks"`).
+
+Complete examples: `test/fixtures/clockwise/r-clockwise.pp` and `l-clockwise.pp`, with the Java
+they export beside them.
+
 ### Robot settings belong to the file
 
 The preview's timing and the park guard's `seconds` come from the robot size
@@ -319,7 +372,13 @@ From the command line, without opening the app:
 
 ```
 node scripts/export-auto.mjs path/to/hive-rush.pp [outDir]
+node scripts/save-auto.mjs path/to/source.pp path/to/biobuzz [drafts|partners]
 ```
+
+The second saves into a biobuzz checkout as **Save to repo folder** does: the project is loaded,
+laid out (link paths) and written as the editor writes it, to `TeamCode/autos/` (or its `drafts/`
+or `partners/`), with its generated Java in the robot's folder. The source may be a project
+assembled by a script, with its paths in any order and no link paths.
 
 `pnpm test` runs the unit tests, including a golden test that exports the
 sample and compares it with `HiveRushAuto.java` line by line. That golden file

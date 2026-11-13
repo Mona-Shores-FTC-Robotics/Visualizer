@@ -306,7 +306,16 @@ function renameExpr(expr: PathExpr, map: (name: string) => string): PathExpr {
 
 // --- printing ---------------------------------------------------------------
 
-type JNode = string | { head: string; args: string[]; children: JNode[] };
+type JNode =
+  | string
+  | { head: string; args: string[]; children: JNode[]; close?: string };
+
+/** Fork: a route choice's legs, the drawing's default (its trigger row) first. */
+function legsOf(card: FirstOfCard): AutoRow[] {
+  return [...card.rows].sort(
+    (a, b) => ("when" in a ? 0 : 1) - ("when" in b ? 0 : 1),
+  );
+}
 
 function printNode(node: JNode, indent: number): string {
   if (typeof node === "string") return node;
@@ -321,7 +330,7 @@ function printNode(node: JNode, indent: number): string {
       )
       .join("");
   }
-  return `${out})`;
+  return `${out}${node.close ?? ")"}`;
 }
 
 const sameAngle = (a: number, b: number) =>
@@ -593,6 +602,15 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           continue;
         }
       }
+      if (card.kind === "firstOf" && card.choice) {
+        // Fork: a route choice. Each leg's cards, one leg after the other, each on its own
+        // choice of the option: the list stays flat, so the guard plans through the picked leg.
+        legsOf(card).forEach((leg, index) => {
+          for (const legCard of leg.cards)
+            nodes.push(routeNode(card.choice!, index, cardNode(legCard)));
+        });
+        continue;
+      }
       nodes.push(cardNode(card));
       if (card.kind === "rejoin") {
         const join = rejoinTail(auto.cards, card.target)?.join;
@@ -616,7 +634,38 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     ];
   };
 
+  /** Fork: one card of a route choice's leg, built only when the drive team picked that leg. */
+  const routeNode = (option: string, index: number, node: JNode): JNode => {
+    const open = `kit.route(${javaString(option)}, ${index}, () -> `;
+    return typeof node === "string"
+      ? `${open}${node})`
+      : { head: `${open}${node.head}`, args: node.args, children: node.children, close: "))" };
+  };
+
+  /** Fork: the seconds a row's match-clock time is written as: the INIT menu's, or the drawing's. */
+  const clockSeconds = (row: AutoRow): string =>
+    "afterMs" in row
+      ? row.option
+        ? `kit.seconds(${javaString(row.option)}, ${javaNumber(row.afterMs / 1000)})`
+        : javaNumber(row.afterMs / 1000)
+      : "0";
+
   const rowNode = (row: AutoRow, card: FirstOfCard): JNode => {
+    if (card.shot) {
+      // Fork: a stop that shoots by the camera or the timer; both rows carry the stop's time.
+      const limit = card.rows.find((r) => "afterMs" in r);
+      const seconds = limit ? clockSeconds(limit) : "0";
+      const condition =
+        "when" in row
+          ? `kit.shotWhen(${row.when.map(javaString).join(", ")}, ${seconds})`
+          : `kit.shotLimit(${seconds})`;
+      if (row.cards.length === 0) return condition;
+      return {
+        head: `${condition}.then`,
+        args: [],
+        children: listNodes(row.cards, rowLabel(row)),
+      };
+    }
     // The partner wait's time limit is the one the drive team may move in init
     // (biobuzz AutoKit.partnerWaitMs); the card's own time stays in the Java as the default.
     const condition =
@@ -628,7 +677,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
             : `kit.afterMs(${javaNumber(row.afterMs)})`
           : row.adjustable
             ? `kit.atMatchSeconds(kit.seconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)}))`
-            : `kit.atMatchSeconds(${javaNumber(row.afterMs / 1000)})`;
+            : `kit.atMatchSeconds(${clockSeconds(row)})`;
     if (row.cards.length === 0) return condition;
     return {
       head: `${condition}.then`,
@@ -653,6 +702,34 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
           `AutoOption.matchSeconds(${javaString(firstOfLabel(card))}, ${javaNumber(row.afterMs / 1000)})`,
         );
   }
+  // Fork: a paired Auto's menu: its route choices, the shot trigger, its times in the order the
+  // Auto reaches them, and what it assumes of the partner.
+  const menu = new Set<string>();
+  const firstOfs = cards.filter((c): c is FirstOfCard => c.kind === "firstOf");
+  for (const card of firstOfs) {
+    if (!card.choice || menu.has(`choice ${card.choice}`)) continue;
+    menu.add(`choice ${card.choice}`);
+    options.push(
+      `AutoOption.choice(${[card.choice, ...legsOf(card).map((leg) => rowLabel(leg))].map(javaString).join(", ")})`,
+    );
+  }
+  if (firstOfs.some((card) => card.shot)) options.push("AutoOption.shotTrigger()");
+  for (const card of firstOfs) {
+    for (const row of card.rows) {
+      if (!("afterMs" in row) || !row.matchClock || !row.option) continue;
+      if (menu.has(`time ${row.option}`)) continue;
+      menu.add(`time ${row.option}`);
+      options.push(
+        `AutoOption.time(${javaString(row.option)}, ${javaNumber(row.afterMs / 1000)})`,
+      );
+    }
+  }
+  if (auto.partner)
+    options.push(
+      auto.partner.follows
+        ? `AutoOption.partner(${[auto.partner.auto, auto.partner.follows, ...(auto.partner.settings ?? [])].map(javaString).join(", ")})`
+        : `AutoOption.partner(${javaString(auto.partner.auto)}, null)`,
+    );
   const sortedList = (values: Iterable<string>) =>
     `{${[...new Set(values)].sort().map(javaString).join(", ")}}`;
 

@@ -85,6 +85,8 @@ export function usedNames(auto: AutoSection): {
     if (card.kind === "action") bump(actions, card.name);
     if (card.kind === "firstOf") {
       if (card.alongside) bump(actions, card.alongside);
+      // Fork: a route choice's trigger row names its option, not a trigger of the robot's.
+      if (card.choice) continue;
       for (const row of card.rows) {
         if ("when" in row) row.when.forEach((name) => bump(conditions, name));
       }

@@ -1,7 +1,7 @@
 import type { BasePoint, StartPose } from "../../types";
 import type { PathCatalog } from "./geometry";
 import { rowKind, type AutoCard, type AutoSection, type PathCard } from "./types";
-import { allCards, parkSpots, rejoinTail } from "./tree";
+import { allCards, childLists, parkSpots, rejoinTail } from "./tree";
 import { isUsed, pointUses } from "./pins";
 
 export type IssueLevel = "error" | "warning";
@@ -144,7 +144,7 @@ export function validateAuto(
           }
           const ends: BasePoint[] = [];
           card.rows.forEach((row, rowIndex) => {
-            if ("when" in row) {
+            if ("when" in row && !card.choice) {
               if (row.when.length === 0) error(card.id, `${name} has no trigger chosen.`, rowIndex);
               for (const condition of row.when) {
                 if (!conditions.has(condition))
@@ -191,6 +191,42 @@ export function validateAuto(
     }
     if (!point.every(Number.isFinite)) error(null, `Point "${name}" has a coordinate that is not a number.`);
   }
+  // Fork: a route choice, the stops that shoot by camera or timer, and the INIT menu's times
+  // (types.ts FirstOfCard.choice and shot, AfterMsRow.option).
+  const choiceNames = new Map<string, string>();
+  const timeOf = new Map<string, number>();
+  for (const card of allCards(auto.cards)) {
+    if (card.kind !== "firstOf") continue;
+    const name = card.label || "This wait";
+    if (card.choice) {
+      if (card.rows.some((row) => !row.label?.trim() || row.cards.length === 0))
+        error(card.id, `${name}: each leg of the "${card.choice}" choice needs a name and at least one step.`);
+      if (card.rows.some((row) => row.cards.some((c) => childLists(c).some((list) => list.length > 0) || (c.kind === "path" && c.park) || c.kind === "rejoin")))
+        error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only; a decision or the park goes after it.`);
+      if (card.shot || card.alongside || card.partnerWait || card.ladder)
+        error(card.id, `${name} is the "${card.choice}" choice; it cannot also be a wait with a command, a partner wait or a camera-or-timer stop.`);
+      const names = card.rows.map((row) => row.label?.trim() ?? "").join(", ");
+      const seen = choiceNames.get(card.choice);
+      if (seen !== undefined && seen !== names)
+        error(card.id, `${name}: the "${card.choice}" choice has legs named ${names} here and ${seen} elsewhere; they must be the same, in the same order.`);
+      choiceNames.set(card.choice, names);
+    }
+    const limit = card.rows.find((row) => "afterMs" in row);
+    if (card.shot && !(limit && "afterMs" in limit && limit.matchClock && card.rows.length === 2))
+      error(card.id, `${name} shoots by the camera or the timer, so it needs a trigger and a time on the match clock.`);
+    for (const row of card.rows) {
+      if (!("afterMs" in row) || !row.option) continue;
+      if (row.adjustable)
+        error(card.id, `${name}: its time is "${row.option}" on the INIT menu; it cannot also be the partner wait.`);
+      const seen = timeOf.get(row.option);
+      if (seen !== undefined && seen !== row.afterMs)
+        error(card.id, `${name}: "${row.option}" is ${row.afterMs / 1000} s here and ${seen / 1000} s elsewhere; one name is one time.`);
+      timeOf.set(row.option, row.afterMs);
+    }
+  }
+  if (auto.partner?.follows && !choiceNames.has(auto.partner.follows))
+    error(null, `The partner note follows "${auto.partner.follows}", which is not a route choice of this Auto.`);
+
   // Fork: what the drive team may change in INIT (types.ts parkChoices, AfterMsRow.adjustable).
   if (auto.parkChoices?.length) {
     const drawn = parkSpots(auto, catalog);

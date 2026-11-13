@@ -210,6 +210,20 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
     );
     if (names.length) auto.parkChoices = [...new Set(names)];
   }
+  if (isObject(raw.partner) && typeof raw.partner.auto === "string" && raw.partner.auto.trim()) {
+    const settings = Array.isArray(raw.partner.settings)
+      ? raw.partner.settings.filter(
+          (name: unknown): name is string => typeof name === "string" && !!name,
+        )
+      : [];
+    auto.partner = {
+      auto: raw.partner.auto.trim(),
+      ...(typeof raw.partner.follows === "string" && raw.partner.follows.trim()
+        ? { follows: raw.partner.follows.trim() }
+        : {}),
+      ...(settings.length ? { settings } : {}),
+    };
+  }
   if (isObject(raw.parkFrom)) {
     const parkFrom: Record<string, string> = {};
     for (const [cardId, lineId] of Object.entries(raw.parkFrom)) {
@@ -385,6 +399,11 @@ function normalizeCard(
           ? { alongside: raw.alongside.trim() }
           : {}),
         ...(raw.partnerWait === true ? { partnerWait: true as const } : {}),
+        // Fork: a route choice, and a stop that shoots by the camera or the timer (types.ts).
+        ...(typeof raw.choice === "string" && raw.choice.trim()
+          ? { choice: raw.choice.trim() }
+          : {}),
+        ...(raw.shot === true ? { shot: true as const } : {}),
         ...ladderOf(raw.ladder, where, problems),
       };
     }
@@ -457,6 +476,10 @@ function normalizeRow(
       afterMs: raw.afterMs,
       ...(matchClock ? { matchClock: true } : {}),
       ...(matchClock && raw.adjustable === true ? { adjustable: true } : {}),
+      // Fork: a time on the INIT menu (types.ts AfterMsRow.option).
+      ...(matchClock && typeof raw.option === "string" && raw.option.trim()
+        ? { option: raw.option.trim() }
+        : {}),
     };
   }
   problems.push(`${where}: afterMs must be a number ≥ 0; dropped the row.`);
@@ -496,6 +519,8 @@ export function serializeAuto(auto: AutoSection): AutoSection {
           rows: c.rows.map(row),
           ...(c.alongside ? { alongside: c.alongside } : {}),
           ...(c.partnerWait ? { partnerWait: true as const } : {}),
+          ...(c.choice ? { choice: c.choice } : {}),
+          ...(c.shot ? { shot: true as const } : {}),
           ...(c.ladder
             ? { ladder: { tries: c.ladder.tries.map((t) => ({ ...t })) } }
             : {}),
@@ -535,6 +560,14 @@ export function serializeAuto(auto: AutoSection): AutoSection {
     out.parkFrom = { ...auto.parkFrom };
   if (auto.teamSpots?.length) out.teamSpots = [...auto.teamSpots];
   if (auto.parkChoices?.length) out.parkChoices = [...auto.parkChoices];
+  if (auto.partner)
+    out.partner = {
+      auto: auto.partner.auto,
+      ...(auto.partner.follows ? { follows: auto.partner.follows } : {}),
+      ...(auto.partner.settings?.length
+        ? { settings: [...auto.partner.settings] }
+        : {}),
+    };
   if (auto.exportName) out.exportName = auto.exportName;
   if (auto.plays && Object.keys(auto.plays).length) {
     out.plays = Object.fromEntries(

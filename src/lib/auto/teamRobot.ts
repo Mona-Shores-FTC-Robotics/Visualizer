@@ -38,7 +38,13 @@ export const TEAM_ROBOT: Pick<
  */
 export function teamRegistry(): AutoRegistry {
   return {
-    actions: ["LaunchAll", "PickFlower", "GardenGather", "LaunchOne", "SpinUp"],
+    actions: [
+      "LaunchAll",
+      "PickFlower",
+      "GardenGather",
+      "LaunchOne",
+      "SpinUp",
+    ],
     conditions: [
       "Empty",
       "IntakeFull",
@@ -47,10 +53,11 @@ export function teamRegistry(): AutoRegistry {
       "CellUp",
       "Tip",
       "CameraBlind",
+      "Always",
     ],
     events: ["Tip"],
     typicalS: {
-      LaunchAll: 4,
+      LaunchAll: 2.5,
       PickFlower: 4.4,
       GardenGather: 6,
       LaunchOne: 0.5,
