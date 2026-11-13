@@ -13,9 +13,9 @@ import type { ProjectDoc } from "../../io/project";
 import type { AtomicPath } from "../../types";
 import { createSegment } from "../../utils/normalize";
 import type { PathCatalog } from "../auto/geometry";
-import { commandSeconds } from "../auto/simulate";
+import { commandSeconds, timeRowEndsAt } from "../auto/simulate";
 import { isSimple, unfold } from "./steps";
-import { timeRowFiresAt, type AutoCard, type AutoSection } from "../auto/types";
+import { type AutoCard, type AutoSection } from "../auto/types";
 
 /** A spot's park, for the builder: the path card it parks after, the path, and when it leaves. */
 export interface SpotPark {
@@ -223,7 +223,8 @@ function leaveTimes(
         at = card.id;
       } else if (card.kind === "firstOf") {
         for (const row of card.rows)
-          if ("afterMs" in row) walk(row.cards, timeRowFiresAt(row, t), null);
+          if ("afterMs" in row)
+            walk(row.cards, timeRowEndsAt(view, card, row, t), null);
       }
     }
     if (at && !out.has(at)) out.set(at, t);

@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import Modal from "../components/ui/Modal.svelte";
   import { showToast } from "../toast";
+  import { DEFAULT_REF } from "../team/teamAutos";
   import { FACTS, cleanValue, timingFileText, type Tip } from "./model";
   import {
     breakpoints,
@@ -117,6 +118,13 @@
   >
     Facts{changed ? ` (${changed} changed)` : ""}
   </button>
+  {#if $teamTiming && $teamTiming.ref !== DEFAULT_REF}
+    <span
+      class="max-w-40 truncate"
+      title="The timing facts are read from {$teamTiming.ref}, where the Autos on screen came from"
+      data-testid="timing-branch">{$teamTiming.ref}</span
+    >
+  {/if}
 </div>
 
 <Modal
@@ -125,15 +133,12 @@
   onClose={() => (open = false)}
   panelClass="console-panel console-flat p-6 w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col"
 >
-  <h2
-    id="timing-title"
-    class="text-2xl font-semibold text-heading mb-1"
-  >
+  <h2 id="timing-title" class="text-2xl font-semibold text-heading mb-1">
     Timing facts
   </h2>
   <p class="text-sm text-body mb-3">
-    How the robot and the HIVE behave, used by the preview. They
-    describe the world, not one Auto: the team's values live in biobuzz <code
+    How the robot and the HIVE behave, used by the preview. They describe the
+    world, not one Auto: the team's values live in biobuzz <code
       >TeamCode/autos/{TIMING_FILE}</code
     >
     {#if $teamTiming}(read from <code>{$teamTiming.ref}</code>){:else}(none

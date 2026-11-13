@@ -223,7 +223,7 @@
       </div>
       <div class={CELL_CLASS}>
         <label class={LABEL_CLASS} for="auto-command-timeout"
-          title="The robot cuts the command off after this long if it has not finished.">Timeout (s)</label>
+          title="The robot cuts the command off after this long if it has not finished. A launch that is already feeding is never cut: for a launch this only limits the wait for spin-up.">Timeout (s)</label>
         <input
           id="auto-command-timeout"
           class={FIELD_CLASS}
@@ -367,7 +367,7 @@
     </div>
     <label
       class="flex items-start gap-2 text-[11px] text-heading"
-      title="The drive team enters 'the partner's last preload leaves at N s' in init and the robot sets this wait's time limit from it. One wait per Auto."
+      title="In init the Driver Station reads 'waiting for partner's TIP until N s', and the drive team moves that second with the D-pad. One wait per Auto."
     >
       <input
         id="auto-firstof-partner-wait"
@@ -388,9 +388,8 @@
         }}
       />
       <span
-        >The partner wait: its time limit is set in init from when the
-        partner's last preload leaves (one per Auto). The time below is the
-        default.</span
+        >The partner wait: the drive team can move its time limit in init
+        (one per Auto). The time below is the default.</span
       >
     </label>
     <!-- Fork: a stop that shoots by the camera or the timer, and a route choice (types.ts). -->

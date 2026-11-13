@@ -37,7 +37,10 @@ export interface ActionCard {
   id: string;
   kind: "action";
   name: string;
-  /** Seconds before the robot cuts the command off; unset means `DEFAULT_TIMEOUT_S`. */
+  /**
+   * Seconds before the robot cuts the command off; unset means `DEFAULT_TIMEOUT_S`. A feeding
+   * launch is never cut once it feeds: there it only limits the wait for spin-up.
+   */
   timeoutS?: number;
   /** Preview only, from older files: how long it keeps the robot busy. The robot's typical time wins. */
   previewMs?: number;
@@ -90,8 +93,8 @@ export interface FirstOfCard {
    */
   alongside?: string;
   /**
-   * This is **the partner wait**: the one wait whose time limit the drive team sets in init from "the
-   * partner's last preload leaves at N s" (biobuzz). At most one per Auto. The export writes its time
+   * This is **the partner wait**: the one wait whose time limit the drive team may move in init
+   * ("waiting for partner's TIP until N s", biobuzz). At most one per Auto. The export writes its time
    * row as `kit.afterMs(kit.partnerWaitMs(<the card's own ms>))`, so the Java keeps the card's seconds
    * as the default; the preview keeps using them too. Only ever `true`; a stock Visualizer ignores it.
    */
@@ -180,8 +183,8 @@ export type AfterMsRow = RowCommon & {
   /** Fork: `afterMs` is a time on the match clock, not a time since the wait began. */
   matchClock?: boolean;
   /**
-   * Fork: the drive team may move it during INIT (biobuzz InitOptions: the partner's last shot on
-   * the D-pad, plus the TIP lag). Only on a match-clock limit, and on one wait per Auto.
+   * Fork: the drive team may move it during INIT (biobuzz InitOptions: the D-pad moves the
+   * second the wait gives up). Only on a match-clock limit, and on one wait per Auto.
    */
   adjustable?: boolean;
   /**

@@ -3,11 +3,13 @@
  * browser's file list. The first is opened as the project, steps and all, so one Auto from a link
  * is there to read and edit. With more than one, all of them, the first too, are drawn as
  * overlays (multi-path mode, which draws the overlays in place of the project), so they play
- * together. The last view is remembered so Reload can fetch it again.
+ * together. The last view is remembered so Reload can fetch it again. The preview's timing facts
+ * follow the view's branch (lib/timing/store.ts) until the page is reloaded.
  */
 import { get, writable } from "svelte/store";
 import * as browserFileStore from "../../utils/browserFileStore";
 import { showToast } from "../toast";
+import { followTimingBranch } from "../timing/store";
 import {
   copyName,
   fetchTeamFiles,
@@ -80,6 +82,10 @@ export async function showTeamView(
       : `Opened ${first.file} from biobuzz ${ref}`,
     "success",
   );
+  // The preview uses the facts of the branch these Autos came from (its timing.json), not the
+  // branch Team Autos last listed. The Autos are open either way, so a failure is only a message.
+  const timingError = await followTimingBranch(ref, getText);
+  if (timingError) showToast(timingError, "error");
   return true;
 }
 
