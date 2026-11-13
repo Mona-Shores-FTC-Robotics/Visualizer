@@ -276,6 +276,25 @@ contract with the robot's `autokit` library:
 - `OPTIONS`, always written (`{}` with none), lists what the drive team may change in INIT (see
   below).
 
+### The simple builder's Choose step
+
+A route choice (`choice` on a wait card, above) is a builder step, **Choose in INIT**: its name on
+the INIT menu, and two legs, each a named list of drives and commands. The drive team picks a leg;
+both end on the same spot and go on with the steps below. A choice sits in the main list. A leg
+holds drives, commands and a wait for its time only ("hold until 15.5 s"). Where the choice is the
+last step of the route, each leg may instead end with its own Park (both, or neither): each way
+parks by its own road, nothing follows, and the list is guarded by the default leg's park.
+
+A **clock check** is a builder step too, "If before 20.7 s: the steps below. Otherwise: …". It is
+a wait card whose match-clock time row comes first and whose trigger row is the robot's `Always`
+trigger: past the time the time row wins, before it the trigger does, at once, so the robot never
+waits. It takes an Otherwise like any Wait, and its time may be the one the drive team sets in
+INIT (`adjustable`).
+
+A stop that shoots by the camera or the timer (`shot`) and a time on the INIT menu (`option`) are
+not builder steps: the builder has no control for them, so it shows such a wait as an advanced step
+and leaves it alone.
+
 ### The simple builder's Otherwise: go on, or instead
 
 A Wait step's Otherwise is its time row's cards. An Otherwise is a list like the main one: it may
