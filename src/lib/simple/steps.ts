@@ -760,7 +760,7 @@ export function setWait(
         delete row.adjustable;
       }
       if (change.adjustable === true && row.matchClock) {
-        // One wait per Auto: the D-pad's up and down move only one.
+        // One wait per Auto: it is one row of the INIT menu.
         for (const other of allCardsOf(auto.cards))
           if (other.kind === "firstOf" && other !== card)
             for (const r of other.rows) if ("afterMs" in r) delete r.adjustable;

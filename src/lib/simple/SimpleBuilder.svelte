@@ -871,7 +871,7 @@
               step.waitAdjustable && "simple-option--on",
             ]}
             aria-pressed={step.waitAdjustable}
-            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's up and down move that second. The time here is what it shows untouched. One wait per Auto."
+            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's left and right move that second. The time here is what it shows untouched. One wait per Auto."
             onclick={() =>
               apply(
                 setWait(doc, step.cardId, {
