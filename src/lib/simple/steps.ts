@@ -35,6 +35,7 @@ import { createEmptyAuto } from "../auto/normalize";
 import { cardTitle, makeCardId } from "../auto/tree";
 import type {
   AutoCard,
+  AutoRow,
   AutoSection,
   FirstOfCard,
   NamedPoint,
@@ -49,7 +50,16 @@ import {
 } from "./garden";
 
 export type StepKind =
-  "launch" | "spinup" | "pick" | "gather" | "wait" | "drive" | "park" | "other";
+  | "launch"
+  | "spinup"
+  | "pick"
+  | "gather"
+  | "wait"
+  | "check"
+  | "choice"
+  | "drive"
+  | "park"
+  | "other";
 
 export interface Step {
   cardId: string;
@@ -88,14 +98,51 @@ export interface Step {
    */
   rejoin?: boolean;
   /**
+   * Choice: the option's name on the INIT menu ("Pickup"), and its two legs, the drawing's default
+   * first: each leg's name on the menu and its steps.
+   */
+  option?: string;
+  legs?: { name: string; steps: Step[] }[];
+  /**
+   * Choice: it is the last step of a list nothing follows, so each leg may end with its own Park
+   * (each way parks by its own road). Otherwise the legs end on one spot and the Park comes below.
+   */
+  legsMayPark?: boolean;
+  /**
    * Wait: nothing follows the list this wait is in, so an Otherwise that runs instead of the steps
    * below ends with its own Park. False inside an Otherwise that goes on: there it just ends.
    */
   insteadParks?: boolean;
 }
 
-/** Where a step goes: the main list, or the Otherwise list of the wait card named. */
-export type StepList = { waitCardId: string } | null;
+/**
+ * Where a step goes: the main list, the Otherwise list of the wait card named, or, with `leg`, one
+ * leg of the choice card named (0 is the drawing's default).
+ */
+export type StepList = { waitCardId: string; leg?: 0 | 1 } | null;
+
+/**
+ * The steps a leg of a choice may hold: the robot does them, then both legs go on the same way. A
+ * wait in a leg waits for nothing but its time ("hold until 15.5 s", to let a partner pass): it has
+ * no Otherwise, so the legs stay flat for the endgame guard.
+ */
+export const LEG_KINDS: StepKind[] = [
+  "launch",
+  "spinup",
+  "pick",
+  "gather",
+  "drive",
+  "wait",
+];
+
+/** A new clock check's time, seconds on the match clock. */
+const CHECK_DEFAULT_S = 20;
+
+/** A new choice's names: the one the team draws most, the first pickup at the WALL FLOWER or the GARDEN. */
+const CHOICE_DEFAULT = {
+  option: "First pickup",
+  legs: ["WALL_FLOWER", "GARDEN"],
+};
 
 /**
  * Fork: what a Wait step waits for, the robot's triggers (biobuzz AutoRegistration). The builder
@@ -114,10 +161,21 @@ export type StepList = { waitCardId: string } | null;
  */
 export const TIME_ONLY = "";
 
+/**
+ * Fork: a clock check, "If before 20.7 s: the steps below. Otherwise: ...". It never waits: the
+ * robot looks at the match clock once and takes one way or the other (cross for a third TIP if
+ * early, stay and finish the second if not). In the file it is a wait card whose match-clock time
+ * row comes first and whose trigger row is the robot's "Always" trigger, so past the time the time
+ * row wins and before it the trigger does, at once. The builder shows it as a Wait step with this
+ * trigger; it takes an Otherwise like any other.
+ */
+export const ALWAYS = "Always";
+
 /** A Wait step's title: "Wait for TIP or CELL up", or "Wait until 12 s" / "Wait 2 s" when it waits for nothing. */
 export function waitTitle(trigger: string, seconds: number, matchClock: boolean): string {
   if (trigger === TIME_ONLY)
     return matchClock ? `Wait until ${seconds} s` : `Wait ${seconds} s`;
+  if (trigger === ALWAYS) return `If before ${seconds} s`;
   return `Wait for ${WAIT_FOR.find((w) => w.trigger === trigger)?.label ?? trigger}`;
 }
 
@@ -133,6 +191,7 @@ export const WAIT_FOR: readonly {
   { trigger: "LeftCellUp", label: "Left CELL up", legacy: true },
   { trigger: "RightCellUp", label: "Right CELL up", legacy: true },
   { trigger: "CameraBlind", label: "camera blind", legacy: true },
+  { trigger: ALWAYS, label: "the clock", legacy: true },
 ];
 /** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
 export const WAIT_DEFAULT_S = 7;
@@ -238,7 +297,7 @@ function walkSteps(
   terminal: boolean,
 ): Step[] {
   const auto = doc.auto!;
-  return cards.map((card): Step => {
+  return cards.map((card, index): Step => {
     const base = { cardId: card.id, spot: null, lineId: null };
     if (card.kind === "action" && card.name === LAUNCH_ALL) {
       // The turret stays locked straight ahead in an Auto: the heading is the aim (aim.ts).
@@ -286,6 +345,29 @@ function walkSteps(
       };
     }
     if (card.kind === "firstOf") {
+      const choice = choiceOf(card);
+      if (choice) {
+        // Each leg starts where the choice is; the list below goes on from the default leg's end
+        // (both legs end on the same spot).
+        const ends = choice.legs.map(() => ({
+          here: { ...at.here },
+          onSpot: at.onSpot,
+        }));
+        const legs = choice.legs.map((leg, i) => ({
+          name: leg.label ?? "",
+          steps: walkSteps(doc, leg.cards, ends[i], parking, false),
+        }));
+        at.here = ends[0].here;
+        at.onSpot = ends[0].onSpot;
+        return {
+          ...base,
+          kind: "choice",
+          label: choiceTitle(choice.option, legs.map((leg) => leg.name)),
+          option: choice.option,
+          legs,
+          legsMayPark: terminal && index === cards.length - 1,
+        };
+      }
       const wait = waitOf(card);
       if (wait) {
         // The Otherwise steps start where the wait is, on a copy: the list below the wait is read
@@ -361,7 +443,10 @@ export function blankAuto(doc: ProjectDoc): ProjectDoc {
 export function isSimple(doc: ProjectDoc): boolean {
   const simple = (steps: Step[]): boolean =>
     steps.every(
-      (step) => step.kind !== "other" && simple(step.otherwise ?? []),
+      (step) =>
+        step.kind !== "other" &&
+        simple(step.otherwise ?? []) &&
+        (step.legs ?? []).every((leg) => simple(leg.steps)),
     );
   return simple(stepsOf(doc));
 }
@@ -379,10 +464,21 @@ export function isBuilderAuto(auto: AutoSection): boolean {
     cards.every((card) => {
       if (card.kind === "action" || card.kind === "path") return true;
       if (card.kind !== "firstOf") return false;
+      const choice = choiceOf(card);
+      if (choice) return choice.legs.every((leg) => steps(leg.cards));
       const wait = waitOf(card);
       return !!wait && steps(wait.otherwise);
     });
   return steps(view.cards);
+}
+
+/** Every step of a list, with the steps of each Otherwise and each leg of a choice, however deep. */
+export function everyStep(steps: Step[]): Step[] {
+  return steps.flatMap((step) => [
+    step,
+    ...everyStep(step.otherwise ?? []),
+    ...(step.legs ?? []).flatMap((leg) => everyStep(leg.steps)),
+  ]);
 }
 
 /**
@@ -394,7 +490,7 @@ export function stepForLine(
   doc: ProjectDoc,
   lineId: string,
 ): { step: Step; viaPark: boolean } | null {
-  const all = stepsOf(doc).flatMap((step) => [step, ...(step.otherwise ?? [])]);
+  const all = everyStep(stepsOf(doc));
   const drives = all.filter(
     (step) => step.kind === "drive" || step.kind === "park",
   );
@@ -527,7 +623,45 @@ export function addStep(
     const list = listOf(auto, into);
     if (!list) throw new Error("No such Wait step for an Otherwise");
     let card: AutoCard;
-    if (kind === "wait") {
+    if (into?.leg !== undefined && !LEG_KINDS.includes(kind)) {
+      // A Park ends a leg only where nothing follows the choice: each way then parks on its own.
+      const owner = findCard(auto, into.waitCardId);
+      const last =
+        !!owner &&
+        owner.index === owner.list.length - 1 &&
+        isTerminal(auto, parking, owner.list);
+      if (kind !== "park" || !last)
+        throw new Error(
+          "A leg of a choice holds drives, commands and plain waits only",
+        );
+      index = list.length;
+    }
+    if (kind === "check") {
+      card = {
+        id: makeCardId(),
+        kind: "firstOf",
+        label: waitTitle(ALWAYS, CHECK_DEFAULT_S, true),
+        rows: [
+          { afterMs: CHECK_DEFAULT_S * 1000, matchClock: true, cards: [] },
+          { when: [ALWAYS], cards: [] },
+        ],
+      };
+      if (!auto.registry.conditions.includes(ALWAYS))
+        auto.registry.conditions = [...auto.registry.conditions, ALWAYS];
+    } else if (kind === "choice") {
+      if (into) throw new Error("A choice goes in the main list");
+      const { option, legs } = CHOICE_DEFAULT;
+      card = {
+        id: makeCardId(),
+        kind: "firstOf",
+        label: choiceTitle(option, legs),
+        choice: option,
+        rows: [
+          { when: [option], label: legs[0], cards: [] },
+          { afterMs: 0, label: legs[1], cards: [] },
+        ],
+      };
+    } else if (kind === "wait") {
       card = {
         id: makeCardId(),
         kind: "firstOf",
@@ -537,6 +671,11 @@ export function addStep(
           { afterMs: WAIT_DEFAULT_S * 1000, cards: [] },
         ],
       };
+      // In a leg of a choice a wait is for its time only.
+      if (into?.leg !== undefined) {
+        card.rows = [{ afterMs: WAIT_DEFAULT_S * 1000, cards: [] }];
+        card.label = waitTitle(TIME_ONLY, WAIT_DEFAULT_S, false);
+      }
     } else if (kind === "spinup") {
       card = { id: makeCardId(), kind: "action", name: SPIN_UP };
     } else if (kind === "launch" || kind === "pick" || kind === "gather") {
@@ -559,7 +698,8 @@ export function addStep(
       auto.pathEnds[path.id] = spot;
       // One park per route: the main one, and each Otherwise that parks instead of going on.
       if (kind === "park")
-        if (into && parking.has(into.waitCardId)) clearParks(list);
+        if (into && (into.leg !== undefined || parking.has(into.waitCardId)))
+          clearParks(list);
         else clearRouteParks(auto, parking);
       card = {
         id: makeCardId(),
@@ -578,6 +718,10 @@ export function addStep(
 function listOf(auto: AutoSection, into: StepList): AutoCard[] | null {
   if (!into) return auto.cards;
   const card = allCardsOf(auto.cards).find((c) => c.id === into.waitCardId);
+  if (into.leg !== undefined) {
+    const choice = card?.kind === "firstOf" ? choiceOf(card) : null;
+    return choice ? choice.legs[into.leg].cards : null;
+  }
   if (card?.kind !== "firstOf" || !waitOf(card)) return null;
   // A wait for nothing but its time has no Otherwise: its time always runs out.
   if (!card.rows.some((row) => "when" in row)) return null;
@@ -590,9 +734,13 @@ function allLists(auto: AutoSection): AutoCard[][] {
   const lists: AutoCard[][] = [];
   const visit = (list: AutoCard[]) => {
     lists.push(list);
-    for (const card of list)
-      if (card.kind === "firstOf" && waitOf(card))
+    for (const card of list) {
+      if (card.kind !== "firstOf") continue;
+      const choice = choiceOf(card);
+      if (choice) choice.legs.forEach((leg) => visit(leg.cards));
+      else if (waitOf(card))
         for (const row of card.rows) if ("afterMs" in row) visit(row.cards);
+    }
   };
   visit(auto.cards);
   return lists;
@@ -714,6 +862,12 @@ export function moveStep(
     if (!found || !target) return;
     const card = found.list[found.index];
     if (into && allCardsOf([card]).some((c) => c.id === into.waitCardId)) return;
+    // A leg holds drives, commands and plain waits only, and a choice stays in the main list.
+    if (into?.leg !== undefined) {
+      if (card.kind === "path" && card.park) return;
+      if (card.kind === "firstOf" && waitOf(card)?.trigger !== TIME_ONLY) return;
+    }
+    if (into && card.kind === "firstOf" && choiceOf(card)) return;
     found.list.splice(found.index, 1);
     const to = target === found.list && index > found.index ? index - 1 : index;
     target.splice(Math.max(0, Math.min(to, target.length)), 0, card);
@@ -740,6 +894,18 @@ export function setWait(
   return edit(doc, (_draft, auto) => {
     const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    // A wait in a leg of a choice stays a wait for its time only.
+    const inLeg = allCardsOf(auto.cards).some(
+      (c) =>
+        c.kind === "firstOf" &&
+        !!choiceOf(c)?.legs.some((leg) => leg.cards.includes(card)),
+    );
+    if (inLeg && change.waitFor !== undefined && change.waitFor !== TIME_ONLY)
+      return;
+    // A clock check stays one: its time and whether the drive team may set it, nothing else.
+    if (waitOf(card)!.trigger === ALWAYS)
+      change = { seconds: change.seconds, adjustable: change.adjustable };
+    else if (change.waitFor === ALWAYS) return;
     if (change.waitFor === TIME_ONLY) {
       // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
       const time = card.rows.find((row) => "afterMs" in row)!;
@@ -772,6 +938,35 @@ export function setWait(
     if (change.spinUp === false) delete card.alongside;
     const wait = waitOf(card)!;
     card.label = waitTitle(wait.trigger, wait.seconds, wait.matchClock);
+  });
+}
+
+/**
+ * Renames a choice: its option on the INIT menu, or a leg (0 is the drawing's default). The
+ * partner note follows the option's new name.
+ */
+export function setChoice(
+  doc: ProjectDoc,
+  cardId: string,
+  change: { option?: string; leg?: 0 | 1; name?: string },
+): ProjectDoc {
+  return edit(doc, (_draft, auto) => {
+    const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
+    const choice = card?.kind === "firstOf" ? choiceOf(card) : null;
+    if (card?.kind !== "firstOf" || !choice) return;
+    const option = change.option?.trim();
+    if (option) {
+      if (auto.partner && auto.partner.follows === card.choice)
+        auto.partner.follows = option;
+      card.choice = option;
+      for (const row of card.rows) if ("when" in row) row.when = [option];
+    }
+    const name = change.name?.trim();
+    if (change.leg !== undefined && name) choice.legs[change.leg].label = name;
+    card.label = choiceTitle(
+      card.choice!,
+      choice.legs.map((leg) => leg.label ?? ""),
+    );
   });
 }
 
@@ -998,6 +1193,13 @@ function withHeadings(doc: ProjectDoc): Path[] {
   const lay = (cards: AutoCard[], from: number): number => {
     let h = from;
     for (const card of cards) {
+      const choice = card.kind === "firstOf" ? choiceOf(card) : null;
+      if (choice) {
+        // Each leg is laid from the heading at the choice; the list goes on from the default's.
+        const ends = choice.legs.map((leg) => lay(leg.cards, h));
+        h = ends[0];
+        continue;
+      }
       if (card.kind === "firstOf" && waitOf(card, true)) {
         for (const row of card.rows) if ("afterMs" in row) lay(row.cards, h);
         // A wait that parks instead of going on: the steps below it are its trigger row's.
@@ -1053,6 +1255,28 @@ function spotOf(
   return node ? (auto.pathEnds[node.id] ?? null) : null;
 }
 
+/** A Choice step's title: "Pickup: WALL_FLOWER or GARDEN". */
+export function choiceTitle(option: string, legs: string[]): string {
+  return `${option}: ${legs.join(" or ")}`;
+}
+
+/**
+ * A Choice step's option and legs, when `card` is one (types.ts FirstOfCard.choice): the drive
+ * team picks a leg in INIT, the robot does its steps, and both legs go on with the steps below.
+ * The drawing's default leg (the trigger row) is first.
+ */
+function choiceOf(
+  card: FirstOfCard,
+): { option: string; legs: [AutoRow, AutoRow] } | null {
+  if (!card.choice || card.rows.length !== 2) return null;
+  if (card.alongside || card.ladder || card.shot || card.partnerWait)
+    return null;
+  const first = card.rows.find((row) => "when" in row);
+  const second = card.rows.find((row) => "afterMs" in row);
+  if (!first || !second) return null;
+  return { option: card.choice, legs: [first, second] };
+}
+
 /**
  * A Wait step's trigger, limit and Otherwise cards, when `card` is one: a trigger row with nothing
  * after it, a time row (its cards are the Otherwise list), and nothing run alongside but SpinUp.
@@ -1070,7 +1294,12 @@ function waitOf(
   otherwise: AutoCard[];
 } | null {
   if (card.alongside && card.alongside !== SPIN_UP) return null;
-  if (card.ladder) return null;
+  if (card.ladder || card.choice) return null;
+  // A paired Auto's stop that shoots by the camera or the timer, and a time on its INIT menu
+  // (types.ts FirstOfCard.shot, AfterMsRow.option): the builder has no control for either, so it
+  // must not show one as a plain wait and drop the setting on the next edit.
+  if (card.shot) return null;
+  if (card.rows.some((row) => "afterMs" in row && row.option)) return null;
   if (card.rows.length === 1) {
     const only = card.rows[0];
     if (!("afterMs" in only) || only.cards.length) return null;
@@ -1095,6 +1324,9 @@ function waitOf(
       }
     | undefined;
   if (!when || !time || when.when.length !== 1) return null;
+  // A clock check is one only as the robot reads it: the time first, on the match clock.
+  if (when.when[0] === ALWAYS && (card.rows[0] !== time || !time.matchClock))
+    return null;
   if (when.cards.length && !allowWhenCards) return null;
   if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
   return {

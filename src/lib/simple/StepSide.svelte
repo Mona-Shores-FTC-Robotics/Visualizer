@@ -23,7 +23,7 @@
   import PathInspector from "../../view/inspector/PathInspector.svelte";
   import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
   import { spotParks } from "./parkFrom";
-  import { addSpot, stepForLine, stepsOf } from "./steps";
+  import { addSpot, stepForLine, stepsOf, everyStep } from "./steps";
   import {
     saveSpotsOpen,
     setSpotUnlocked,
@@ -54,9 +54,8 @@
   /** How many steps end on this spot: moving it moves them all. */
   let visits = $derived(
     spot
-      ? stepsOf(doc)
-          .flatMap((s) => [s, ...(s.otherwise ?? [])])
-          .filter((s) => s.spot === spot && s.lineId).length
+      ? everyStep(stepsOf(doc)).filter((s) => s.spot === spot && s.lineId)
+          .length
       : 0,
   );
   let park = $derived(

@@ -32,6 +32,7 @@ import {
   pickSpot,
 } from "../src/lib/simple/flowers";
 import {
+  ALWAYS,
   TIME_ONLY,
   addSpot,
   addStep,
@@ -42,6 +43,7 @@ import {
   setSpotHeading,
   setStart,
   setStartHeading,
+  setChoice,
   setWait,
   setWaitRejoin,
   renameSpot,
@@ -890,7 +892,11 @@ describe("a Wait step's Otherwise list", () => {
 
   /** Every step, however deep in an Otherwise. */
   const everyStep = (steps: Step[]): Step[] =>
-    steps.flatMap((s) => [s, ...everyStep(s.otherwise ?? [])]);
+    steps.flatMap((s) => [
+      s,
+      ...everyStep(s.otherwise ?? []),
+      ...(s.legs ?? []).flatMap((leg) => everyStep(leg.steps)),
+    ]);
   const stepOf = (doc: ProjectDoc, cardId: string) =>
     everyStep(stepsOf(doc)).find((s) => s.cardId === cardId)!;
   /** Adds a step at the end of the Otherwise of a wait, wherever that wait is. */
@@ -1039,6 +1045,201 @@ describe("a Wait step's Otherwise list", () => {
     const { doc, outer, inner } = nestedFallback();
     expect(moveStep(doc, outer, 0, { waitCardId: inner })).toEqual(doc);
     expect(moveStep(doc, outer, 0, { waitCardId: outer })).toEqual(doc);
+  });
+
+  /** Preloads, then WALL FLOWER or GARDEN as the drive team picks, then a second volley and park. */
+  function pickupChoice(): { doc: ProjectDoc; choice: string } {
+    let doc = fresh();
+    doc = addSpot(doc, "WALL_FLOWER_STAGING", 23.1, 47.2, 180);
+    doc = addSpot(doc, "GARDEN_STAGING", 11.5, 22.1, 270);
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    const made = addStep(doc, "choice", doc.auto!.cards.length);
+    doc = made.doc;
+    const choice = made.cardId;
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other">, spot?: string) => {
+      const length = stepOf(doc, choice).legs![n].steps.length;
+      doc = addStep(doc, kind, length, spot, { waitCardId: choice, leg: n }).doc;
+    };
+    leg(0, "drive", "WALL_FLOWER_STAGING");
+    leg(0, "pick");
+    leg(0, "drive", "RIGHT_FIRE");
+    leg(1, "drive", "GARDEN_STAGING");
+    leg(1, "gather");
+    leg(1, "drive", "RIGHT_FIRE");
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "RIGHT_PARK");
+    return { doc, choice };
+  }
+
+  it("a choice holds two legs the drive team picks between, and stays Simple", () => {
+    const { doc, choice } = pickupChoice();
+    expect(isSimple(doc)).toBe(true);
+    const step = stepOf(doc, choice);
+    expect(step).toMatchObject({
+      kind: "choice",
+      option: "First pickup",
+      label: "First pickup: WALL_FLOWER or GARDEN",
+    });
+    expect(step.legs!.map((leg) => leg.name)).toEqual(["WALL_FLOWER", "GARDEN"]);
+    expect(step.legs![0].steps.map((s) => s.kind)).toEqual(["drive", "pick", "drive"]);
+    expect(step.legs![1].steps.map((s) => s.kind)).toEqual(["drive", "gather", "drive"]);
+    // The launch below the choice is aimed from where both legs end.
+    expect(stepsOf(doc).map((s) => s.kind)).toEqual(["launch", "choice", "launch", "park"]);
+    expect(stepsOf(doc)[2].atSpot).toBe("RIGHT_FIRE");
+  });
+
+  it("a choice exports as route cards the guard plans through, with its INIT option", () => {
+    const laid = settled(pickupChoice().doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "pickup.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source).toContain('AutoOption.choice("First pickup", "WALL_FLOWER", "GARDEN")');
+    expect(java.source.match(/kit\.route\("First pickup", 0,/g)?.length).toBe(3);
+    expect(java.source.match(/kit\.route\("First pickup", 1,/g)?.length).toBe(3);
+    expect(java.source).toContain('kit.route("First pickup", 1, () -> kit.command("GardenGather"');
+  });
+
+  it("a choice and its legs can be renamed", () => {
+    const start = pickupChoice();
+    let doc = setChoice(start.doc, start.choice, { option: "Second load" });
+    doc = setChoice(doc, start.choice, { leg: 1, name: "GARDEN_FIRST" });
+    expect(stepOf(doc, start.choice)).toMatchObject({
+      option: "Second load",
+      label: "Second load: WALL_FLOWER or GARDEN_FIRST",
+    });
+    expect(isSimple(doc)).toBe(true);
+  });
+
+  it("a clock check never waits: before its time the steps below, otherwise the Otherwise", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    const made = addStep(doc, "check", doc.auto!.cards.length);
+    doc = setWait(made.doc, made.cardId, { seconds: 20.7 });
+    doc = add(doc, "drive", "RIGHT_FIRE");
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "RIGHT_PARK");
+    // Too late: park instead of the steps below.
+    doc = setWaitRejoin(doc, made.cardId, false);
+    expect(isSimple(doc)).toBe(true);
+    const step = stepOf(doc, made.cardId);
+    expect(step).toMatchObject({
+      kind: "wait",
+      waitFor: ALWAYS,
+      waitS: 20.7,
+      waitClock: true,
+      label: "If before 20.7 s",
+      rejoin: false,
+    });
+    expect(step.otherwise?.map((s) => s.kind)).toEqual(["park"]);
+    // In the file the time row is first, so past the time it wins; before it "Always" does.
+    const card = doc.auto!.cards.find((c) => c.id === made.cardId)!;
+    if (card.kind !== "firstOf") throw new Error("not a wait");
+    expect("afterMs" in card.rows[0] && card.rows[0].matchClock).toBe(true);
+    expect("when" in card.rows[1] && card.rows[1].when).toEqual([ALWAYS]);
+    expect(doc.auto!.registry.conditions).toContain(ALWAYS);
+    // It stays a clock check: no trigger, no "at most".
+    expect(setWait(doc, made.cardId, { waitFor: "CellUp" })).toEqual(doc);
+    expect(setWait(doc, made.cardId, { matchClock: false })).toEqual(doc);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "check.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source.indexOf("kit.atMatchSeconds(20.7)")).toBeGreaterThan(0);
+    expect(java.source.indexOf("kit.atMatchSeconds(20.7)")).toBeLessThan(
+      java.source.indexOf('kit.when("Always")'),
+    );
+  });
+
+  it("a clock check's time may be the one the drive team sets in INIT", () => {
+    let doc = fresh();
+    const made = addStep(doc, "check", 0);
+    doc = setWait(made.doc, made.cardId, { adjustable: true });
+    expect(stepOf(doc, made.cardId).waitAdjustable).toBe(true);
+  });
+
+  it("a choice that ends the route lets each leg park by its own road", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "LEFT_FIRE", 57.5, 123.5, 273.4);
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    doc = add(doc, "drive", "LEFT_FIRE");
+    const made = addStep(doc, "choice", doc.auto!.cards.length);
+    doc = setChoice(made.doc, made.cardId, { option: "Priority" });
+    doc = setChoice(doc, made.cardId, { leg: 0, name: "THREE_TIP" });
+    doc = setChoice(doc, made.cardId, { leg: 1, name: "PARK" });
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other">, spot?: string) => {
+      const length = stepOf(doc, made.cardId).legs![n].steps.length;
+      doc = addStep(doc, kind, length, spot, { waitCardId: made.cardId, leg: n }).doc;
+    };
+    expect(stepOf(doc, made.cardId).legsMayPark).toBe(true);
+    leg(0, "drive", "RIGHT_FIRE");
+    leg(0, "launch");
+    leg(0, "park", "RIGHT_PARK");
+    leg(1, "wait");
+    leg(1, "park", "RIGHT_PARK");
+    expect(isSimple(doc)).toBe(true);
+    expect(stepOf(doc, made.cardId).legs!.map((l) => l.steps.map((s) => s.kind))).toEqual([
+      ["drive", "launch", "park"],
+      ["wait", "park"],
+    ]);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "priority.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    // The list is guarded, and every card of each leg, its park included, is a route card.
+    expect(java.source).toContain('kit.guarded("Auto"');
+    expect(java.source.match(/kit\.route\("Priority", 0,/g)?.length).toBe(3);
+    expect(java.source.match(/kit\.route\("Priority", 1,/g)?.length).toBe(2);
+  });
+
+  it("a choice with steps below it takes no Park in a leg", () => {
+    const { doc, choice } = pickupChoice();
+    expect(stepOf(doc, choice).legsMayPark).toBe(false);
+    expect(() =>
+      addStep(doc, "park", 0, "RIGHT_PARK", { waitCardId: choice, leg: 1 }),
+    ).toThrow();
+  });
+
+  it("a leg holds drives, commands and holds only, and a choice stays in the main list", () => {
+    const { doc, choice } = pickupChoice();
+    // A wait in a leg is a hold for its time only, and stays one.
+    const held = addStep(doc, "wait", 1, undefined, { waitCardId: choice, leg: 1 });
+    const hold = stepOf(held.doc, held.cardId);
+    expect(hold).toMatchObject({ kind: "wait", waitFor: TIME_ONLY });
+    expect(setWait(held.doc, held.cardId, { waitFor: "CellUp" })).toEqual(held.doc);
+    expect(isSimple(held.doc)).toBe(true);
+    const withWait = add(doc, "wait");
+    const wait = stepsOf(withWait).find((s) => s.kind === "wait")!.cardId;
+    expect(() =>
+      addStep(withWait, "choice", 0, undefined, { waitCardId: wait }),
+    ).toThrow();
+    expect(moveStep(withWait, choice, 0, { waitCardId: wait })).toEqual(withWait);
   });
 
   it("lays an Otherwise drive's heading from the heading at the wait", () => {

@@ -201,8 +201,15 @@ export function validateAuto(
     if (card.choice) {
       if (card.rows.some((row) => !row.label?.trim() || row.cards.length === 0))
         error(card.id, `${name}: each leg of the "${card.choice}" choice needs a name and at least one step.`);
-      if (card.rows.some((row) => row.cards.some((c) => childLists(c).some((list) => list.length > 0) || (c.kind === "path" && c.park) || c.kind === "rejoin")))
-        error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only; a decision or the park goes after it.`);
+      // A leg holds drives, commands and plain waits. It may end with the park, if the other leg
+      // does too: then each way parks by its own road and nothing follows the choice.
+      const isPark = (c: AutoCard) => c.kind === "path" && c.park;
+      const parkLast = (row: (typeof card.rows)[number]) =>
+        row.cards.length > 0 && isPark(row.cards[row.cards.length - 1]);
+      if (card.rows.some((row) => row.cards.some((c, i) => childLists(c).some((list) => list.length > 0) || (isPark(c) && i !== row.cards.length - 1) || c.kind === "rejoin")))
+        error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only, and may end with the park; a decision goes after it.`);
+      if (card.rows.some(parkLast) && !card.rows.every(parkLast))
+        error(card.id, `${name}: one leg of the "${card.choice}" choice ends with the park and the other does not; both park, or the park goes after the choice.`);
       if (card.shot || card.alongside || card.partnerWait || card.ladder)
         error(card.id, `${name} is the "${card.choice}" choice; it cannot also be a wait with a command, a partner wait or a camera-or-timer stop.`);
       const names = card.rows.map((row) => row.label?.trim() ?? "").join(", ");
