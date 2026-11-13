@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-12T22:32:02.588Z",
+  "timestamp": "2026-11-13T01:59:22.845Z",
   "startPoint": {
     "x": 55.6,
     "y": 7.7,
@@ -100,7 +100,15 @@
           "segments": [
             {
               "startProgress": 0,
-              "endProgress": 0.7,
+              "endProgress": 0.4,
+              "interpolationType": "constant",
+              "parameters": {
+                "degrees": 180
+              }
+            },
+            {
+              "startProgress": 0.4,
+              "endProgress": 0.9,
               "interpolationType": "linear",
               "parameters": {
                 "startDeg": 180,
@@ -108,7 +116,7 @@
               }
             },
             {
-              "startProgress": 0.7,
+              "startProgress": 0.9,
               "endProgress": 1,
               "interpolationType": "constant",
               "parameters": {
@@ -203,7 +211,7 @@
       "segments": [
         {
           "id": "r-pickup-park-lane-garden",
-          "color": "#e15759",
+          "color": "#f28e2b",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -308,15 +316,41 @@
           "segments": [
             {
               "startProgress": 0,
-              "endProgress": 0.6,
+              "endProgress": 0.1,
               "interpolationType": "linear",
               "parameters": {
                 "startDeg": 270,
+                "endDeg": 180
+              }
+            },
+            {
+              "startProgress": 0.1,
+              "endProgress": 0.2,
+              "interpolationType": "linear",
+              "parameters": {
+                "startDeg": 180,
+                "endDeg": 90
+              }
+            },
+            {
+              "startProgress": 0.2,
+              "endProgress": 0.5,
+              "interpolationType": "constant",
+              "parameters": {
+                "degrees": 90
+              }
+            },
+            {
+              "startProgress": 0.5,
+              "endProgress": 0.9,
+              "interpolationType": "linear",
+              "parameters": {
+                "startDeg": 90,
                 "endDeg": 295.5
               }
             },
             {
-              "startProgress": 0.6,
+              "startProgress": 0.9,
               "endProgress": 1,
               "interpolationType": "constant",
               "parameters": {
@@ -432,7 +466,7 @@
       "segments": [
         {
           "id": "r-catch-park-south",
-          "color": "#76b7b2",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -458,7 +492,7 @@
         },
         {
           "id": "r-catch-park-in",
-          "color": "#59a14f",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -506,7 +540,7 @@
       "segments": [
         {
           "id": "r-cross-out",
-          "color": "#e15759",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -535,7 +569,7 @@
         },
         {
           "id": "r-cross-south",
-          "color": "#f28e2b",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -577,7 +611,7 @@
       "segments": [
         {
           "id": "r-right-park-west",
-          "color": "#f28e2b",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -602,7 +636,7 @@
         },
         {
           "id": "r-right-park-lane",
-          "color": "#76b7b2",
+          "color": "#59a14f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
