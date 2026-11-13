@@ -1202,6 +1202,10 @@ describe("a Wait step's Otherwise list", () => {
       ["wait", "park"],
     ]);
     const laid = settled(doc);
+    // The drive that brings the robot to the choice keeps a park from its spot: the guard may
+    // have to park before either leg starts.
+    const toChoice = stepsOf(laid).find((s) => s.spot === "LEFT_FIRE")!;
+    expect(laid.auto!.parkFrom?.[toChoice.cardId]).toBeTruthy();
     const java = generateAutoJava({
       auto: laid.auto!,
       startPoint: laid.startPoint,
@@ -1216,6 +1220,20 @@ describe("a Wait step's Otherwise list", () => {
     expect(java.source).toContain('kit.guarded("Auto"');
     expect(java.source.match(/kit\.route\("Priority", 0,/g)?.length).toBe(3);
     expect(java.source.match(/kit\.route\("Priority", 1,/g)?.length).toBe(2);
+  });
+
+  it("an Auto with no Park step keeps the park paths it has", () => {
+    // Drawn elsewhere: spot parks but no Park step (R-Infraviolet). Nothing says where the parks
+    // go, so the builder leaves them alone rather than drop them.
+    const start = settled(pickupChoice().doc);
+    const parks = Object.keys(start.auto!.parkFrom ?? {}).length;
+    expect(parks).toBeGreaterThan(0);
+    const park = stepsOf(start).find((s) => s.kind === "park")!;
+    const auto = structuredClone(start.auto!);
+    auto.cards = auto.cards.filter((c) => c.id !== park.cardId);
+    const noPark = { ...start, auto };
+    const catalog = buildPathCatalog(noPark.startPoint, noPark.lines, settings);
+    expect(withSpotParks(noPark, catalog)).toBe(noPark);
   });
 
   it("a choice with steps below it takes no Park in a leg", () => {
