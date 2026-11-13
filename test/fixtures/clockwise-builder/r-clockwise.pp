@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-13T14:59:50.595Z",
+  "timestamp": "2026-11-13T17:39:23.692Z",
   "startPoint": {
     "x": 55.6,
     "y": 7.7,
@@ -220,7 +220,7 @@
       "segments": [
         {
           "id": "r-pickup-park-lane-garden",
-          "color": "#59a14f",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -250,7 +250,7 @@
         },
         {
           "id": "r-pickup-park-turn-garden",
-          "color": "#76b7b2",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -495,7 +495,7 @@
       "segments": [
         {
           "id": "r-catch-park-south",
-          "color": "#59a14f",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -569,7 +569,7 @@
       "segments": [
         {
           "id": "r-cross-south",
-          "color": "#f28e2b",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -598,7 +598,7 @@
         },
         {
           "id": "r-cross-turn",
-          "color": "#76b7b2",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -652,7 +652,7 @@
       "segments": [
         {
           "id": "r-right-park-west",
-          "color": "#9c755f",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -677,7 +677,7 @@
         },
         {
           "id": "r-right-park-lane",
-          "color": "#4e79a7",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -1157,6 +1157,7 @@
                                     "afterMs": 23200,
                                     "matchClock": true,
                                     "adjustable": true,
+                                    "tip": 2,
                                     "cards": [
                                       {
                                         "id": "r-launch-left-again",

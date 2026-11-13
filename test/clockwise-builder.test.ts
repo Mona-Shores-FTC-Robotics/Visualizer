@@ -44,10 +44,10 @@ describe("the Clockwise pair as builder steps", () => {
         .find((line) => line.includes("AutoOption[] OPTIONS"))!;
     };
     expect(options("r-clockwise.pp")).toContain(
-      '{AutoOption.matchSeconds("R3 RIGHT up by", 23.2), AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.choice("Priority", "THREE_TIP", "PARK")}',
+      '{AutoOption.matchSeconds("R3 RIGHT up by", 23.2, 2), AutoOption.choice("Pickup", "WALL_FLOWER", "GARDEN"), AutoOption.choice("Priority", "THREE_TIP", "PARK")}',
     );
     expect(options("l-clockwise.pp")).toContain(
-      '{AutoOption.matchSeconds("L1 LEFT up by", 9.5), AutoOption.choice("Pickup", "GARDEN", "WALL_FLOWER")}',
+      '{AutoOption.matchSeconds("L1 LEFT up by", 9.5, 1), AutoOption.choice("Pickup", "GARDEN", "WALL_FLOWER")}',
     );
   });
 });
