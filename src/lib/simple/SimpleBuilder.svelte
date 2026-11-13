@@ -3,6 +3,7 @@
   // pick a start, then add Launch all, Drive to, Pick flower and Park from the palette, by click
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
+    Clock,
     Flower2,
     Hourglass,
     Link2,
@@ -66,6 +67,7 @@
     setWait,
     setChoice,
     everyStep,
+    ALWAYS,
     LEG_KINDS,
     setParkChoice,
     setWaitRejoin,
@@ -135,6 +137,13 @@
       hint: "Wait here until the CELL in front of the robot is up (at once if it already is), at most a few seconds",
     },
     {
+      kind: "check",
+      short: "If before",
+      label: "If before a time",
+      icon: Clock,
+      hint: "Look at the match clock once: before the time the robot goes on with the steps below, otherwise it does the Otherwise. It never waits",
+    },
+    {
       kind: "choice",
       short: "Choose",
       label: "Choose in INIT",
@@ -156,6 +165,7 @@
     pick: Flower2,
     gather: Sprout,
     wait: Hourglass,
+    check: Clock,
     choice: Split,
     park: SquareParking,
     other: null,
@@ -559,7 +569,8 @@
 </script>
 
 {#snippet stepItem(step: Step, index: number, into: StepList)}
-  {@const Icon = ICONS[step.kind]}
+  {@const Icon =
+    step.kind === "wait" && step.waitFor === ALWAYS ? Clock : ICONS[step.kind]}
   <li
     class={[
       "simple-step",
@@ -813,6 +824,44 @@
     {:else if step.kind === "wait"}
       {@const trigger =
         WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ?? "TIP"}
+      {#if step.waitFor === ALWAYS}
+      <!-- Fork: a clock check (steps.ts ALWAYS): it never waits, it takes one way or the other. -->
+      <div
+        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+      >
+        <span>If the match clock reads before</span>
+        <span class="inline-flex items-center gap-1">
+          <input
+            class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+            type="number"
+            min="0"
+            step="0.5"
+            aria-label="Seconds"
+            value={step.waitS}
+            onchange={(e) =>
+              apply(
+                setWait(doc, step.cardId, {
+                  seconds: Number(e.currentTarget.value) || 0.1,
+                }),
+              )}
+          />s,
+        </span>
+        <span>the robot goes straight on with the steps below. It never waits here.</span>
+      </div>
+      <div class="mt-1 flex flex-wrap items-center gap-1 pl-6">
+        <button
+          type="button"
+          class={["simple-option", step.waitAdjustable && "simple-option--on"]}
+          aria-pressed={step.waitAdjustable}
+          title="The drive team may move this time in INIT with the D-pad. One step per Auto."
+          onclick={() =>
+            apply(
+              setWait(doc, step.cardId, { adjustable: !step.waitAdjustable }),
+            )}
+          >{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
+        >
+      </div>
+      {:else}
       <!-- One sentence: wait for [trigger] [at most | until] [N] s. -->
       <div
         class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
@@ -898,6 +947,7 @@
           >
         {/if}
       </div>
+      {/if}
       {#if step.waitFor !== TIME_ONLY}
       <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
       {@const sub = { waitCardId: step.cardId }}
@@ -906,9 +956,9 @@
           class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
         >
           <span class="font-medium text-heading"
-            >If no {trigger}
-            {step.waitClock ? "by" : "in"}
-            {step.waitS} s:</span
+            >{#if step.waitFor === ALWAYS}At {step.waitS} s or later:{:else}If no {trigger}
+              {step.waitClock ? "by" : "in"}
+              {step.waitS} s:{/if}</span
           >
           {#if step.otherwise?.length}
             <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->

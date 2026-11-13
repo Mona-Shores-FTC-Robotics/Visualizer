@@ -55,6 +55,7 @@ export type StepKind =
   | "pick"
   | "gather"
   | "wait"
+  | "check"
   | "choice"
   | "drive"
   | "park"
@@ -129,6 +130,9 @@ export const LEG_KINDS: StepKind[] = [
   "wait",
 ];
 
+/** A new clock check's time, seconds on the match clock. */
+const CHECK_DEFAULT_S = 20;
+
 /** A new choice's names: the one the team draws most, WALL FLOWER or GARDEN. */
 const CHOICE_DEFAULT = { option: "Pickup", legs: ["WALL_FLOWER", "GARDEN"] };
 
@@ -149,10 +153,21 @@ const CHOICE_DEFAULT = { option: "Pickup", legs: ["WALL_FLOWER", "GARDEN"] };
  */
 export const TIME_ONLY = "";
 
+/**
+ * Fork: a clock check, "If before 20.7 s: the steps below. Otherwise: ...". It never waits: the
+ * robot looks at the match clock once and takes one way or the other (cross for a third TIP if
+ * early, stay and finish the second if not). In the file it is a wait card whose match-clock time
+ * row comes first and whose trigger row is the robot's "Always" trigger, so past the time the time
+ * row wins and before it the trigger does, at once. The builder shows it as a Wait step with this
+ * trigger; it takes an Otherwise like any other.
+ */
+export const ALWAYS = "Always";
+
 /** A Wait step's title: "Wait for TIP or CELL up", or "Wait until 12 s" / "Wait 2 s" when it waits for nothing. */
 export function waitTitle(trigger: string, seconds: number, matchClock: boolean): string {
   if (trigger === TIME_ONLY)
     return matchClock ? `Wait until ${seconds} s` : `Wait ${seconds} s`;
+  if (trigger === ALWAYS) return `If before ${seconds} s`;
   return `Wait for ${WAIT_FOR.find((w) => w.trigger === trigger)?.label ?? trigger}`;
 }
 
@@ -168,6 +183,7 @@ export const WAIT_FOR: readonly {
   { trigger: "LeftCellUp", label: "Left CELL up", legacy: true },
   { trigger: "RightCellUp", label: "Right CELL up", legacy: true },
   { trigger: "CameraBlind", label: "camera blind", legacy: true },
+  { trigger: ALWAYS, label: "the clock", legacy: true },
 ];
 /** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
 export const WAIT_DEFAULT_S = 7;
@@ -600,7 +616,19 @@ export function addStep(
     let card: AutoCard;
     if (into?.leg !== undefined && !LEG_KINDS.includes(kind))
       throw new Error("A leg of a choice holds drives, commands and plain waits only");
-    if (kind === "choice") {
+    if (kind === "check") {
+      card = {
+        id: makeCardId(),
+        kind: "firstOf",
+        label: waitTitle(ALWAYS, CHECK_DEFAULT_S, true),
+        rows: [
+          { afterMs: CHECK_DEFAULT_S * 1000, matchClock: true, cards: [] },
+          { when: [ALWAYS], cards: [] },
+        ],
+      };
+      if (!auto.registry.conditions.includes(ALWAYS))
+        auto.registry.conditions = [...auto.registry.conditions, ALWAYS];
+    } else if (kind === "choice") {
       if (into) throw new Error("A choice goes in the main list");
       const { option, legs } = CHOICE_DEFAULT;
       card = {
@@ -853,6 +881,10 @@ export function setWait(
     );
     if (inLeg && change.waitFor !== undefined && change.waitFor !== TIME_ONLY)
       return;
+    // A clock check stays one: its time and whether the drive team may set it, nothing else.
+    if (waitOf(card)!.trigger === ALWAYS)
+      change = { seconds: change.seconds, adjustable: change.adjustable };
+    else if (change.waitFor === ALWAYS) return;
     if (change.waitFor === TIME_ONLY) {
       // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
       const time = card.rows.find((row) => "afterMs" in row)!;
@@ -1271,6 +1303,9 @@ function waitOf(
       }
     | undefined;
   if (!when || !time || when.when.length !== 1) return null;
+  // A clock check is one only as the robot reads it: the time first, on the match clock.
+  if (when.when[0] === ALWAYS && (card.rows[0] !== time || !time.matchClock))
+    return null;
   if (when.cards.length && !allowWhenCards) return null;
   if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
   return {

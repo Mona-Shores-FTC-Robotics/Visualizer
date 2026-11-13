@@ -32,6 +32,7 @@ import {
   pickSpot,
 } from "../src/lib/simple/flowers";
 import {
+  ALWAYS,
   TIME_ONLY,
   addSpot,
   addStep,
@@ -1116,6 +1117,62 @@ describe("a Wait step's Otherwise list", () => {
       label: "Second load: WALL_FLOWER or GARDEN_FIRST",
     });
     expect(isSimple(doc)).toBe(true);
+  });
+
+  it("a clock check never waits: before its time the steps below, otherwise the Otherwise", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    const made = addStep(doc, "check", doc.auto!.cards.length);
+    doc = setWait(made.doc, made.cardId, { seconds: 20.7 });
+    doc = add(doc, "drive", "RIGHT_FIRE");
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "RIGHT_PARK");
+    // Too late: park instead of the steps below.
+    doc = setWaitRejoin(doc, made.cardId, false);
+    expect(isSimple(doc)).toBe(true);
+    const step = stepOf(doc, made.cardId);
+    expect(step).toMatchObject({
+      kind: "wait",
+      waitFor: ALWAYS,
+      waitS: 20.7,
+      waitClock: true,
+      label: "If before 20.7 s",
+      rejoin: false,
+    });
+    expect(step.otherwise?.map((s) => s.kind)).toEqual(["park"]);
+    // In the file the time row is first, so past the time it wins; before it "Always" does.
+    const card = doc.auto!.cards.find((c) => c.id === made.cardId)!;
+    if (card.kind !== "firstOf") throw new Error("not a wait");
+    expect("afterMs" in card.rows[0] && card.rows[0].matchClock).toBe(true);
+    expect("when" in card.rows[1] && card.rows[1].when).toEqual([ALWAYS]);
+    expect(doc.auto!.registry.conditions).toContain(ALWAYS);
+    // It stays a clock check: no trigger, no "at most".
+    expect(setWait(doc, made.cardId, { waitFor: "CellUp" })).toEqual(doc);
+    expect(setWait(doc, made.cardId, { matchClock: false })).toEqual(doc);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "check.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source.indexOf("kit.atMatchSeconds(20.7)")).toBeGreaterThan(0);
+    expect(java.source.indexOf("kit.atMatchSeconds(20.7)")).toBeLessThan(
+      java.source.indexOf('kit.when("Always")'),
+    );
+  });
+
+  it("a clock check's time may be the one the drive team sets in INIT", () => {
+    let doc = fresh();
+    const made = addStep(doc, "check", 0);
+    doc = setWait(made.doc, made.cardId, { adjustable: true });
+    expect(stepOf(doc, made.cardId).waitAdjustable).toBe(true);
   });
 
   it("a leg holds drives, commands and holds only, and a choice stays in the main list", () => {

@@ -283,6 +283,12 @@ the INIT menu, and two legs, each a named list of drives and commands. The drive
 both end on the same spot and go on with the steps below. A choice sits in the main list, and a leg
 holds no wait and no park.
 
+A **clock check** is a builder step too, "If before 20.7 s: the steps below. Otherwise: …". It is
+a wait card whose match-clock time row comes first and whose trigger row is the robot's `Always`
+trigger: past the time the time row wins, before it the trigger does, at once, so the robot never
+waits. It takes an Otherwise like any Wait, and its time may be the one the drive team sets in
+INIT (`adjustable`).
+
 A stop that shoots by the camera or the timer (`shot`) and a time on the INIT menu (`option`) are
 not builder steps: the builder has no control for them, so it shows such a wait as an advanced step
 and leaves it alone.
