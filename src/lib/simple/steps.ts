@@ -367,6 +367,25 @@ export function isSimple(doc: ProjectDoc): boolean {
 }
 
 /**
+ * Whether the Auto is made of builder steps only, by its cards alone (no geometry): commands,
+ * drives and Wait steps, each Wait's Otherwise the same, however deep. A paired Auto's hand-made
+ * decisions (a route choice, a stop on the "Always" trigger) are not. The export asks, to guard
+ * the steps that lead to a Wait that parks (codegen/auto/javaAuto.ts).
+ */
+export function isBuilderAuto(auto: AutoSection): boolean {
+  const view = structuredClone(auto);
+  unfold(view);
+  const steps = (cards: AutoCard[]): boolean =>
+    cards.every((card) => {
+      if (card.kind === "action" || card.kind === "path") return true;
+      if (card.kind !== "firstOf") return false;
+      const wait = waitOf(card);
+      return !!wait && steps(wait.otherwise);
+    });
+  return steps(view.cards);
+}
+
+/**
  * The Drive or Park step a path belongs to: the step that drives it, or, for a spot's park path
  * (parkFrom.ts, the builder's P), the drive whose spot it parks from (`viaPark`). Null for any
  * other path, such as a link.
