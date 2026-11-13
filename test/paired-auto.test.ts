@@ -117,7 +117,7 @@ describe("a paired Auto", () => {
     );
     // A clock gate is an ordinary wait on Always: its time is on the menu too.
     expect(java).toContain(
-      'kit.atMatchSeconds(kit.seconds("TS scoring FLOWER by", 16.9)).then(',
+      'kit.atMatchSeconds(kit.seconds("TS scoring FLOWER by", 17.6)).then(',
     );
   });
 
