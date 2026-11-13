@@ -34,6 +34,8 @@ import {
 import {
   ALWAYS,
   TIME_ONLY,
+  initRow,
+  newTimeName,
   addSpot,
   addStep,
   blankAuto,
@@ -1168,11 +1170,44 @@ describe("a Wait step's Otherwise list", () => {
     );
   });
 
-  it("a clock check's time may be the one the drive team sets in INIT", () => {
+  it("a clock check's time goes on the INIT menu under a name of its own", () => {
     let doc = fresh();
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
     const made = addStep(doc, "check", 0);
-    doc = setWait(made.doc, made.cardId, { adjustable: true });
-    expect(stepOf(doc, made.cardId).waitAdjustable).toBe(true);
+    doc = add(made.doc, "park", "RIGHT_PARK");
+    // The "partner's TIP" row is a wait's: a clock check cannot be it.
+    expect(setWait(doc, made.cardId, { adjustable: true })).toEqual(doc);
+    expect(newTimeName(doc)).toBe("Go on before");
+    doc = setWait(doc, made.cardId, { option: newTimeName(doc), seconds: 20.5 });
+    expect(stepOf(doc, made.cardId)).toMatchObject({
+      waitOption: "Go on before",
+      waitAdjustable: false,
+    });
+    expect(isSimple(doc)).toBe(true);
+    expect(newTimeName(doc)).toBe("Go on before 2");
+    // What the Driver Station's row reads, and what the export gives it.
+    expect(initRow("time", "Go on before", 20.5)).toBe("Go on before ◀▶: 20.5 s");
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "time.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source).toContain('AutoOption.time("Go on before", 20.5)');
+    expect(java.source).toContain('kit.atMatchSeconds(kit.seconds("Go on before", 20.5))');
+    expect(java.source).not.toContain("AutoOption.matchSeconds");
+    // Off the menu again.
+    expect(stepOf(setWait(doc, made.cardId, { option: null }), made.cardId).waitOption).toBeUndefined();
+  });
+
+  it("the Driver Station rows read as biobuzz InitOptions writes them", () => {
+    expect(initRow("choice", "Pickup", "WALL_FLOWER")).toBe("Pickup ◀▶: WALL_FLOWER");
+    expect(initRow("partnerWait", "", 9)).toBe("waiting for partner's TIP ◀▶ until 9 s");
   });
 
   it("a choice that ends the route lets each leg park by its own road", () => {
@@ -1202,6 +1237,10 @@ describe("a Wait step's Otherwise list", () => {
       ["wait", "park"],
     ]);
     const laid = settled(doc);
+    // The drive that brings the robot to the choice keeps a park from its spot: the guard may
+    // have to park before either leg starts.
+    const toChoice = stepsOf(laid).find((s) => s.spot === "LEFT_FIRE")!;
+    expect(laid.auto!.parkFrom?.[toChoice.cardId]).toBeTruthy();
     const java = generateAutoJava({
       auto: laid.auto!,
       startPoint: laid.startPoint,
@@ -1216,6 +1255,20 @@ describe("a Wait step's Otherwise list", () => {
     expect(java.source).toContain('kit.guarded("Auto"');
     expect(java.source.match(/kit\.route\("Priority", 0,/g)?.length).toBe(3);
     expect(java.source.match(/kit\.route\("Priority", 1,/g)?.length).toBe(2);
+  });
+
+  it("an Auto with no Park step keeps the park paths it has", () => {
+    // Drawn elsewhere: spot parks but no Park step (R-Infraviolet). Nothing says where the parks
+    // go, so the builder leaves them alone rather than drop them.
+    const start = settled(pickupChoice().doc);
+    const parks = Object.keys(start.auto!.parkFrom ?? {}).length;
+    expect(parks).toBeGreaterThan(0);
+    const park = stepsOf(start).find((s) => s.kind === "park")!;
+    const auto = structuredClone(start.auto!);
+    auto.cards = auto.cards.filter((c) => c.id !== park.cardId);
+    const noPark = { ...start, auto };
+    const catalog = buildPathCatalog(noPark.startPoint, noPark.lines, settings);
+    expect(withSpotParks(noPark, catalog)).toBe(noPark);
   });
 
   it("a choice with steps below it takes no Park in a leg", () => {

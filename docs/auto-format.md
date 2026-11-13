@@ -288,8 +288,14 @@ parks by its own road, nothing follows, and the list is guarded by the default l
 A **clock check** is a builder step too, "If before 20.7 s: the steps below. Otherwise: …". It is
 a wait card whose match-clock time row comes first and whose trigger row is the robot's `Always`
 trigger: past the time the time row wins, before it the trigger does, at once, so the robot never
-waits. It takes an Otherwise like any Wait, and its time may be the one the drive team sets in
-INIT (`adjustable`).
+waits. It takes an Otherwise like any Wait. Its time may go on the INIT menu under a name of its
+own (`option` on the time row, exported as `AutoOption.time`): the Driver Station's row reads
+"Go on before ◀▶: 20.7 s". It is never `adjustable`: that row reads "waiting for partner's TIP
+until N s" on the Driver Station, which is a wait's.
+
+Beside each control that puts a row on the INIT menu (a choice, the wait for the partner's TIP, a
+clock check's time, the park pick) the builder shows the Driver Station's row word for word
+(`initRow` in `lib/simple/steps.ts`, after biobuzz `InitOptions.row`). Change one, change the other.
 
 A stop that shoots by the camera or the timer (`shot`) and a time on the INIT menu (`option`) are
 not builder steps: the builder has no control for them, so it shows such a wait as an advanced step

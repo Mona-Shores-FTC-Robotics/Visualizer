@@ -88,6 +88,11 @@ export interface Step {
   waitClock?: boolean;
   /** Wait: the drive team may move it in INIT, the second its wait for the partner's TIP gives up (biobuzz InitOptions). */
   waitAdjustable?: boolean;
+  /**
+   * Clock check: its time's name on the INIT menu, when the drive team may set it there (the
+   * Driver Station's row reads "<name> ◀▶: 20.7 s").
+   */
+  waitOption?: string;
   /** Wait: the launcher spins up while it waits (SpinUp alongside). */
   spinUp?: boolean;
   /** Wait: the steps that run only if it times out (its Otherwise list), in order. */
@@ -388,6 +393,7 @@ function walkSteps(
           waitS: wait.seconds,
           waitClock: wait.matchClock,
           waitAdjustable: wait.adjustable,
+          waitOption: wait.option,
           spinUp: wait.spinUp,
           otherwise,
           rejoin,
@@ -889,6 +895,11 @@ export function setWait(
     matchClock?: boolean;
     /** The drive team may move it in INIT; only on the match clock, one wait per Auto. */
     adjustable?: boolean;
+    /**
+     * Clock check only: its time's name on the INIT menu, so the drive team may set it there;
+     * null takes it off the menu.
+     */
+    option?: string | null;
   },
 ): ProjectDoc {
   return edit(doc, (_draft, auto) => {
@@ -903,9 +914,11 @@ export function setWait(
     if (inLeg && change.waitFor !== undefined && change.waitFor !== TIME_ONLY)
       return;
     // A clock check stays one: its time and whether the drive team may set it, nothing else.
-    if (waitOf(card)!.trigger === ALWAYS)
-      change = { seconds: change.seconds, adjustable: change.adjustable };
+    // On the INIT menu its time goes by a name of its own: the "partner's TIP" row is a wait's.
+    const check = waitOf(card)!.trigger === ALWAYS;
+    if (check) change = { seconds: change.seconds, option: change.option };
     else if (change.waitFor === ALWAYS) return;
+    else change = { ...change, option: undefined };
     if (change.waitFor === TIME_ONLY) {
       // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
       const time = card.rows.find((row) => "afterMs" in row)!;
@@ -933,6 +946,12 @@ export function setWait(
         row.adjustable = true;
       }
       if (change.adjustable === false) delete row.adjustable;
+      if (change.option !== undefined) {
+        const name = change.option?.trim();
+        if (name) row.option = name;
+        else delete row.option;
+        delete row.adjustable;
+      }
     }
     if (change.spinUp === true) card.alongside = SPIN_UP;
     if (change.spinUp === false) delete card.alongside;
@@ -1255,6 +1274,39 @@ function spotOf(
   return node ? (auto.pathEnds[node.id] ?? null) : null;
 }
 
+/**
+ * A name for a clock check's time on the INIT menu that no other time of this Auto has: the
+ * Driver Station's row reads "Go on before ◀▶: 20.7 s".
+ */
+export function newTimeName(doc: ProjectDoc): string {
+  const taken = new Set(
+    allCardsOf(doc.auto?.cards ?? []).flatMap((c) =>
+      c.kind === "firstOf"
+        ? c.rows.flatMap((r) => ("afterMs" in r && r.option ? [r.option] : []))
+        : [],
+    ),
+  );
+  const base = "Go on before";
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
+}
+
+/**
+ * The Driver Station's INIT row for a step, word for word (biobuzz InitOptions.row), so the
+ * builder can show what the drive team will read: a choice, the wait for the partner's TIP, or a
+ * named time. `value` is the choice picked or the seconds.
+ */
+export function initRow(
+  kind: "choice" | "partnerWait" | "time",
+  name: string,
+  value: string | number,
+): string {
+  if (kind === "choice") return `${name} ◀▶: ${value}`;
+  if (kind === "partnerWait")
+    return `waiting for partner's TIP ◀▶ until ${value} s`;
+  return `${name} ◀▶: ${value} s`;
+}
+
 /** A Choice step's title: "Pickup: WALL_FLOWER or GARDEN". */
 export function choiceTitle(option: string, legs: string[]): string {
   return `${option}: ${legs.join(" or ")}`;
@@ -1290,6 +1342,8 @@ function waitOf(
   seconds: number;
   matchClock: boolean;
   adjustable: boolean;
+  /** A clock check's time, by name on the INIT menu. */
+  option?: string;
   spinUp: boolean;
   otherwise: AutoCard[];
 } | null {
@@ -1299,7 +1353,13 @@ function waitOf(
   // (types.ts FirstOfCard.shot, AfterMsRow.option): the builder has no control for either, so it
   // must not show one as a plain wait and drop the setting on the next edit.
   if (card.shot) return null;
-  if (card.rows.some((row) => "afterMs" in row && row.option)) return null;
+  // A named time is the clock check's "Set in INIT" (below); on any other wait it is a paired
+  // Auto's, which the builder has no control for.
+  const named = card.rows.some((row) => "afterMs" in row && row.option);
+  const clock = card.rows.some(
+    (row) => "when" in row && row.when.length === 1 && row.when[0] === ALWAYS,
+  );
+  if (named && !clock) return null;
   if (card.rows.length === 1) {
     const only = card.rows[0];
     if (!("afterMs" in only) || only.cards.length) return null;
@@ -1320,6 +1380,7 @@ function waitOf(
         afterMs: number;
         matchClock?: boolean;
         adjustable?: boolean;
+        option?: string;
         cards: AutoCard[];
       }
     | undefined;
@@ -1334,6 +1395,7 @@ function waitOf(
     seconds: time.afterMs / 1000,
     matchClock: !!time.matchClock,
     adjustable: !!time.adjustable,
+    option: time.option,
     spinUp: card.alongside === SPIN_UP,
     otherwise: time.cards,
   };

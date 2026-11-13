@@ -38,18 +38,36 @@ export function withSpotParks(
   // The builder's view: a wait that parks instead of going on has the steps below it in line.
   const view = structuredClone(auto);
   unfold(view);
-  const wanted = parkedSpots(view);
-  const parkCard = view.cards.find((c) => c.kind === "path" && c.park);
-  const parkSpot =
-    parkCard?.kind === "path" ? auto.pathEnds[parkCard.lineId] : undefined;
+  // A spot is pinned to a path's last segment: a path drawn in several pieces (a park that
+  // bends round the HIVE) is a group, and its end is its last piece's.
+  const top = new Map(doc.lines.map((line) => [line.id, line]));
+  const endId = (lineId: string): string => {
+    let node = top.get(lineId);
+    while (node && node.kind === "compound" && node.segments.length)
+      node = node.segments[node.segments.length - 1];
+    return node?.id ?? lineId;
+  };
+  const endSpot = (lineId: string) => auto.pathEnds[endId(lineId)];
+  const wanted = parkedSpots(view, endSpot);
+  // The Auto's PARK spot: every Park step is on it, so the first one whose end is pinned to a
+  // spot names it. That is the main list's Park in an Auto built here; a route that ends in a
+  // choice whose legs each park has its Parks there, and a file drawn elsewhere may leave one
+  // Park's end unpinned.
+  const isPark = (c: AutoCard) => c.kind === "path" && c.park;
+  const parkSpot = [...view.cards.filter(isPark), ...everyCard(view.cards).filter(isPark)]
+    .map((c) => (c.kind === "path" ? endSpot(c.lineId) : undefined))
+    .find((spot) => !!spot);
   const parkPoint = parkSpot ? auto.points[parkSpot] : undefined;
+  // No Park step to say where the parks go: an Auto still being built has no spot parks to lose,
+  // and one drawn elsewhere with park paths of its own and no Park step keeps them as they are.
+  if (!parkSpot) return doc;
 
   const current = auto.parkFrom ?? {};
   const lines = new Map(doc.lines.map((line) => [line.id, line]));
   const cards = new Map(everyCard(view.cards).map((c) => [c.id, c]));
   const spotOf = (cardId: string) => {
     const card = cards.get(cardId);
-    return card?.kind === "path" ? auto.pathEnds[card.lineId] : undefined;
+    return card?.kind === "path" ? endSpot(card.lineId) : undefined;
   };
 
   // One park per spot: every drive to the same spot parks along the same path. A spot's park
@@ -110,7 +128,7 @@ export function withSpotParks(
   }
 
   const ends = new Set(Object.values(next));
-  const pinsRight = [...ends].every((id) => auto.pathEnds[id] === parkSpot);
+  const pinsRight = [...ends].every((id) => endSpot(id) === parkSpot);
   if (
     !removed.size &&
     !added.length &&
@@ -121,8 +139,8 @@ export function withSpotParks(
     return doc;
 
   const pathEnds = { ...auto.pathEnds };
-  for (const id of removed) delete pathEnds[id];
-  if (parkSpot) for (const id of ends) pathEnds[id] = parkSpot;
+  for (const id of removed) delete pathEnds[endId(id)];
+  if (parkSpot) for (const id of ends) pathEnds[endId(id)] = parkSpot;
   const parkFrom = Object.keys(next).length ? next : undefined;
   return {
     ...doc,
@@ -170,11 +188,14 @@ export function isSpotPark(doc: ProjectDoc, lineId: string): boolean {
  * Park step's own path starts there. A drive inside an Otherwise that goes on afterwards always
  * has one: more steps follow it. `auto` is the builder's view (steps.ts unfold).
  */
-function parkedSpots(auto: AutoSection): Map<string, string> {
+function parkedSpots(
+  auto: AutoSection,
+  endSpot: (lineId: string) => string | undefined,
+): Map<string, string> {
   const out = new Map<string, string>();
   const add = (card: AutoCard) => {
     if (card.kind !== "path" || card.park) return;
-    const spot = auto.pathEnds[card.lineId];
+    const spot = endSpot(card.lineId);
     if (spot) out.set(card.id, spot);
   };
   const parks = (list: AutoCard[]): boolean =>
