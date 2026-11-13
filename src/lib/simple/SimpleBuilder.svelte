@@ -14,6 +14,7 @@
     Navigation,
     Fan,
     Rocket,
+    Split,
     SquareParking,
     X,
   } from "@lucide/svelte";
@@ -63,6 +64,9 @@
     startsFrom,
     setStepSpot,
     setWait,
+    setChoice,
+    everyStep,
+    LEG_KINDS,
     setParkChoice,
     setWaitRejoin,
     sideSpot,
@@ -131,6 +135,13 @@
       hint: "Wait here until the CELL in front of the robot is up (at once if it already is), at most a few seconds",
     },
     {
+      kind: "choice",
+      short: "Choose",
+      label: "Choose in INIT",
+      icon: Split,
+      hint: "Two ways to do the next part (WALL FLOWER or GARDEN, say): the drive team picks one in INIT, and both go on with the steps below",
+    },
+    {
       kind: "park",
       short: "Park",
       label: "Park",
@@ -145,6 +156,7 @@
     pick: Flower2,
     gather: Sprout,
     wait: Hourglass,
+    choice: Split,
     park: SquareParking,
     other: null,
   };
@@ -215,7 +227,8 @@
   } | null>(null);
 
   /** A list's key for drag-and-drop: the main list, or the wait whose Otherwise it is. */
-  const listKey = (into: StepList) => into?.waitCardId ?? "";
+  const listKey = (into: StepList) =>
+    into ? `${into.waitCardId}${into.leg === undefined ? "" : `/${into.leg}`}` : "";
 
   /**
    * Fork: team spots this Auto links that the team's list does not have: made as team spots on a
@@ -330,8 +343,11 @@
   }
 
   function add(kind: AddKind, index = insertIndex(), into: StepList = null) {
-    // Building an Otherwise: show it, so the step just added is drawn.
-    if (into) previewTip(into.waitCardId, false);
+    // A leg holds drives and commands only, and a choice stays in the main list (steps.ts).
+    if (into?.leg !== undefined && !LEG_KINDS.includes(kind)) return;
+    if (kind === "choice" && into) return;
+    // Building an Otherwise, or a leg of a choice: show it, so the step just added is drawn.
+    if (into) previewTip(into.waitCardId, into.leg === 0);
     if (kind === "drive" || kind === "park") {
       // The team's park for this side (RIGHT_START → RIGHT_PARK), else an older file's PARK.
       const teamPark = sideSpot(side, "PARK");
@@ -977,6 +993,91 @@
         </label>
       </div>
       {/if}
+    {:else if step.kind === "choice"}
+      <!-- Fork: a route choice (steps.ts): the drive team picks one leg in INIT; both go on below. -->
+      <div
+        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+      >
+        <span>On the INIT menu as</span>
+        <input
+          class={[fieldClass, "!w-28 !py-0.5 text-xs"]}
+          aria-label="Choice name"
+          value={step.option}
+          onchange={(e) =>
+            apply(setChoice(doc, step.cardId, { option: e.currentTarget.value }))}
+        />
+      </div>
+      {#each step.legs ?? [] as leg, legIndex (legIndex)}
+        {@const sub = { waitCardId: step.cardId, leg: legIndex as 0 | 1 }}
+        {@const shown = previewsTip(step.cardId) === (legIndex === 0)}
+        <div class="simple-otherwise mt-1.5 ml-2">
+          <div
+            class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
+          >
+            <span class="font-medium text-heading"
+              >{legIndex === 0 ? "Drawn:" : "Or:"}</span
+            >
+            <input
+              class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
+              aria-label={legIndex === 0 ? "First leg's name" : "Second leg's name"}
+              value={leg.name}
+              onchange={(e) =>
+                apply(
+                  setChoice(doc, step.cardId, {
+                    leg: legIndex as 0 | 1,
+                    name: e.currentTarget.value,
+                  }),
+                )}
+            />
+            <span
+              class="simple-branch ml-auto"
+              title="Which leg the field and the preview show"
+            >
+              <button
+                type="button"
+                class:on={shown}
+                aria-pressed={shown}
+                onclick={() => previewTip(step.cardId, legIndex === 0)}
+                >show</button
+              >
+            </span>
+          </div>
+          <ol class="mt-1 flex flex-col gap-1" aria-label={`${leg.name} steps`}>
+            {#each leg.steps as other, i (other.cardId)}
+              {@render stepItem(other, i, sub)}
+            {/each}
+            <li
+              class={[
+                "simple-end !p-1 !text-left",
+                dropping(sub, leg.steps.length) && "simple-step--drop",
+              ]}
+              ondragover={(e) => dragOver(e, leg.steps.length, sub)}
+              ondragleave={() => (dropAt = null)}
+              ondrop={(e) => drop(e, leg.steps.length, sub)}
+            >
+              <select
+                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+                aria-label={`Add a step to ${leg.name}`}
+                title="Or drag a step from the Add row onto this line"
+                value=""
+                onchange={(e) => {
+                  const kind = e.currentTarget.value as AddKind;
+                  e.currentTarget.value = "";
+                  if (kind) add(kind, leg.steps.length, sub);
+                }}
+              >
+                <option value="">+ add a step…</option>
+                {#each PALETTE.filter((t) => LEG_KINDS.includes(t.kind)) as tile (tile.kind)}
+                  <option value={tile.kind}>{tile.label}</option>
+                {/each}
+              </select>
+            </li>
+          </ol>
+        </div>
+      {/each}
+      <p class="mt-1 pl-6 text-xs text-body">
+        Both ways end on the same spot, and the steps below follow either.
+      </p>
     {:else if step.kind === "gather"}
       <div class="mt-1 pl-6 text-xs">
         {#if step.garden}
@@ -1155,7 +1256,7 @@
       {@render stepItem(step, index, null)}
     {/each}
 
-    {#if steps.length && !steps.some((step) => step.kind === "park" || step.otherwise?.some((o) => o.kind === "park"))}
+    {#if steps.length && !everyStep(steps).some((step) => step.kind === "park")}
       <li class="px-1 text-xs text-warning">
         No Park step: add one, so the robot parks by 30 s even when a step runs
         long.

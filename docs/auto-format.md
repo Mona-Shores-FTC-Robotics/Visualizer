@@ -276,6 +276,17 @@ contract with the robot's `autokit` library:
 - `OPTIONS`, always written (`{}` with none), lists what the drive team may change in INIT (see
   below).
 
+### The simple builder's Choose step
+
+A route choice (`choice` on a wait card, above) is a builder step, **Choose in INIT**: its name on
+the INIT menu, and two legs, each a named list of drives and commands. The drive team picks a leg;
+both end on the same spot and go on with the steps below. A choice sits in the main list, and a leg
+holds no wait and no park.
+
+A stop that shoots by the camera or the timer (`shot`) and a time on the INIT menu (`option`) are
+not builder steps: the builder has no control for them, so it shows such a wait as an advanced step
+and leaves it alone.
+
 ### The simple builder's Otherwise: go on, or instead
 
 A Wait step's Otherwise is its time row's cards. An Otherwise is a list like the main one: it may
