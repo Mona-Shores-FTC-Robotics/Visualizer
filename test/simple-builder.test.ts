@@ -16,6 +16,7 @@ import { TEAM_ROBOT, teamRegistry } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc, relink } from "../src/lib/auto/links";
 import { withSpotParks } from "../src/lib/simple/parkFrom";
+import { gatherPlan } from "../src/lib/simple/garden";
 import {
   motionPoseAt,
   simulateAuto,
@@ -327,6 +328,20 @@ describe("the simple builder", () => {
     expect(preview(doc).motions).toHaveLength(0);
   });
 
+  it("times a gather from GARDEN_STAGING as the robot's logs do, less the stick when it came down on the drive in", () => {
+    const staging = { x: 11.5, y: 22.1, headingDeg: 270 };
+    // Logged from this spot: stick 0.7, in about 0.95 + 0.36 at the wall, dwell 0.4, back 0.64.
+    const standing = gatherPlan("g", staging, 10)!;
+    expect(standing.seconds).toBeGreaterThan(2.9);
+    expect(standing.seconds).toBeLessThan(3.3);
+    // The drive before it lowered the stick a second earlier: no stick pause at all.
+    const lowered = gatherPlan("g", staging, 10, 9)!;
+    expect(standing.seconds - lowered.seconds).toBeCloseTo(0.7, 6);
+    // Lowered only 0.2 s before the card: the rest of the swing is still waited for.
+    const late = gatherPlan("g", staging, 10, 9.8)!;
+    expect(standing.seconds - late.seconds).toBeCloseTo(0.2, 6);
+  });
+
   it("gathers from the nearest GARDEN and comes back, its time from the distance", () => {
     let doc = fresh();
     doc = addSpot(doc, "FIRE_G", 45, 29, 90);
@@ -339,15 +354,23 @@ describe("the simple builder", () => {
     const run = preview(doc);
     const gather = run.motions;
     expect(gather.length).toBeGreaterThan(0);
-    // In to red's GARDEN, facing the audience, mid-dwell; back at FIRE_G at the end.
-    const dwell = gather[8];
+    // The stick's 0.7 s first (the drive did not arrive facing the GARDEN), then in toward red's
+    // GARDEN at (8.5, 9.5), stopping 3.6 in short of it (the stick on the wall), facing the
+    // audience, mid-dwell; back at FIRE_G at the end.
+    expect(gather[0].t1 - gather[0].t0).toBeCloseTo(0.7, 6);
+    const dwell = gather[9];
     const there = motionPoseAt(run, (dwell.t0 + dwell.t1) / 2)!;
-    expect([there.x, there.y, there.headingDeg]).toEqual([9.5, 10.96, 270]);
+    const whole = Math.hypot(45 - 8.5, 29 - 9.5);
+    expect(there.x).toBeCloseTo(45 - (36.5 * (whole - 3.6)) / whole, 6);
+    expect(there.y).toBeCloseTo(29 - (19.5 * (whole - 3.6)) / whole, 6);
+    expect(there.headingDeg).toBe(270);
     const end = motionPoseAt(run, gather[gather.length - 1].t1)!;
-    expect([end.x, end.y]).toEqual([45, 29]);
-    // In and back at the robot's speed caps, plus the 1.5 s dwell: longer from farther away.
+    expect(end.x).toBeCloseTo(45, 9);
+    expect(end.y).toBeCloseTo(29, 9);
+    // The stick, in and back at the robot's speed caps, the stall wait and the 0.4 s dwell: longer
+    // from farther away.
     const seconds = gather[gather.length - 1].t1 - gather[0].t0;
-    expect(seconds).toBeGreaterThan(1.5 + 1);
+    expect(seconds).toBeGreaterThan(0.7 + 0.36 + 0.4 + 1);
     let far = fresh();
     far = addSpot(far, "FAR", 70, 60, 90);
     far = add(far, "drive", "FAR");

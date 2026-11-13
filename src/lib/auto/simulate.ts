@@ -17,7 +17,12 @@ import {
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import { LOWER_WITHIN_IN, pickFrom, pickMotions } from "../simple/flowers";
-import { gatherPlan } from "../simple/garden";
+import {
+  gardenFor,
+  gatherPlan,
+  LOWER_WITHIN_DEG as GARDEN_LOWER_WITHIN_DEG,
+  LOWER_WITHIN_IN as GARDEN_LOWER_WITHIN_IN,
+} from "../simple/garden";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -630,6 +635,34 @@ export function simulateAuto(
     return drove.t0 + timeAtFraction(path, 1 - LOWER_WITHIN_IN / path.length);
   };
 
+  /**
+   * Fork: the drive card right before a GardenGather card lowers the stick over its last
+   * GARDEN_LOWER_WITHIN_IN, once the robot faces the GARDEN to within GARDEN_LOWER_WITHIN_DEG and
+   * stays so to the drive's end (biobuzz GardenGather.approach). Returns when the stick went down,
+   * or null when the gather does not follow a drive that ran or that drive never faced the GARDEN.
+   * Distance is along the path here, straight to its end on the robot: the same on a straight end.
+   */
+  const gardenStickDownOnDriveBefore = (
+    prev: AutoCard | undefined,
+    gardenHeadingDeg: number,
+  ): number | null => {
+    if (!prev || prev.kind !== "path") return null;
+    const drove = drives[drives.length - 1];
+    if (!drove || drove.cardId !== prev.id) return null;
+    const path = catalog.byId.get(drove.pathId);
+    if (!path || path.length <= 1e-9) return null;
+    const facing = (distance: number) =>
+      Math.abs(((path.headingAtDistance(distance) - gardenHeadingDeg + 540) % 360) - 180) <=
+      GARDEN_LOWER_WITHIN_DEG;
+    if (!facing(path.length)) return null;
+    // Walk back from the end while the robot still faces the GARDEN, at most the last stretch.
+    const earliest = Math.max(0, path.length - GARDEN_LOWER_WITHIN_IN);
+    let from = path.length;
+    for (let d = path.length - 0.5; d >= earliest && facing(d); d -= 0.5) from = d;
+    if (from - earliest < 0.5 && facing(earliest)) from = earliest;
+    return drove.t0 + timeAtFraction(path, from / path.length);
+  };
+
   const runCard = (card: AutoCard, guards: Guard[], prev?: AutoCard): Signal => {
     ran.add(card.id);
     switch (card.kind) {
@@ -637,10 +670,13 @@ export function simulateAuto(
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
         // Fork: a GardenGather takes as long as its drive in and back (lib/simple/garden.ts).
-        const gather =
-          card.name === "GardenGather"
-            ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
-            : null;
+        const gatherGarden = card.name === "GardenGather" ? gardenFor(pos.x, pos.y) : null;
+        const gardenStickAt = gatherGarden
+          ? gardenStickDownOnDriveBefore(prev, gatherGarden.gather.headingDeg)
+          : null;
+        const gather = gatherGarden
+          ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t, gardenStickAt)
+          : null;
         const busy = gather ? gather.seconds : commandSeconds(auto, card, timing, t);
         if (GRAB_COMMANDS.has(card.name)) {
           // Never cut, so not started unless its typical time and the park both fit; else the
@@ -659,6 +695,14 @@ export function simulateAuto(
         const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
         const stickDownAt = pick ? stickDownOnDriveBefore(prev) : null;
         if (gather) motions.push(...gather.motions);
+        if (gather && gardenStickAt !== null) {
+          note(
+            "Stick down on the drive in, once facing the GARDEN (the gather's wait counts from then)",
+            "event",
+            card.id,
+            gardenStickAt,
+          );
+        }
         if (pick?.ok) {
           if (stickDownAt !== null) {
             note(
