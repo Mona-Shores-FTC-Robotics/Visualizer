@@ -246,7 +246,7 @@ export function validateAuto(
   );
   if (adjustable.length > 1)
     for (const card of adjustable)
-      error(card.id, "Only one wait per Auto can be changed in INIT (the D-pad's up and down).");
+      error(card.id, "Only one wait per Auto can be changed in INIT.");
 
   const uses = pointUses(auto);
   for (const name of Object.keys(auto.points)) {
