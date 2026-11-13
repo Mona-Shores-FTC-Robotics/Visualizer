@@ -34,6 +34,8 @@ import {
 import {
   ALWAYS,
   TIME_ONLY,
+  initRow,
+  newTimeName,
   addSpot,
   addStep,
   blankAuto,
@@ -1168,11 +1170,44 @@ describe("a Wait step's Otherwise list", () => {
     );
   });
 
-  it("a clock check's time may be the one the drive team sets in INIT", () => {
+  it("a clock check's time goes on the INIT menu under a name of its own", () => {
     let doc = fresh();
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
     const made = addStep(doc, "check", 0);
-    doc = setWait(made.doc, made.cardId, { adjustable: true });
-    expect(stepOf(doc, made.cardId).waitAdjustable).toBe(true);
+    doc = add(made.doc, "park", "RIGHT_PARK");
+    // The "partner's TIP" row is a wait's: a clock check cannot be it.
+    expect(setWait(doc, made.cardId, { adjustable: true })).toEqual(doc);
+    expect(newTimeName(doc)).toBe("Go on before");
+    doc = setWait(doc, made.cardId, { option: newTimeName(doc), seconds: 20.5 });
+    expect(stepOf(doc, made.cardId)).toMatchObject({
+      waitOption: "Go on before",
+      waitAdjustable: false,
+    });
+    expect(isSimple(doc)).toBe(true);
+    expect(newTimeName(doc)).toBe("Go on before 2");
+    // What the Driver Station's row reads, and what the export gives it.
+    expect(initRow("time", "Go on before", 20.5)).toBe("Go on before ◀▶: 20.5 s");
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "time.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source).toContain('AutoOption.time("Go on before", 20.5)');
+    expect(java.source).toContain('kit.atMatchSeconds(kit.seconds("Go on before", 20.5))');
+    expect(java.source).not.toContain("AutoOption.matchSeconds");
+    // Off the menu again.
+    expect(stepOf(setWait(doc, made.cardId, { option: null }), made.cardId).waitOption).toBeUndefined();
+  });
+
+  it("the Driver Station rows read as biobuzz InitOptions writes them", () => {
+    expect(initRow("choice", "Pickup", "WALL_FLOWER")).toBe("Pickup ◀▶: WALL_FLOWER");
+    expect(initRow("partnerWait", "", 9)).toBe("waiting for partner's TIP ◀▶ until 9 s");
   });
 
   it("a choice that ends the route lets each leg park by its own road", () => {
