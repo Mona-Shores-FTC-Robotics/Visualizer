@@ -21,7 +21,7 @@ public final class LClockwiseAuto {
     public static final String SOURCE = "l-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-13|9:59AM";
+    public static final String SAVED = "11-13|10:13AM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -54,6 +54,7 @@ public final class LClockwiseAuto {
         Pose rightStart = p.of(55.6, 7.7, 90);
         Pose gardenStaging = p.of(11.5, 22.1, 270);
         Pose wallFlowerStaging = p.of(23.1, 47.2, 180);
+        Pose laneEnd = p.of(60.5, 34, 270);
         Pose rightWallNear = p.of(35.9, 10.6, 66.9);
         Pose leftPark = p.of(14.5, 117.4, 0);
 
@@ -81,9 +82,8 @@ public final class LClockwiseAuto {
         Pose point12Start = p.of(34, 106, 90);
         Pose point12 = p.of(36, 118.2, 0);
         Pose point12Control1 = p.of(35, 112, 0);
-        Pose underTheHiveToTheLaneSEnd = p.of(60.5, 34, 270);
-        Pose underTheHiveToTheLaneSEndControl1 = p.of(58.7683, 101.5686, 0);
-        Pose underTheHiveToTheLaneSEndControl2 = p.of(65.2005, 71.9052, 0);
+        Pose underTheHiveToLaneEndControl1 = p.of(58.7683, 101.5686, 0);
+        Pose underTheHiveToLaneEndControl2 = p.of(65.2005, 71.9052, 0);
         Pose point16 = p.of(34, 106, 90);
         Pose point16Control1 = p.of(33, 40, 0);
         Pose point16Control2 = p.of(33, 92, 0);
@@ -93,7 +93,6 @@ public final class LClockwiseAuto {
         Pose point17Start = p.of(34, 106, 90);
         Pose point17 = p.of(36, 118.2, 0);
         Pose point17Control1 = p.of(35, 112, 0);
-        Pose linkNeverDriven_4 = p.of(60.5, 34, 270);
         Pose toWallFlowerStagingControl1 = p.of(52, 38, 0);
         Pose toWallFlowerStagingControl2 = p.of(36, 38, 0);
         Pose toWallFlowerStagingControl3 = p.of(33, 47.2, 0);
@@ -136,9 +135,9 @@ public final class LClockwiseAuto {
         Path gardenParkToLeftPark = Paths.path(Paths.curve(gardenStaging, point6Control1, point6Control2, point6).linear(gardenStaging, point6), Paths.curve(point7Start, point7Control1, point7).linear(point7Start, point7), Paths.line(point7, leftPark).constant(leftPark));
         Path gardenToRightWallNear = Paths.curve(gardenStaging, gardenToRightWallNearControl1, rightWallNear).linear(gardenStaging, rightWallNear);
         Path outsideLaneToLeftPark = Paths.path(Paths.curve(rightWallNear, point11Control1, point11Control2, point11).heading(Interpolator.piecewise().until(0.2, Interpolator.linear(point11Segment1Start, point11Segment1End)).until(1, Interpolator.constant(point11Segment2Heading))), Paths.curve(point12Start, point12Control1, point12).linear(point12Start, point12), Paths.line(point12, leftPark).constant(leftPark));
-        Path underTheHiveToTheLaneSEndPath = Paths.curve(leftWallHive, underTheHiveToTheLaneSEndControl1, underTheHiveToTheLaneSEndControl2, underTheHiveToTheLaneSEnd).constant(underTheHiveToTheLaneSEnd);
-        Path laneSEndParkToLeftPark = Paths.path(Paths.curve(underTheHiveToTheLaneSEnd, point16Control1, point16Control2, point16).heading(Interpolator.piecewise().until(0.3, Interpolator.linear(point16Segment1Start, point16Segment1End)).until(1, Interpolator.constant(point16Segment2Heading))), Paths.curve(point17Start, point17Control1, point17).linear(point17Start, point17), Paths.line(point17, leftPark).constant(leftPark));
-        Path toWallFlowerStaging = Paths.curve(linkNeverDriven_4, toWallFlowerStagingControl1, toWallFlowerStagingControl2, toWallFlowerStagingControl3, wallFlowerStaging).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(toWallFlowerStagingSegment1Start, wallFlowerStaging)).until(1, Interpolator.constant(wallFlowerStaging)));
+        Path underTheHiveToLaneEnd = Paths.curve(leftWallHive, underTheHiveToLaneEndControl1, underTheHiveToLaneEndControl2, laneEnd).constant(laneEnd);
+        Path laneSEndParkToLeftPark = Paths.path(Paths.curve(laneEnd, point16Control1, point16Control2, point16).heading(Interpolator.piecewise().until(0.3, Interpolator.linear(point16Segment1Start, point16Segment1End)).until(1, Interpolator.constant(point16Segment2Heading))), Paths.curve(point17Start, point17Control1, point17).linear(point17Start, point17), Paths.line(point17, leftPark).constant(leftPark));
+        Path toWallFlowerStaging = Paths.curve(laneEnd, toWallFlowerStagingControl1, toWallFlowerStagingControl2, toWallFlowerStagingControl3, wallFlowerStaging).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(toWallFlowerStagingSegment1Start, wallFlowerStaging)).until(1, Interpolator.constant(wallFlowerStaging)));
         Path flowerParkToLeftPark = Paths.path(Paths.curve(wallFlowerStaging, point21Control1, point21Control2, point21).heading(Interpolator.piecewise().until(0.25, Interpolator.linear(point21Segment1Start, point21Segment1End)).until(1, Interpolator.constant(point21Segment2Heading))), Paths.curve(point22Start, point22Control1, point22).linear(point22Start, point22), Paths.line(point22, leftPark).constant(leftPark));
         Path flowerToRightWallNear = Paths.curve(wallFlowerStaging, flowerToRightWallNearControl1, flowerToRightWallNearControl2, rightWallNear).heading(Interpolator.piecewise().until(0.25, Interpolator.linear(flowerToRightWallNearSegment1Start, flowerToRightWallNearSegment1End)).until(0.6, Interpolator.constant(flowerToRightWallNearSegment2Heading)).until(1, Interpolator.linear(flowerToRightWallNearSegment3Start, rightWallNear)));
         Path underTheHiveToRightStart = Paths.path(Paths.curve(leftWallHive, point27Control1, point27Control2, point27).constant(point27), Paths.line(point28Start, point28).linear(point28Start, point28), Paths.line(point28, rightStart).constant(rightStart));
@@ -154,7 +153,7 @@ public final class LClockwiseAuto {
                                         kit.route("Pickup", 0, () -> kit.path("under the HIVE to GARDEN_STAGING", underTheHiveToGardenStaging, 4.1, gardenParkToLeftPark, 3.7)),
                                         kit.route("Pickup", 0, () -> kit.command("GardenGather", 5.5)),
                                         kit.route("Pickup", 0, () -> kit.path("GARDEN to RIGHT_WALL_NEAR", gardenToRightWallNear, 1.5, outsideLaneToLeftPark, 3.9)),
-                                        kit.route("Pickup", 1, () -> kit.path("under the HIVE to the lane's end", underTheHiveToTheLaneSEndPath, 3, laneSEndParkToLeftPark, 3.8)),
+                                        kit.route("Pickup", 1, () -> kit.path("under the HIVE to LANE_END", underTheHiveToLaneEnd, 3, laneSEndParkToLeftPark, 3.8)),
                                         kit.route("Pickup", 1, () -> kit.firstOf("R has passed the FLOWER: go at 15.5 s",
                                                 kit.atMatchSeconds(15.5))),
                                         kit.route("Pickup", 1, () -> kit.path("to WALL_FLOWER_STAGING", toWallFlowerStaging, 1.8, flowerParkToLeftPark, 3.2)),
