@@ -354,7 +354,10 @@
 
   function add(kind: AddKind, index = insertIndex(), into: StepList = null) {
     // A leg holds drives and commands only, and a choice stays in the main list (steps.ts).
-    if (into?.leg !== undefined && !LEG_KINDS.includes(kind)) return;
+    if (into?.leg !== undefined && !LEG_KINDS.includes(kind)) {
+      const owner = everyStep(steps).find((s) => s.cardId === into.waitCardId);
+      if (kind !== "park" || !owner?.legsMayPark) return;
+    }
     if (kind === "choice" && into) return;
     // Building an Otherwise, or a leg of a choice: show it, so the step just added is drawn.
     if (into) previewTip(into.waitCardId, into.leg === 0);
@@ -1117,7 +1120,7 @@
                 }}
               >
                 <option value="">+ add a step…</option>
-                {#each PALETTE.filter((t) => LEG_KINDS.includes(t.kind)) as tile (tile.kind)}
+                {#each PALETTE.filter((t) => LEG_KINDS.includes(t.kind) || (t.kind === "park" && step.legsMayPark)) as tile (tile.kind)}
                   <option value={tile.kind}>{tile.label}</option>
                 {/each}
               </select>
@@ -1126,7 +1129,11 @@
         </div>
       {/each}
       <p class="mt-1 pl-6 text-xs text-body">
-        Both ways end on the same spot, and the steps below follow either.
+        {#if step.legs?.some((leg) => leg.steps.some((s) => s.kind === "park"))}
+          Each way ends with its own Park, and nothing follows.
+        {:else}
+          Both ways end on the same spot, and the steps below follow either.
+        {/if}
       </p>
     {:else if step.kind === "gather"}
       <div class="mt-1 pl-6 text-xs">

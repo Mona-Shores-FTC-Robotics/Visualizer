@@ -104,6 +104,11 @@ export interface Step {
   option?: string;
   legs?: { name: string; steps: Step[] }[];
   /**
+   * Choice: it is the last step of a list nothing follows, so each leg may end with its own Park
+   * (each way parks by its own road). Otherwise the legs end on one spot and the Park comes below.
+   */
+  legsMayPark?: boolean;
+  /**
    * Wait: nothing follows the list this wait is in, so an Otherwise that runs instead of the steps
    * below ends with its own Park. False inside an Otherwise that goes on: there it just ends.
    */
@@ -292,7 +297,7 @@ function walkSteps(
   terminal: boolean,
 ): Step[] {
   const auto = doc.auto!;
-  return cards.map((card): Step => {
+  return cards.map((card, index): Step => {
     const base = { cardId: card.id, spot: null, lineId: null };
     if (card.kind === "action" && card.name === LAUNCH_ALL) {
       // The turret stays locked straight ahead in an Auto: the heading is the aim (aim.ts).
@@ -360,6 +365,7 @@ function walkSteps(
           label: choiceTitle(choice.option, legs.map((leg) => leg.name)),
           option: choice.option,
           legs,
+          legsMayPark: terminal && index === cards.length - 1,
         };
       }
       const wait = waitOf(card);
@@ -617,8 +623,19 @@ export function addStep(
     const list = listOf(auto, into);
     if (!list) throw new Error("No such Wait step for an Otherwise");
     let card: AutoCard;
-    if (into?.leg !== undefined && !LEG_KINDS.includes(kind))
-      throw new Error("A leg of a choice holds drives, commands and plain waits only");
+    if (into?.leg !== undefined && !LEG_KINDS.includes(kind)) {
+      // A Park ends a leg only where nothing follows the choice: each way then parks on its own.
+      const owner = findCard(auto, into.waitCardId);
+      const last =
+        !!owner &&
+        owner.index === owner.list.length - 1 &&
+        isTerminal(auto, parking, owner.list);
+      if (kind !== "park" || !last)
+        throw new Error(
+          "A leg of a choice holds drives, commands and plain waits only",
+        );
+      index = list.length;
+    }
     if (kind === "check") {
       card = {
         id: makeCardId(),
@@ -681,7 +698,8 @@ export function addStep(
       auto.pathEnds[path.id] = spot;
       // One park per route: the main one, and each Otherwise that parks instead of going on.
       if (kind === "park")
-        if (into && parking.has(into.waitCardId)) clearParks(list);
+        if (into && (into.leg !== undefined || parking.has(into.waitCardId)))
+          clearParks(list);
         else clearRouteParks(auto, parking);
       card = {
         id: makeCardId(),

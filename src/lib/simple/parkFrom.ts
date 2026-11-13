@@ -177,11 +177,20 @@ function parkedSpots(auto: AutoSection): Map<string, string> {
     const spot = auto.pathEnds[card.lineId];
     if (spot) out.set(card.id, spot);
   };
+  const parks = (list: AutoCard[]): boolean =>
+    everyCard(list).some((c) => c.kind === "path" && c.park);
   const route = (list: AutoCard[]) => {
-    const parkIndex = list.findIndex((c) => c.kind === "path" && c.park);
-    if (parkIndex < 0) return;
+    const own = list.findIndex((c) => c.kind === "path" && c.park);
+    // A route may end in a choice whose legs each park instead: every drive before it has a park.
+    const last = list[list.length - 1];
+    const legsPark =
+      own < 0 &&
+      last?.kind === "firstOf" &&
+      last.rows.every((row) => parks(row.cards));
+    if (own < 0 && !legsPark) return;
+    const parkIndex = own < 0 ? list.length : own;
     let lastBefore: string | null = null;
-    for (let i = parkIndex - 1; i >= 0; i--) {
+    for (let i = own - 1; i >= 0; i--) {
       if (list[i].kind === "path") {
         lastBefore = list[i].id;
         break;

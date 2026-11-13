@@ -1175,6 +1175,57 @@ describe("a Wait step's Otherwise list", () => {
     expect(stepOf(doc, made.cardId).waitAdjustable).toBe(true);
   });
 
+  it("a choice that ends the route lets each leg park by its own road", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_FIRE", 57.5, 18, 91.9);
+    doc = addSpot(doc, "LEFT_FIRE", 57.5, 123.5, 273.4);
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    doc = add(doc, "drive", "LEFT_FIRE");
+    const made = addStep(doc, "choice", doc.auto!.cards.length);
+    doc = setChoice(made.doc, made.cardId, { option: "Priority" });
+    doc = setChoice(doc, made.cardId, { leg: 0, name: "THREE_TIP" });
+    doc = setChoice(doc, made.cardId, { leg: 1, name: "PARK" });
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other">, spot?: string) => {
+      const length = stepOf(doc, made.cardId).legs![n].steps.length;
+      doc = addStep(doc, kind, length, spot, { waitCardId: made.cardId, leg: n }).doc;
+    };
+    expect(stepOf(doc, made.cardId).legsMayPark).toBe(true);
+    leg(0, "drive", "RIGHT_FIRE");
+    leg(0, "launch");
+    leg(0, "park", "RIGHT_PARK");
+    leg(1, "wait");
+    leg(1, "park", "RIGHT_PARK");
+    expect(isSimple(doc)).toBe(true);
+    expect(stepOf(doc, made.cardId).legs!.map((l) => l.steps.map((s) => s.kind))).toEqual([
+      ["drive", "launch", "park"],
+      ["wait", "park"],
+    ]);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "priority.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    // The list is guarded, and every card of each leg, its park included, is a route card.
+    expect(java.source).toContain('kit.guarded("Auto"');
+    expect(java.source.match(/kit\.route\("Priority", 0,/g)?.length).toBe(3);
+    expect(java.source.match(/kit\.route\("Priority", 1,/g)?.length).toBe(2);
+  });
+
+  it("a choice with steps below it takes no Park in a leg", () => {
+    const { doc, choice } = pickupChoice();
+    expect(stepOf(doc, choice).legsMayPark).toBe(false);
+    expect(() =>
+      addStep(doc, "park", 0, "RIGHT_PARK", { waitCardId: choice, leg: 1 }),
+    ).toThrow();
+  });
+
   it("a leg holds drives, commands and holds only, and a choice stays in the main list", () => {
     const { doc, choice } = pickupChoice();
     // A wait in a leg is a hold for its time only, and stays one.
@@ -1183,9 +1234,6 @@ describe("a Wait step's Otherwise list", () => {
     expect(hold).toMatchObject({ kind: "wait", waitFor: TIME_ONLY });
     expect(setWait(held.doc, held.cardId, { waitFor: "CellUp" })).toEqual(held.doc);
     expect(isSimple(held.doc)).toBe(true);
-    expect(() =>
-      addStep(doc, "park", 0, "RIGHT_PARK", { waitCardId: choice, leg: 1 }),
-    ).toThrow();
     const withWait = add(doc, "wait");
     const wait = stepsOf(withWait).find((s) => s.kind === "wait")!.cardId;
     expect(() =>

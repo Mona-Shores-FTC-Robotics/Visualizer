@@ -599,6 +599,11 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       }
       return null;
     };
+    // A route choice whose legs each end with the park: the drawing's default leg's.
+    if (last.choice) {
+      const legPark = parkCardOf(legsOf(last)[0].cards);
+      if (legPark) return legPark.lineId;
+    }
     const rows = [...last.rows].sort(
       (a, b) => Number("when" in a) - Number("when" in b),
     );
