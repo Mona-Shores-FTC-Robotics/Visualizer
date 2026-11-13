@@ -21,7 +21,7 @@ public final class RClockwiseAuto {
     public static final String SOURCE = "r-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-13|12:39PM";
+    public static final String SAVED = "11-13|1:09PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};

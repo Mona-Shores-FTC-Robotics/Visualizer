@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-13T17:39:24.349Z",
+  "timestamp": "2026-11-13T18:09:03.838Z",
   "startPoint": {
     "x": 62.3,
     "y": 133.8,
@@ -105,7 +105,7 @@
       "segments": [
         {
           "id": "l-under-hive-garden",
-          "color": "#f28e2b",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -138,7 +138,7 @@
         },
         {
           "id": "l-to-garden-garden",
-          "color": "#4e79a7",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -171,7 +171,7 @@
       "segments": [
         {
           "id": "l-pickup-park-lane-garden",
-          "color": "#59a14f",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -201,7 +201,7 @@
         },
         {
           "id": "l-pickup-park-turn-garden-face",
-          "color": "#edc948",
+          "color": "#b07aa1",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -227,7 +227,7 @@
         },
         {
           "id": "l-pickup-park-turn-garden",
-          "color": "#e15759",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -301,7 +301,7 @@
       "segments": [
         {
           "id": "l-park-lane",
-          "color": "#f28e2b",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -350,7 +350,7 @@
         },
         {
           "id": "l-park-turn-face",
-          "color": "#76b7b2",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -376,7 +376,7 @@
         },
         {
           "id": "l-park-turn",
-          "color": "#76b7b2",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -453,7 +453,7 @@
       "segments": [
         {
           "id": "l-under-park-lane-flower",
-          "color": "#4e79a7",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -502,7 +502,7 @@
         },
         {
           "id": "l-under-park-turn-flower-face",
-          "color": "#59a14f",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -528,7 +528,7 @@
         },
         {
           "id": "l-under-park-turn-flower",
-          "color": "#f28e2b",
+          "color": "#4e79a7",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -629,7 +629,7 @@
       "segments": [
         {
           "id": "l-pickup-park-lane-flower",
-          "color": "#76b7b2",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -678,7 +678,7 @@
         },
         {
           "id": "l-pickup-park-turn-flower-face",
-          "color": "#f28e2b",
+          "color": "#e15759",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -704,7 +704,7 @@
         },
         {
           "id": "l-pickup-park-turn-flower",
-          "color": "#76b7b2",
+          "color": "#f28e2b",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -825,7 +825,7 @@
       "segments": [
         {
           "id": "l-rescue-south",
-          "color": "#4e79a7",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -854,7 +854,7 @@
         },
         {
           "id": "l-rescue-turn",
-          "color": "#76b7b2",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -908,7 +908,7 @@
       "segments": [
         {
           "id": "l-rescue-park-clear",
-          "color": "#f28e2b",
+          "color": "#59a14f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -937,7 +937,7 @@
         },
         {
           "id": "l-rescue-park-west",
-          "color": "#9c755f",
+          "color": "#76b7b2",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -957,7 +957,7 @@
         },
         {
           "id": "l-rescue-park-lane",
-          "color": "#4e79a7",
+          "color": "#9c755f",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -1012,7 +1012,7 @@
         },
         {
           "id": "l-rescue-park-turn",
-          "color": "#9c755f",
+          "color": "#edc948",
           "name": "",
           "locked": false,
           "waitBeforeMs": 0,
@@ -1393,7 +1393,7 @@
               {
                 "id": "l-stop-2",
                 "kind": "firstOf",
-                "label": "L2: RIGHT up by 19.2 s, otherwise keep the load",
+                "label": "L2: RIGHT up by 22 s, otherwise keep the load",
                 "rows": [
                   {
                     "when": [
@@ -1427,7 +1427,7 @@
                     ]
                   },
                   {
-                    "afterMs": 19200,
+                    "afterMs": 22000,
                     "matchClock": true,
                     "cards": [
                       {

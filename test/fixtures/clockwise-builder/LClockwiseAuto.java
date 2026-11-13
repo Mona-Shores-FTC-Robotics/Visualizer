@@ -21,7 +21,7 @@ public final class LClockwiseAuto {
     public static final String SOURCE = "l-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-13|12:39PM";
+    public static final String SAVED = "11-13|1:09PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -159,14 +159,14 @@ public final class LClockwiseAuto {
                                         kit.route("Pickup", 1, () -> kit.path("to WALL_FLOWER_STAGING", toWallFlowerStaging, 1.8, flowerParkToLeftPark, 3.2)),
                                         kit.route("Pickup", 1, () -> kit.command("PickFlower", 4.5)),
                                         kit.route("Pickup", 1, () -> kit.path("FLOWER to RIGHT_WALL_NEAR", flowerToRightWallNear, 2.1, outsideLaneToLeftPark, 3.9)),
-                                        kit.firstOf("L2: RIGHT up by 19.2 s, otherwise keep the load",
+                                        kit.firstOf("L2: RIGHT up by 22 s, otherwise keep the load",
                                                 kit.when("RightCellUp").then(
                                                         kit.guarded("If RightCellUp", outsideLaneToLeftPark, 3.9,
                                                                 kit.command("LaunchAll", 1),
                                                                 kit.firstOf("R has left the scoring FLOWER: park at 22.7 s",
                                                                         kit.atMatchSeconds(22.7)),
                                                                 kit.path("outside lane to LEFT_PARK", outsideLaneToLeftPark, 3.9))),
-                                                kit.atMatchSeconds(19.2).then(
+                                                kit.atMatchSeconds(22).then(
                                                         kit.guarded("Timed out", outsideLaneToLeftPark, 3.9,
                                                                 kit.firstOf("R has left the scoring FLOWER: park at 22.7 s",
                                                                         kit.atMatchSeconds(22.7)),
