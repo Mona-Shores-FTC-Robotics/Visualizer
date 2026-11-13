@@ -891,7 +891,11 @@ describe("a Wait step's Otherwise list", () => {
 
   /** Every step, however deep in an Otherwise. */
   const everyStep = (steps: Step[]): Step[] =>
-    steps.flatMap((s) => [s, ...everyStep(s.otherwise ?? [])]);
+    steps.flatMap((s) => [
+      s,
+      ...everyStep(s.otherwise ?? []),
+      ...(s.legs ?? []).flatMap((leg) => everyStep(leg.steps)),
+    ]);
   const stepOf = (doc: ProjectDoc, cardId: string) =>
     everyStep(stepsOf(doc)).find((s) => s.cardId === cardId)!;
   /** Adds a step at the end of the Otherwise of a wait, wherever that wait is. */
@@ -1114,11 +1118,14 @@ describe("a Wait step's Otherwise list", () => {
     expect(isSimple(doc)).toBe(true);
   });
 
-  it("a leg holds drives and commands only, and a choice stays in the main list", () => {
+  it("a leg holds drives, commands and holds only, and a choice stays in the main list", () => {
     const { doc, choice } = pickupChoice();
-    expect(() =>
-      addStep(doc, "wait", 0, undefined, { waitCardId: choice, leg: 0 }),
-    ).toThrow();
+    // A wait in a leg is a hold for its time only, and stays one.
+    const held = addStep(doc, "wait", 1, undefined, { waitCardId: choice, leg: 1 });
+    const hold = stepOf(held.doc, held.cardId);
+    expect(hold).toMatchObject({ kind: "wait", waitFor: TIME_ONLY });
+    expect(setWait(held.doc, held.cardId, { waitFor: "CellUp" })).toEqual(held.doc);
+    expect(isSimple(held.doc)).toBe(true);
     expect(() =>
       addStep(doc, "park", 0, "RIGHT_PARK", { waitCardId: choice, leg: 1 }),
     ).toThrow();

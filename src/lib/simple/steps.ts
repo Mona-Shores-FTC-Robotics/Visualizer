@@ -115,8 +115,19 @@ export interface Step {
  */
 export type StepList = { waitCardId: string; leg?: 0 | 1 } | null;
 
-/** The steps a leg of a choice may hold: the robot does them, then both legs go on the same way. */
-export const LEG_KINDS: StepKind[] = ["launch", "spinup", "pick", "gather", "drive"];
+/**
+ * The steps a leg of a choice may hold: the robot does them, then both legs go on the same way. A
+ * wait in a leg waits for nothing but its time ("hold until 15.5 s", to let a partner pass): it has
+ * no Otherwise, so the legs stay flat for the endgame guard.
+ */
+export const LEG_KINDS: StepKind[] = [
+  "launch",
+  "spinup",
+  "pick",
+  "gather",
+  "drive",
+  "wait",
+];
 
 /** A new choice's names: the one the team draws most, WALL FLOWER or GARDEN. */
 const CHOICE_DEFAULT = { option: "Pickup", legs: ["WALL_FLOWER", "GARDEN"] };
@@ -588,7 +599,7 @@ export function addStep(
     if (!list) throw new Error("No such Wait step for an Otherwise");
     let card: AutoCard;
     if (into?.leg !== undefined && !LEG_KINDS.includes(kind))
-      throw new Error("A leg of a choice holds drives and commands only");
+      throw new Error("A leg of a choice holds drives, commands and plain waits only");
     if (kind === "choice") {
       if (into) throw new Error("A choice goes in the main list");
       const { option, legs } = CHOICE_DEFAULT;
@@ -612,6 +623,11 @@ export function addStep(
           { afterMs: WAIT_DEFAULT_S * 1000, cards: [] },
         ],
       };
+      // In a leg of a choice a wait is for its time only.
+      if (into?.leg !== undefined) {
+        card.rows = [{ afterMs: WAIT_DEFAULT_S * 1000, cards: [] }];
+        card.label = waitTitle(TIME_ONLY, WAIT_DEFAULT_S, false);
+      }
     } else if (kind === "spinup") {
       card = { id: makeCardId(), kind: "action", name: SPIN_UP };
     } else if (kind === "launch" || kind === "pick" || kind === "gather") {
@@ -797,8 +813,11 @@ export function moveStep(
     if (!found || !target) return;
     const card = found.list[found.index];
     if (into && allCardsOf([card]).some((c) => c.id === into.waitCardId)) return;
-    // A leg holds drives and commands only, and a choice stays in the main list.
-    if (into?.leg !== undefined && (card.kind === "firstOf" || (card.kind === "path" && card.park))) return;
+    // A leg holds drives, commands and plain waits only, and a choice stays in the main list.
+    if (into?.leg !== undefined) {
+      if (card.kind === "path" && card.park) return;
+      if (card.kind === "firstOf" && waitOf(card)?.trigger !== TIME_ONLY) return;
+    }
     if (into && card.kind === "firstOf" && choiceOf(card)) return;
     found.list.splice(found.index, 1);
     const to = target === found.list && index > found.index ? index - 1 : index;
@@ -826,6 +845,14 @@ export function setWait(
   return edit(doc, (_draft, auto) => {
     const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    // A wait in a leg of a choice stays a wait for its time only.
+    const inLeg = allCardsOf(auto.cards).some(
+      (c) =>
+        c.kind === "firstOf" &&
+        !!choiceOf(c)?.legs.some((leg) => leg.cards.includes(card)),
+    );
+    if (inLeg && change.waitFor !== undefined && change.waitFor !== TIME_ONLY)
+      return;
     if (change.waitFor === TIME_ONLY) {
       // Waiting for nothing: only the time row stays, and it has no Otherwise to run.
       const time = card.rows.find((row) => "afterMs" in row)!;
