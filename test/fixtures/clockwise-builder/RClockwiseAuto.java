@@ -21,7 +21,7 @@ public final class RClockwiseAuto {
     public static final String SOURCE = "r-clockwise.pp";
 
     /** When the .pp was saved, Michigan time (empty if unknown); the OpMode's name on the Driver Station ends with it. */
-    public static final String SAVED = "11-13|1:09PM";
+    public static final String SAVED = "11-14|3:50PM";
 
     /** Registered robot commands this Auto uses; checked when the OpMode initialises. */
     public static final String[] COMMANDS = {"GardenGather", "LaunchAll", "PickFlower", "SpinUp"};
@@ -52,45 +52,54 @@ public final class RClockwiseAuto {
         Pose rightStart = p.of(55.6, 7.7, 90);
         Pose wallFlowerStaging = p.of(23.1, 47.2, 180);
         Pose gardenStaging = p.of(11.5, 22.1, 270);
-        Pose leftWallNear = p.of(37.8, 130.7, 295.5);
-        Pose scoringFlowerStaging = p.of(47.2, 119.3, 90);
         Pose leftCloseHive = p.of(59.9, 116.2, 270);
+        Pose scoringFlowerStaging = p.of(47.2, 119.3, 90);
         Pose rightCloseHive = p.of(56.1, 25.3, 90);
         Pose rightPark = p.of(14.5, 98.7, 0);
 
         // Other poses the paths need (control points, unnamed endpoints).
         Pose flowerParkToRightParkControl1 = p.of(26, 75, 0);
-        Pose outsideLaneFromTheFlowerToLeftWallNearControl1 = p.of(29.5, 72, 0);
-        Pose outsideLaneFromTheFlowerToLeftWallNearControl2 = p.of(29, 108, 0);
-        Pose outsideLaneFromTheFlowerToLeftWallNearSegment1Start = p.of(37.8, 130.7, 180);
-        Pose outsideLaneFromTheFlowerToLeftWallNearSegment1End = p.of(37.8, 130.7, 90);
-        Pose outsideLaneFromTheFlowerToLeftWallNearSegment2Heading = p.of(37.8, 130.7, 90);
-        Pose outsideLaneFromTheFlowerToLeftWallNearSegment3Start = p.of(37.8, 130.7, 90);
-        Pose leftParkToRightParkControl1 = p.of(31, 104, 0);
+        Pose point4 = p.of(36, 100, 90);
+        Pose point4Control1 = p.of(27, 76, 0);
+        Pose point4Control2 = p.of(32, 92, 0);
+        Pose point4Segment1Start = p.of(36, 100, 180);
+        Pose point4Segment1End = p.of(36, 100, 90);
+        Pose point4Segment2Heading = p.of(36, 100, 90);
+        Pose point5Control1 = p.of(40, 112, 0);
+        Pose point5Control2 = p.of(52, 114, 0);
+        Pose point5Segment1Start = p.of(59.9, 116.2, 90);
+        Pose point5Segment1End = p.of(59.9, 116.2, 0);
+        Pose point5Segment2Start = p.of(59.9, 116.2, 360);
+        Pose point6 = p.of(50, 98.7, 360);
+        Pose point6Control1 = p.of(57, 106, 0);
         Pose toGardenStagingControl1 = p.of(46, 22, 0);
         Pose toGardenStagingControl2 = p.of(30, 22.1, 0);
-        Pose point8 = p.of(30, 80, 90);
-        Pose point8Control1 = p.of(30, 30, 0);
-        Pose point8Control2 = p.of(30, 60, 0);
-        Pose point9Start = p.of(30, 80, 90);
-        Pose point9Control1 = p.of(30, 92, 0);
-        Pose outsideLaneFromTheGardenToLeftWallNearControl1 = p.of(30, 30, 0);
-        Pose outsideLaneFromTheGardenToLeftWallNearControl2 = p.of(29.5, 72, 0);
-        Pose outsideLaneFromTheGardenToLeftWallNearControl3 = p.of(29, 108, 0);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment1Start = p.of(37.8, 130.7, 270);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment1End = p.of(37.8, 130.7, 180);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment2Start = p.of(37.8, 130.7, 180);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment2End = p.of(37.8, 130.7, 90);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment3Heading = p.of(37.8, 130.7, 90);
-        Pose outsideLaneFromTheGardenToLeftWallNearSegment4Start = p.of(37.8, 130.7, 90);
-        Pose toScoringFlowerStagingControl1 = p.of(38, 119, 0);
+        Pose point10 = p.of(30, 80, 90);
+        Pose point10Control1 = p.of(30, 30, 0);
+        Pose point10Control2 = p.of(30, 60, 0);
+        Pose point11Start = p.of(30, 80, 90);
+        Pose point11Control1 = p.of(30, 92, 0);
+        Pose point13 = p.of(36, 100, 90);
+        Pose point13Control1 = p.of(30, 30, 0);
+        Pose point13Control2 = p.of(28, 70, 0);
+        Pose point13Control3 = p.of(32, 92, 0);
+        Pose point13Segment1Start = p.of(36, 100, 270);
+        Pose point13Segment1End = p.of(36, 100, 180);
+        Pose point13Segment2Start = p.of(36, 100, 180);
+        Pose point13Segment2End = p.of(36, 100, 90);
+        Pose point13Segment3Heading = p.of(36, 100, 90);
+        Pose point14Control1 = p.of(40, 112, 0);
+        Pose point14Control2 = p.of(52, 114, 0);
+        Pose point14Segment1Start = p.of(59.9, 116.2, 90);
+        Pose point14Segment1End = p.of(59.9, 116.2, 0);
+        Pose point14Segment2Start = p.of(59.9, 116.2, 360);
+        Pose toScoringFlowerStagingSegment1Heading = p.of(47.2, 119.3, 270);
+        Pose toScoringFlowerStagingSegment2Start = p.of(47.2, 119.3, 270);
         Pose scoringFlowerParkToRightParkControl1 = p.of(40, 100, 0);
         Pose scoringFlowerParkToRightParkControl2 = p.of(28, 96, 0);
         Pose turnToLeftCloseHiveSegment1Start = p.of(59.9, 116.2, 450);
         Pose turnToLeftCloseHiveSegment1End = p.of(59.9, 116.2, 360);
         Pose turnToLeftCloseHiveSegment2Start = p.of(59.9, 116.2, 360);
-        Pose point16 = p.of(50, 98.7, 360);
-        Pose point16Control1 = p.of(57, 106, 0);
         Pose point19 = p.of(58.3, 41, 270);
         Pose point19Control1 = p.of(58.8, 101.6, 0);
         Pose point19Control2 = p.of(62, 71.9, 0);
@@ -106,39 +115,38 @@ public final class RClockwiseAuto {
         // Paths, written as the stock Visualizer export writes them.
         Path toWallFlowerStaging = Paths.line(rightStart, wallFlowerStaging).linear(rightStart, wallFlowerStaging);
         Path flowerParkToRightPark = Paths.curve(wallFlowerStaging, flowerParkToRightParkControl1, rightPark).linear(wallFlowerStaging, rightPark);
-        Path outsideLaneFromTheFlowerToLeftWallNear = Paths.curve(wallFlowerStaging, outsideLaneFromTheFlowerToLeftWallNearControl1, outsideLaneFromTheFlowerToLeftWallNearControl2, leftWallNear).heading(Interpolator.piecewise().until(0.12, Interpolator.linear(outsideLaneFromTheFlowerToLeftWallNearSegment1Start, outsideLaneFromTheFlowerToLeftWallNearSegment1End)).until(0.5, Interpolator.constant(outsideLaneFromTheFlowerToLeftWallNearSegment2Heading)).until(0.9, Interpolator.linear(outsideLaneFromTheFlowerToLeftWallNearSegment3Start, leftWallNear)).until(1, Interpolator.constant(leftWallNear)));
-        Path leftParkToRightPark = Paths.curve(leftWallNear, leftParkToRightParkControl1, rightPark).linear(leftWallNear, rightPark);
+        Path outsideLaneFromTheFlowerToLeftCloseHive = Paths.path(Paths.curve(wallFlowerStaging, point4Control1, point4Control2, point4).heading(Interpolator.piecewise().until(0.2, Interpolator.linear(point4Segment1Start, point4Segment1End)).until(1, Interpolator.constant(point4Segment2Heading))), Paths.curve(point4, point5Control1, point5Control2, leftCloseHive).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(point5Segment1Start, point5Segment1End)).until(1, Interpolator.linear(point5Segment2Start, leftCloseHive))));
+        Path catchParkToRightPark = Paths.path(Paths.curve(leftCloseHive, point6Control1, point6).linear(leftCloseHive, point6), Paths.line(point6, rightPark).constant(rightPark));
         Path toGardenStaging = Paths.curve(rightStart, toGardenStagingControl1, toGardenStagingControl2, gardenStaging).linear(rightStart, gardenStaging);
-        Path gardenParkToRightPark = Paths.path(Paths.curve(gardenStaging, point8Control1, point8Control2, point8).linear(gardenStaging, point8), Paths.curve(point9Start, point9Control1, rightPark).linear(point9Start, rightPark));
-        Path outsideLaneFromTheGardenToLeftWallNear = Paths.curve(gardenStaging, outsideLaneFromTheGardenToLeftWallNearControl1, outsideLaneFromTheGardenToLeftWallNearControl2, outsideLaneFromTheGardenToLeftWallNearControl3, leftWallNear).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(outsideLaneFromTheGardenToLeftWallNearSegment1Start, outsideLaneFromTheGardenToLeftWallNearSegment1End)).until(0.2, Interpolator.linear(outsideLaneFromTheGardenToLeftWallNearSegment2Start, outsideLaneFromTheGardenToLeftWallNearSegment2End)).until(0.5, Interpolator.constant(outsideLaneFromTheGardenToLeftWallNearSegment3Heading)).until(0.9, Interpolator.linear(outsideLaneFromTheGardenToLeftWallNearSegment4Start, leftWallNear)).until(1, Interpolator.constant(leftWallNear)));
-        Path toScoringFlowerStaging = Paths.curve(leftWallNear, toScoringFlowerStagingControl1, scoringFlowerStaging).linear(leftWallNear, scoringFlowerStaging);
+        Path gardenParkToRightPark = Paths.path(Paths.curve(gardenStaging, point10Control1, point10Control2, point10).linear(gardenStaging, point10), Paths.curve(point11Start, point11Control1, rightPark).linear(point11Start, rightPark));
+        Path outsideLaneFromTheGardenToLeftCloseHive = Paths.path(Paths.curve(gardenStaging, point13Control1, point13Control2, point13Control3, point13).heading(Interpolator.piecewise().until(0.1, Interpolator.linear(point13Segment1Start, point13Segment1End)).until(0.2, Interpolator.linear(point13Segment2Start, point13Segment2End)).until(1, Interpolator.constant(point13Segment3Heading))), Paths.curve(point13, point14Control1, point14Control2, leftCloseHive).heading(Interpolator.piecewise().until(0.5, Interpolator.linear(point14Segment1Start, point14Segment1End)).until(1, Interpolator.linear(point14Segment2Start, leftCloseHive))));
+        Path toScoringFlowerStaging = Paths.line(leftCloseHive, scoringFlowerStaging).heading(Interpolator.piecewise().until(0.45, Interpolator.constant(toScoringFlowerStagingSegment1Heading)).until(1, Interpolator.linear(toScoringFlowerStagingSegment2Start, scoringFlowerStaging)));
         Path scoringFlowerParkToRightPark = Paths.curve(scoringFlowerStaging, scoringFlowerParkToRightParkControl1, scoringFlowerParkToRightParkControl2, rightPark).linear(scoringFlowerStaging, rightPark);
         Path turnToLeftCloseHive = Paths.line(scoringFlowerStaging, leftCloseHive).heading(Interpolator.piecewise().until(0.4, Interpolator.linear(turnToLeftCloseHiveSegment1Start, turnToLeftCloseHiveSegment1End)).until(1, Interpolator.linear(turnToLeftCloseHiveSegment2Start, leftCloseHive)));
-        Path catchParkToRightPark = Paths.path(Paths.curve(leftCloseHive, point16Control1, point16).linear(leftCloseHive, point16), Paths.line(point16, rightPark).constant(rightPark));
         Path underTheHiveToRightCloseHive = Paths.path(Paths.curve(leftCloseHive, point19Control1, point19Control2, point19).constant(point19), Paths.line(point20Start, point20).linear(point20Start, point20), Paths.line(point20, rightCloseHive).constant(rightCloseHive));
         Path outsideLaneToRightPark = Paths.path(Paths.curve(rightCloseHive, point22Control1, point22).constant(point22), Paths.curve(point22, point23Control1, point23Control2, rightPark).heading(Interpolator.piecewise().until(0.65, Interpolator.constant(point23Segment1Heading)).until(1, Interpolator.linear(point23Segment2Start, rightPark))));
 
         return kit.sequence(
-                kit.guarded("Auto", leftParkToRightPark, 1.9,
+                kit.guarded("Auto", catchParkToRightPark, 2.2,
                         kit.command("SpinUp"),
                         kit.command("LaunchAll"),
                         kit.route("Pickup", 0, () -> kit.path("to WALL_FLOWER_STAGING", toWallFlowerStaging, 2.1, flowerParkToRightPark, 2.1)),
                         kit.route("Pickup", 0, () -> kit.command("PickFlower", 4.5)),
-                        kit.route("Pickup", 0, () -> kit.path("outside lane from the FLOWER to LEFT_WALL_NEAR", outsideLaneFromTheFlowerToLeftWallNear, 2.9, leftParkToRightPark, 1.9)),
+                        kit.route("Pickup", 0, () -> kit.path("outside lane from the FLOWER to LEFT_CLOSE_HIVE", outsideLaneFromTheFlowerToLeftCloseHive, 3, catchParkToRightPark, 2.2)),
                         kit.route("Pickup", 1, () -> kit.path("to GARDEN_STAGING", toGardenStaging, 2, gardenParkToRightPark, 2.8)),
                         kit.route("Pickup", 1, () -> kit.command("GardenGather", 5.5)),
-                        kit.route("Pickup", 1, () -> kit.path("outside lane from the GARDEN to LEFT_WALL_NEAR", outsideLaneFromTheGardenToLeftWallNear, 3.6, leftParkToRightPark, 1.9)),
+                        kit.route("Pickup", 1, () -> kit.path("outside lane from the GARDEN to LEFT_CLOSE_HIVE", outsideLaneFromTheGardenToLeftCloseHive, 3.8, catchParkToRightPark, 2.2)),
                         kit.firstOf("R2: LEFT up by 15.5 s, otherwise park",
                                 kit.when("LeftCellUp").then(
-                                        kit.guarded("If LeftCellUp", leftParkToRightPark, 1.9,
+                                        kit.guarded("If LeftCellUp", catchParkToRightPark, 2.2,
                                                 kit.command("LaunchAll", 1),
                                                 kit.firstOf("Time for the scoring FLOWER: before 17.6 s",
                                                         kit.atMatchSeconds(17.6).then(
-                                                                kit.guarded("Timed out", leftParkToRightPark, 1.9,
-                                                                        kit.path("left park to RIGHT_PARK", leftParkToRightPark, 1.9))),
+                                                                kit.guarded("Timed out", catchParkToRightPark, 2.2,
+                                                                        kit.path("catch park to RIGHT_PARK", catchParkToRightPark, 2.2))),
                                                         kit.when("Always").then(
                                                                 kit.guarded("If Always", scoringFlowerParkToRightPark, 1.9,
-                                                                        kit.path("to SCORING_FLOWER_STAGING", toScoringFlowerStaging, 1.3, scoringFlowerParkToRightPark, 1.9),
+                                                                        kit.path("to SCORING_FLOWER_STAGING", toScoringFlowerStaging, 1.6, scoringFlowerParkToRightPark, 1.9),
                                                                         kit.command("PickFlower", 4.5),
                                                                         kit.firstOf("Time to look at the HIVE from the left: before 22.2 s",
                                                                                 kit.atMatchSeconds(22.2).then(
@@ -163,7 +171,7 @@ public final class RClockwiseAuto {
                                                                                                                                 kit.atMatchSeconds(26.4)),
                                                                                                                         kit.path("catch park to RIGHT_PARK", catchParkToRightPark, 2.2)))))))))))),
                                 kit.atMatchSeconds(15.5).then(
-                                        kit.guarded("Timed out", leftParkToRightPark, 1.9,
-                                                kit.path("left park to RIGHT_PARK", leftParkToRightPark, 1.9))))));
+                                        kit.guarded("Timed out", catchParkToRightPark, 2.2,
+                                                kit.path("catch park to RIGHT_PARK", catchParkToRightPark, 2.2))))));
     }
 }
