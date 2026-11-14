@@ -46,7 +46,9 @@ import {
   setStart,
   setStartHeading,
   setChoice,
+  setStepTimeout,
   setWait,
+  setWaitName,
   setWaitRejoin,
   renameSpot,
   startName,
@@ -1203,6 +1205,77 @@ describe("a Wait step's Otherwise list", () => {
     expect(java.source).not.toContain("AutoOption.matchSeconds");
     // Off the menu again.
     expect(stepOf(setWait(doc, made.cardId, { option: null }), made.cardId).waitOption).toBeUndefined();
+  });
+
+  it("a command's time limit is set, kept and taken off in the builder", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "launch");
+    doc = add(doc, "pick");
+    doc = add(doc, "park", "RIGHT_PARK");
+    const [launch, pick] = stepsOf(doc);
+    // A new launch has none (the robot's own 5 s); a new pick has the builder's 8 s.
+    expect(launch.timeoutS).toBeUndefined();
+    expect(pick.timeoutS).toBe(8);
+    doc = setStepTimeout(doc, launch.cardId, 1);
+    doc = setStepTimeout(doc, pick.cardId, 4.5);
+    expect(stepsOf(doc).slice(0, 2).map((s) => s.timeoutS)).toEqual([1, 4.5]);
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "limits.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (!java.ok) return;
+    expect(java.source).toContain('kit.command("LaunchAll", 1)');
+    expect(java.source).toContain('kit.command("PickFlower", 4.5)');
+    // Off again: the robot's own limit.
+    doc = setStepTimeout(doc, launch.cardId, null);
+    expect(stepsOf(doc)[0].timeoutS).toBeUndefined();
+    expect(isSimple(doc)).toBe(true);
+  });
+
+  it("a wait keeps the name it was given, and goes back to its title when the name is cleared", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "RIGHT_PARK", 14.5, 98.7, 0);
+    doc = add(doc, "wait");
+    const wait = doc.auto!.cards[0].id;
+    doc = add(doc, "launch");
+    doc = add(doc, "park", "RIGHT_PARK");
+    expect(stepOf(doc, wait).name).toBeUndefined();
+    doc = setWaitName(doc, wait, "RIGHT CELL still up?");
+    expect(stepOf(doc, wait)).toMatchObject({
+      name: "RIGHT CELL still up?",
+      label: "Wait for TIP or CELL up",
+    });
+    // Editing the wait does not take the name away.
+    doc = setWait(doc, wait, { seconds: 0.75 });
+    doc = setWait(doc, wait, { waitFor: "RightCellUp" });
+    expect(stepOf(doc, wait)).toMatchObject({
+      name: "RIGHT CELL still up?",
+      label: "Wait for Right CELL up",
+    });
+    const laid = settled(doc);
+    const java = generateAutoJava({
+      auto: laid.auto!,
+      startPoint: laid.startPoint,
+      lines: laid.lines,
+      shapes: [],
+      settings,
+      sourceFileName: "named.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) expect(java.source).toContain('kit.firstOf("RIGHT CELL still up?"');
+    // Cleared, it follows its title again, here and on later edits.
+    doc = setWaitName(doc, wait, "  ");
+    expect(stepOf(doc, wait).name).toBeUndefined();
+    doc = setWait(doc, wait, { waitFor: "CellUp" });
+    const card = doc.auto!.cards.find((c) => c.id === wait)!;
+    expect(card.kind === "firstOf" && card.label).toBe("Wait for TIP or CELL up");
   });
 
   it("the Driver Station rows read as biobuzz InitOptions writes them", () => {

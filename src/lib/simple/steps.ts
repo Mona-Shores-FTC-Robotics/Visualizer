@@ -81,6 +81,16 @@ export interface Step {
   /** Launch all: where it goes with the turret locked (aim.ts), and the spot it is launched from. */
   aim?: Aim;
   atSpot?: string | null;
+  /**
+   * Launch all, Pick flower, Garden gather: the most the step may take, seconds, when the Auto
+   * sets one. Unset, the robot gives a command {@link DEFAULT_TIMEOUT_S}.
+   */
+  timeoutS?: number;
+  /**
+   * Wait, clock check: the name someone gave it ("RIGHT CELL still up?"), which the match log
+   * shows. Unset, it goes by its title (`label`).
+   */
+  name?: string;
   /** Wait: the trigger it waits for (WAIT_FOR), and the most it waits, seconds. */
   waitFor?: string;
   waitS?: number;
@@ -314,6 +324,7 @@ function walkSteps(
         label: "Launch all",
         aim: aimFrom(at.here.x, at.here.y, at.here.h, auto.drawnFor),
         atSpot: at.onSpot,
+        timeoutS: card.timeoutS,
       };
     }
     if (card.kind === "action" && card.name === SPIN_UP) {
@@ -333,6 +344,7 @@ function walkSteps(
         ...base,
         kind: "pick",
         label: "Pick flower",
+        timeoutS: card.timeoutS,
         flower: pick.flower,
         problem: pick.ok ? null : pick.why,
         squares: pick.ok && pick.squares,
@@ -345,6 +357,7 @@ function walkSteps(
         ...base,
         kind: "gather",
         label: "Garden gather",
+        timeoutS: card.timeoutS,
         garden,
         problem: garden
           ? null
@@ -380,6 +393,7 @@ function walkSteps(
         // The Otherwise steps start where the wait is, on a copy: the list below the wait is read
         // as if the trigger came (the preview's default), so it goes on from the wait's pose too.
         const rejoin = !parking.has(card.id);
+        const title = waitTitle(wait.trigger, wait.seconds, wait.matchClock);
         const otherwise = walkSteps(
           doc,
           wait.otherwise,
@@ -390,7 +404,8 @@ function walkSteps(
         return {
           ...base,
           kind: "wait",
-          label: waitTitle(wait.trigger, wait.seconds, wait.matchClock),
+          label: title,
+          name: card.label && card.label !== title ? card.label : undefined,
           waitFor: wait.trigger,
           waitS: wait.seconds,
           waitClock: wait.matchClock,
@@ -910,6 +925,11 @@ export function setWait(
   return edit(doc, (_draft, auto) => {
     const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
     if (card?.kind !== "firstOf" || !waitOf(card)) return;
+    // A name someone gave the wait stays; one that is only its title follows the title.
+    const before = waitOf(card)!;
+    const named =
+      !!card.label &&
+      card.label !== waitTitle(before.trigger, before.seconds, before.matchClock);
     // A wait in a leg of a choice stays a wait for its time only.
     const inLeg = allCardsOf(auto.cards).some(
       (c) =>
@@ -972,7 +992,46 @@ export function setWait(
     if (change.spinUp === true) card.alongside = SPIN_UP;
     if (change.spinUp === false) delete card.alongside;
     const wait = waitOf(card)!;
-    card.label = waitTitle(wait.trigger, wait.seconds, wait.matchClock);
+    if (!named)
+      card.label = waitTitle(wait.trigger, wait.seconds, wait.matchClock);
+  });
+}
+
+/**
+ * Names a wait or a clock check: the match log shows the name, and for the wait set in INIT it is
+ * what the Auto asks the drive team's pick by. An empty name puts its title back.
+ */
+export function setWaitName(
+  doc: ProjectDoc,
+  cardId: string,
+  name: string,
+): ProjectDoc {
+  return edit(doc, (_draft, auto) => {
+    const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
+    const wait = card?.kind === "firstOf" ? waitOf(card) : null;
+    if (card?.kind !== "firstOf" || !wait) return;
+    card.label =
+      name.trim() || waitTitle(wait.trigger, wait.seconds, wait.matchClock);
+  });
+}
+
+/** The robot's limit on a command whose step sets none (biobuzz AutoKit.DEFAULT_TIMEOUT_S). */
+export const DEFAULT_TIMEOUT_S = 5;
+
+/**
+ * Sets the most a Launch all, Pick flower or Garden gather may take, seconds (at least 0.1), or
+ * with null takes the limit off, so the robot's own applies.
+ */
+export function setStepTimeout(
+  doc: ProjectDoc,
+  cardId: string,
+  seconds: number | null,
+): ProjectDoc {
+  return edit(doc, (_draft, auto) => {
+    const card = allCardsOf(auto.cards).find((c) => c.id === cardId);
+    if (card?.kind !== "action") return;
+    if (seconds === null || !Number.isFinite(seconds)) delete card.timeoutS;
+    else card.timeoutS = Math.round(Math.max(0.1, seconds) * 10) / 10;
   });
 }
 
