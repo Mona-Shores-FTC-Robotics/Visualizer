@@ -66,6 +66,9 @@
     setStepSpot,
     setWait,
     setChoice,
+    setStepTimeout,
+    setWaitName,
+    DEFAULT_TIMEOUT_S,
     everyStep,
     initRow,
     newTimeName,
@@ -802,6 +805,7 @@
     {:else if step.kind === "launch" && step.aim}
       {@const aim = step.aim}
       {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
+      {@render limitRow(step)}
       <div class="mt-1 flex items-center gap-2 pl-6 text-xs">
         <span class={["flex-1", aim.on ? "text-body" : "text-danger"]}>
           {#if aim.on}
@@ -833,6 +837,21 @@
     {:else if step.kind === "wait"}
       {@const trigger =
         WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ?? "TIP"}
+      <!-- Fork: a name of its own for the match log (steps.ts setWaitName); empty, its title. -->
+      <div
+        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+      >
+        <span>Name</span>
+        <input
+          class={[fieldClass, "!w-44 !py-0.5 text-xs"]}
+          aria-label="Name in the match log"
+          title="What the match log calls this step. Leave it empty to go by its title."
+          placeholder={step.label}
+          value={step.name ?? ""}
+          onchange={(e) =>
+            apply(setWaitName(doc, step.cardId, e.currentTarget.value))}
+        />
+      </div>
       {#if step.waitFor === ALWAYS}
       <!-- Fork: a clock check (steps.ts ALWAYS): it never waits, it takes one way or the other. -->
       <div
@@ -1198,6 +1217,7 @@
         {/if}
       </p>
     {:else if step.kind === "gather"}
+      {@render limitRow(step)}
       <div class="mt-1 pl-6 text-xs">
         {#if step.garden}
           <span class="text-body"
@@ -1210,6 +1230,7 @@
         {/if}
       </div>
     {:else if step.kind === "pick"}
+      {@render limitRow(step)}
       <div class="mt-1 pl-6 text-xs">
         {#if step.flower && !step.problem}
           <span class="text-body"
@@ -1233,6 +1254,34 @@
       </div>
     {/if}
   </li>
+{/snippet}
+
+<!-- Fork: the most a command may take (steps.ts setStepTimeout); empty, the robot's own 5 s. -->
+{#snippet limitRow(step: Step)}
+  <div
+    class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+    title="If the step has not finished by then, the robot stops it and goes on. A launch that has started feeding always finishes."
+  >
+    <span>at most</span>
+    <input
+      class={[fieldClass, "!w-14 !py-0.5 text-xs"]}
+      type="number"
+      min="0.1"
+      step="0.5"
+      aria-label="Time limit, seconds"
+      placeholder={String(DEFAULT_TIMEOUT_S)}
+      value={step.timeoutS ?? ""}
+      onchange={(e) =>
+        apply(
+          setStepTimeout(
+            doc,
+            step.cardId,
+            e.currentTarget.value === "" ? null : Number(e.currentTarget.value),
+          ),
+        )}
+    />
+    <span>s</span>
+  </div>
 {/snippet}
 
 {#snippet spotOptions()}
@@ -1277,6 +1326,12 @@
       >
     {/each}
   </div>
+  <!-- Fork: the alliance the Auto is drawn for. The team's starts and spots are RED's, and the
+       robot turns the whole Auto half a turn for BLUE, so the builder shows it and does not ask. -->
+  <p class="text-xs text-body">
+    Drawn for {doc.auto?.drawnFor === "BLUE" ? "BLUE" : "RED"}: the robot turns
+    it for {doc.auto?.drawnFor === "BLUE" ? "RED" : "BLUE"}.
+  </p>
   {#if side && linkedSpots.has(side)}
     {@const open = $unlockedSpots.has(side)}
     <button

@@ -304,6 +304,16 @@ A stop that shoots by the camera or the timer (`shot`) and a time on the INIT me
 not builder steps: the builder has no control for them, so it shows such a wait as an advanced step
 and leaves it alone.
 
+### What else the builder sets on a step
+
+- **A command's time limit** (`timeoutS` on Launch all, Pick flower and Garden gather): "at most
+  N s". Empty, the robot's own 5 s applies; a new pick or gather starts at 8 s.
+- **A wait's name** (the card's `label`): what the match log calls it, and what the wait set in
+  INIT is asked for by. Empty, the wait goes by its title ("Wait for TIP or CELL up"), which follows
+  later edits; a name someone typed stays through them.
+- **The alliance** (`drawnFor`) is shown, not asked: the team's starts and spots are RED's and the
+  robot turns the whole Auto for BLUE.
+
 ### The simple builder's Otherwise: go on, or instead
 
 A Wait step's Otherwise is its time row's cards. An Otherwise is a list like the main one: it may
