@@ -50,6 +50,8 @@ export interface PathInfo {
   sampleDistances: number[];
   /** Inches covered `time` seconds after the path starts. */
   distanceAt: (time: number) => number;
+  /** Fork: the robot's heading, degrees, `distance` inches along the path. */
+  headingAtDistance: (distance: number) => number;
 }
 
 export interface PathCatalog {
@@ -162,6 +164,20 @@ export function buildPathCatalog(
         const run = prediction.timeline.find((event) => event.run)?.run;
         if (!run) return 0;
         return runDistanceAt(run, settings, Math.min(time, run.totalTime));
+      },
+      headingAtDistance: (distance: number) => {
+        let left = Math.max(0, distance);
+        for (const segment of segments) {
+          const length = segment.curve.length;
+          if (left <= length || segment === last)
+            return segmentHeadingAt(
+              flat,
+              segment.index,
+              length > 1e-9 ? Math.min(1, left / length) : 1,
+            );
+          left -= length;
+        }
+        return segmentHeadingAt(flat, last.index, 1);
       },
     });
   });
