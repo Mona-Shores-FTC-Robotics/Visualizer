@@ -20,7 +20,6 @@
   import { useLinks } from "../state/links.svelte";
   import { exportAutoJava } from "../lib/auto/exportAction";
   import AutoCardList from "../lib/auto/components/AutoCardList.svelte";
-  import PlanPanel from "../lib/plan/PlanPanel.svelte";
   import SimpleBuilder from "../lib/simple/SimpleBuilder.svelte";
   import MatchSide from "../lib/match/MatchSide.svelte";
 
@@ -100,12 +99,6 @@
         {/if}
         {#if auto.view === "simple"}
           <SimpleBuilder />
-        {:else if auto.view === "plan" && auto.plan}
-          <PlanPanel
-            onExport={exportAuto}
-            errorCount={auto.issues.filter((issue) => issue.level === "error")
-              .length}
-          />
         {:else}
           <AutoCardList
             auto={auto.auto}
@@ -118,7 +111,6 @@
             defaultExportName={pathStem(links.sourceName) || "untitled"}
             robotAt={{ x: playback.robotPose.x, y: playback.robotPose.y }}
             onExport={exportAuto}
-            onPlan={() => (auto.view = "plan")}
           />
         {/if}
       </div>

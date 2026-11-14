@@ -9,15 +9,12 @@ async function openSample(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(SAMPLE);
-  await expect(
-    page.getByRole("navigation", { name: "Chapters" }),
-  ).toBeVisible();
+  await expect(page.getByText(/\d+ cards?/)).toBeVisible();
   return errors;
 }
 
-/** The sample is not simple-builder steps, so it opens in the plan view; the cards are a click away. */
+/** The sample is not simple-builder steps, so it opens as cards. */
 async function showCards(page: Page) {
-  await page.getByRole("button", { name: "Edit as cards" }).click();
   await expect(page.getByText(/\d+ cards?/)).toBeVisible();
 }
 
@@ -105,92 +102,6 @@ test("the Auto survives a reload", async ({ page }) => {
   await page.waitForTimeout(1200); // the session is saved after 750 ms
   await page.reload();
   await expect.poll(() => steps.count()).toBe(count);
-});
-
-// The plan view: the good path in TIP chapters, a miss per tip, times changed with − / +.
-
-test("the plan shows the good path in chapters, and − / + changes a wait", async ({
-  page,
-}) => {
-  const errors = await openSample(page);
-  const chapters = page.getByRole("navigation", { name: "Chapters" });
-  await expect(chapters.getByRole("button")).toHaveText([/TIP 1/, /Park/]);
-  // The wait that ends TIP 1 is in the open chapter; selecting it shows its stepper.
-  const wait = page.getByRole("button", { name: /up to [\d.]+ s/ }).first();
-  await wait.click();
-  const more = page.getByRole("button", { name: /time limit: more/ });
-  const shown = page.getByRole("group", { name: /time limit/ });
-  const before = await shown.textContent();
-  await more.click();
-  await expect(shown).not.toHaveText(before!);
-  await page.getByTitle("Undo").click();
-  await expect(shown).toHaveText(before!);
-  expect(errors).toEqual([]);
-});
-
-test("the field's ◆ shows what happens when TIP 1 doesn't come, and back", async ({
-  page,
-}) => {
-  await openSample(page);
-  await page
-    .getByRole("button", { name: "Show what happens if TIP 1 doesn't come" })
-    .click();
-  await expect(page.getByText("◆ If TIP 1 doesn't come")).toBeVisible();
-  await page.getByRole("button", { name: /Back to the good path/ }).click();
-  await expect(
-    page.getByRole("navigation", { name: "Chapters" }),
-  ).toBeVisible();
-});
-
-test("All outcomes lists the good path and each miss, each parked by 30 s", async ({
-  page,
-}) => {
-  await openSample(page);
-  await page.getByRole("button", { name: /All outcomes \(2\)/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("button")).toHaveText([
-    /Every tip comes\s*[\d.]+ s/,
-    /TIP 1 doesn't come.*[\d.]+ s/,
-  ]);
-  await dialog.getByRole("button", { name: /TIP 1 doesn't come/ }).click();
-  await expect(page.getByText("◆ If TIP 1 doesn't come")).toBeVisible();
-});
-
-test("a miss becomes a ladder of tries: add one, see its outcomes, undo", async ({
-  page,
-}) => {
-  const errors = await openSample(page);
-  await page
-    .getByRole("button", { name: "Show what happens if TIP 1 doesn't come" })
-    .click();
-  await page.getByRole("button", { name: /Replace with tries/ }).click();
-  await page.getByRole("button", { name: "Replace", exact: true }).click();
-  const tries = page.getByRole("list", { name: "Tries" });
-  await expect(tries.getByRole("listitem")).toHaveText([/^P\s*Park/]);
-
-  await page.getByRole("button", { name: "+ Add a try" }).click();
-  await page.getByRole("button", { name: /Refill in the GARDEN/ }).click();
-  await expect(tries.getByRole("listitem")).toHaveText([
-    /Refill in the GARDEN/,
-    /Then park/,
-  ]);
-  await expect(page.getByText("1 backup")).toBeVisible();
-
-  await page
-    .getByRole("button", { name: "Close: back to the good path" })
-    .click();
-  await page.getByRole("button", { name: /All outcomes \(3\)/ }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("button")).toHaveText([
-    /Every tip comes/,
-    /TIP 1 doesn't come · Try 1 works/,
-    /TIP 1 doesn't come · Every try misses: park/,
-  ]);
-  await page.keyboard.press("Escape");
-
-  await page.getByTitle("Undo").click();
-  await expect(page.getByText("1 backup")).toBeHidden();
-  expect(errors).toEqual([]);
 });
 
 // The simple builder (lib/simple): a new Auto built from the palette, a spot clicked on the field.

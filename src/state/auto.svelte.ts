@@ -41,18 +41,8 @@ import {
   type TeamSpots,
 } from "../lib/team/teamSpots";
 import { editSpot, teamSpots, unlockedSpots } from "../lib/team/spotsStore";
-import { ladderInfo } from "../lib/ladder/compile";
 import { timingValues } from "../lib/timing/store";
 import type { Tip } from "../lib/timing/model";
-import {
-  cardTimes,
-  missScenario,
-  ladderScenario,
-  ladderOutcomes,
-  planOf,
-  GOOD_PATH,
-  type PlanStep,
-} from "../lib/plan/plan";
 import type { EditorState } from "./editor.svelte";
 import type { Overlay, Overlays } from "./overlays.svelte";
 import type { ProjectStore } from "./project.svelte";
@@ -77,13 +67,8 @@ export class AutoState {
   matchControls = $state(true);
   /** The Match view's what-ifs: facts, triggers and no-shows for this look only. */
   match = new MatchControls();
-  /** How the left panel shows the Auto: the plan (good path, chapters, misses) or every card. */
-  /** Fork: "simple" is the builder for our robot's steps (lib/simple); the others are advanced. */
-  view = $state<"simple" | "plan" | "cards">("simple");
-  /** The chapter open in the plan view. */
-  chapter = $state(0);
-  /** The branching wait whose miss is open in the plan view, by card id. */
-  miss = $state<string | null>(null);
+  /** Fork: "simple" is the builder for our robot's steps (lib/simple); "cards" is every card. */
+  view = $state<"simple" | "cards">("simple");
 
   #project: ProjectStore;
   #getSettings: () => Settings;
@@ -133,7 +118,7 @@ export class AutoState {
       if (!auto || !catalog) return null;
       const doc = this.#project.doc;
       // Alone, nothing models the partner's Auto, so a tip we wait for is
-      // taken to come; the plan view's good path depends on it.
+      // taken to come.
       return previewTogether(
         [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
         this.#timingValues.current,
@@ -143,24 +128,6 @@ export class AutoState {
     },
   );
   preview = $derived(this.together?.previews[0] ?? null);
-  /** The Auto as a plan: good path, chapters, misses (lib/plan). */
-  plan = $derived.by(() =>
-    this.auto && this.catalog ? planOf(this.auto, this.catalog.names) : null,
-  );
-  /** When each card runs in the preview on screen. */
-  times = $derived.by(() =>
-    this.preview ? cardTimes(this.preview) : NO_TIMES,
-  );
-  /** The open miss's wait, when one is open: a wait that branches, or a plain wait for a tip. */
-  missStep = $derived.by(
-    () => this.plan?.steps.find((step) => step.cardId === this.miss) ?? null,
-  );
-  /** The open miss's ladder, when it has one. */
-  missLadder = $derived.by(() =>
-    this.auto && this.miss ? ladderInfo(this.auto, this.miss) : null,
-  );
-  /** Which outcome of the open ladder the preview shows (`ladderOutcomes`'s `k`). */
-  missTry = $state(0);
   worst = $derived(
     this.auto && this.catalog ? worstCase(this.auto, this.catalog) : null,
   );
@@ -297,23 +264,9 @@ export class AutoState {
       void project.loads;
       untrack(() => {
         resetAutoView();
-        // Fork: an Auto of our robot's steps opens in the simple builder, any other in the plan.
-        this.view = isSimple(project.doc) ? "simple" : "plan";
+        // Fork: an Auto of our robot's steps opens in the simple builder, any other as cards.
+        this.view = isSimple(project.doc) ? "simple" : "cards";
         this.#pinned = null;
-        this.chapter = 0;
-        this.miss = null;
-      });
-    });
-
-    // The plan view previews the good path, or the miss it has open; answers set on the cards
-    // do not carry into it. A miss whose wait is gone closes.
-    $effect.pre(() => {
-      if (this.view !== "plan") return;
-      const step = this.missStep;
-      const scenario = step ? this.#missScenario(step) : GOOD_PATH;
-      untrack(() => {
-        if (this.miss && !step) this.miss = null;
-        previewScenario.set(scenario);
       });
     });
 
@@ -429,78 +382,6 @@ export class AutoState {
     };
   }
 
-  #missScenario(step: PlanStep) {
-    const ladder = this.missLadder;
-    return ladder
-      ? ladderScenario(step.cardId, ladder, this.missTry)
-      : missScenario(step);
-  }
-
-  /**
-   * Shows what happens when `step`'s tip doesn't come: the preview and the field follow it. With
-   * a ladder, outcome `k` (`ladderOutcomes`): the first try working, unless another is asked for.
-   */
-  openMiss(step: PlanStep, k = 0) {
-    this.miss = step.cardId;
-    this.missTry = k;
-    previewScenario.set(this.#missScenario(step));
-  }
-
-  /** The field's ◆: opens that wait's miss, or closes it when it is the one open. */
-  toggleMiss(cardId: string) {
-    const step = this.plan?.steps.find((s) => s.cardId === cardId);
-    if (!step || this.miss === cardId) this.closeMiss();
-    else this.openMiss(step);
-  }
-
-  /** Back to the good path. */
-  closeMiss() {
-    this.miss = null;
-    previewScenario.set(GOOD_PATH);
-  }
-
-  /**
-   * Every way the Auto can run, for "All outcomes": the good path, then each wait that branches
-   * with its tip missed. Each is a preview of its own, so it is computed when asked for.
-   */
-  outcomes(): {
-    label: string;
-    step: PlanStep | null;
-    /** For a ladder: which outcome (`ladderOutcomes`'s `k`). */
-    k: number;
-    preview: PreviewResult;
-  }[] {
-    const auto = this.auto;
-    const catalog = this.catalog;
-    const plan = this.plan;
-    if (!auto || !catalog || !plan) return [];
-    const doc = this.#project.doc;
-    const run = (scenario: Record<string, boolean>) =>
-      previewTogether(
-        [this.#entry(doc, this.#getSettings(), scenario)],
-        this.#timingValues.current,
-        false,
-        { tipsCome: true },
-      ).previews[0];
-    return [
-      { label: "Every tip comes", step: null, k: 0, preview: run(GOOD_PATH) },
-      ...plan.branches.flatMap((step) => {
-        const name = `${step.tip ?? step.label} doesn't come`;
-        const ladder = ladderInfo(auto, step.cardId);
-        if (!ladder)
-          return [
-            { label: name, step, k: 0, preview: run(missScenario(step)) },
-          ];
-        return ladderOutcomes(ladder).map(({ k, label }) => ({
-          label: `${name} · ${label}`,
-          step,
-          k,
-          preview: run(ladderScenario(step.cardId, ladder, k)),
-        }));
-      }),
-    ];
-  }
-
   /** Where the open project's robot is, `seconds` into the preview. */
   poseAt(seconds: number, settings: Settings): RobotPose | null {
     const preview = this.preview;
@@ -579,11 +460,6 @@ function idSet(ids: string[]): ReadonlySet<string> {
 }
 
 const NONE = idSet([]);
-const NO_TIMES: ReadonlyMap<string, { t0: number; t1: number }> = cardTimes({
-  log: [],
-  drives: [],
-} as unknown as PreviewResult);
-
 /** Where a robot is in a preview: on its project paths, or on a routine's own drive. */
 export function previewPose(
   preview: PreviewResult,

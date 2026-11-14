@@ -210,7 +210,7 @@ export function validateAuto(
         error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only, and may end with the park; a decision goes after it.`);
       if (card.rows.some(parkLast) && !card.rows.every(parkLast))
         error(card.id, `${name}: one leg of the "${card.choice}" choice ends with the park and the other does not; both park, or the park goes after the choice.`);
-      if (card.shot || card.alongside || card.partnerWait || card.ladder)
+      if (card.shot || card.alongside || card.partnerWait)
         error(card.id, `${name} is the "${card.choice}" choice; it cannot also be a wait with a command, a partner wait or a camera-or-timer stop.`);
       const names = card.rows.map((row) => row.label?.trim() ?? "").join(", ");
       const seen = choiceNames.get(card.choice);

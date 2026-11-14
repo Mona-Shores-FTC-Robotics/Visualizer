@@ -18,14 +18,6 @@
     y: Axis;
     showUntaken: boolean;
     /**
-     * Plan view (lib/plan): each branching wait is a ◆ button on the field; pressing it shows
-     * that wait's miss, or the good path again. `missId` is the miss open, if any.
-     */
-    onDecision?: (cardId: string) => void;
-    missId?: string | null;
-    /** A wait on the plan: its tip's name and how many tries back it up; null for any other. */
-    decision?: (cardId: string) => { label: string; backups: number } | null;
-    /**
      * Fork: a spot's park path to show (AutoSection.parkFrom), with every other path dimmed.
      * The spots' park paths are not drawn otherwise.
      */
@@ -39,9 +31,6 @@
     x,
     y,
     showUntaken,
-    onDecision,
-    missId = null,
-    decision,
     focusLine = null,
   }: Props = $props();
 
@@ -199,7 +188,7 @@
     />
   {/if}
 
-  {#each onDecision ? [] : decisionSpots as spot (spot.id)}
+  {#each decisionSpots as spot (spot.id)}
     <rect
       x={x(spot.at.x) - unit * 1.6}
       y={y(spot.at.y) - unit * 1.6}
@@ -235,37 +224,3 @@
     >{/if}
   {/each}
 </svg>
-
-{#if onDecision}
-  {#each decisionSpots.filter((spot) => (spot.taken || spot.id === missId) && decision?.(spot.id)) as spot (spot.id)}
-    {@const open = spot.id === missId}
-    {@const { label, backups } = decision!(spot.id)!}
-    <button
-      type="button"
-      class={[
-        "absolute z-40 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-sm border-2 text-[11px] font-bold shadow",
-        open
-          ? "rotate-45 border-warning bg-warning text-base"
-          : "rotate-45 border-base bg-heading text-base hover:bg-warning",
-      ]}
-      style={`left: ${x(spot.at.x)}px; top: ${y(spot.at.y)}px;`}
-      title={open
-        ? `Showing: ${label} doesn't come. Press for the good path.`
-        : `What if ${label} doesn't come?`}
-      aria-label={open
-        ? `Back to the good path (${label} comes)`
-        : `Show what happens if ${label} doesn't come`}
-      aria-pressed={open}
-      onpointerdown={(event) => event.stopPropagation()}
-      onclick={() => onDecision(spot.id)}
-      ><span class="-rotate-45">{open ? "✕" : "?"}</span></button
-    >
-    {#if backups > 0}
-      <span
-        class="pointer-events-none absolute z-40 translate-x-3 -translate-y-1/2 rounded-full border border-warning bg-base px-1.5 text-[10px] font-semibold whitespace-nowrap text-warning"
-        style={`left: ${x(spot.at.x)}px; top: ${y(spot.at.y)}px;`}
-        >{backups} {backups === 1 ? "backup" : "backups"}</span
-      >
-    {/if}
-  {/each}
-{/if}

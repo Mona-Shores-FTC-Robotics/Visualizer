@@ -20,17 +20,10 @@ What the fork adds:
   with an Otherwise of its own) and Park. Each step is
   an ordinary card, so the file, the preview and the Java export are the same as for any Auto.
   Every Auto and partner stand-in in biobuzz opens here. Save, Share and Export are in the top bar.
-- **The plan view and the card list.** A file the builder can't read as steps (several triggers
-  racing, a ladder, a command beside a wait) opens in the plan view instead: the good path in TIP
-  chapters, a ◆ on the field for each wait that branches, **All outcomes**, and **Edit as cards**
-  for every card the engine supports. Waits on a condition the robot registers but cannot sense
-  yet (biobuzz `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
-- **Ladders.** A miss is a ladder of tries, then park: "if TIP 1 doesn't come, refill at the wall
-  FLOWER and shoot again; then the GARDEN; then park". Tries are shared plays picked from a
-  short BIOBUZZ list, and three fixed rules finish every route (a try that works goes back to the
-  plan, a source is used once, every route ends at the park). The ladder is built into ordinary
-  cards, so the robot runs it with no new code. See
-  [`docs/auto-format.md`](docs/auto-format.md#ladders).
+- **The card list.** A file the builder can't read as steps (several triggers racing, a command
+  beside a wait) opens as cards instead, with every card the engine supports. There is no way
+  in from the builder. Waits on a condition the robot registers but cannot sense yet (biobuzz
+  `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
 - **Tested against real data.** `test/real-autos.test.ts` reads the team's six Autos, the
   simulator's runs of two of them and robot 20245's first match logs (refresh with
   `node scripts/refresh-biobuzz-fixtures.mjs ../biobuzz`), and fails when the preview drifts out
