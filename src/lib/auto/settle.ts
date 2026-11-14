@@ -1,12 +1,11 @@
 /**
- * Fork: what the editor does to a document after every edit, as a plain function: ladders
- * compiled, pins holding, link paths laid out. The Auto store runs it on the open file; saving
+ * Fork: what the editor does to a document after every edit, as a plain function:
+ * pins holding, link paths laid out. The Auto store runs it on the open file; saving
  * team spots runs it on every Auto that uses one (lib/team/teamSpots.ts), with no editor open.
  */
 import type { ProjectDoc } from "../../io";
 import type { Settings } from "../../types";
 import { atomicSegments } from "../../utils/pathTraversal";
-import { compileLadders } from "../ladder/compile";
 import { relink } from "./links";
 import {
   atomicPaths,
@@ -28,13 +27,6 @@ export function settleDoc(
 ): { doc: ProjectDoc; pinned: PinState } {
   let auto = doc.auto!;
   let { startPoint, lines } = doc;
-
-  // Ladders first: they write cards, paths and pins of their own (lib/ladder).
-  const built = compileLadders(auto, lines);
-  if (built.changed) {
-    auto = built.auto;
-    lines = built.lines;
-  }
 
   const segments = atomicPaths(lines);
   const stale = Object.keys(auto.pathEnds).filter((id) => !segments.has(id));
@@ -69,7 +61,7 @@ export function settleDoc(
     if (result.linkIds.length) auto.linkPaths = result.linkIds;
     else delete auto.linkPaths;
   }
-  if (result.changed || built.changed) {
+  if (result.changed) {
     sequence = atomicSegments(lines).map((line) => ({
       kind: "path" as const,
       lineId: line.id,

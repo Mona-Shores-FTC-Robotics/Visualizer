@@ -53,7 +53,6 @@
   import { lockToAxis, snapPoint } from "./snap";
   import { useAuto } from "../state/auto.svelte";
   import AutoFieldOverlay from "../lib/auto/components/AutoFieldOverlay.svelte";
-  import { ladderInfo } from "../lib/ladder/compile";
   import FieldRuler from "../lib/components/FieldRuler.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
   import MatchTimeline from "../lib/match/MatchTimeline.svelte";
@@ -503,21 +502,7 @@
           {x}
           {y}
           showUntaken={auto.showUntaken && auto.view === "cards"}
-          onDecision={auto.view === "plan"
-            ? (id) => auto.toggleMiss(id)
-            : undefined}
-          missId={auto.miss}
           focusLine={auto.focusedPark}
-          decision={(id) => {
-            const step = auto.plan?.branches.find((s) => s.cardId === id);
-            if (!step) return null;
-            const ladder = auto.auto ? ladderInfo(auto.auto, id) : null;
-            return {
-              label: step.tip ?? step.label,
-              backups:
-                ladder?.tries.filter((t) => t.status === "kept").length ?? 0,
-            };
-          }}
         />
       {/if}
 

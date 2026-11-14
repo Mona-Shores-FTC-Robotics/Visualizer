@@ -7,7 +7,7 @@
  *   Drive to X    a path card whose path ends on the named point X
  *   Park at X     the same, marked as the park path
  *
- * So the file, the preview, the plan view and the Java export are the same as for any Auto; the
+ * So the file, the preview and the Java export are the same as for any Auto; the
  * builder only hides what a first Auto does not need. A card the builder did not make (a decision
  * beyond a Wait's Otherwise) shows as an advanced step and is left alone.
  *
@@ -1398,7 +1398,7 @@ function choiceOf(
   card: FirstOfCard,
 ): { option: string; legs: [AutoRow, AutoRow] } | null {
   if (!card.choice || card.rows.length !== 2) return null;
-  if (card.alongside || card.ladder || card.shot || card.partnerWait)
+  if (card.alongside || card.shot || card.partnerWait)
     return null;
   const first = card.rows.find((row) => "when" in row);
   const second = card.rows.find((row) => "afterMs" in row);
@@ -1427,7 +1427,7 @@ function waitOf(
   otherwise: AutoCard[];
 } | null {
   if (card.alongside && card.alongside !== SPIN_UP) return null;
-  if (card.ladder || card.choice) return null;
+  if (card.choice) return null;
   // A paired Auto's stop that shoots by the camera or the timer, and a time on its INIT menu
   // (types.ts FirstOfCard.shot, AfterMsRow.option): the builder has no control for either, so it
   // must not show one as a plain wait and drop the setting on the next edit.

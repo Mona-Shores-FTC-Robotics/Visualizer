@@ -1,6 +1,6 @@
 // The team's real Autos and the simulator's runs of them (test/fixtures/biobuzz/, refreshed by
-// scripts/refresh-biobuzz-fixtures.mjs): the plan view must read them sensibly, and the preview
-// must stay in the ballpark of what the simulator measured.
+// scripts/refresh-biobuzz-fixtures.mjs): the preview must park
+// in time, and must stay in the ballpark of what the simulator measured.
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/config/defaults";
@@ -8,6 +8,7 @@ import { parseProject, robotConfigOf } from "../src/io";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import {
   AUTO_LENGTH_S,
+  switchKey,
   type PreviewResult,
   type Scenario,
 } from "../src/lib/auto/simulate";
@@ -18,7 +19,6 @@ import {
   type TimingValues,
 } from "../src/lib/timing/model";
 import { previewTogether } from "../src/lib/timing/together";
-import { cardTimes, missScenario, planOf } from "../src/lib/plan/plan";
 
 const DIR = "test/fixtures/biobuzz";
 
@@ -31,7 +31,14 @@ function load(path: string, values: TimingValues = fallbackValues()) {
   const doc = loaded.doc;
   const settings = { ...DEFAULT_SETTINGS, ...doc.robot };
   const catalog = buildPathCatalog(doc.startPoint, doc.lines, settings);
-  const plan = planOf(doc.auto!, catalog.names);
+  /** Every wait with a trigger and a time limit: the waits that can miss. */
+  const waits = allCards(doc.auto!.cards).flatMap((card) => {
+    if (card.kind !== "firstOf") return [];
+    const time = card.rows.find((row) => "afterMs" in row);
+    if (!time || !("afterMs" in time)) return [];
+    if (!card.rows.some((row) => "when" in row)) return [];
+    return [{ card, limitS: time.afterMs / 1000 }];
+  });
   const preview = (scenario: Scenario): PreviewResult =>
     previewTogether(
       [
@@ -47,7 +54,7 @@ function load(path: string, values: TimingValues = fallbackValues()) {
       true,
       { tipsCome: true },
     ).previews[0];
-  return { doc, settings, catalog, plan, preview };
+  return { doc, settings, catalog, waits, preview };
 }
 
 /** The team's timing facts, measured on robot 20245 (driveSpeed 1.5): `real/timing.json`. */
@@ -60,36 +67,15 @@ const MEASURED: TimingValues = {
   ),
 };
 
-/** Autos built before we decided to branch only on what the robot can sense; to be rebuilt. */
-const REBUILD = new Set(["sister-right-fixed.pp"]);
-
 describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
   "%s",
   (file) => {
-    const { doc, settings, catalog, plan, preview } = load(
+    const { doc, settings, catalog, waits, preview } = load(
       `${DIR}/autos/${file}`,
     );
 
-    it("reads as chapters, the way the plan view shows it", async () => {
-      const summary = plan.chapters
-        .map((chapter) =>
-          [
-            chapter.name,
-            ...chapter.steps.map(
-              (step) =>
-                `  ${step.kind.padEnd(7)} ${step.label}${step.limitS !== undefined ? ` (up to ${step.limitS} s, ${step.sense})` : ""}${step.miss ? `  ◆ miss: ${step.miss.length} steps${step.then ? `, then back to ${step.then.label}` : ""}` : ""}`,
-            ),
-          ].join("\n"),
-        )
-        .join("\n");
-      await expect(summary + "\n").toMatchFileSnapshot(
-        `golden/biobuzz/${file}.plan.txt`,
-      );
-    });
-
     it("ends its good path parked, by 30 s", () => {
       const good = preview({});
-      expect(plan.chapters.at(-1)?.name).toBe("Park");
       expect(good.endTime).toBeLessThanOrEqual(AUTO_LENGTH_S);
       expect(
         good.guard,
@@ -97,32 +83,25 @@ describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
       ).toBeNull();
     });
 
-    it.skipIf(REBUILD.has(file))("meets its TIPs in order", () => {
-      const tips = plan.chapters
-        .filter((c) => c.name !== "Park")
-        .map((c) => Number(c.name.split(" ")[1]));
-      expect(tips).toEqual([...tips].sort((a, b) => a - b));
-    });
-
     it("parks by 30 s whatever tip is missed, at the robot's measured speed", () => {
       // At the simulator's speed, about 25% slower on drives than the robot on 25 Oct,
       // L-Quals' TIP 1 miss runs to 30.8 s: the guard never cuts a path, so a long miss
       // can overrun.
       const measured = load(`${DIR}/autos/${file}`, MEASURED).preview;
-      for (const branch of plan.branches) {
-        const miss = measured(missScenario(branch));
-        expect(
-          miss.endTime,
-          `${branch.tip ?? branch.label} missed`,
-        ).toBeLessThanOrEqual(AUTO_LENGTH_S + 1e-6);
+      for (const { card } of waits) {
+        const miss = measured({ [switchKey(card.id)]: false });
+        expect(miss.endTime, `${card.label ?? card.id} missed`).toBeLessThanOrEqual(AUTO_LENGTH_S + 1e-6);
       }
     });
 
     it("has believable waits and speeds", () => {
-      for (const step of plan.steps) {
-        if (step.limitS === undefined) continue;
-        expect(step.limitS, step.label).toBeGreaterThanOrEqual(0.25);
-        expect(step.limitS, step.label).toBeLessThanOrEqual(15);
+      // The main sequence's waits; one inside a branch may be a quick "is it up now?" check.
+      for (const { card, limitS } of waits) {
+        if (!doc.auto!.cards.includes(card)) continue;
+        if (card.rows.some((row) => "matchClock" in row && row.matchClock))
+          continue;
+        expect(limitS, card.label).toBeGreaterThanOrEqual(0.25);
+        expect(limitS, card.label).toBeLessThanOrEqual(15);
       }
       for (const path of catalog.paths) {
         const average = path.length / Math.max(1e-6, path.seconds);
@@ -143,7 +122,7 @@ describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
  * short drives, where speeding up and slowing down dominate) and finishes within a second of it.
  */
 describe.each(["l-quals", "r-quals"])("%s against the simulator", (auto) => {
-  const { catalog, plan, preview } = load(`${DIR}/sim/${auto}.pp`);
+  const { catalog, preview } = load(`${DIR}/sim/${auto}.pp`);
   const sim = JSON.parse(readFileSync(`${DIR}/sim/${auto}.json`, "utf8")) as {
     driveSeconds: Record<string, { median: number; runs: number }>;
     finishedAt: { median: number; runs: number };
@@ -192,15 +171,6 @@ describe.each(["l-quals", "r-quals"])("%s against the simulator", (auto) => {
   it("finishes the good path within 2 s of the simulator", () => {
     const good = preview({});
     expect(Math.abs(good.endTime - sim.finishedAt.median)).toBeLessThan(2);
-  });
-
-  it("gives every step of the good path a time", () => {
-    const times = cardTimes(preview({}));
-    for (const step of plan.steps) {
-      const t = times.get(step.cardId);
-      expect(t, step.label).toBeTruthy();
-      expect(t!.t1, step.label).toBeGreaterThanOrEqual(t!.t0);
-    }
   });
 });
 

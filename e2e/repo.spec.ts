@@ -116,9 +116,7 @@ test("Save to repo folder writes the .pp and its Java into the checkout, and the
     [`${GENERATED}/RSoloAuto.java`]: "old",
   });
   await page.goto(SAMPLE);
-  await expect(
-    page.getByRole("navigation", { name: "Chapters" }),
-  ).toBeVisible();
+  await expect(page.getByText(/\d+ cards?/)).toBeVisible();
 
   await openRepoDialog(page);
   const dialog = page.getByRole("dialog");
@@ -174,9 +172,7 @@ test("without the File System Access API the dialog says so", async ({
       .showDirectoryPicker;
   });
   await page.goto(SAMPLE);
-  await expect(
-    page.getByRole("navigation", { name: "Chapters" }),
-  ).toBeVisible();
+  await expect(page.getByText(/\d+ cards?/)).toBeVisible();
   await openRepoDialog(page);
   await expect(
     page

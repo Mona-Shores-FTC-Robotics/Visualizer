@@ -1,6 +1,6 @@
 /**
- * The four FLOWERs, and the robot's FLOWER pick as the preview draws it. Game-specific on purpose,
- * like lib/ladder/plays.ts: next season this file is rewritten.
+ * The four FLOWERs, and the robot's FLOWER pick as the preview draws it. Game-specific on purpose:
+ * next season this file is rewritten.
  *
  * Positions are biobuzz `localization/FlowerFieldPoints` (the official field model): each FLOWER's
  * centre is 2.71 in off a wall and 47.36 in along it, and the other two are those two turned half
