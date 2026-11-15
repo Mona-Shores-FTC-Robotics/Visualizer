@@ -85,13 +85,30 @@ export function gatherPlan(
   cardId: string,
   from: { x: number; y: number; headingDeg: number },
   t0: number,
+  /**
+   * The whole step's seconds, when the timing sets it (`gardenGatherS`, capped at the step's limit):
+   * the drives in and back keep their time and the gather gets the rest; a step shorter than the
+   * two drives shortens them alike, with no gather.
+   */
+  total?: number,
 ): { garden: Garden; seconds: number; motions: MotionRecord[] } | null {
   const garden = gardenFor(from.x, from.y);
   if (!garden) return null;
   const to = garden.gather;
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
-  const inS = legSeconds(distance, IN_SPEED);
-  const backS = legSeconds(distance, BACK_SPEED);
+  let inS = legSeconds(distance, IN_SPEED);
+  let backS = legSeconds(distance, BACK_SPEED);
+  let dwellS = DWELL_S;
+  if (total !== undefined && Number.isFinite(total) && total >= 0) {
+    const drives = inS + backS;
+    if (total >= drives) dwellS = total - drives;
+    else {
+      const scale = drives > 0 ? total / drives : 0;
+      inS *= scale;
+      backS *= scale;
+      dwellS = 0;
+    }
+  }
   const records: MotionRecord[] = [];
   let t = t0;
   const leg = (
@@ -123,10 +140,10 @@ export function gatherPlan(
   records.push({
     cardId,
     t0: t,
-    t1: t + DWELL_S,
-    motion: line(to, to, DWELL_S, to.headingDeg),
+    t1: t + dwellS,
+    motion: line(to, to, dwellS, to.headingDeg),
   });
-  t += DWELL_S;
+  t += dwellS;
   leg(to, from, backS);
   return { garden, seconds: t - t0, motions: records };
 }

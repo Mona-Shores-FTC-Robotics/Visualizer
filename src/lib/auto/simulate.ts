@@ -685,9 +685,21 @@ export function simulateAuto(
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
         // Fork: a GardenGather takes as long as its drive in and back (lib/simple/garden.ts).
+        // Fork: its whole time from the timing (gardenGatherS), never past the step's limit.
+        const gatherTotal =
+          card.name === "GardenGather"
+            ? timing?.actionSeconds(card.name, t)
+            : undefined;
         const gather =
           card.name === "GardenGather"
-            ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
+            ? gatherPlan(
+                card.id,
+                { ...pos, headingDeg: heading },
+                t,
+                gatherTotal === undefined
+                  ? undefined
+                  : Math.min(gatherTotal, card.timeoutS ?? DEFAULT_TIMEOUT_S),
+              )
             : null;
         const busy = gather
           ? gather.seconds

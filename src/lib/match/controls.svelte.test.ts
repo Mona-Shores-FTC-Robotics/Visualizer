@@ -17,14 +17,16 @@ test("the robot's facts and the HIVE's split every fact between them", () => {
 
 test("a preset changes only what it says, over the team's facts, and reset undoes it", () => {
   const controls = new MatchControls();
-  const misses = MATCH_PRESETS.find((p) => p.id === "misses")!;
-  controls.apply(misses, ["a.pp", "b.pp"], base);
-  assertEqual(controls.own["a.pp"], {
-    volleyLoad: Math.round(base.volleyLoad / 2),
-  });
+  const slow = MATCH_PRESETS.find((p) => p.id === "slow")!;
+  controls.apply(slow, ["a.pp", "b.pp"], base);
+  const mine = controls.own["a.pp"];
+  assert(mine.driveSpeed! < base.driveSpeed, "drives slower");
+  assert(mine.pickFlowerS! > base.pickFlowerS, "picks slower");
+  assert(mine.gardenGatherS! > base.gardenGatherS, "gathers slower");
+  assert(!("volleyLoad" in mine), "every volley still lands its 4");
   assertEqual(controls.own["b.pp"], controls.own["a.pp"]);
   assertEqual(controls.shared(base), base);
-  assertEqual(controls.preset, "misses");
+  assertEqual(controls.preset, "slow");
   assert(controls.changed, "a preset is a change");
   // Changing anything by hand leaves the preset.
   controls.setHive("tipSwingS", 2);

@@ -50,3 +50,35 @@ test("PARK: R keeps its load and parks, as before", () => {
   assert(!preview.unparked, "parked");
   assert(preview.endTime < 30, "parked inside AUTO");
 });
+
+test("a GARDEN gather takes gardenGatherS, never past its step's limit", () => {
+  const garden = { Pickup: false };
+  const gather = (v: typeof values) =>
+    previewTogether(
+      [entry(rText, garden), entry(lText)],
+      v,
+    ).previews[0].actions.find((a) => a.command === "GardenGather")!;
+  const g = gather({ ...values, gardenGatherS: 4.4 });
+  assert(Math.abs(g.t1 - g.t0 - 4.4) < 1e-9, `4.4 s (${g.t1 - g.t0})`);
+  // R-Clockwise's gather has a 5.5 s limit.
+  const capped = gather({ ...values, gardenGatherS: 8 });
+  assert(
+    Math.abs(capped.t1 - capped.t0 - 5.5) < 1e-9,
+    `5.5 s (${capped.t1 - capped.t0})`,
+  );
+});
+
+test("a FLOWER pick takes pickFlowerS, never past its step's limit", () => {
+  const pick = (v: typeof values) =>
+    previewTogether([entry(rText), entry(lText)], v).previews[0].actions.find(
+      (a) => a.command === "PickFlower",
+    )!;
+  const p = pick({ ...values, pickFlowerS: 3.6 });
+  assert(Math.abs(p.t1 - p.t0 - 3.6) < 1e-9, `3.6 s (${p.t1 - p.t0})`);
+  // R-Clockwise's picks have a 4.5 s limit.
+  const capped = pick({ ...values, pickFlowerS: 6 });
+  assert(
+    Math.abs(capped.t1 - capped.t0 - 4.5) < 1e-9,
+    `4.5 s (${capped.t1 - capped.t0})`,
+  );
+});

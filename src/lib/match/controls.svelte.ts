@@ -31,20 +31,12 @@ export const MATCH_PRESETS: MatchPreset[] = [
     id: "slow",
     label: "Slow",
     title:
-      "Both robots drive 20% slower, launch 25% slower and take half again as long to fill the intake",
+      "Both robots drive 20% slower, launch 25% slower and take a quarter again as long to pick a FLOWER or gather the GARDEN",
     robot: (base) => ({
       driveSpeed: round(base.driveSpeed * 0.8, 0.05),
       volleyS: round(base.volleyS * 1.25, 0.1),
-      intakeFullS: round(base.intakeFullS * 1.5, 0.1),
-    }),
-    hive: () => ({}),
-  },
-  {
-    id: "misses",
-    label: "Misses",
-    title: "Half of every volley misses the CELL, so a TIP needs more volleys",
-    robot: (base) => ({
-      volleyLoad: Math.max(1, Math.round(base.volleyLoad / 2)),
+      pickFlowerS: round(base.pickFlowerS * 1.25, 0.1),
+      gardenGatherS: round(base.gardenGatherS * 1.25, 0.1),
     }),
     hive: () => ({}),
   },

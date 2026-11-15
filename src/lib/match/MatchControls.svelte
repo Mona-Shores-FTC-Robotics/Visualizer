@@ -20,6 +20,7 @@
     type RouteChoice,
   } from "./whatIfs";
   import { switchKey } from "../auto/simulate";
+  import { allCards } from "../auto/tree";
   import type { TimingFact, TimingValues } from "../timing/model";
   import {
     clampFact,
@@ -136,6 +137,8 @@
     spinUpS: "Spin-up",
     volleyS: "Volley time",
     intakeFullS: "Intake full",
+    pickFlowerS: "FLOWER pick",
+    gardenGatherS: "GARDEN gather",
     volleyLoad: "Hits per volley",
     tipStartS: "TIP delay",
     tipSwingS: "HIVE swing",
@@ -162,14 +165,25 @@
   }
 
   /**
-   * A robot's sliders: the facts that time something its Auto does. "Intake full" times a wait for
-   * the intake to fill, which no Auto on master has, so it shows only for an Auto that has one.
+   * A robot's sliders: the facts that time something its Auto does. "FLOWER pick" and "GARDEN
+   * gather" show only for an Auto with that step, and "Intake full" only for one that waits for the
+   * intake to fill, which no Auto on master does. "Hits per volley" is not a slider: the HIVE takes a
+   * volley as its 4 POLLEN (mentor, 15 Nov 2026).
    */
   function robotFacts(robot: RobotInfo): TimingFact[] {
     const waits = triggers(robot.auto);
-    return ROBOT_FACT_LIST.filter(
-      (fact) => fact.id !== "intakeFullS" || waits.includes("IntakeFull"),
+    const steps = new Set(
+      allCards(robot.auto.cards).flatMap((c) =>
+        c.kind === "action" ? [c.name] : [],
+      ),
     );
+    return ROBOT_FACT_LIST.filter((fact) => {
+      if (fact.id === "volleyLoad") return false;
+      if (fact.id === "intakeFullS") return waits.includes("IntakeFull");
+      if (fact.id === "pickFlowerS") return steps.has("PickFlower");
+      if (fact.id === "gardenGatherS") return steps.has("GardenGather");
+      return true;
+    });
   }
 
   /** Whether a condition comes: the controls only ever answer one for every wait on it. */
