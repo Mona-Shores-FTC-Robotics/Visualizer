@@ -9,7 +9,14 @@
    * on the timeline (`show="hive"`); with more, `show="all"`.
    */
   import type { AutoSection } from "../auto/types";
-  import { previewQuestions } from "../auto/simulate";
+  import {
+    choiceLabel,
+    routeChoices,
+    senseTriggers,
+    triggerHint,
+    triggerLabel,
+    type RouteChoice,
+  } from "./whatIfs";
   import type { TimingFact, TimingValues } from "../timing/model";
   import {
     clampFact,
@@ -19,7 +26,11 @@
     ROBOT_FACT_LIST,
     type MatchControls,
   } from "./controls.svelte";
-  import { checkboxClass, labelClass } from "../components/ui/styles";
+  import {
+    checkboxClass,
+    fieldClass,
+    labelClass,
+  } from "../components/ui/styles";
   import type { FieldEntry } from "../timing/together";
   import { knobBreaks, type Knob } from "./breakpoints";
   import { tipping } from "./tipping.svelte";
@@ -129,17 +140,6 @@
     startLoad: "Start weight",
   };
 
-  /** What a trigger coming means, for its checkbox. */
-  const TRIGGER: Record<string, string> = {
-    CellUp: "TIP or CELL up comes",
-    Tip: "TIP comes",
-    LeftCellUp: "LEFT CELL comes up",
-    RightCellUp: "RIGHT CELL comes up",
-    IntakeFull: "Intake fills",
-    Empty: "Launcher empties",
-    CameraBlind: "Camera goes blind",
-  };
-
   function unit(fact: TimingFact) {
     if (fact.unit === "POLLEN") return "";
     if (fact.unit === "×") return "×";
@@ -150,12 +150,12 @@
     return `${value.toFixed(digits)}${unit(fact)}`;
   }
 
-  /** Each robot's triggers: one checkbox per condition its waits ask. */
+  /**
+   * Each robot's sensed triggers: one checkbox per condition its waits ask, but not a route
+   * choice (a dropdown) or the clock check's always-true trigger (whatIfs.ts).
+   */
   function triggers(auto: AutoSection): string[] {
-    const seen: string[] = [];
-    for (const q of previewQuestions(auto))
-      if (!seen.includes(q.condition)) seen.push(q.condition);
-    return seen;
+    return senseTriggers(auto);
   }
 
   /**
@@ -172,6 +172,11 @@
   /** Whether a condition comes: the controls only ever answer one for every wait on it. */
   function comes(robot: RobotInfo, condition: string): boolean {
     return controls.scenario[robot.file]?.[condition] ?? true;
+  }
+
+  /** The leg of a route choice previewed: the drawn one (0) unless its trigger is answered no. */
+  function legOf(robot: RobotInfo, choice: RouteChoice): 0 | 1 {
+    return comes(robot, choice.condition) ? 0 : 1;
   }
 
   function robotValue(robot: RobotInfo, fact: TimingFact): number {
@@ -316,6 +321,39 @@
           { robot: robots.indexOf(robot), id: fact.id },
         )}
       {/each}
+      {#if routeChoices(robot.auto).length}
+        <!-- Fork: the Auto's route choices, as the Driver Station's INIT rows (whatIfs.ts). -->
+        <div class="mt-1 flex flex-col gap-1 border-t border-border pt-1.5">
+          {#each routeChoices(robot.auto) as choice (choice.condition)}
+            {@const leg = legOf(robot, choice)}
+            <label
+              class={[
+                labelClass,
+                "flex items-center gap-1.5 text-[11px]",
+                leg === 1 && "font-semibold text-heading",
+              ]}
+              title={`The INIT menu's ${choice.option} row: which way the robot goes. ${choice.legs[0]} is the one drawn.`}
+            >
+              <span class="shrink-0">INIT</span>
+              <select
+                class={[fieldClass, "!w-auto min-w-0 !py-0.5 text-[11px]"]}
+                aria-label={`INIT ${choice.option}`}
+                value={leg}
+                onchange={(event) =>
+                  controls.setTrigger(
+                    robot.file,
+                    robot.auto,
+                    choice.condition,
+                    (event.currentTarget as HTMLSelectElement).value === "0",
+                  )}
+              >
+                <option value={0}>{choiceLabel(choice, 0)}</option>
+                <option value={1}>{choiceLabel(choice, 1)}</option>
+              </select>
+            </label>
+          {/each}
+        </div>
+      {/if}
       {#if triggers(robot.auto).length}
         <div
           class="mt-1 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-1.5"
@@ -328,9 +366,7 @@
                 "flex items-center gap-1 text-[11px]",
                 !yes && "text-danger",
               ]}
-              title={yes
-                ? "Comes when the timing says. Untick: it never comes, and each wait on it runs to its limit"
-                : "Never comes: each wait on it runs to its limit"}
+              title={triggerHint(condition, yes)}
             >
               <input
                 type="checkbox"
@@ -344,7 +380,7 @@
                     (event.currentTarget as HTMLInputElement).checked,
                   )}
               />
-              {TRIGGER[condition] ?? `${condition} comes`}
+              {triggerLabel(condition)}
             </label>
           {/each}
         </div>
@@ -417,7 +453,7 @@
         type="button"
         class="rounded-md border border-border px-2 py-0.5 text-body hover:text-heading disabled:opacity-40"
         disabled={!controls.changed}
-        title="Back to the team's timing.json, every trigger coming and every robot moving"
+        title="Back to the team's timing.json, every trigger coming, every INIT choice as drawn and every robot moving"
         onclick={() => controls.reset()}>Team values</button
       >
     </div>
