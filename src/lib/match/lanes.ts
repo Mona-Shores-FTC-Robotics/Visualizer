@@ -76,6 +76,8 @@ export interface RobotLane {
   still: boolean;
   /** Seconds spent in waits. */
   waitingS: number;
+  /** AUTO ended on the way to the park (Priority on the TIP). */
+  unparked: boolean;
   /** Seconds to spare at the end of the 30 s Auto (negative: over). */
   spareS: number;
 }
@@ -276,6 +278,7 @@ export function matchLanes(
       stalled: preview.stalled,
       still: entries[robot]?.still ?? false,
       waitingS: waits.reduce((sum, w) => sum + (w.t1 - w.t0), 0),
+      unparked: preview.unparked ?? false,
       spareS: AUTO_LENGTH_S - preview.endTime,
     };
   });
@@ -306,6 +309,8 @@ export function robotSummary(robot: RobotLane): string {
     `waited ${robot.waitingS.toFixed(1)} s`,
   ];
   if (robot.stalled) parts.push("stuck in a wait");
+  else if (robot.unparked)
+    parts.push("not parked: AUTO ends on the way to the park (Priority)");
   else if (robot.spareS >= 0)
     parts.push(
       `done ${fmt(robot.endTime)}, ${robot.spareS.toFixed(1)} s spare`,

@@ -5,6 +5,7 @@ import {
   choiceLabel,
   routeChoices,
   senseTriggers,
+  stops,
   triggerHint,
   triggerLabel,
 } from "./whatIfs";
@@ -12,8 +13,11 @@ import {
 // and clock checks on "Always"; L-NoCross waits on CellUp, LeftCellUp and RightCellUp.
 import rClockwiseText from "./fixtures/r-clockwise.pp?raw";
 import lNoCrossText from "./fixtures/l-no-cross.pp?raw";
+import lClockwiseText from "./fixtures/l-clockwise.pp?raw";
+import { switchKey } from "../auto/simulate";
 
 const autoOf = (text: string) => normalizeAuto(JSON.parse(text).auto).auto!;
+const stopsOf = (text: string) => stops(autoOf(text), JSON.parse(text).lines);
 const rClockwise = autoOf(rClockwiseText);
 const lNoCross = autoOf(lNoCrossText);
 
@@ -72,4 +76,51 @@ test("picking a route choice's second leg answers its trigger no, and back again
   assertEqual(controls.scenario["r.pp"]?.[pickup.condition], false);
   controls.setTrigger("r.pp", rClockwise, pickup.condition, true);
   assert(!controls.changed, "the drawn leg is no change");
+});
+
+test("each stop says what it waits for, until when, and both outcomes, the planned one first", () => {
+  assertEqual(
+    stopsOf(rClockwiseText).map((s) => [s.name, s.asks, s.planned, s.late]),
+    [
+      [
+        "R2: LEFT up by 15.5 s, otherwise park",
+        "LEFT CELL read up · until 15.5 s",
+        "shoot LEFT, if before 17.6 s",
+        "park",
+      ],
+      [
+        "R3 RIGHT up by",
+        "RIGHT CELL read up · until 23.2 s (set in INIT)",
+        "INIT Priority",
+        "shoot LEFT, hold until 26.4 s, park",
+      ],
+    ],
+  );
+  // L1's late way crosses under the HIVE and shoots at RIGHT, from RIGHT_START.
+  const [l1] = stopsOf(lClockwiseText);
+  assertEqual(
+    l1.late,
+    "drive to RIGHT_START, shoot RIGHT, hold until 22.5 s, …",
+  );
+});
+
+test("a CellUp stop names the CELL the robot faces, and a short window says within", () => {
+  const [first] = stopsOf(lNoCrossText);
+  assertEqual(first.asks, "LEFT CELL read up · until 9 s (set in INIT)");
+  assertEqual(first.planned, "go on");
+  const tipSeen = stopsOf(lNoCrossText)[1];
+  assertEqual(tipSeen.asks, "LEFT CELL read up · within 0.75 s");
+});
+
+test("a stop is answered alone: Too late on R3 leaves R2 in time", () => {
+  const controls = new MatchControls();
+  const [r2, r3] = stopsOf(rClockwiseText);
+  controls.setWait("r.pp", r3.cardId, false);
+  assertEqual(controls.scenario["r.pp"], { [switchKey(r3.cardId)]: false });
+  assert(
+    controls.scenario["r.pp"][switchKey(r2.cardId)] === undefined,
+    "R2 untouched",
+  );
+  controls.setWait("r.pp", r3.cardId, true);
+  assert(!controls.changed, "In time again is no change");
 });

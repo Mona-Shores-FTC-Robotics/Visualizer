@@ -13,10 +13,13 @@
     choiceLabel,
     routeChoices,
     senseTriggers,
+    stops,
+    type Stop,
     triggerHint,
     triggerLabel,
     type RouteChoice,
   } from "./whatIfs";
+  import { switchKey } from "../auto/simulate";
   import type { TimingFact, TimingValues } from "../timing/model";
   import {
     clampFact,
@@ -170,6 +173,23 @@
   }
 
   /** Whether a condition comes: the controls only ever answer one for every wait on it. */
+  /** Each robot's stops, from its Auto and its paths (whatIfs.ts). */
+  function stopsOf(robot: RobotInfo): Stop[] {
+    return stops(robot.auto, entries[robots.indexOf(robot)]?.lines ?? []);
+  }
+
+  /** Whether a stop's trigger comes in time in this look: its own answer, else its trigger's. */
+  function stopOnTime(robot: RobotInfo, stop: Stop): boolean {
+    const scenario = controls.scenario[robot.file] ?? {};
+    const own = stop.own ? scenario[switchKey(stop.cardId)] : undefined;
+    return own ?? scenario[stop.condition] ?? true;
+  }
+
+  function setStop(robot: RobotInfo, stop: Stop, onTime: boolean) {
+    if (stop.own) controls.setWait(robot.file, stop.cardId, onTime);
+    else controls.setTrigger(robot.file, robot.auto, stop.condition, onTime);
+  }
+
   function comes(robot: RobotInfo, condition: string): boolean {
     return controls.scenario[robot.file]?.[condition] ?? true;
   }
@@ -354,34 +374,59 @@
           {/each}
         </div>
       {/if}
-      {#if triggers(robot.auto).length}
-        <div
-          class="mt-1 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-1.5"
-        >
-          {#each triggers(robot.auto) as condition (condition)}
-            {@const yes = comes(robot, condition)}
-            <label
-              class={[
-                labelClass,
-                "flex items-center gap-1 text-[11px]",
-                !yes && "text-danger",
-              ]}
-              title={triggerHint(condition, yes)}
+      {#if stopsOf(robot).length}
+        <!-- Fork: one row per stop, the planned outcome first (whatIfs.ts stops). -->
+        <div class="mt-1 flex flex-col gap-1.5 border-t border-border pt-1.5">
+          {#each stopsOf(robot) as stop (stop.cardId)}
+            {@const onTime = stopOnTime(robot, stop)}
+            <div
+              class="flex flex-col gap-0.5 text-[11px]"
+              role="radiogroup"
+              aria-label={stop.name}
             >
-              <input
-                type="checkbox"
-                class={checkboxClass}
-                checked={yes}
-                onchange={(event) =>
-                  controls.setTrigger(
-                    robot.file,
-                    robot.auto,
-                    condition,
-                    (event.currentTarget as HTMLInputElement).checked,
-                  )}
-              />
-              {triggerLabel(condition)}
-            </label>
+              <span
+                class={[
+                  "truncate font-medium",
+                  onTime ? "text-heading" : "text-danger",
+                ]}
+                title={`${stop.name}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
+                >{stop.name}</span
+              >
+              <span class="-mt-0.5 truncate text-[10px] text-body"
+                >{stop.asks}</span
+              >
+              <div class="grid grid-cols-2 gap-1">
+                {#each [true, false] as planned (planned)}
+                  {@const on = onTime === planned}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    class={[
+                      "min-w-0 rounded-md border px-1.5 py-0.5 text-left leading-tight transition",
+                      on &&
+                        planned &&
+                        "border-primary bg-primary/15 text-heading",
+                      on &&
+                        !planned &&
+                        "border-danger bg-danger/10 text-danger",
+                      !on && "border-border text-body hover:text-heading",
+                    ]}
+                    title={planned
+                      ? `In time: ${stop.planned}`
+                      : `Too late: ${stop.late}`}
+                    onclick={() => setStop(robot, stop, planned)}
+                  >
+                    <span class="block font-semibold"
+                      >{planned ? "✓ In time" : "✗ Too late"}</span
+                    >
+                    <span class="block"
+                      >{planned ? stop.planned : stop.late}</span
+                    >
+                  </button>
+                {/each}
+              </div>
+            </div>
           {/each}
         </div>
       {/if}
