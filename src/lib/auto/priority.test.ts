@@ -2,7 +2,7 @@ import { assert, assertEqual, test } from "../testing/harness";
 import { normalizeAuto } from "./normalize";
 import { normalizePaths, normalizeStartPose } from "../../utils/normalize";
 import { DEFAULT_SETTINGS } from "../../config";
-import { fallbackValues } from "../timing/model";
+import { fallbackValues, type TimingValues } from "../timing/model";
 import { previewTogether, type FieldEntry } from "../timing/together";
 import { tipBeforePark, type Scenario } from "./simulate";
 // biobuzz TeamCode/autos as of 15 Nov 2026: R-Clockwise has the INIT row Priority (THREE_TIP drawn,
@@ -21,7 +21,11 @@ function entry(text: string, scenario: Scenario = {}): FieldEntry {
   };
 }
 
-const values = { ...fallbackValues(), volleyS: 2.5, spinUpS: 1.1 };
+const values: TimingValues = {
+  ...fallbackValues(),
+  volleyS: 2.5,
+  spinUpS: 1.1,
+};
 const rPreview = (scenario: Scenario) =>
   previewTogether([entry(rText, scenario), entry(lText)], values).previews[0];
 const volleys = (scenario: Scenario) =>
@@ -53,7 +57,7 @@ test("PARK: R keeps its load and parks, as before", () => {
 
 test("a GARDEN gather takes gardenGatherS, never past its step's limit", () => {
   const garden = { Pickup: false };
-  const gather = (v: typeof values) =>
+  const gather = (v: TimingValues) =>
     previewTogether(
       [entry(rText, garden), entry(lText)],
       v,
@@ -69,7 +73,7 @@ test("a GARDEN gather takes gardenGatherS, never past its step's limit", () => {
 });
 
 test("a FLOWER pick takes pickFlowerS, never past its step's limit", () => {
-  const pick = (v: typeof values) =>
+  const pick = (v: TimingValues) =>
     previewTogether([entry(rText), entry(lText)], v).previews[0].actions.find(
       (a) => a.command === "PickFlower",
     )!;
