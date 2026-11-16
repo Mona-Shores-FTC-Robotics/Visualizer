@@ -54,6 +54,8 @@ export type StepKind =
   | "spinup"
   | "pick"
   | "gather"
+  /** A command the builder has no step of its own for: shown by its name, with its time limit. */
+  | "command"
   | "wait"
   | "check"
   | "choice"
@@ -450,6 +452,13 @@ function walkSteps(
         lineId: card.lineId,
       };
     }
+    if (card.kind === "action")
+      return {
+        ...base,
+        kind: "command",
+        label: card.name || "Command",
+        timeoutS: card.timeoutS,
+      };
     return { ...base, kind: "other", label: cardTitle(card) };
   });
 }
@@ -637,7 +646,7 @@ export function setStartHeading(
  */
 export function addStep(
   doc: ProjectDoc,
-  kind: Exclude<StepKind, "other">,
+  kind: Exclude<StepKind, "other" | "command">,
   index: number,
   spot?: string,
   into: StepList = null,
@@ -1469,7 +1478,6 @@ function waitOf(
   if (when.when[0] === ALWAYS && (card.rows[0] !== time || !time.matchClock))
     return null;
   if (when.cards.length && !allowWhenCards) return null;
-  if (!WAIT_FOR.some((w) => w.trigger === when.when[0])) return null;
   return {
     trigger: when.when[0],
     seconds: time.afterMs / 1000,

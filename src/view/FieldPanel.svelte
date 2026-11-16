@@ -501,7 +501,6 @@
           preview={auto.preview}
           {x}
           {y}
-          showUntaken={auto.showUntaken && auto.view === "cards"}
           focusLine={auto.focusedPark}
         />
       {/if}

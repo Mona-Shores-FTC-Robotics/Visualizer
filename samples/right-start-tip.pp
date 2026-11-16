@@ -419,6 +419,11 @@
     "startAt": "RIGHT_START",
     "cards": [
       {
+        "id": "first-tip-launch",
+        "kind": "action",
+        "name": "LaunchAll"
+      },
+      {
         "id": "first-tip",
         "kind": "firstOf",
         "label": "Did the HIVE tip?",
@@ -531,8 +536,7 @@
               }
             ]
           }
-        ],
-        "alongside": "LaunchAll"
+        ]
       }
     ]
   },

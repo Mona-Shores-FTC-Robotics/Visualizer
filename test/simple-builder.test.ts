@@ -73,7 +73,7 @@ function fresh(): ProjectDoc {
 
 const add = (
   doc: ProjectDoc,
-  kind: Exclude<StepKind, "other">,
+  kind: Exclude<StepKind, "other" | "command">,
   spot?: string,
 ) => addStep(doc, kind, doc.auto!.cards.length, spot).doc;
 
@@ -81,7 +81,7 @@ const add = (
 const addOtherwise = (
   doc: ProjectDoc,
   waitCardId: string,
-  kind: Exclude<StepKind, "other" | "wait">,
+  kind: Exclude<StepKind, "other" | "command" | "wait">,
   spot?: string,
 ) => {
   const into: StepList = { waitCardId };
@@ -907,7 +907,7 @@ describe("a Wait step's Otherwise list", () => {
   const into = (
     doc: ProjectDoc,
     waitCardId: string,
-    kind: Exclude<StepKind, "other">,
+    kind: Exclude<StepKind, "other" | "command">,
     spot?: string,
   ) =>
     addStep(
@@ -1062,7 +1062,7 @@ describe("a Wait step's Otherwise list", () => {
     const made = addStep(doc, "choice", doc.auto!.cards.length);
     doc = made.doc;
     const choice = made.cardId;
-    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other">, spot?: string) => {
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other" | "command">, spot?: string) => {
       const length = stepOf(doc, choice).legs![n].steps.length;
       doc = addStep(doc, kind, length, spot, { waitCardId: choice, leg: n }).doc;
     };
@@ -1330,7 +1330,7 @@ describe("a Wait step's Otherwise list", () => {
     doc = setChoice(made.doc, made.cardId, { option: "Priority" });
     doc = setChoice(doc, made.cardId, { leg: 0, name: "THREE_TIP" });
     doc = setChoice(doc, made.cardId, { leg: 1, name: "PARK" });
-    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other">, spot?: string) => {
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other" | "command">, spot?: string) => {
       const length = stepOf(doc, made.cardId).legs![n].steps.length;
       doc = addStep(doc, kind, length, spot, { waitCardId: made.cardId, leg: n }).doc;
     };
@@ -1832,5 +1832,69 @@ describe("stepForLine", () => {
 
   it("finds nothing for a path no step drives", () => {
     expect(stepForLine(doc, "no-such-path")).toBeNull();
+  });
+});
+
+describe("steps the builder has no control of its own for", () => {
+  /** A new Auto with `cards` put in by hand, as an older file or another tool would. */
+  const withCards = (cards: AutoCard[]): ProjectDoc => {
+    const doc = add(fresh(), "launch");
+    return { ...doc, auto: { ...doc.auto!, cards: [...doc.auto!.cards, ...cards] } };
+  };
+
+  it("shows a command it does not know by its name, with its time limit", () => {
+    const doc = withCards([
+      { id: "sweep", kind: "action", name: "SweepRow", timeoutS: 4 },
+    ]);
+    const step = stepsOf(doc).at(-1)!;
+    expect(step.kind).toBe("command");
+    expect(step.label).toBe("SweepRow");
+    expect(step.timeoutS).toBe(4);
+    expect(isSimple(doc)).toBe(true);
+    const next = setStepTimeout(doc, "sweep", 2);
+    expect(stepsOf(next).at(-1)!.timeoutS).toBe(2);
+  });
+
+  it("reads a wait on a trigger it does not list, named by the trigger", () => {
+    const doc = withCards([
+      {
+        id: "empty",
+        kind: "firstOf",
+        label: "Wait until empty",
+        rows: [
+          { when: ["Empty"], cards: [] },
+          { afterMs: 4000, cards: [] },
+        ],
+      },
+    ]);
+    const step = stepsOf(doc).at(-1)!;
+    expect(step.kind).toBe("wait");
+    expect(step.waitFor).toBe("Empty");
+    expect(step.waitS).toBe(4);
+    expect(step.label).toBe("Wait for Empty");
+    expect(isSimple(doc)).toBe(true);
+  });
+
+  it("lists a card it cannot read as a step, and can move or remove it", () => {
+    const doc = withCards([
+      {
+        id: "old",
+        kind: "firstOf",
+        label: "Fire and wait",
+        alongside: "LaunchAll",
+        rows: [
+          { when: ["Tip"], cards: [] },
+          { afterMs: 3000, cards: [] },
+        ],
+      },
+    ]);
+    expect(stepsOf(doc).at(-1)!.kind).toBe("other");
+    expect(isSimple(doc)).toBe(false);
+    const moved = moveStep(doc, "old", 0);
+    expect(stepsOf(moved)[0].kind).toBe("other");
+    expect(moved.auto!.cards[0]).toEqual(doc.auto!.cards.at(-1));
+    expect(stepsOf(removeStep(doc, "old")).some((s) => s.kind === "other")).toBe(
+      false,
+    );
   });
 });

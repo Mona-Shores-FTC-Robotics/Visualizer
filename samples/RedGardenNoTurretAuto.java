@@ -71,35 +71,46 @@ public final class RedGardenNoTurretAuto {
 
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
+        Path collectAheadPark = Paths.line(collectAhead, park).tangent();
         Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
+        Path collectHomePark = Paths.line(collectHome, park).tangent();
         Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
+        Path collectLeftPark = Paths.line(collectLeft, park).tangent();
         Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
         Path toHiveEntrance = Paths.line(collectHome, hiveEntrance).constant(hiveEntrance);
+        Path hiveEntrancePark = Paths.line(hiveEntrance, park).tangent();
         Path underHive = Paths.line(hiveEntrance, corridorExit).constant(corridorExit);
+        Path corridorExitPark = Paths.line(corridorExit, park).tangent();
         Path clearToTurnPath = Paths.line(corridorExit, clearToTurn).constant(clearToTurn);
+        Path clearToTurnPark = Paths.line(clearToTurn, park).tangent();
         Path turnToLoadingCell = Paths.line(clearToTurn, rearShot).linear(clearToTurn, rearShot);
+        Path rearShotPark = Paths.line(rearShot, park).tangent();
         Path toLoadingFlower = Paths.line(rearShot, loadingFlower).linear(rearShot, loadingFlower);
+        Path loadingFlowerPark = Paths.line(loadingFlower, park).tangent();
         Path turnToLoadingCellAgain = Paths.line(loadingFlower, flowerShot).linear(loadingFlower, flowerShot);
         Path toParkPath = Paths.line(flowerShot, toPark).constant(toPark);
         Path toGardenSidePath = Paths.line(start, toGardenSide).constant(toGardenSide);
+        Path gardenSidePark = Paths.line(toGardenSide, park).tangent();
         Path toGardenFlower = Paths.line(toGardenFlowerStart, gardenFlower).linear(toGardenFlowerStart, gardenFlower);
+        Path gardenFlowerPark = Paths.line(gardenFlower, park).tangent();
         Path turnToGardenCell = Paths.line(gardenFlower, gardenShot).linear(gardenFlower, gardenShot);
         Path gardenToParkPath = Paths.line(gardenShot, gardenToPark).constant(gardenToPark);
 
         return kit.sequence(
-                kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
+                kit.command("LaunchAll"),
+                kit.firstOf("Did our HIVE tip?",
                         kit.when("Tip").then(
                                 kit.guarded("If tipped", toParkPath, 1.6,
-                                        kit.path("Pass1Ahead", pass1Ahead, 1),
-                                        kit.path("Pass1Back", pass1Back, 0.9),
-                                        kit.path("Pass2Left", pass2Left, 0.9),
-                                        kit.path("Pass2Back", pass2Back, 0.9),
-                                        kit.path("ToHiveEntrance", toHiveEntrance, 1.3),
-                                        kit.path("UnderHive", underHive, 2.3),
-                                        kit.path("ClearToTurn", clearToTurnPath, 1),
-                                        kit.path("TurnToLoadingCell", turnToLoadingCell, 1),
+                                        kit.path("Pass1Ahead", pass1Ahead, 1, collectAheadPark, 2.7),
+                                        kit.path("Pass1Back", pass1Back, 0.9, collectHomePark, 2.9),
+                                        kit.path("Pass2Left", pass2Left, 0.9, collectLeftPark, 2.7),
+                                        kit.path("Pass2Back", pass2Back, 0.9, collectHomePark, 2.9),
+                                        kit.path("ToHiveEntrance", toHiveEntrance, 1.3, hiveEntrancePark, 2.6),
+                                        kit.path("UnderHive", underHive, 2.3, corridorExitPark, 1.8),
+                                        kit.path("ClearToTurn", clearToTurnPath, 1, clearToTurnPark, 1.7),
+                                        kit.path("TurnToLoadingCell", turnToLoadingCell, 1, rearShotPark, 1.7),
                                         kit.command("LaunchAll"),
-                                        kit.path("ToLoadingFlower", toLoadingFlower, 1.3),
+                                        kit.path("ToLoadingFlower", toLoadingFlower, 1.3, loadingFlowerPark, 1.7),
                                         kit.firstOf("Take 4 POLLEN from the RED_LOADING FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),
@@ -108,8 +119,8 @@ public final class RedGardenNoTurretAuto {
                                         kit.path("ToPark", toParkPath, 1.6))),
                         kit.afterMs(8000).then(
                                 kit.guarded("If not tipped", gardenToParkPath, 2.1,
-                                        kit.path("ToGardenSide", toGardenSidePath, 1.5),
-                                        kit.path("ToGardenFlower", toGardenFlower, 1.5),
+                                        kit.path("ToGardenSide", toGardenSidePath, 1.5, gardenSidePark, 2.5),
+                                        kit.path("ToGardenFlower", toGardenFlower, 1.5, gardenFlowerPark, 2.1),
                                         kit.firstOf("Take 4 POLLEN from the RED_GARDEN FLOWER",
                                                 kit.when("IntakeFull"),
                                                 kit.afterMs(1500)),

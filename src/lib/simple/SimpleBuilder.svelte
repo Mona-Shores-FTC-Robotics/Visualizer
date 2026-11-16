@@ -11,6 +11,7 @@
     LockOpen,
     Pencil,
     Sprout,
+    Terminal,
     GripVertical,
     Navigation,
     Fan,
@@ -90,7 +91,7 @@
   const auto = useAuto();
   const playback = usePlayback();
 
-  type AddKind = Exclude<StepKind, "other">;
+  type AddKind = Exclude<StepKind, "other" | "command">;
   const PALETTE: {
     kind: AddKind;
     label: string;
@@ -169,6 +170,7 @@
     drive: Navigation,
     pick: Flower2,
     gather: Sprout,
+    command: Terminal,
     wait: Hourglass,
     check: Clock,
     choice: Split,
@@ -612,7 +614,7 @@
               />{/if}{part}{/each}</span
         >
         {#if step.kind === "other"}<span class="text-[10px] text-body"
-            >advanced</span
+            >not a builder step</span
           >{/if}
       </button>
       {#if parks.has(step.cardId)}
@@ -836,7 +838,9 @@
       {/if}
     {:else if step.kind === "wait"}
       {@const trigger =
-        WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ?? "TIP"}
+        WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
+        step.waitFor ??
+        "TIP"}
       <!-- Fork: a name of its own for the match log (steps.ts setWaitName); empty, its title. -->
       <div
         class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
@@ -926,6 +930,9 @@
               }),
             )}
         >
+          {#if !WAIT_FOR.some((w) => w.trigger === step.waitFor)}<option
+              value={step.waitFor}>{step.waitFor}</option
+            >{/if}
           {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
               value={w.trigger}
               disabled={w.trigger === TIME_ONLY && !!step.otherwise?.length}
@@ -1216,6 +1223,8 @@
           Both ways end on the same spot, and the steps below follow either.
         {/if}
       </p>
+    {:else if step.kind === "command"}
+      {@render limitRow(step)}
     {:else if step.kind === "gather"}
       {@render limitRow(step)}
       <div class="mt-1 pl-6 text-xs">

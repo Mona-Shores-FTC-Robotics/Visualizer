@@ -57,8 +57,6 @@ import { workspaceDocument } from "../lib/repo/workspaceStore";
  */
 export class AutoState {
   #workspace = fromStore(workspaceDocument);
-  /** Draw the branches the preview does not take, dashed. */
-  showUntaken = $state(true);
   /** With several Autos shown together: draw the branches their previews do not take, faint. */
   overlayUntaken = $state(false);
   /** With several Autos shown together: the Match timeline under the field (lib/match). */
@@ -67,8 +65,6 @@ export class AutoState {
   matchControls = $state(true);
   /** The Match view's what-ifs: facts, triggers and no-shows for this look only. */
   match = new MatchControls();
-  /** Fork: "simple" is the builder for our robot's steps (lib/simple); "cards" is every card. */
-  view = $state<"simple" | "cards">("simple");
 
   #project: ProjectStore;
   #getSettings: () => Settings;
@@ -264,8 +260,6 @@ export class AutoState {
       void project.loads;
       untrack(() => {
         resetAutoView();
-        // Fork: an Auto of our robot's steps opens in the simple builder, any other as cards.
-        this.view = isSimple(project.doc) ? "simple" : "cards";
         this.#pinned = null;
       });
     });
