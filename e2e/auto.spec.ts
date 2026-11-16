@@ -5,25 +5,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 const SAMPLE = "/#sample=red-garden-basic";
 
+const stepItems = (page: Page) =>
+  page.getByLabel("Steps").getByRole("listitem");
+
 async function openSample(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(SAMPLE);
-  await expect(page.getByText(/\d+ cards?/)).toBeVisible();
+  await expect(stepItems(page).first()).toBeVisible();
   return errors;
 }
-
-/** The sample is not simple-builder steps, so it opens as cards. */
-async function showCards(page: Page) {
-  await expect(page.getByText(/\d+ cards?/)).toBeVisible();
-}
-
-const card = (page: Page, name: string) =>
-  page.getByRole("button", { name, exact: false }).filter({ hasText: name });
-const inspectorName = (page: Page) =>
-  page.getByLabel("Inspector").getByLabel("Name");
-const cardCount = async (page: Page) =>
-  Number((await page.getByText(/\d+ cards?/).textContent())?.match(/\d+/)?.[0]);
 
 test("a sample link opens its Auto, previewed against the 30 s budget", async ({
   page,
@@ -32,27 +23,6 @@ test("a sample link opens its Auto, previewed against the 30 s budget", async ({
   await expect(page.getByText(/of 30 s/).first()).toBeVisible();
   await expect(page.getByText("Shared copy")).toBeVisible();
   expect(errors).toEqual([]);
-});
-
-test("selecting a path card puts its path in the inspector", async ({
-  page,
-}) => {
-  await openSample(page);
-  await showCards(page);
-  await card(page, "ToRearShot").first().click();
-  await expect(inspectorName(page)).toHaveValue("ToRearShot");
-});
-
-test("+ Path adds a path and the card that drives it, in one undo step", async ({
-  page,
-}) => {
-  await openSample(page);
-  await showCards(page);
-  const before = await cardCount(page);
-  await page.getByRole("button", { name: "+ Path" }).click();
-  await expect.poll(() => cardCount(page)).toBe(before + 1);
-  await page.getByTitle("Undo").click();
-  await expect.poll(() => cardCount(page)).toBe(before);
 });
 
 test("Export Auto (Java) downloads the class the command line writes", async ({
@@ -86,10 +56,10 @@ test("a share link opens the same Auto", async ({ page, context }) => {
     .inputValue();
   expect(url).toContain("#data=");
 
+  const count = await stepItems(page).count();
   const other = await context.newPage();
   await other.goto(url);
-  await showCards(other);
-  await expect(other.getByText("16 cards")).toBeVisible();
+  await expect.poll(() => stepItems(other).count()).toBe(count);
 });
 
 test("the Auto survives a reload", async ({ page }) => {

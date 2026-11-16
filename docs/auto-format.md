@@ -24,16 +24,11 @@ class names use; upstream saves `.pp.json`, which also opens here.
 The fork is one screen: the **Auto** on the left, the **field** on the right.
 A file without an Auto opens with one path card per path, in Path List order.
 
-- **+ Command / + Wait for / + Decision / + Path** add a card after the
-  selected card (or at the end of a selected branch). **+ Path** and the field's **+ Add Path** make a new
-  path that starts where the robot is at that point of the Auto.
-- Click a card to edit it in place, under the card. A path card shows
-  **Ends at** and **Park path**; **more** has the path. Clicking a path on the field selects its card.
-- Above the field: one switch per condition (**✓** happens, **✗** never
-  does). Below it: the play bar, the time against 30 s and the worst case.
-  While it plays, the running card is outlined.
-- **Setup** (start pose, registry, named points, alliance, export name) and
-  **Export** are in the Auto header.
+- The left panel is the **builder**: the Auto as a list of our robot's steps (see "The simple
+  builder" below). It opens every file; a card it cannot read as a step is listed as "not a
+  builder step" and kept as it is.
+- Below the field: the play bar, the time against 30 s and the worst case.
+- **Save**, **Share** and **Export** are in the top bar.
 
 ## Shape
 
@@ -69,7 +64,7 @@ A complete example that uses every card kind is
 | `exportName` | string, optional | Name of the generated class before the `Auto` suffix. Defaults to the file name (`hive-rush.pp` → `HiveRushAuto`). |
 | `registry.actions` | string[] | Robot actions the robot code registers. The editor cannot read robot code, so the file carries the list; dropdowns offer only these. |
 | `registry.conditions` | string[] | Registered true/false conditions, likewise. |
-| `registry.typicalS` | `{ name: seconds }`, optional | Each command's typical time, from the robot's list (`TeamCode/auto-registry.json`, loaded in Setup). |
+| `registry.typicalS` | `{ name: seconds }`, optional | Each command's typical time, from the robot's list (biobuzz `AutoRegistration`; the builder's list is `teamRegistry`). |
 | `registry.events` | string[], optional | The conditions that are events: once true, true for the rest of the match (`Tip1`). The rest are states, which can turn false again (`IntakeFull`). The editor shows which is which; the export does not use it. |
 | `points` | `{ name: [x, y] \| [x, y, headingDeg] }` | Named points (inches, Pedro field frame). Exported as named `Pose` locals; a path endpoint that sits on a named point uses its name. |
 | `pathEnds` | `{ pathId: pointName }` | Path ends that are named points (pins; see below), by the id of the path segment that ends there (a group's last segment). Always written, even empty. |
@@ -394,21 +389,21 @@ compiles with `javac --release 8` against Pedro 3.0.1, Ivy and the contract's
 Each wait that branches has its **own switch**: **✓** its trigger fires, **✗** its
 time limit passes. So "the HIVE did not tip at the first wait, but did at the retry" is two
 switches. A **plain wait** (no cards on either row, like IntakeFull at a FLOWER) is not a switch:
-one answer per trigger holds for every plain wait on it. The trigger chips above the field set
-every wait on that trigger at once (± when they differ). Everything starts ✓ (the happy path);
-the switches are not saved in the file.
+one answer per trigger holds for every plain wait on it. In the builder a wait's Otherwise has a
+**show** toggle, which is that wait's switch. Everything starts ✓ (the happy path); the switches
+are not saved in the file.
 
 ✓ fires the moment the wait starts, or, with a command alongside, when the command would finish
 (its typical time), since the launch is what tips the HIVE. ✗ runs to the limit. The in-between
 is not previewed: a real run falls between them.
 
-**Routes** (`src/lib/auto/routes.ts`): every way through the Auto, one choice at each branching
-wait it reaches, ✓ before ✗. Each is timed twice, with every plain wait ✓ and with every plain
-wait ✗, and flagged when it runs past 30 s or the endgame guard parks it.
+**Routes** (`src/lib/auto/routes.ts`, used by the tests): every way through the Auto, one choice
+at each branching wait it reaches, ✓ before ✗. Each is timed twice, with every plain wait ✓ and
+with every plain wait ✗, and flagged when it runs past 30 s or the endgame guard parks it.
 
 Decisions pick the first row that fires; the
 robot drives the chosen paths with the app's own motion profile; the field
-highlights the branches taken and dashes the others; a log lists each card,
+draws the branches taken; a log lists each card,
 row and event with its time against the 30 s budget.
 
 Each branch also shows its **worst case**: the Auto's end time if that branch
@@ -582,16 +577,16 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   up is marked so the spot can be moved onto the line. Its card gets an 8 s timeout. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its
-  time from the distance at the robot's speed caps. `src/state/auto.svelte.ts` — `view` is "simple" for a file of those
-  steps (every file in biobuzz `TeamCode/autos`), the card list otherwise; "← Simple" goes back
-  only when the file is simple, and there is no way in from the builder to the card list. `src/state/files.svelte.ts` — a new
+  time from the distance at the robot's speed caps. The builder is the only editor: `src/state/auto.svelte.ts` — `simple` says
+  whether every step is one the builder reads (every file in biobuzz `TeamCode/autos`), which
+  decides whether it lays headings and spot parks. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click
   goes to `spotPicker` while the builder waits for a spot; the inches are `FieldRuler`, outside
   the field; spot names show near the mouse (`fieldHover`). An Auto that lists no commands gets
   our robot's (`teamRegistry`).
 - `src/state/dialogs.svelte.ts` — the fork's dialogs.
 - `src/model/mirror.ts` — a mirrored project mirrors its Auto's named points.
-- `src/view/LayersPanel.svelte` — the card list in place of the path tree.
+- `src/view/LayersPanel.svelte` — the builder in place of the path tree.
 - `src/view/FieldPanel.svelte`, `src/view/scene/PathMarkers.svelte`,
   `src/view/scene/PathStrokes.svelte` — the Auto overlay and field axes; path
   strokes stay clickable but hidden (the overlay draws them by branch); link

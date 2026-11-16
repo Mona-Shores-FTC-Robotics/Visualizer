@@ -58,22 +58,27 @@ public final class RedGardenBasicAuto {
 
         // Paths, written as the stock Visualizer export writes them.
         Path pass1Ahead = Paths.line(start, collectAhead).constant(collectAhead);
+        Path collectAheadPark = Paths.line(collectAhead, park).constant(park);
         Path pass1Back = Paths.line(collectAhead, collectHome).constant(collectHome);
+        Path collectHomePark = Paths.line(collectHome, park).constant(park);
         Path pass2Left = Paths.line(collectHome, collectLeft).linear(collectHome, collectLeft);
+        Path collectLeftPark = Paths.line(collectLeft, park).linear(collectLeft, park);
         Path pass2Back = Paths.line(collectLeft, collectHome).linear(collectLeft, collectHome);
         Path toRearShot = Paths.line(collectHome, rearShot).constant(rearShot);
+        Path rearShotPark = Paths.line(rearShot, park).constant(park);
         Path toLoadingFlower = Paths.line(rearShot, loadingFlower).constant(loadingFlower);
         Path toPark = Paths.line(loadingFlower, park).constant(park);
 
         return kit.sequence(
-                kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
+                kit.command("LaunchAll"),
+                kit.firstOf("Did our HIVE tip?",
                         kit.when("Tip").then(
                                 kit.guarded("If tipped", toPark, 1.7,
-                                        kit.path("Pass1Ahead", pass1Ahead, 1.3),
-                                        kit.path("Pass1Back", pass1Back, 1.2),
-                                        kit.path("Pass2Left", pass2Left, 1.3),
-                                        kit.path("Pass2Back", pass2Back, 1.3),
-                                        kit.path("ToRearShot", toRearShot, 3),
+                                        kit.path("Pass1Ahead", pass1Ahead, 1.3, collectAheadPark, 2.6),
+                                        kit.path("Pass1Back", pass1Back, 1.2, collectHomePark, 2.9),
+                                        kit.path("Pass2Left", pass2Left, 1.3, collectLeftPark, 2.5),
+                                        kit.path("Pass2Back", pass2Back, 1.3, collectHomePark, 2.9),
+                                        kit.path("ToRearShot", toRearShot, 3, rearShotPark, 1.9),
                                         kit.command("LaunchAll"),
                                         kit.path("ToLoadingFlower", toLoadingFlower, 1.2),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
@@ -83,7 +88,7 @@ public final class RedGardenBasicAuto {
                                         kit.path("ToPark", toPark, 1.7))),
                         kit.afterMs(8000).then(
                                 kit.guarded("If not tipped", toPark, 1.7,
-                                        kit.path("ToRearShot", toRearShot, 3),
+                                        kit.path("ToRearShot", toRearShot, 3, rearShotPark, 1.9),
                                         kit.path("ToLoadingFlower", toLoadingFlower, 1.2),
                                         kit.firstOf("Take 4 POLLEN from the LOADING FLOWER",
                                                 kit.when("IntakeFull"),

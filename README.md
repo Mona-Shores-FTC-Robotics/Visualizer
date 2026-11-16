@@ -20,10 +20,10 @@ What the fork adds:
   with an Otherwise of its own) and Park. Each step is
   an ordinary card, so the file, the preview and the Java export are the same as for any Auto.
   Every Auto and partner stand-in in biobuzz opens here. Save, Share and Export are in the top bar.
-- **The card list.** A file the builder can't read as steps (several triggers racing, a command
-  beside a wait) opens as cards instead, with every card the engine supports. There is no way
-  in from the builder. Waits on a condition the robot registers but cannot sense yet (biobuzz
-  `AutoRegistration.PLACEHOLDERS`) say "timed on the robot for now".
+- **One editor.** The builder opens every file. A command it has no step of its own for shows by
+  its name with its time limit, and a wait shows whatever trigger it waits for. A card it cannot
+  read as a step (an older file's command beside a wait, a `rejoin`) is listed as "not a builder
+  step": it can be moved or removed, and the file, the preview and the export keep it as it is.
 - **Tested against real data.** `test/real-autos.test.ts` reads the team's six Autos, the
   simulator's runs of two of them and robot 20245's first match logs (refresh with
   `node scripts/refresh-biobuzz-fixtures.mjs ../biobuzz`), and fails when the preview drifts out

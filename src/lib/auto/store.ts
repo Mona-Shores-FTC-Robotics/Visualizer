@@ -2,7 +2,6 @@ import { get, writable } from "svelte/store";
 import type { ProjectStore } from "../../state/project.svelte";
 import type { Scenario } from "./simulate";
 import type { AutoSection } from "./types";
-import { foldedBranches } from "./fold";
 
 /**
  * The open project's `auto` section, mirrored from `project.doc.auto` (see
@@ -61,21 +60,6 @@ export function updateAuto(mutate: (auto: AutoSection) => void, record = true): 
   project.apply((doc) => ({ ...doc, auto: draft }), record ? {} : { coalesce: "auto" });
 }
 
-/**
- * Adjust the Auto without an undo step, for what follows from an edit (pins,
- * link paths) rather than being one.
- */
-export function amendAuto(mutate: (auto: AutoSection) => void): void {
-  const current = project?.doc.auto;
-  if (!project || !current) return;
-  const draft = structuredClone(current) as AutoSection;
-  mutate(draft);
-  project.amend((doc) => ({ ...doc, auto: draft }));
-}
-
-/** The end of a typed edit. Coalescing already made it one step. */
-export function commitAuto(): void {}
-
 export function parseSelection(
   selection: string | null,
 ): { cardId: string | null; rowIndex: number | null } {
@@ -91,7 +75,6 @@ export function parseSelection(
 /** Forget the previous project's selection and preview answers, after a load. */
 export function resetAutoView(): void {
   selectedCardId.set(null);
-  foldedBranches.set(new Set());
   previewScenario.set({});
 }
 

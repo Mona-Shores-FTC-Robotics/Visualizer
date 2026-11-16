@@ -60,7 +60,8 @@ public final class RedSimpleAuto {
         Path toGarden = Paths.curve(start, toGardenControl1, garden).linear(start, garden);
 
         return kit.sequence(
-                kit.firstOf("Did our HIVE tip?", kit.command("LaunchAll"),
+                kit.command("LaunchAll"),
+                kit.firstOf("Did our HIVE tip?",
                         kit.when("Tip").then(
                                 kit.path("UnderHive", underHive, 2.8),
                                 kit.command("LaunchAll")),

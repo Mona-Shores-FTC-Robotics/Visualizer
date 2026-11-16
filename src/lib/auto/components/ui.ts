@@ -1,19 +1,3 @@
-/**
- * Class strings shared by the Auto panels, on the same theme tokens as
- * upstream's inspector (lib/components/ui/styles.ts), so Auto mode looks like
- * the rest of the Visualizer in both themes.
- */
-export const FIELD_CLASS =
-  "w-full min-w-0 rounded-lg border border-border bg-base px-2 py-1 text-heading tabular-nums outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50";
-export const ACTION_CLASS =
-  "rounded-lg border border-border bg-base px-2 py-1 font-medium text-heading transition hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50";
-export const DANGER_CLASS =
-  "rounded-lg border border-danger bg-danger px-2 py-1 font-medium text-white transition hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50";
-export const LABEL_CLASS = "mb-1 block font-medium text-body";
-export const CELL_CLASS = "rounded-lg border border-border bg-base/60 px-2 py-1.5";
-export const SECTION_CLASS =
-  "w-full rounded-xl border border-border bg-base/60 p-3 text-xs text-body space-y-3";
-
 /** The trunk is drawn in the Visualizer's path yellow. */
 export const TRUNK_COLOR = "#ffc516";
 

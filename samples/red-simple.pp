@@ -211,6 +211,11 @@
     },
     "cards": [
       {
+        "id": "tip-decision-launch",
+        "kind": "action",
+        "name": "LaunchAll"
+      },
+      {
         "id": "tip-decision",
         "kind": "firstOf",
         "label": "Did our HIVE tip?",
@@ -250,8 +255,7 @@
               }
             ]
           }
-        ],
-        "alongside": "LaunchAll"
+        ]
       }
     ],
     "startAt": "Start",

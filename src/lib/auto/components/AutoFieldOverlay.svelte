@@ -16,7 +16,6 @@
     preview: PreviewResult | null;
     x: Axis;
     y: Axis;
-    showUntaken: boolean;
     /**
      * Fork: a spot's park path to show (AutoSection.parkFrom), with every other path dimmed.
      * The spots' park paths are not drawn otherwise.
@@ -30,7 +29,6 @@
     preview,
     x,
     y,
-    showUntaken,
     focusLine = null,
   }: Props = $props();
 
@@ -122,7 +120,7 @@
   {#each [false, true] as layerTaken (layerTaken)}
     {#each pathCards.filter((card) => ran(card) === layerTaken) as card (card.id)}
       {@const info = catalog.byId.get(card.lineId)}
-      {#if info && (layerTaken || showUntaken)}
+      {#if info && layerTaken}
         {@const color = colors.get(card.id) ?? "#ffc516"}
         {@const selected = selectedId === card.id}
         {#if selected}

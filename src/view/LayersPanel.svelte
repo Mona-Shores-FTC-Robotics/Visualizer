@@ -7,7 +7,6 @@
   import { setShapes } from "../model/commands";
   import { useEditor } from "../state/editor.svelte";
   import { useProject } from "../state/project.svelte";
-  import { usePlayback } from "../state/playback.svelte";
   import type { Overlays } from "../state/overlays.svelte";
   import IconButton from "../lib/components/ui/IconButton.svelte";
   import PanelSection from "../lib/components/ui/PanelSection.svelte";
@@ -15,11 +14,7 @@
   import PathTree from "./layers/PathTree.svelte";
   import ObstacleList from "./layers/ObstacleList.svelte";
   import OverlayList from "./layers/OverlayList.svelte";
-  import { pathStem } from "../utils/filename";
   import { useAuto } from "../state/auto.svelte";
-  import { useLinks } from "../state/links.svelte";
-  import { exportAutoJava } from "../lib/auto/exportAction";
-  import AutoCardList from "../lib/auto/components/AutoCardList.svelte";
   import SimpleBuilder from "../lib/simple/SimpleBuilder.svelte";
   import MatchSide from "../lib/match/MatchSide.svelte";
 
@@ -34,20 +29,7 @@
 
   const project = useProject();
   const editor = useEditor();
-  const playback = usePlayback();
   const auto = useAuto();
-  const links = useLinks();
-
-  function exportAuto() {
-    const { startPoint, lines, shapes } = project.doc;
-    exportAutoJava({
-      startPoint,
-      lines,
-      shapes,
-      settings,
-      sourceFileName: links.sourceName ?? "untitled.pp",
-    });
-  }
 
   let overlaysOpen = $state(false);
 
@@ -85,34 +67,8 @@
       <MatchSide index={0} />
     {:else if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
-      <div
-        class={["flex flex-col", auto.view !== "simple" && "min-h-80 flex-1"]}
-      >
-        {#if auto.view !== "simple" && auto.simple}
-          <button
-            type="button"
-            class="mb-1 self-start px-1 text-xs text-body underline"
-            onclick={() => (auto.view = "simple")}
-            title="Back to the simple builder: our robot's steps"
-            >← Simple</button
-          >
-        {/if}
-        {#if auto.view === "simple"}
-          <SimpleBuilder />
-        {:else}
-          <AutoCardList
-            auto={auto.auto}
-            catalog={auto.catalog}
-            issues={auto.issues}
-            preview={auto.preview}
-            worst={auto.worst}
-            shapes={project.doc.shapes}
-            now={playback.seconds}
-            defaultExportName={pathStem(links.sourceName) || "untitled"}
-            robotAt={{ x: playback.robotPose.x, y: playback.robotPose.y }}
-            onExport={exportAuto}
-          />
-        {/if}
+      <div class="flex flex-col">
+        <SimpleBuilder />
       </div>
     {:else}
       <PanelSection
@@ -161,52 +117,5 @@
       </PanelSection>
     </div>
 
-    {#if auto.view !== "simple"}
-      <PanelSection title="Robot">
-        {@const pose = playback.robotPose}
-        {@const readouts = [
-          { label: "X", value: pose.x.toFixed(1), unit: "in" },
-          { label: "Y", value: pose.y.toFixed(1), unit: "in" },
-          { label: "Heading", value: pose.heading.toFixed(0), unit: "°" },
-          { label: "t", value: pose.t?.toFixed(3) ?? "–", unit: "" },
-        ]}
-        <dl class="grid grid-cols-2 gap-1.5 px-1" aria-label="Robot pose">
-          {#each readouts as { label, value, unit } (label)}
-            <div
-              class="flex flex-col gap-0.5 rounded-lg border border-border bg-base/60 px-2.5 py-1.5"
-            >
-              <dt
-                class="text-[10px] font-medium tracking-wide text-body uppercase"
-              >
-                {label}
-              </dt>
-              <dd
-                class="flex items-baseline gap-1 font-mono text-sm text-heading tabular-nums"
-              >
-                {value}
-                {#if unit}<span class="text-[10px] text-body">{unit}</span>{/if}
-              </dd>
-            </div>
-          {/each}
-        </dl>
-        <!-- The padding widens the hover target beyond the thin bar. -->
-        <div
-          class="mx-1 mt-0.5 cursor-help py-1.5"
-          role="progressbar"
-          title="t: how far the robot is along the current path segment, from 0 (start) to 1 (end)"
-          aria-label="Progress along the current segment"
-          aria-valuemin={0}
-          aria-valuemax={1}
-          aria-valuenow={pose.t ?? 0}
-        >
-          <div class="h-1 overflow-hidden rounded-full bg-border">
-            <div
-              class="h-full rounded-full bg-primary"
-              style={`width: ${(pose.t ?? 0) * 100}%`}
-            ></div>
-          </div>
-        </div>
-      </PanelSection>
-    {/if}
   </div>
 </aside>

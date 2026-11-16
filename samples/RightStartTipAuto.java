@@ -87,7 +87,8 @@ public final class RightStartTipAuto {
                         kit.path("LEFT_SHOT to LEFT_LOADING_ZONE", leftShotToLeftLoadingZone, 1.4)));
 
         return kit.sequence(
-                kit.firstOf("Did the HIVE tip?", kit.command("LaunchAll"),
+                kit.command("LaunchAll"),
+                kit.firstOf("Did the HIVE tip?",
                         kit.when("Tip").then(
                                 kit.guarded("Tipped", leftShotToLeftLoadingZone, 1.4,
                                         kit.path("to RIGHT_HIVE_ENTRANCE → to LEFT_HIVE_ENTRANCE → to LEFT_FLOWER", Paths.path(toRightHiveEntrance, toLeftHiveEntrance, toLeftFlower), 5.2),

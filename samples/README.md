@@ -8,7 +8,7 @@ opens as a shared copy: change anything, and "Save as new file" keeps your versi
 ## `right-start-tip.pp`
 
 The design's sample Auto (the route view's mockups use it), on the v1 spots. From RIGHT_START:
-**LaunchAll · wait for Tip ≤4 s**. ✓: drive through both HIVE entrances to LEFT_FLOWER in one
+**LaunchAll, then wait for Tip ≤4 s**. ✓: drive through both HIVE entrances to LEFT_FLOWER in one
 drive, collect, shoot at LEFT_SHOT and park in the LEFT LOADING ZONE. Timed out: collect in the
 GARDEN, shoot from RIGHT_SHOT, then **rejoin the main plan at RIGHT_HIVE_ENTRANCE**, as if the
 first launch had tipped it (it drives on through the entrances without stopping; the steps after
@@ -19,8 +19,7 @@ are shared, not copied). One branch, two routes. LEFT_SHOT and RIGHT_SHOT are pl
 Not an Auto: a tour of every named spot, so their names show on the field and they can be moved
 to where they make sense. Spots are named as seen from your alliance area (where the drivers and
 human player stand): LEFT_ is the wall on your left, RIGHT_ the wall on your right, YOUR_WALL the
-wall you stand behind. For red, left is the back wall. Paired LEFT_/RIGHT_ spots mirror across y = 70.75, and both robots get a LOADING ZONE spot. Drag a spot's end on the field, or type it
-in Setup → Named points; every path ending there moves with it.
+wall you stand behind. For red, left is the back wall. Paired LEFT_/RIGHT_ spots mirror across y = 70.75, and both robots get a LOADING ZONE spot. Drag a spot's end on the field; every path ending there moves with it.
 
 ## `red-simple.pp`
 
