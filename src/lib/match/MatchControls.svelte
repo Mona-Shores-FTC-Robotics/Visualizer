@@ -9,7 +9,18 @@
    * on the timeline (`show="hive"`); with more, `show="all"`.
    */
   import type { AutoSection } from "../auto/types";
-  import { previewQuestions } from "../auto/simulate";
+  import {
+    choiceLabel,
+    routeChoices,
+    senseTriggers,
+    stops,
+    type Stop,
+    triggerHint,
+    triggerLabel,
+    type RouteChoice,
+  } from "./whatIfs";
+  import { switchKey } from "../auto/simulate";
+  import { allCards } from "../auto/tree";
   import type { TimingFact, TimingValues } from "../timing/model";
   import {
     clampFact,
@@ -19,7 +30,11 @@
     ROBOT_FACT_LIST,
     type MatchControls,
   } from "./controls.svelte";
-  import { checkboxClass, labelClass } from "../components/ui/styles";
+  import {
+    checkboxClass,
+    fieldClass,
+    labelClass,
+  } from "../components/ui/styles";
   import type { FieldEntry } from "../timing/together";
   import { knobBreaks, type Knob } from "./breakpoints";
   import { tipping } from "./tipping.svelte";
@@ -122,22 +137,13 @@
     spinUpS: "Spin-up",
     volleyS: "Volley time",
     intakeFullS: "Intake full",
+    pickFlowerS: "FLOWER pick",
+    gardenGatherS: "GARDEN gather",
     volleyLoad: "Hits per volley",
     tipStartS: "TIP delay",
     tipSwingS: "HIVE swing",
     tipLoad: "Weight to TIP",
     startLoad: "Start weight",
-  };
-
-  /** What a trigger coming means, for its checkbox. */
-  const TRIGGER: Record<string, string> = {
-    CellUp: "TIP or CELL up comes",
-    Tip: "TIP comes",
-    LeftCellUp: "LEFT CELL comes up",
-    RightCellUp: "RIGHT CELL comes up",
-    IntakeFull: "Intake fills",
-    Empty: "Launcher empties",
-    CameraBlind: "Camera goes blind",
   };
 
   function unit(fact: TimingFact) {
@@ -150,28 +156,61 @@
     return `${value.toFixed(digits)}${unit(fact)}`;
   }
 
-  /** Each robot's triggers: one checkbox per condition its waits ask. */
+  /**
+   * Each robot's sensed triggers: one checkbox per condition its waits ask, but not a route
+   * choice (a dropdown) or the clock check's always-true trigger (whatIfs.ts).
+   */
   function triggers(auto: AutoSection): string[] {
-    const seen: string[] = [];
-    for (const q of previewQuestions(auto))
-      if (!seen.includes(q.condition)) seen.push(q.condition);
-    return seen;
+    return senseTriggers(auto);
   }
 
   /**
-   * A robot's sliders: the facts that time something its Auto does. "Intake full" times a wait for
-   * the intake to fill, which no Auto on master has, so it shows only for an Auto that has one.
+   * A robot's sliders: the facts that time something its Auto does. "FLOWER pick" and "GARDEN
+   * gather" show only for an Auto with that step, and "Intake full" only for one that waits for the
+   * intake to fill, which no Auto on master does. "Hits per volley" is not a slider: the HIVE takes a
+   * volley as its 4 POLLEN (mentor, 15 Nov 2026).
    */
   function robotFacts(robot: RobotInfo): TimingFact[] {
     const waits = triggers(robot.auto);
-    return ROBOT_FACT_LIST.filter(
-      (fact) => fact.id !== "intakeFullS" || waits.includes("IntakeFull"),
+    const steps = new Set(
+      allCards(robot.auto.cards).flatMap((c) =>
+        c.kind === "action" ? [c.name] : [],
+      ),
     );
+    return ROBOT_FACT_LIST.filter((fact) => {
+      if (fact.id === "volleyLoad") return false;
+      if (fact.id === "intakeFullS") return waits.includes("IntakeFull");
+      if (fact.id === "pickFlowerS") return steps.has("PickFlower");
+      if (fact.id === "gardenGatherS") return steps.has("GardenGather");
+      return true;
+    });
   }
 
   /** Whether a condition comes: the controls only ever answer one for every wait on it. */
+  /** Each robot's stops, from its Auto and its paths (whatIfs.ts). */
+  function stopsOf(robot: RobotInfo): Stop[] {
+    return stops(robot.auto, entries[robots.indexOf(robot)]?.lines ?? []);
+  }
+
+  /** Whether a stop's trigger comes in time in this look: its own answer, else its trigger's. */
+  function stopOnTime(robot: RobotInfo, stop: Stop): boolean {
+    const scenario = controls.scenario[robot.file] ?? {};
+    const own = stop.own ? scenario[switchKey(stop.cardId)] : undefined;
+    return own ?? scenario[stop.condition] ?? true;
+  }
+
+  function setStop(robot: RobotInfo, stop: Stop, onTime: boolean) {
+    if (stop.own) controls.setWait(robot.file, stop.cardId, onTime);
+    else controls.setTrigger(robot.file, robot.auto, stop.condition, onTime);
+  }
+
   function comes(robot: RobotInfo, condition: string): boolean {
     return controls.scenario[robot.file]?.[condition] ?? true;
+  }
+
+  /** The leg of a route choice previewed: the drawn one (0) unless its trigger is answered no. */
+  function legOf(robot: RobotInfo, choice: RouteChoice): 0 | 1 {
+    return comes(robot, choice.condition) ? 0 : 1;
   }
 
   function robotValue(robot: RobotInfo, fact: TimingFact): number {
@@ -316,36 +355,92 @@
           { robot: robots.indexOf(robot), id: fact.id },
         )}
       {/each}
-      {#if triggers(robot.auto).length}
-        <div
-          class="mt-1 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-1.5"
-        >
-          {#each triggers(robot.auto) as condition (condition)}
-            {@const yes = comes(robot, condition)}
+      {#if routeChoices(robot.auto).length}
+        <!-- Fork: the Auto's route choices, as the Driver Station's INIT rows (whatIfs.ts). -->
+        <div class="mt-1 flex flex-col gap-1 border-t border-border pt-1.5">
+          {#each routeChoices(robot.auto) as choice (choice.condition)}
+            {@const leg = legOf(robot, choice)}
             <label
               class={[
                 labelClass,
-                "flex items-center gap-1 text-[11px]",
-                !yes && "text-danger",
+                "flex items-center gap-1.5 text-[11px]",
+                leg === 1 && "font-semibold text-heading",
               ]}
-              title={yes
-                ? "Comes when the timing says. Untick: it never comes, and each wait on it runs to its limit"
-                : "Never comes: each wait on it runs to its limit"}
+              title={`The INIT menu's ${choice.option} row: which way the robot goes. ${choice.legs[0]} is the one drawn.`}
             >
-              <input
-                type="checkbox"
-                class={checkboxClass}
-                checked={yes}
+              <span class="shrink-0">INIT</span>
+              <select
+                class={[fieldClass, "!w-auto min-w-0 !py-0.5 text-[11px]"]}
+                aria-label={`INIT ${choice.option}`}
+                value={leg}
                 onchange={(event) =>
                   controls.setTrigger(
                     robot.file,
                     robot.auto,
-                    condition,
-                    (event.currentTarget as HTMLInputElement).checked,
+                    choice.condition,
+                    (event.currentTarget as HTMLSelectElement).value === "0",
                   )}
-              />
-              {TRIGGER[condition] ?? `${condition} comes`}
+              >
+                <option value={0}>{choiceLabel(choice, 0)}</option>
+                <option value={1}>{choiceLabel(choice, 1)}</option>
+              </select>
             </label>
+          {/each}
+        </div>
+      {/if}
+      {#if stopsOf(robot).length}
+        <!-- Fork: one row per stop, the planned outcome first (whatIfs.ts stops). -->
+        <div class="mt-1 flex flex-col gap-1.5 border-t border-border pt-1.5">
+          {#each stopsOf(robot) as stop (stop.cardId)}
+            {@const onTime = stopOnTime(robot, stop)}
+            <div
+              class="flex flex-col gap-0.5 text-[11px]"
+              role="radiogroup"
+              aria-label={stop.name}
+            >
+              <span
+                class={[
+                  "truncate font-medium",
+                  onTime ? "text-heading" : "text-danger",
+                ]}
+                title={`${stop.name}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
+                >{stop.name}</span
+              >
+              <span class="-mt-0.5 truncate text-[10px] text-body"
+                >{stop.asks}</span
+              >
+              <div class="grid grid-cols-2 gap-1">
+                {#each [true, false] as planned (planned)}
+                  {@const on = onTime === planned}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    class={[
+                      "min-w-0 rounded-md border px-1.5 py-0.5 text-left leading-tight transition",
+                      on &&
+                        planned &&
+                        "border-primary bg-primary/15 text-heading",
+                      on &&
+                        !planned &&
+                        "border-danger bg-danger/10 text-danger",
+                      !on && "border-border text-body hover:text-heading",
+                    ]}
+                    title={planned
+                      ? `In time: ${stop.planned}`
+                      : `Too late: ${stop.late}`}
+                    onclick={() => setStop(robot, stop, planned)}
+                  >
+                    <span class="block font-semibold"
+                      >{planned ? "✓ In time" : "✗ Too late"}</span
+                    >
+                    <span class="block"
+                      >{planned ? stop.planned : stop.late}</span
+                    >
+                  </button>
+                {/each}
+              </div>
+            </div>
           {/each}
         </div>
       {/if}
@@ -417,7 +512,7 @@
         type="button"
         class="rounded-md border border-border px-2 py-0.5 text-body hover:text-heading disabled:opacity-40"
         disabled={!controls.changed}
-        title="Back to the team's timing.json, every trigger coming and every robot moving"
+        title="Back to the team's timing.json, every trigger coming, every INIT choice as drawn and every robot moving"
         onclick={() => controls.reset()}>Team values</button
       >
     </div>

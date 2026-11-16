@@ -85,8 +85,8 @@ test(
     const t0 = performance.now();
     const all = knobs.map((k) => knobBreaks(entries, values, k, names));
     const ms = performance.now() - t0;
-    assertEqual(all.length, 14);
-    console.log(`breakpoint search, 14 sliders: ${ms.toFixed(0)} ms`);
+    assertEqual(all.length, 18);
+    console.log(`breakpoint search, 18 sliders: ${ms.toFixed(0)} ms`);
     assert(ms < 10_000, `took ${ms.toFixed(0)} ms`);
   },
 );

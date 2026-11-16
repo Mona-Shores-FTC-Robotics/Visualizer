@@ -79,6 +79,22 @@ export const FACTS: TimingFact[] = [
     range: [0, 6],
   },
   {
+    id: "pickFlowerS",
+    label: "FLOWER pick, the whole step: square up, push, dwell and back out",
+    times:
+      "PickFlower; never past the step's own time limit, which ends it on the robot too",
+    fallback: 4.0,
+    range: [1.5, 8],
+  },
+  {
+    id: "gardenGatherS",
+    label: "GARDEN gather, the whole step: drive in, gather and drive back",
+    times:
+      "GardenGather; never past the step's own time limit. The preview keeps the drives in and back and gives the rest to the gather",
+    fallback: 5.0,
+    range: [2, 9],
+  },
+  {
     id: "tipLoad",
     label: "Weight that TIPs an empty raised CELL",
     times: "how many volleys a TIP needs",
@@ -122,10 +138,15 @@ export const ROBOT_FACTS: readonly string[] = [
   "volleyS",
   "intakeFullS",
   "volleyLoad",
+  "pickFlowerS",
+  "gardenGatherS",
 ];
 
 /** The command whose run is a volley. */
 export const VOLLEY_COMMAND = "LaunchAll";
+/** The FLOWER pick and the GARDEN gather, timed by `pickFlowerS` and `gardenGatherS`. */
+export const PICK_COMMAND = "PickFlower";
+export const GATHER_COMMAND = "GardenGather";
 /** The command that starts the launcher and finishes at once (biobuzz LaunchCards.spinUp). */
 export const SPIN_UP_COMMAND = "SpinUp";
 
@@ -338,6 +359,8 @@ export function previewTiming(
     },
     actionSeconds(name, t0 = 0) {
       if (name === SPIN_UP_COMMAND) return 0;
+      if (name === PICK_COMMAND) return values.pickFlowerS;
+      if (name === GATHER_COMMAND) return values.gardenGatherS;
       if (name === VOLLEY_COMMAND) {
         // A launch waits for speed first: the rest of the spin-up from when it was asked, or all
         // of it from rest.

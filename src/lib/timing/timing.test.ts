@@ -107,12 +107,20 @@ test("SpinUp finishes at once; the first LaunchAll waits out the rest of the spi
   assertEqual(t.actionSeconds("LaunchAll", 9), 4, "left spinning after a launch");
 });
 
+test("a FLOWER pick and a GARDEN gather take their facts' time", () => {
+  const t = previewTiming({ ...values, pickFlowerS: 3.6, gardenGatherS: 4.4 }, []);
+  assertEqual(t.actionSeconds("PickFlower", 5), 3.6);
+  assertEqual(t.actionSeconds("GardenGather", 5), 4.4);
+});
+
 test("the facts are the current robot's: no catapult or removed-card facts", () => {
   assertEqual(
     FACTS.map((f) => f.id).sort(),
     [
       "driveSpeed",
+      "gardenGatherS",
       "intakeFullS",
+      "pickFlowerS",
       "spinUpS",
       "startLoad",
       "tipLoad",

@@ -6,7 +6,7 @@
  * Robots are keyed by their file, so a change follows the Auto, not its place in the list.
  */
 import type { AutoSection } from "../auto/types";
-import { setTrigger, type Scenario } from "../auto/simulate";
+import { setTrigger, switchKey, type Scenario } from "../auto/simulate";
 import {
   FACTS,
   ROBOT_FACTS,
@@ -31,20 +31,12 @@ export const MATCH_PRESETS: MatchPreset[] = [
     id: "slow",
     label: "Slow",
     title:
-      "Both robots drive 20% slower, launch 25% slower and take half again as long to fill the intake",
+      "Both robots drive 20% slower, launch 25% slower and take a quarter again as long to pick a FLOWER or gather the GARDEN",
     robot: (base) => ({
       driveSpeed: round(base.driveSpeed * 0.8, 0.05),
       volleyS: round(base.volleyS * 1.25, 0.1),
-      intakeFullS: round(base.intakeFullS * 1.5, 0.1),
-    }),
-    hive: () => ({}),
-  },
-  {
-    id: "misses",
-    label: "Misses",
-    title: "Half of every volley misses the CELL, so a TIP needs more volleys",
-    robot: (base) => ({
-      volleyLoad: Math.max(1, Math.round(base.volleyLoad / 2)),
+      pickFlowerS: round(base.pickFlowerS * 1.25, 0.1),
+      gardenGatherS: round(base.gardenGatherS * 1.25, 0.1),
     }),
     hive: () => ({}),
   },
@@ -126,6 +118,18 @@ export class MatchControls {
     const now = setTrigger(this.scenario[file] ?? {}, auto, condition, yes);
     // "Comes" is the default: keep only the answers that differ from it.
     if (yes) delete now[condition];
+    this.scenario = { ...this.scenario, [file]: now };
+    this.preset = null;
+  }
+
+  /**
+   * Fork: one wait's answer alone (simulate.ts switchKey): as planned (its trigger comes in time,
+   * the default, so nothing is kept) or late (its time limit passes first).
+   */
+  setWait(file: string, cardId: string, onTime: boolean) {
+    const now = { ...(this.scenario[file] ?? {}) };
+    if (onTime) delete now[switchKey(cardId)];
+    else now[switchKey(cardId)] = false;
     this.scenario = { ...this.scenario, [file]: now };
     this.preset = null;
   }

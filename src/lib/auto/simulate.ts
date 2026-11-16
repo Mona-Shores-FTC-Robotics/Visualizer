@@ -313,6 +313,11 @@ export interface PreviewResult {
   guard: { t: number; label: string } | null;
   /** True when a wait had no row that could ever fire. */
   stalled: boolean;
+  /**
+   * Fork: AUTO ended with the robot on its way to the park, the drive team's Priority having put
+   * the TIP first (see tipBeforePark). Optional for previews built elsewhere.
+   */
+  unparked?: boolean;
 }
 
 interface Guard {
@@ -331,7 +336,10 @@ interface Guard {
  * robot off its spot and back, so the endgame guard never cuts one, and does not start one unless
  * its typical time and the park both fit.
  */
-export const GRAB_COMMANDS: ReadonlySet<string> = new Set(["PickFlower", "GardenGather"]);
+export const GRAB_COMMANDS: ReadonlySet<string> = new Set([
+  "PickFlower",
+  "GardenGather",
+]);
 
 type Signal = { abortTo: Guard } | null;
 
@@ -343,6 +351,29 @@ const MAX_REJOINS = 20;
  * (biobuzz `AutoKit.GUARD_MARGIN_S`).
  */
 export const GUARD_MARGIN_S = 1.0;
+
+/**
+ * Fork: the INIT row that puts a third TIP before the park (biobuzz `AutoOption.PRIORITY`). Its
+ * first leg is the TIP.
+ */
+export const PRIORITY_OPTION = "Priority";
+
+/**
+ * Fork: whether the drive team's Priority picks the TIP for this Auto (biobuzz `AutoKit.route`
+ * sets `tipBeforePark` as the Auto is built, so it holds for the whole Auto, wherever the choice
+ * sits). Then the endgame guard asks of a volley only that its last piece is out by 30 s: it goes
+ * for one that is, cuts nothing on the way, and the robot ends AUTO where it shot, on its way to
+ * the park (`AutoKit.parkComesFirst`, `goForVolleyIfItFits`).
+ */
+export function tipBeforePark(auto: AutoSection, scenario: Scenario): boolean {
+  for (const card of allCards(auto.cards)) {
+    if (card.kind !== "firstOf" || card.choice !== PRIORITY_OPTION) continue;
+    const drawn = card.rows.find((row) => "when" in row);
+    const trigger = drawn && "when" in drawn ? drawn.when[0] : undefined;
+    if (trigger) return answerFor(scenario, card, trigger);
+  }
+  return false;
+}
 
 /** Seconds the export writes for a park path: its drive time at the drawing's speed, rounded up to 0.1 s. */
 export function parkSeconds(seconds: number): number {
@@ -376,6 +407,15 @@ export function simulateAuto(
   const waits: WaitRecord[] = [];
   let guardFired: PreviewResult["guard"] = null;
   let stalled = false;
+  /** Fork: Priority on the TIP (see tipBeforePark). */
+  const tipFirst = tipBeforePark(auto, scenario);
+  /**
+   * Fork: with `tipFirst`, the volley card the guard is going for: until it has run, no guard
+   * parks, refuses or cuts anything (biobuzz AutoKit.tooLateToContinue while goingForVolley).
+   */
+  let goingFor: string | null = null;
+  /** Fork: AUTO ended with the robot on its way to the park (Priority on the TIP). */
+  let unparked = false;
 
   let t = 0;
   let pos: BasePoint = { x: startPoint.x, y: startPoint.y };
@@ -475,6 +515,7 @@ export function simulateAuto(
   };
 
   const pendingDeadline = (guards: Guard[]): Guard | null => {
+    if (goingFor) return null;
     let soonest: Guard | null = null;
     for (const guard of guards) {
       if (guard.parked) continue;
@@ -485,6 +526,7 @@ export function simulateAuto(
 
   const passedGuard = (guards: Guard[]): Guard | null => {
     // The innermost guard whose deadline has passed parks the robot.
+    if (goingFor) return null;
     for (let i = guards.length - 1; i >= 0; i--) {
       const guard = guards[i];
       if (!guard.parked && t >= guard.deadline - 1e-9) return guard;
@@ -620,7 +662,9 @@ export function simulateAuto(
    * between, or a block boundary, means no pairing. Returns when the stick went down on that
    * drive, or null when the pick does not follow a drive that ran.
    */
-  const stickDownOnDriveBefore = (prev: AutoCard | undefined): number | null => {
+  const stickDownOnDriveBefore = (
+    prev: AutoCard | undefined,
+  ): number | null => {
     if (!prev || prev.kind !== "path") return null;
     const drove = drives[drives.length - 1];
     if (!drove || drove.cardId !== prev.id) return null;
@@ -630,23 +674,48 @@ export function simulateAuto(
     return drove.t0 + timeAtFraction(path, 1 - LOWER_WITHIN_IN / path.length);
   };
 
-  const runCard = (card: AutoCard, guards: Guard[], prev?: AutoCard): Signal => {
+  const runCard = (
+    card: AutoCard,
+    guards: Guard[],
+    prev?: AutoCard,
+  ): Signal => {
     ran.add(card.id);
     switch (card.kind) {
       case "action": {
         note(card.name || "(no action)", "card", card.id);
         const deadline = pendingDeadline(guards);
         // Fork: a GardenGather takes as long as its drive in and back (lib/simple/garden.ts).
+        // Fork: its whole time from the timing (gardenGatherS), never past the step's limit.
+        const gatherTotal =
+          card.name === "GardenGather"
+            ? timing?.actionSeconds(card.name, t)
+            : undefined;
         const gather =
           card.name === "GardenGather"
-            ? gatherPlan(card.id, { ...pos, headingDeg: heading }, t)
+            ? gatherPlan(
+                card.id,
+                { ...pos, headingDeg: heading },
+                t,
+                gatherTotal === undefined
+                  ? undefined
+                  : Math.min(gatherTotal, card.timeoutS ?? DEFAULT_TIMEOUT_S),
+              )
             : null;
-        const busy = gather ? gather.seconds : commandSeconds(auto, card, timing, t);
+        const busy = gather
+          ? gather.seconds
+          : commandSeconds(auto, card, timing, t);
         if (GRAB_COMMANDS.has(card.name)) {
           // Never cut, so not started unless its typical time and the park both fit; else the
           // guard parks now, from the spot the robot is on.
-          if (deadline && deadline.deadline < t + commandSeconds(auto, card, timing, t)) {
-            note(`${card.name}: not started, it and the park no longer fit`, "guard", card.id);
+          if (
+            deadline &&
+            deadline.deadline < t + commandSeconds(auto, card, timing, t)
+          ) {
+            note(
+              `${card.name}: not started, it and the park no longer fit`,
+              "guard",
+              card.id,
+            );
             return { abortTo: deadline };
           }
         } else if (deadline && deadline.deadline < t + busy) {
@@ -656,7 +725,8 @@ export function simulateAuto(
         // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): square up onto
         // its FLOWER's line if needed, push and back out, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
-        const pick = card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
+        const pick =
+          card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
         const stickDownAt = pick ? stickDownOnDriveBefore(prev) : null;
         if (gather) motions.push(...gather.motions);
         if (pick?.ok) {
@@ -669,7 +739,14 @@ export function simulateAuto(
             );
           }
           motions.push(
-            ...pickMotions(card.id, { ...pos, headingDeg: heading }, pick, t, busy, stickDownAt !== null),
+            ...pickMotions(
+              card.id,
+              { ...pos, headingDeg: heading },
+              pick,
+              t,
+              busy,
+              stickDownAt !== null,
+            ),
           );
         }
         const unfired =
@@ -694,6 +771,7 @@ export function simulateAuto(
           heading = pick.start.headingDeg;
         }
         timing?.commandRan?.(card.name, t - busy, t, !unfired);
+        if (goingFor === card.id) goingFor = null;
         return null;
       }
       case "path": {
@@ -708,12 +786,30 @@ export function simulateAuto(
         const guard = guards[guards.length - 1];
         const parkId = auto.parkFrom?.[card.id];
         const spotPath = parkId ? catalog.byId.get(parkId) : undefined;
-        if (guard && !guard.parked && !card.park) {
+        if (guard && !guard.parked && !card.park && !goingFor) {
           const after = spotPath ?? guard.ownPath;
-          if (t + parkSeconds(path.seconds) + guardSeconds(after) > AUTO_LENGTH_S + 1e-9) {
-            note(`${path.name}: not started, it and the park from there no longer fit`, "guard", card.id);
+          if (
+            t + parkSeconds(path.seconds) + guardSeconds(after) >
+            AUTO_LENGTH_S + 1e-9
+          ) {
+            note(
+              `${path.name}: not started, it and the park from there no longer fit`,
+              "guard",
+              card.id,
+            );
             return { abortTo: guard };
           }
+        }
+        // Fork: with the TIP before the park, the park after the volley may not fit: AUTO ends
+        // with the robot on its way (biobuzz AutoKit: the park is the last card, never refused).
+        if (card.park && tipFirst && t + path.seconds > AUTO_LENGTH_S + 1e-9) {
+          if (t >= AUTO_LENGTH_S - 1e-9) {
+            unparked = true;
+            return null;
+          }
+          drive(card, path, AUTO_LENGTH_S - t);
+          unparked = true;
+          return null;
         }
         // The guard never cuts a path short (biobuzz AutoKit.guarded): a path it let start
         // runs to its end, and the check before the next card parks from there.
@@ -724,11 +820,17 @@ export function simulateAuto(
         // block entered on that spot parks from it, not from where its own Park path starts.
         spot = spotPath
           ? {
-              park: { id: `${card.id}#park`, kind: "path", lineId: spotPath.id, park: true },
+              park: {
+                id: `${card.id}#park`,
+                kind: "path",
+                lineId: spotPath.id,
+                park: true,
+              },
               path: spotPath,
             }
           : null;
-        for (const watching of guards) if (!watching.parked) parkFromHere(watching);
+        for (const watching of guards)
+          if (!watching.parked) parkFromHere(watching);
         return null;
       }
       case "firstOf":
@@ -835,6 +937,39 @@ export function simulateAuto(
     return chain;
   };
 
+  /**
+   * Fork: biobuzz AutoKit.goForVolleyIfItFits, with Priority on the TIP: from `list[from]`, the
+   * cards up to the next feeding launch in this list, at their planned times, then that volley:
+   * when it ends by 30 s the guard goes for it (`goingFor`). A card with no planned time (a wait)
+   * ends the look-ahead with no, as on the robot.
+   */
+  const goForVolleyIfItFits = (list: AutoCard[], from: number) => {
+    let at = t;
+    for (let i = from; i < list.length; i++) {
+      const card = list[i];
+      if (card.kind === "action") {
+        const seconds = commandSeconds(auto, card, timing, at);
+        if (FEEDING_LAUNCHES.has(card.name)) {
+          if (at + seconds <= AUTO_LENGTH_S + 1e-9) {
+            goingFor = card.id;
+            note(
+              `Endgame: the next volley's last piece is out at ${(at + seconds).toFixed(1)} s: going for it, not parking (Priority: the TIP before the park)`,
+              "guard",
+              card.id,
+            );
+          }
+          return;
+        }
+        at += seconds;
+      } else if (card.kind === "path") {
+        if (card.park) return;
+        const path = catalog.byId.get(card.lineId);
+        if (!path) return;
+        at += parkSeconds(path.drawnSeconds ?? path.seconds);
+      } else return;
+    }
+  };
+
   const runList = (list: AutoCard[], outer: Guard[], label: string): Signal => {
     const parkCard = parkCardOf(list);
     const parkPath = parkCard ? catalog.byId.get(parkCard.lineId) : undefined;
@@ -864,6 +999,7 @@ export function simulateAuto(
         if (signal) return signal;
         continue;
       }
+      if (tipFirst && !goingFor) goForVolleyIfItFits(list, i);
       const due = passedGuard(guards);
       if (due) {
         if (due === own) {
@@ -897,9 +1033,11 @@ export function simulateAuto(
   note(
     stalled
       ? "Stopped: a wait can never finish"
-      : t <= AUTO_LENGTH_S
-        ? `Done · ${(AUTO_LENGTH_S - t).toFixed(1)} s spare`
-        : `Over the 30 s Auto by ${(t - AUTO_LENGTH_S).toFixed(1)} s`,
+      : unparked
+        ? "AUTO over on the way to the park: not parked (Priority: the TIP before the park)"
+        : t <= AUTO_LENGTH_S
+          ? `Done · ${(AUTO_LENGTH_S - t).toFixed(1)} s spare`
+          : `Over the 30 s Auto by ${(t - AUTO_LENGTH_S).toFixed(1)} s`,
     t <= AUTO_LENGTH_S && !stalled ? "end" : "warn",
   );
   log.sort((a, b) => a.t - b.t);
@@ -916,6 +1054,7 @@ export function simulateAuto(
     waits,
     guard: guardFired,
     stalled,
+    unparked,
   };
 }
 
