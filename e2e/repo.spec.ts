@@ -407,6 +407,9 @@ test("local shared spots override reachable master and save every linked auto to
   await page
     .getByRole("button", { name: "Unlock team spot", exact: true })
     .click();
+  // other.pp uses END too, so unlocking asks whether the move is for every Auto.
+  await expect(page.getByText("Also used by other.")).toBeVisible();
+  await page.getByRole("button", { name: /Move it for every Auto/ }).click();
   await x.fill("63");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByTestId("workspace-status")).toContainText(

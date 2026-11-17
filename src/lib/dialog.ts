@@ -24,7 +24,20 @@ export interface PromptRequest extends BaseRequest {
   resolve: (value: string | null) => void;
 }
 
-export type DialogRequest = ConfirmRequest | PromptRequest;
+/** One answer to a choice: its button, and a line under it saying what it does. */
+export interface Choice {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+export interface ChoiceRequest extends BaseRequest {
+  kind: "choice";
+  choices: Choice[];
+  resolve: (id: string | null) => void;
+}
+
+export type DialogRequest = ConfirmRequest | PromptRequest | ChoiceRequest;
 
 /** The open confirm or prompt dialog; the host renders it. */
 export const dialogRequest = writable<DialogRequest | null>(null);
@@ -46,5 +59,14 @@ export function promptDialog(
 ): Promise<string | null> {
   return new Promise((resolve) =>
     dialogRequest.set({ value: "", ...options, kind: "prompt", resolve }),
+  );
+}
+
+/** Ask which of a few answers: resolves to the chosen one's id, or null if dismissed. */
+export function choiceDialog(
+  options: Omit<ChoiceRequest, "kind" | "resolve">,
+): Promise<string | null> {
+  return new Promise((resolve) =>
+    dialogRequest.set({ ...options, kind: "choice", resolve }),
   );
 }

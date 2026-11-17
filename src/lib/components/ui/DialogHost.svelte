@@ -29,11 +29,20 @@
     if (!request) return;
     dialogRequest.set(null);
     if (request.kind === "confirm") request.resolve(confirmed);
+    else if (request.kind === "choice") request.resolve(null);
     else request.resolve(confirmed ? value.trim() : null);
+  }
+
+  function choose(id: string) {
+    const request = $dialogRequest;
+    if (request?.kind !== "choice") return;
+    dialogRequest.set(null);
+    request.resolve(id);
   }
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
+    if (shown?.kind === "choice") return;
     if (!problem) finish(true);
   }
 
@@ -81,17 +90,36 @@
         </div>
       {/if}
 
+      {#if shown.kind === "choice"}
+        <div class="flex flex-col gap-2">
+          {#each shown.choices as choice (choice.id)}
+            <button
+              type="button"
+              class="flex flex-col items-start gap-0.5 rounded-md border border-border px-3 py-2 text-left hover:border-primary hover:bg-primary/10"
+              onclick={() => choose(choice.id)}
+            >
+              <span class="text-sm font-semibold text-heading"
+                >{choice.label}</span
+              >
+              {#if choice.hint}
+                <span class="text-xs text-body">{choice.hint}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
       <div class="flex justify-end gap-2">
         <Button variant="ghost" onclick={() => finish(false)}>Cancel</Button>
-        <Button
-          type="submit"
-          variant={shown.kind === "confirm" && shown.danger
-            ? "danger"
-            : "primary"}
-          disabled={problem !== null}
-        >
-          {shown.confirmLabel ?? "OK"}
-        </Button>
+        {#if shown.kind !== "choice"}<Button
+            type="submit"
+            variant={shown.kind === "confirm" && shown.danger
+              ? "danger"
+              : "primary"}
+            disabled={problem !== null}
+          >
+            {shown.confirmLabel ?? "OK"}
+          </Button>{/if}
       </div>
     </form>
   {/if}

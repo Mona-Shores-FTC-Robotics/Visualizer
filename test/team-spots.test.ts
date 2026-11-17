@@ -13,9 +13,14 @@ import { TEAM_ROBOT } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc } from "../src/lib/auto/links";
 import { addSpot, addStep, blankAuto } from "../src/lib/simple/steps";
+import { spotsUsedBy } from "../src/lib/team/spotUnlock";
+import { launchSpotHeadingDeg } from "../src/lib/simple/aim";
 import {
+  aimMovedLaunchSpots,
   applyTeamSpots,
   changedSpots,
+  forkName,
+  forkSpot,
   linkSpot,
   parseTeamSpots,
   reexportWithSpots,
@@ -275,5 +280,81 @@ describe("sortSpotEdits", () => {
   it("a change to a spot the list has, but this Auto does not use, is elsewhere and not gone", () => {
     const result = sortSpotEdits({ RIGHT_PARK: [1, 2, 0] }, new Set(), saved);
     expect(result).toEqual({ here: [], elsewhere: ["RIGHT_PARK"], gone: [] });
+  });
+});
+
+describe("a new spot for this Auto only", () => {
+  it("names it after the spot, a start keeping _START", () => {
+    expect(forkName("PARK", new Set(["PARK"]))).toBe("PARK_2");
+    expect(forkName("PARK", new Set(["PARK", "PARK_2"]))).toBe("PARK_3");
+    expect(forkName("RIGHT_START", new Set())).toBe("RIGHT_2_START");
+  });
+
+  it("moves every use of the team spot to the new one, where it was", () => {
+    const doc = linked();
+    const parkLine = doc.auto!.cards.find(
+      (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "PARK",
+    );
+    expect(parkLine).toBeDefined();
+    const out = forkSpot(doc, "PARK", "PARK_2");
+    if ("problem" in out) throw new Error(out.problem);
+    const auto = out.doc.auto!;
+    expect(auto.points.PARK).toBeUndefined();
+    expect(auto.points.PARK_2).toEqual(TEAM.PARK);
+    expect(auto.teamSpots).toContain("PARK_2");
+    expect(auto.teamSpots).not.toContain("PARK");
+    expect(Object.values(auto.pathEnds)).not.toContain("PARK");
+    expect(Object.values(auto.pathEnds)).toContain("PARK_2");
+    // The other team spot is untouched, so moving PARK_2 moves this Auto alone.
+    expect(auto.points.LAUNCH_LEFT).toEqual(TEAM.LAUNCH_LEFT);
+  });
+
+  it("refuses a name in use, a bad name, or a start without _START", () => {
+    const doc = linked();
+    expect(forkSpot(doc, "PARK", "LAUNCH_LEFT")).toHaveProperty("problem");
+    expect(forkSpot(doc, "PARK", "park 2")).toHaveProperty("problem");
+    expect(forkSpot(doc, "PARK", "PARK_START")).toHaveProperty("problem");
+    expect(forkSpot(doc, "WALL_PICK", "WALL_PICK_2")).toHaveProperty("problem");
+  });
+
+  it("finds the Autos that link a spot", () => {
+    const uses = serializeProject(linked(), { pretty: true });
+    const found = spotsUsedBy([
+      { file: "a.pp", text: uses },
+      { file: "b.pp", text: "not json" },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].spots).toEqual(linked().auto!.teamSpots);
+    expect(found[0].spots).toContain("PARK");
+  });
+});
+
+describe("an Auto launch spot aims itself as it moves", () => {
+  it("faces the CELL at its end as biobuzz places the five launch spots", () => {
+    // biobuzz TeamCode/autos/spots.json, 16 Nov 2026: AutoLaunchSpotsTest holds them to 0.3°.
+    const placed: Record<string, [number, number, number]> = {
+      LEFT_AUTO_HIVE: [61.9, 120.4, 268.1],
+      LEFT_AUTO_OFFSET: [40.7, 121.1, 298.7],
+      RIGHT_AUTO_HIVE: [59.2, 20.9, 96.1],
+      RIGHT_AUTO_OFFSET: [32.1, 16.4, 61],
+      RIGHT_AUTO_FIX_TIP: [55.3, 25.7, 90],
+    };
+    for (const [x, y, h] of Object.values(placed))
+      expect(launchSpotHeadingDeg(x, y)).toBe(h);
+  });
+
+  it("turns an unlocked _AUTO_ spot, and nothing else", () => {
+    let doc = linked();
+    doc = linkSpot(doc, "LEFT_AUTO_HIVE_2", [50, 120, 0]);
+    const unlocked = new Set(["LEFT_AUTO_HIVE_2", "PARK"]);
+    const aimed = aimMovedLaunchSpots(doc, unlocked);
+    expect(aimed.auto!.points.LEFT_AUTO_HIVE_2[2]).toBe(
+      launchSpotHeadingDeg(50, 120),
+    );
+    expect(aimed.auto!.points.PARK).toEqual(doc.auto!.points.PARK);
+    // Already aimed: nothing to do.
+    expect(aimMovedLaunchSpots(aimed, unlocked)).toBe(aimed);
+    // Locked: the team's list decides, not the drag.
+    expect(aimMovedLaunchSpots(doc, new Set())).toBe(doc);
   });
 });

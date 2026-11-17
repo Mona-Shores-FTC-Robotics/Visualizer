@@ -7,22 +7,23 @@ import { aimFrom } from "../src/lib/simple/aim";
 import { stepsOf } from "../src/lib/simple/steps";
 
 describe("the aim with the turret locked", () => {
+  // The turret's axis 2.68 in right of centre (biobuzz TurretSubsystem, from 1.87 in 77e4608).
   it("finds the heading onto our CELL at the robot's end of the field", () => {
     const start = aimFrom(54.06, 7.72, 90, "RED");
     expect(start.cell).toBe("AUDIENCE");
-    expect(start.needDeg).toBeCloseTo(87.7, 1);
-    expect(start.offDeg).toBeCloseTo(2.3, 1);
+    expect(start.needDeg).toBeCloseTo(88.6, 1);
+    expect(start.offDeg).toBeCloseTo(1.4, 1);
     expect(start.on).toBe(true);
 
     const far = aimFrom(59.4, 129.5, 270, "RED");
     expect(far.cell).toBe("SCORING");
-    expect(far.needDeg).toBeCloseTo(270.6, 1);
+    expect(far.needDeg).toBeCloseTo(271.6, 1);
     expect(far.on).toBe(true);
 
     // The old R-Quals' launch spots, drawn for a turret that aims.
     expect(Math.abs(aimFrom(55, 24, 270, "RED").offDeg)).toBeGreaterThan(170);
     const fire3 = aimFrom(45, 26, 90, "RED");
-    expect(fire3.needDeg).toBeCloseTo(71.2, 1);
+    expect(fire3.needDeg).toBeCloseTo(72.5, 1);
     expect(fire3.on).toBe(false);
   });
 
