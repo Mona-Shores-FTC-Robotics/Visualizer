@@ -17,10 +17,12 @@
  *     and 24 in (approachStandoffIn). Skipped when already within 1.5 in and 5 degrees of that
  *     (atApproachIn, atApproachDeg), so a drive that ends lined up costs nothing;
  *   stick: 0.7 s for the stick to come down (stickDownMs). After a drive card there is no such
- *     pause: the robot lowers the stick over the last 18 in of that drive (lowerWithinIn,
+ *     pause: the robot lowers the stick over the last 24 in of that drive (lowerWithinIn,
  *     FlowerPicker.approach, run by AutoKit for the path card right before a PickFlower card), so
- *     it is down by the time the card starts (3 Nov 2026);
- *   push: a path along the FLOWER's line to 7 in from its centre (contactStandoffIn);
+ *     it is down by the time the card starts (3 Nov 2026; 24 in since 5 Nov 2026, 18 before: at 18
+ *     the stick was down only 0.52 to 0.55 s before arrival, short of its 0.7 s);
+ *   push: a path along the FLOWER's line to 9 in from its centre (contactStandoffIn; 9 since
+ *     5 Nov 2026, 7 before: at 7 every push stalled short, pressing into the FLOWER);
  *   dwell: 2 s, the slow pick an Auto's timing plans for (PickFlower's 4.4 s, mentor 3 Nov 2026):
  *     a FLOWER that does not fill the lane dwells the whole cap (dwellMs). One that fills it ends
  *     the dwell on full (FlowerPicker.dwellEndsOnFull) about 1.1 s in;
@@ -57,7 +59,7 @@ export const MAX_RANGE_IN = 60;
 /** FlowerPicker.approachStandoffIn: the pick spot, this far back from the FLOWER's centre. */
 export const APPROACH_STANDOFF_IN = 24;
 /** FlowerPicker.contactStandoffIn: where the push stops, from the FLOWER's centre. */
-export const CONTACT_STANDOFF_IN = 7;
+export const CONTACT_STANDOFF_IN = 9;
 /** FlowerPicker.autoMaxOffIn: an Auto's pick refuses past this far off the FLOWER's line, inches. */
 export const AUTO_MAX_OFF_IN = 12;
 /** FlowerPicker.autoMaxOffDeg: and past this far from square to it, degrees. */
@@ -68,7 +70,7 @@ export const MIN_AUTO_START_IN = 18;
  * FlowerPicker.lowerWithinIn: on the drive before a pick, the stick comes down once the robot is
  * this close to the drive's end, inches (the robot's approach; see pickMotions).
  */
-export const LOWER_WITHIN_IN = 18;
+export const LOWER_WITHIN_IN = 24;
 /** FlowerPicker.atApproachIn and atApproachDeg: this close to the square-up point, it is skipped. */
 const AT_APPROACH_IN = 1.5;
 const AT_APPROACH_DEG = 5;

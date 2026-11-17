@@ -571,7 +571,7 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   stopped: when the robot is off the FLOWER's line or not square to it, one short move puts it on
   the line, square, at the distance it stopped (kept between 18 and 24 in from the FLOWER's
   centre); a drive that ends lined up skips it. The preview (`simulate.ts` motions) draws that
-  square-up, the stick, the push along the line to 12 in from the FLOWER, the dwell and the
+  square-up, the stick, the push along the line to 9 in from the FLOWER, the dwell and the
   back-out to where the push started, where it ends. A pick the robot would refuse (not in front of
   the FLOWER, more than 12 in off its line, or more than 30° from square) is marked red, and one that squares
   up is marked so the spot can be moved onto the line. Its card gets an 8 s timeout. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
