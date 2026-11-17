@@ -590,7 +590,9 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   one on the far wall), and the command joins an Auto's list only with its first such step. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its
-  time from the distance at the robot's speed caps. The builder is the only editor: `src/state/auto.svelte.ts` — `simple` says
+  time from the distance at the robot's speed caps. The drive in curves over to the side wall first
+  and runs down it into the corner, ending where the walls stop the robot (its side on the side
+  wall, its nose on the audience wall); the drive back is that run backwards. The builder is the only editor: `src/state/auto.svelte.ts` — `simple` says
   whether every step is one the builder reads (every file in biobuzz `TeamCode/autos`), which
   decides whether it lays headings and spot parks. `src/state/files.svelte.ts` — a new
   project is `blankAuto`: no paths, at the right start. `src/view/FieldPanel.svelte` — a click

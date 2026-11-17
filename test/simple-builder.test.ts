@@ -352,7 +352,23 @@ describe("the simple builder", () => {
     // In to red's GARDEN, facing the audience, mid-dwell; back at FIRE_G at the end.
     const dwell = gather[8];
     const there = motionPoseAt(run, (dwell.t0 + dwell.t1) / 2)!;
-    expect([there.x, there.y, there.headingDeg]).toEqual([8.5, 9.5, 270]);
+    // The drive in aims 1 in deeper and 2 in nearer the side wall than the gather pose (8.5, 9.5);
+    // the walls stop it: the 16 in frame's side on the side wall, the nose on the audience wall.
+    expect([there.x, there.y, there.headingDeg]).toEqual([8, 9.5, 270]);
+    // The drive in curves over to the side wall first: a third of the way in it is nearer the
+    // wall than the straight line from FIRE_G to the corner is at that depth.
+    const straightX = (y: number) => 8 + ((45 - 8) * (y - 9.5)) / (29 - 9.5);
+    const early = motionPoseAt(run, gather[2].t1)!;
+    expect(early.x).toBeLessThan(straightX(early.y) - 2);
+    // And never through a wall.
+    for (const m of gather) {
+      const p = motionPoseAt(run, m.t1)!;
+      expect(p.x).toBeGreaterThanOrEqual(8);
+      expect(p.y).toBeGreaterThanOrEqual(9.5);
+    }
+    // The drive back is the drive in run backwards: up the side wall first, then over.
+    const out = motionPoseAt(run, gather[11].t1)!;
+    expect(out.x).toBeLessThan(straightX(out.y) - 2);
     const end = motionPoseAt(run, gather[gather.length - 1].t1)!;
     expect([end.x, end.y]).toEqual([45, 29]);
     // In and back at the robot's speed caps, plus the 0.4 s dwell: longer from farther away.
