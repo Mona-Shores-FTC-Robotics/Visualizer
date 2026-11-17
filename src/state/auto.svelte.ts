@@ -30,7 +30,7 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
-import { aimMovedLaunchSpots } from "../lib/team/teamSpots";
+import { aimMovedLaunchSpots, aimOwnLaunchSpots } from "../lib/team/teamSpots";
 import {
   laneName,
   matchLanes,
@@ -355,6 +355,13 @@ export class AutoState {
         const started = startSpotFollowsStart(doc, unlocked);
         if (started !== doc) {
           project.amend(() => started);
+          return;
+        }
+        // A spot of this Auto's own that a Launch all fires from faces its CELL, as biobuzz
+        // requires of every spot an Auto launches from (AutoVolleySpotsTest).
+        const own = aimOwnLaunchSpots(doc);
+        if (own !== doc) {
+          project.amend(() => own);
           return;
         }
         const auto = doc.auto;

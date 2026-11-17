@@ -24,7 +24,13 @@ import type { NamedPoint } from "../auto/types";
 import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { withSpotParks } from "../simple/parkFrom";
 import { isLaunchSpotName, launchSpotHeadingDeg } from "../simple/aim";
-import { isSimple, isStartName, layHeadings } from "../simple/steps";
+import {
+  everyStep,
+  isSimple,
+  isStartName,
+  layHeadings,
+  stepsOf,
+} from "../simple/steps";
 import { GENERATED_DIRS } from "../sim/biobuzz";
 import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
 
@@ -290,6 +296,34 @@ export function aimMovedLaunchSpots(
   for (const name of auto.teamSpots) {
     const point = auto.points[name];
     if (!point || !unlocked.has(name) || !isLaunchSpotName(name)) continue;
+    const heading = launchSpotHeadingDeg(point[0], point[1]);
+    if (point[2] === heading) continue;
+    points ??= { ...auto.points };
+    points[name] = [point[0], point[1], heading];
+  }
+  if (!points) return doc;
+  const next = { ...doc, auto: { ...auto, points } };
+  return isSimple(next) ? layHeadings(next) : next;
+}
+
+/**
+ * The document with each of this Auto's own spots that a Launch all fires from turned to aim at
+ * its CELL (aim.ts launchSpotHeadingDeg), as an unlocked …_AUTO_… team spot is; `doc` itself when
+ * each already does. biobuzz's AutoVolleySpotsTest holds every spot an Auto launches from to that
+ * aim (AutoLaunchSpots.launchSpotProblem), so its heading is not the drawer's to set. Starts are
+ * placed by the marks and team spots by the team, so neither turns here; nor does an Auto drawn
+ * for BLUE, whose spots are not red's.
+ */
+export function aimOwnLaunchSpots(doc: ProjectDoc): ProjectDoc {
+  const auto = doc.auto;
+  if (!auto || auto.drawnFor === "BLUE") return doc;
+  const team = new Set(auto.teamSpots ?? []);
+  let points: Record<string, NamedPoint> | null = null;
+  for (const step of everyStep(stepsOf(doc))) {
+    const name = step.kind === "launch" ? step.atSpot : null;
+    if (!name || team.has(name) || isStartName(name)) continue;
+    const point = (points ?? auto.points)[name];
+    if (!point) continue;
     const heading = launchSpotHeadingDeg(point[0], point[1]);
     if (point[2] === heading) continue;
     points ??= { ...auto.points };
