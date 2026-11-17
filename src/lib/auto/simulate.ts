@@ -14,10 +14,12 @@ import {
   parkCardOf,
   rejoinTail,
   rowLabel,
+  waitParkLine,
 } from "./tree";
 import { poseAlong, type Motion } from "./motion";
 import { LOWER_WITHIN_IN, pickFrom, pickMotions } from "../simple/flowers";
 import { gatherPlan } from "../simple/garden";
+import { isBuilderAuto } from "../simple/steps";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -427,6 +429,11 @@ export function simulateAuto(
   let goingFor: string | null = null;
   /** Fork: AUTO ended with the robot on its way to the park (Priority on the TIP). */
   let unparked = false;
+  /**
+   * Fork: an Auto made of builder steps guards a list that ends in a wait that parks with that
+   * wait's park, as the export does (javaAuto.ts, tree.ts waitParkLine).
+   */
+  const builderAuto = isBuilderAuto(auto);
 
   let t = 0;
   let pos: BasePoint = { x: startPoint.x, y: startPoint.y };
@@ -737,8 +744,9 @@ export function simulateAuto(
         // Fork: a PickFlower is the robot's FlowerPicker (lib/simple/flowers.ts): square up onto
         // its FLOWER's line if needed, push and back out, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
-        const pick =
-          FLOWER_PICKS.has(card.name) ? pickFrom(pos.x, pos.y, heading) : null;
+        const pick = FLOWER_PICKS.has(card.name)
+          ? pickFrom(pos.x, pos.y, heading)
+          : null;
         const stickDownAt = pick ? stickDownOnDriveBefore(prev) : null;
         if (gather) motions.push(...gather.motions);
         if (pick?.ok) {
@@ -982,21 +990,108 @@ export function simulateAuto(
     }
   };
 
+  /**
+   * Fork: biobuzz AutoKit.goForVolleyIfItFits with the park after the volley (BuiltAuto
+   * parkAfterVolley, on): from `list[from]`, the cards up to the next volley at their planned
+   * times (a drive's exported time, a command's typical time, a plain wait's earliest limit), then
+   * that volley and the guard's own park with its margin. A CELL check (a wait whose one trigger
+   * row starts with a launch, with a time limit) counts as its volley, even as the list's last
+   * card; a card that cannot be timed ends the look-ahead with no answer. Returns why the robot
+   * parks now, or null when it goes on.
+   */
+  const volleyLeavesNoPark = (
+    list: AutoCard[],
+    from: number,
+    guard: Guard,
+  ): string | null => {
+    const now = t;
+    let at = t;
+    const volleyOf = (card: AutoCard): ActionCard | null => {
+      if (card.kind === "action")
+        return FEEDING_LAUNCHES.has(card.name) ? card : null;
+      if (card.kind !== "firstOf" || card.alongside || card.choice) return null;
+      const triggers = card.rows.filter((row) => "when" in row);
+      const limited = card.rows.some((row) => "afterMs" in row);
+      if (triggers.length !== 1 || !limited) return null;
+      const first = triggers[0].cards[0];
+      return first?.kind === "action" && FEEDING_LAUNCHES.has(first.name)
+        ? first
+        : null;
+    };
+    const last = list[list.length - 1];
+    const end =
+      last && last.kind === "firstOf" && volleyOf(last)
+        ? list.length
+        : list.length - 1;
+    for (let i = from; i < end; i++) {
+      const card = list[i];
+      const volley = volleyOf(card);
+      if (volley) {
+        const volleyS = commandSeconds(auto, volley, timing, at);
+        const parkS = parkSeconds(
+          guard.ownPath.drawnSeconds ?? guard.ownPath.seconds,
+        );
+        const parkedAt = at + volleyS + parkS + GUARD_MARGIN_S;
+        return parkedAt > AUTO_LENGTH_S + 1e-9
+          ? `${(at - now).toFixed(1)} s of cards to the next volley, the volley (${volleyS.toFixed(1)} s) and the park (${parkS.toFixed(1)} s + ${GUARD_MARGIN_S.toFixed(1)} s margin) end at ${parkedAt.toFixed(1)} s`
+          : null;
+      }
+      if (card.kind === "action") {
+        at += commandSeconds(auto, card, timing, at);
+      } else if (card.kind === "path") {
+        if (card.park) return null;
+        const path = catalog.byId.get(card.lineId);
+        if (!path) return null;
+        at += parkSeconds(path.drawnSeconds ?? path.seconds);
+      } else if (card.kind === "firstOf" && isPlainWait(card)) {
+        const limits = card.rows.flatMap((row) =>
+          "afterMs" in row ? [timeRowFiresAt(row, at)] : [],
+        );
+        if (!limits.length) return null;
+        at = Math.min(...limits);
+      } else return null;
+    }
+    return null;
+  };
+
   const runList = (list: AutoCard[], outer: Guard[], label: string): Signal => {
     const parkCard = parkCardOf(list);
     const parkPath = parkCard ? catalog.byId.get(parkCard.lineId) : undefined;
-    const own: Guard | null =
-      parkCard && parkPath
+    // Fork: a builder Auto's list with no park of its own that ends in a wait that parks is
+    // guarded by that wait's park, as the export guards it.
+    const waitLine = !parkCard && builderAuto ? waitParkLine(auto, list) : null;
+    const waitPath = waitLine ? catalog.byId.get(waitLine) : undefined;
+    const waitCard: PathCard | null =
+      waitLine && waitPath
         ? {
-            deadline: AUTO_LENGTH_S - guardSeconds(parkPath),
-            park: parkCard,
-            path: parkPath,
-            ownPark: parkCard,
-            ownPath: parkPath,
+            id: `guard:${label}:${waitLine}`,
+            kind: "path",
+            lineId: waitLine,
+            park: true,
+          }
+        : null;
+    const own: Guard | null =
+      waitCard && waitPath
+        ? {
+            deadline: AUTO_LENGTH_S - guardSeconds(waitPath),
+            park: waitCard,
+            path: waitPath,
+            ownPark: waitCard,
+            ownPath: waitPath,
             label,
             parked: false,
           }
-        : null;
+        : parkCard && parkPath
+          ? {
+              deadline: AUTO_LENGTH_S - guardSeconds(parkPath),
+              park: parkCard,
+              path: parkPath,
+              ownPark: parkCard,
+              ownPath: parkPath,
+              label,
+              parked: false,
+            }
+          : null;
     // A block entered on a spot with its own park parks from it until the robot drives away
     // (biobuzz AutoKit.guarded: watchFromHere).
     if (own) parkFromHere(own);
@@ -1012,6 +1107,24 @@ export function simulateAuto(
         continue;
       }
       if (tipFirst && !goingFor) goForVolleyIfItFits(list, i);
+      // Fork: the park after the volley (biobuzz AutoKit.advance): a trip toward a volley that
+      // would leave no time to park is not begun; the guard parks now instead.
+      const watching = own ?? guards[guards.length - 1];
+      if (!tipFirst && watching && !watching.parked && i < list.length - 1) {
+        const why = volleyLeavesNoPark(list, i, watching);
+        if (why) {
+          note(
+            `${label}: ${why}: no time to park after it, parking now`,
+            "guard",
+            card.id,
+          );
+          if (watching === own) {
+            park(own);
+            return null;
+          }
+          return { abortTo: watching };
+        }
+      }
       const due = passedGuard(guards);
       if (due) {
         if (due === own) {

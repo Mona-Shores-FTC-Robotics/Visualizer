@@ -40,6 +40,15 @@ describe("a Wait's outcome entered with too little time left", () => {
       if (first.kind !== "action")
         throw new Error("first card is not a command");
       first.timeoutS = 12;
+      // The robot plans a volley at its typical 2.5 s (biobuzz AutoRegistration
+      // LAUNCH_ALL_TYPICAL_S); at this file's older 4.5 s the guard's look-ahead would park before
+      // the drive to the wait, and the robot would never reach the spot this test is about.
+      // The preview runs a command for its typical time, so the delay goes there too.
+      slow.registry.typicalS = {
+        ...slow.registry.typicalS,
+        LaunchAll: 2.5,
+        [first.name]: 4,
+      };
       const result = simulateAuto(slow, catalog, doc.startPoint, {
         [switchKey(wait.id)]: tipped,
       });
@@ -49,6 +58,14 @@ describe("a Wait's outcome entered with too little time left", () => {
       expect(arrived.cardId).toBe(before.id);
       expect(last.pathId).toBe(spotPark);
       expect(last.t1).toBeLessThanOrEqual(30 + 1e-6);
+      // Parked by the robot's look-ahead (AutoKit.goForVolleyIfItFits with parkAfterVolley): the
+      // volley ahead and the park after it no longer fit, so the trip toward it is not begun.
+      expect(
+        result.log.some(
+          (l) =>
+            l.kind === "guard" && l.text.includes("no time to park after it"),
+        ),
+      ).toBe(true);
     });
   }
 });

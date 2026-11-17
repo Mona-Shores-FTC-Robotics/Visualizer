@@ -29,6 +29,7 @@ import {
   parkCardOf,
   rowLabel,
   usedNames,
+  waitParkLine,
 } from "../../auto/tree";
 import { isUsed, pointUses } from "../../auto/pins";
 import { isBuilderAuto } from "../../simple/steps";
@@ -307,8 +308,7 @@ function renameExpr(expr: PathExpr, map: (name: string) => string): PathExpr {
 // --- printing ---------------------------------------------------------------
 
 type JNode =
-  | string
-  | { head: string; args: string[]; children: JNode[]; close?: string };
+  string | { head: string; args: string[]; children: JNode[]; close?: string };
 
 /** Fork: a route choice's legs, the drawing's default (its trigger row) first. */
 function legsOf(card: FirstOfCard): AutoRow[] {
@@ -580,49 +580,9 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
   // they were drawn and timed with.
   const builderAuto = isBuilderAuto(auto);
 
-  /**
-   * The park for a list whose last card is a wait that parks, from the spot that wait is on: a
-   * Park step that comes before any drive in one of the wait's outcomes (its Otherwise first),
-   * else the spot's own park (`parkFrom` of the drive that brought the robot there).
-   */
-  const parkOfLastWait = (list: AutoCard[]): string | null => {
-    const last = list[list.length - 1];
-    if (last?.kind !== "firstOf") return null;
-    const fromHere = (cards: AutoCard[]): string | null => {
-      for (const card of cards) {
-        if (card.kind === "path") return card.park ? card.lineId : null;
-        // A route choice whose legs end with a wait that parks: as its default leg starts.
-        if (card.kind === "firstOf" && card.choice && !parkCardOf(legsOf(card)[0].cards))
-          return fromHere(legsOf(card)[0].cards);
-        if (card.kind === "firstOf") return parkOfLastWait([card]);
-        if (card.kind === "rejoin") return null;
-      }
-      return null;
-    };
-    // A route choice whose legs each end with the park, or with a wait that parks: the drawing's
-    // default leg's.
-    if (last.choice) {
-      const leg = legsOf(last)[0].cards;
-      const legPark = parkCardOf(leg)?.lineId ?? parkOfLastWait(leg);
-      if (legPark) return legPark;
-    }
-    const rows = [...last.rows].sort(
-      (a, b) => Number("when" in a) - Number("when" in b),
-    );
-    for (const row of rows) {
-      const park = fromHere(row.cards);
-      if (park) return park;
-    }
-    if (!allCards(last.rows.flatMap((row) => row.cards)).some(
-      (card) => card.kind === "path" && card.park,
-    ))
-      return null;
-    for (let i = list.length - 2; i >= 0; i--) {
-      const card = list[i];
-      if (card.kind === "path") return auto.parkFrom?.[card.id] ?? null;
-    }
-    return null;
-  };
+  /** The park for a list whose last card is a wait that parks (tree.ts waitParkLine). */
+  const parkOfLastWait = (list: AutoCard[]): string | null =>
+    waitParkLine(auto, list);
 
   const listNodes = (list: AutoCard[], label: string): JNode[] => {
     const nodes: JNode[] = [];
@@ -689,7 +649,12 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const open = `kit.route(${javaString(option)}, ${index}, () -> `;
     return typeof node === "string"
       ? `${open}${node})`
-      : { head: `${open}${node.head}`, args: node.args, children: node.children, close: "))" };
+      : {
+          head: `${open}${node.head}`,
+          args: node.args,
+          children: node.children,
+          close: "))",
+        };
   };
 
   /** Fork: the seconds a row's match-clock time is written as: the INIT menu's, or the drawing's. */
@@ -763,7 +728,8 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
       `AutoOption.choice(${[card.choice, ...legsOf(card).map((leg) => rowLabel(leg))].map(javaString).join(", ")})`,
     );
   }
-  if (firstOfs.some((card) => card.shot)) options.push("AutoOption.shotTrigger()");
+  if (firstOfs.some((card) => card.shot))
+    options.push("AutoOption.shotTrigger()");
   for (const card of firstOfs) {
     for (const row of card.rows) {
       if (!("afterMs" in row) || !row.matchClock || !row.option) continue;
