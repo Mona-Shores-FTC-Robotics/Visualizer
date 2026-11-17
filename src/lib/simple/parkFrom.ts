@@ -54,7 +54,10 @@ export function withSpotParks(
   // choice whose legs each park has its Parks there, and a file drawn elsewhere may leave one
   // Park's end unpinned.
   const isPark = (c: AutoCard) => c.kind === "path" && c.park;
-  const parkSpot = [...view.cards.filter(isPark), ...everyCard(view.cards).filter(isPark)]
+  const parkSpot = [
+    ...view.cards.filter(isPark),
+    ...everyCard(view.cards).filter(isPark),
+  ]
     .map((c) => (c.kind === "path" ? endSpot(c.lineId) : undefined))
     .find((spot) => !!spot);
   const parkPoint = parkSpot ? auto.points[parkSpot] : undefined;
@@ -111,7 +114,14 @@ export function withSpotParks(
   }
 
   const kept = new Set(Object.values(next));
-  const removed = new Set(Object.values(current).filter((id) => !kept.has(id)));
+  // A spot's park path that a step also drives (a Park in a wait's Otherwise drawn along it, as
+  // in l-under-hive.pp) is that step's path: it stops being a spot park, and stays.
+  const driven = new Set(
+    everyCard(auto.cards).flatMap((c) => (c.kind === "path" ? [c.lineId] : [])),
+  );
+  const removed = new Set(
+    Object.values(current).filter((id) => !kept.has(id) && !driven.has(id)),
+  );
   // The park spot moved, or Park now goes elsewhere: the lines follow.
   const moved = new Map<string, AtomicPath>();
   for (const id of kept) {

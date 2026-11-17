@@ -5,6 +5,7 @@ import { dialogRequest } from "../lib/dialog";
 import { formatKeys, type KeySpec, type Shortcut } from "../lib/shortcuts";
 import { showToast } from "../lib/toast";
 import { currentFilePath } from "../stores";
+import { selectedCardId } from "../lib/auto/store";
 import { downloadBlob } from "../utils/download";
 import { exportElementAsPng } from "../utils/exportImage";
 import { PROJECT_EXTENSION, pathStem } from "../utils/filename";
@@ -214,7 +215,11 @@ export function createActions(deps: ActionDeps): Action[] {
       title: "Deselect",
       keys: ["Escape"],
       when: () => !drawing(),
-      run: () => editor.clearSelection(),
+      // Fork: the builder's selected step too, which the Step panel follows.
+      run: () => {
+        editor.clearSelection();
+        selectedCardId.set(null);
+      },
     },
 
     {

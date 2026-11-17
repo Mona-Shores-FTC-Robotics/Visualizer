@@ -207,7 +207,11 @@ export const TIME_ONLY = "";
 export const ALWAYS = "Always";
 
 /** A Wait step's title: "Wait for TIP or CELL up", or "Wait until 12 s" / "Wait 2 s" when it waits for nothing. */
-export function waitTitle(trigger: string, seconds: number, matchClock: boolean): string {
+export function waitTitle(
+  trigger: string,
+  seconds: number,
+  matchClock: boolean,
+): string {
   if (trigger === TIME_ONLY)
     return matchClock ? `Wait until ${seconds} s` : `Wait ${seconds} s`;
   if (trigger === ALWAYS) return `If before ${seconds} s`;
@@ -228,6 +232,30 @@ export const WAIT_FOR: readonly {
   { trigger: "CameraBlind", label: "camera blind", legacy: true },
   { trigger: ALWAYS, label: "the clock", legacy: true },
 ];
+/**
+ * What a wait waits for, in the fewest words, for the builder's cards and Step panel: "CELL up",
+ * not WAIT_FOR's "TIP or CELL up" (CellUp is the aimed CELL read up; a TIP alone never ends it).
+ */
+export function waitShort(trigger: string | undefined): string {
+  switch (trigger) {
+    case "CellUp":
+      return "CELL up";
+    case "LeftCellUp":
+      return "LEFT CELL up";
+    case "RightCellUp":
+      return "RIGHT CELL up";
+    case "IntakeFull":
+      return "intake full";
+    case "Tip":
+      return "TIP";
+    case "CameraBlind":
+      return "camera blind";
+    case TIME_ONLY:
+      return "the time";
+    default:
+      return trigger ?? "CELL up";
+  }
+}
 /** A new Wait step's limit, seconds: the robot moves on after this even with no TIP. */
 export const WAIT_DEFAULT_S = 7;
 
@@ -442,7 +470,10 @@ function walkSteps(
         return {
           ...base,
           kind: "choice",
-          label: choiceTitle(choice.option, legs.map((leg) => leg.name)),
+          label: choiceTitle(
+            choice.option,
+            legs.map((leg) => leg.name),
+          ),
           option: choice.option,
           legs,
           legsMayPark: terminal && index === cards.length - 1,
@@ -973,11 +1004,13 @@ export function moveStep(
     const target = listOf(auto, into);
     if (!found || !target) return;
     const card = found.list[found.index];
-    if (into && allCardsOf([card]).some((c) => c.id === into.waitCardId)) return;
+    if (into && allCardsOf([card]).some((c) => c.id === into.waitCardId))
+      return;
     // A leg holds drives, commands and plain waits only, and a choice stays in the main list.
     if (into?.leg !== undefined) {
       if (card.kind === "path" && card.park) return;
-      if (card.kind === "firstOf" && waitOf(card)?.trigger !== TIME_ONLY) return;
+      if (card.kind === "firstOf" && waitOf(card)?.trigger !== TIME_ONLY)
+        return;
     }
     if (into && card.kind === "firstOf" && choiceOf(card)) return;
     found.list.splice(found.index, 1);
@@ -1017,7 +1050,8 @@ export function setWait(
     const before = waitOf(card)!;
     const named =
       !!card.label &&
-      card.label !== waitTitle(before.trigger, before.seconds, before.matchClock);
+      card.label !==
+        waitTitle(before.trigger, before.seconds, before.matchClock);
     // A wait in a leg of a choice stays a wait for its time only.
     const inLeg = allCardsOf(auto.cards).some(
       (c) =>
@@ -1068,7 +1102,11 @@ export function setWait(
         delete row.adjustable;
         delete row.tip;
       }
-      if (change.tip !== undefined && row.adjustable && [1, 2, 3].includes(change.tip))
+      if (
+        change.tip !== undefined &&
+        row.adjustable &&
+        [1, 2, 3].includes(change.tip)
+      )
         row.tip = change.tip;
       if (change.option !== undefined) {
         const name = change.option?.trim();
@@ -1207,7 +1245,12 @@ export function setWaitRejoin(
       draft.lines = [...draft.lines, path];
       draft.sequence = [...draft.sequence, { kind: "path", lineId: path.id }];
       auto.pathEnds[path.id] = spot;
-      list.push({ id: makeCardId(), kind: "path", lineId: path.id, park: true });
+      list.push({
+        id: makeCardId(),
+        kind: "path",
+        lineId: path.id,
+        park: true,
+      });
     };
     endWithPark(row.cards);
   });
@@ -1486,8 +1529,7 @@ function choiceOf(
   card: FirstOfCard,
 ): { option: string; legs: [AutoRow, AutoRow] } | null {
   if (!card.choice || card.rows.length !== 2) return null;
-  if (card.alongside || card.shot || card.partnerWait)
-    return null;
+  if (card.alongside || card.shot || card.partnerWait) return null;
   const first = card.rows.find((row) => "when" in row);
   const second = card.rows.find((row) => "afterMs" in row);
   if (!first || !second) return null;
