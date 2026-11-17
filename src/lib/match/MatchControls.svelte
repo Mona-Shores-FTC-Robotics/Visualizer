@@ -40,14 +40,12 @@
     ROBOT_FACT_LIST,
     type MatchControls,
   } from "./controls.svelte";
-  import {
-    checkboxClass,
-    fieldClass,
-    labelClass,
-  } from "../components/ui/styles";
+  import { fieldClass } from "../components/ui/styles";
   import type { FieldEntry } from "../timing/together";
   import { knobBreaks, type Knob } from "./breakpoints";
   import { tipping } from "./tipping.svelte";
+  import Menu from "../components/ui/Menu.svelte";
+  import type { MenuEntry } from "../components/ui/menu";
 
   interface RobotInfo {
     file: string;
@@ -69,6 +67,11 @@
     show?: "all" | "bar" | "hive" | number;
     /** A robot's panel: its result in words, under its name (lanes.ts robotSummary). */
     summary?: string;
+    /** The bar: the match's result in one line (lanes.ts matchResult). */
+    result?: string | null;
+    /** The bar's More menu: whether the branches not taken are drawn, faint. */
+    untaken?: boolean;
+    onUntaken?: (on: boolean) => void;
   }
 
   let {
@@ -79,7 +82,39 @@
     values,
     show: part = "all",
     summary,
+    result = null,
+    untaken = false,
+    onUntaken,
   }: Props = $props();
+
+  /** The bar's More menu: the what-ifs and views a look seldom needs. */
+  let moreEntries = $derived<MenuEntry[]>([
+    ...MATCH_PRESETS.map((preset) => ({
+      label: `${controls.preset === preset.id ? "✓ " : ""}What if: ${preset.label}`,
+      run: () =>
+        controls.apply(
+          preset,
+          robots.map((r) => r.file),
+          base,
+        ),
+    })),
+    "separator",
+    {
+      label: tipping.searching
+        ? "Finding tipping points…"
+        : "Find tipping points",
+      disabled: tipping.searching,
+      run: findTicks,
+    },
+    ...(onUntaken
+      ? [
+          {
+            label: `${untaken ? "✓ " : ""}Show branches not taken`,
+            run: () => onUntaken(!untaken),
+          },
+        ]
+      : []),
+  ]);
 
   const keyOf = (knob: Knob) => `${knob.robot ?? "hive"}:${knob.id}`;
   /** In a side panel: each slider under its name, so it fits a narrow panel. */
@@ -217,14 +252,16 @@
       return [];
     }
   });
-  /** A robot's TIP rows: the TIPs its volleys try for first. */
-  function tipsOf(robot: RobotInfo): TipToggle[] {
-    const index = robots.indexOf(robot);
-    return tips.filter((t) => t.robot === index);
-  }
   /** A TIP's choices: on try 1 … tries, then never. */
   function tipChoices(t: TipToggle): number[] {
     return [...Array.from({ length: t.tries }, (_, i) => i), Infinity];
+  }
+  /** A try's button: whose volley, what it fires, when it lands ("r-no-cross FLOWER 11 s"). */
+  function tryLabel(t: TipToggle, misses: number): string {
+    if (misses === Infinity) return "never";
+    const at = t.tryList[misses];
+    if (!at) return tipChoiceLabel(misses);
+    return `${robots[at.robot]?.name ?? `robot ${at.robot + 1}`} ${at.what} ${Math.round(at.t)} s`;
   }
 
   /** Whether a stop's trigger comes in time in this look: its own answer, else its trigger's. */
@@ -345,7 +382,10 @@
 {/snippet}
 
 {#snippet robotPanel(robot: RobotInfo)}
+  <!-- Fork: a robot's result and its timing. What happens to it in the match (no-show, INIT, its
+       stops) is asked above the field (robotQuestions), with the TIPs. -->
   {@const still = controls.still[robot.file] ?? false}
+  {@const changed = Object.keys(controls.own[robot.file] ?? {}).length}
   <section
     class="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-base/60 p-2"
   >
@@ -358,158 +398,178 @@
         class="truncate text-xs font-semibold text-heading"
         title={robot.file}>{robot.name}</span
       >
-      <label
-        class={[labelClass, "ml-auto flex items-center gap-1 text-[11px]"]}
-        title="The robot stays at its start: a partner that does not run its Auto"
-      >
-        <input
-          type="checkbox"
-          class={checkboxClass}
-          checked={still}
-          onchange={(event) =>
-            controls.setStill(
-              robot.file,
-              (event.currentTarget as HTMLInputElement).checked,
-            )}
-        />
-        No-show
-      </label>
     </header>
     {#if summary}
       <p class="-mt-1 text-[11px] text-body">{summary}</p>
     {/if}
-    <div
-      class={["flex flex-col gap-1", still && "pointer-events-none opacity-40"]}
-    >
-      {#each robotFacts(robot) as fact (fact.id)}
-        {@render slider(
-          fact,
-          robotValue(robot, fact),
-          controls.own[robot.file]?.[fact.id] !== undefined,
-          (v) => controls.setOwn(robot.file, fact.id, v),
-          { robot: robots.indexOf(robot), id: fact.id },
-        )}
-      {/each}
-      {#if routeChoices(robot.auto).length}
-        <!-- Fork: the Auto's route choices, as the Driver Station's INIT rows (whatIfs.ts). -->
-        <div class="mt-1 flex flex-col gap-1 border-t border-border pt-1.5">
-          {#each routeChoices(robot.auto) as choice (choice.condition)}
-            {@const leg = legOf(robot, choice)}
-            <label
-              class={[
-                labelClass,
-                "flex items-center gap-1.5 text-[11px]",
-                leg === 1 && "font-semibold text-heading",
-              ]}
-              title={`The INIT menu's ${choice.option} row: which way the robot goes. ${choice.legs[0]} is the one drawn.`}
-            >
-              <span class="shrink-0">INIT</span>
-              <select
-                class={[fieldClass, "!w-auto min-w-0 !py-0.5 text-[11px]"]}
-                aria-label={`INIT ${choice.option}`}
-                value={leg}
-                onchange={(event) =>
-                  controls.setTrigger(
-                    robot.file,
-                    robot.auto,
-                    choice.condition,
-                    (event.currentTarget as HTMLSelectElement).value === "0",
-                  )}
-              >
-                <option value={0}>{choiceLabel(choice, 0)}</option>
-                <option value={1}>{choiceLabel(choice, 1)}</option>
-              </select>
-            </label>
+    {#if !still}
+      <details class="group text-[11px]" open={changed > 0 || undefined}>
+        <summary
+          class="cursor-pointer select-none text-body hover:text-heading"
+          title="How long this robot takes to spin up, launch, pick and drive, for this look only. The team's values are in Timing → Facts, outside the Match view."
+        >
+          Robot timing{changed ? ` · ${changed} changed` : ""}
+        </summary>
+        <div class="mt-1.5 flex flex-col gap-1">
+          {#each robotFacts(robot) as fact (fact.id)}
+            {@render slider(
+              fact,
+              robotValue(robot, fact),
+              controls.own[robot.file]?.[fact.id] !== undefined,
+              (v) => controls.setOwn(robot.file, fact.id, v),
+              { robot: robots.indexOf(robot), id: fact.id },
+            )}
           {/each}
         </div>
-      {/if}
-      {#if tipsOf(robot).length || stopsOf(robot).length}
-        <!-- Fork: the TIPs this robot tries for (tipToggles.ts), then its other stops (whatIfs.ts):
-             a name and ✓ / ✗ only; the field shows what each does. -->
-        <div class="mt-1 flex flex-col gap-1.5 border-t border-border pt-1.5">
-          {#each tipsOf(robot) as t (t.tip)}
-            <div
-              class="flex flex-col gap-0.5 text-[11px]"
-              role="radiogroup"
-              aria-label={`TIP ${t.tip}`}
-            >
-              <span
-                class={[
-                  "truncate font-medium",
-                  t.misses === Infinity ? "text-danger" : "text-heading",
-                ]}>TIP {t.tip}</span
-              >
-              <div class="flex flex-wrap gap-1">
-                {#each tipChoices(t) as misses (misses)}
-                  {@const on = t.misses === misses}
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    class={[
-                      "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
-                      on &&
-                        misses !== Infinity &&
-                        "border-primary bg-primary/15 text-heading",
-                      on &&
-                        misses === Infinity &&
-                        "border-danger bg-danger/10 text-danger",
-                      !on && "border-border text-body hover:text-heading",
-                    ]}
-                    title={tipChoiceHint(t.tip, misses)}
-                    onclick={() => controls.setTipMisses(t.tip, misses)}
-                    >{tipChoiceLabel(misses)}</button
-                  >
-                {/each}
-              </div>
-            </div>
-          {/each}
-          {#each stopsOf(robot) as stop (stop.cardId)}
-            {@const onTime = stopOnTime(robot, stop)}
-            <div
-              class="flex flex-col gap-0.5 text-[11px]"
-              role="radiogroup"
-              aria-label={triggerLabel(stop.condition)}
-            >
-              <span
-                class={[
-                  "truncate font-medium",
-                  onTime ? "text-heading" : "text-danger",
-                ]}
-                title={`${stop.name} · ${stop.asks}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
-                >{triggerLabel(stop.condition)}</span
-              >
-              <div class="flex flex-wrap gap-1">
-                {#each [true, false] as planned (planned)}
-                  {@const on = onTime === planned}
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    class={[
-                      "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
-                      on &&
-                        planned &&
-                        "border-primary bg-primary/15 text-heading",
-                      on &&
-                        !planned &&
-                        "border-danger bg-danger/10 text-danger",
-                      !on && "border-border text-body hover:text-heading",
-                    ]}
-                    title={planned
-                      ? `It comes: ${stop.planned}`
-                      : `It does not come: ${stop.late}`}
-                    onclick={() => setStop(robot, stop, planned)}
-                    >{planned ? "✓" : "✗"}</button
-                  >
-                {/each}
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
+      </details>
+    {/if}
   </section>
+{/snippet}
+
+{#snippet robotQuestions(robot: RobotInfo)}
+  <!-- Fork: what can happen to one robot in the match: it runs or is a no-show, its INIT picks
+       (the Driver Station's rows), and its stops other than the TIPs (whatIfs.ts). -->
+  {@const still = controls.still[robot.file] ?? false}
+  <span
+    class="flex min-w-0 items-center gap-1 text-[11px] font-medium whitespace-nowrap text-heading"
+  >
+    <span
+      class="inline-block size-2 shrink-0 rounded-full"
+      style={`background: ${robot.color}`}
+    ></span>
+    {robot.name}
+  </span>
+  <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+    <div class="flex gap-1" role="radiogroup" aria-label={`${robot.name} runs`}>
+      {#each [false, true] as noShow (noShow)}
+        {@const on = still === noShow}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={on}
+          class={[
+            "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
+            on && !noShow && "border-primary bg-primary/15 text-heading",
+            on && noShow && "border-danger bg-danger/10 text-danger",
+            !on && "border-border text-body hover:text-heading",
+          ]}
+          title={noShow
+            ? "The robot stays at its start: a partner that does not run its Auto"
+            : "The robot runs its Auto"}
+          onclick={() => controls.setStill(robot.file, noShow)}
+          >{noShow ? "no-show" : "runs"}</button
+        >
+      {/each}
+    </div>
+    {#if !still}
+      {#each routeChoices(robot.auto) as choice (choice.condition)}
+        {@const leg = legOf(robot, choice)}
+        <label
+          class={[
+            "flex items-center gap-1",
+            leg === 1 ? "font-semibold text-heading" : "text-body",
+          ]}
+          title={`The INIT menu's ${choice.option} row: which way the robot goes. ${choice.legs[0]} is the one drawn.`}
+        >
+          <span class="shrink-0">INIT</span>
+          <select
+            class={[fieldClass, "!w-auto min-w-0 !py-0.5 text-[11px]"]}
+            aria-label={`INIT ${choice.option}`}
+            value={leg}
+            onchange={(event) =>
+              controls.setTrigger(
+                robot.file,
+                robot.auto,
+                choice.condition,
+                (event.currentTarget as HTMLSelectElement).value === "0",
+              )}
+          >
+            <option value={0}>{choiceLabel(choice, 0)}</option>
+            <option value={1}>{choiceLabel(choice, 1)}</option>
+          </select>
+        </label>
+      {/each}
+      {#each stopsOf(robot) as stop (stop.cardId)}
+        {@const onTime = stopOnTime(robot, stop)}
+        <span
+          class="flex items-center gap-1"
+          role="radiogroup"
+          aria-label={triggerLabel(stop.condition)}
+        >
+          <span
+            class={onTime ? "text-body" : "font-semibold text-danger"}
+            title={`${stop.name} · ${stop.asks}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
+            >{triggerLabel(stop.condition)}</span
+          >
+          {#each [true, false] as planned (planned)}
+            {@const on = onTime === planned}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={on}
+              class={[
+                "rounded-md border px-1.5 py-0.5 font-semibold leading-tight transition",
+                on && planned && "border-primary bg-primary/15 text-heading",
+                on && !planned && "border-danger bg-danger/10 text-danger",
+                !on && "border-border text-body hover:text-heading",
+              ]}
+              title={planned
+                ? `It comes: ${stop.planned}`
+                : `It does not come: ${stop.late}`}
+              onclick={() => setStop(robot, stop, planned)}
+              >{planned ? "✓" : "✗"}</button
+            >
+          {/each}
+        </span>
+      {/each}
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet tipRows()}
+  <!-- Fork: the TIPs the robots try for (tipToggles.ts), the HIVE's and not one robot's: for each,
+       which volley TIPs it, named by whose it is and when it lands, or never. The field and the
+       timeline show what each robot then does. -->
+  {#each tips as t (t.tip)}
+    <span
+      class={[
+        "text-[11px] font-medium whitespace-nowrap",
+        t.misses === Infinity ? "text-danger" : "text-heading",
+      ]}>TIP {t.tip} comes on</span
+    >
+    <div
+      class="flex flex-wrap items-center gap-1 text-[11px]"
+      role="radiogroup"
+      aria-label={`TIP ${t.tip}`}
+    >
+      {#each tipChoices(t) as misses (misses)}
+        {@const on = t.misses === misses}
+        {@const at = t.tryList[misses]}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={on}
+          class={[
+            "flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
+            on &&
+              misses !== Infinity &&
+              "border-primary bg-primary/15 text-heading",
+            on &&
+              misses === Infinity &&
+              "border-danger bg-danger/10 text-danger",
+            !on && "border-border text-body hover:text-heading",
+          ]}
+          title={tipChoiceHint(t.tip, misses)}
+          onclick={() => controls.setTipMisses(t.tip, misses)}
+        >
+          {#if at && robots[at.robot]}<span
+              class="inline-block size-2 shrink-0 rounded-full"
+              style={`background: ${robots[at.robot].color}`}
+            ></span>{/if}{tryLabel(t, misses)}</button
+        >
+      {/each}
+    </div>
+  {/each}
 {/snippet}
 
 {#snippet hivePanel()}
@@ -539,47 +599,42 @@
 {:else if part === "hive"}
   {@render hivePanel()}
 {:else}
-  <div class="flex flex-col gap-2" bind:clientWidth={width}>
-    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-      <span class={labelClass}>What if</span>
-      {#each MATCH_PRESETS as preset (preset.id)}
+  <div class="flex flex-col gap-1.5" bind:clientWidth={width}>
+    <!-- Fork: the answer first, then the questions that change it (mentor, 17 Nov 2026: the
+         Match view had grown a control for every idea; what is left asks about the match). -->
+    <div class="flex items-center gap-2">
+      <p
+        class="min-w-0 flex-1 text-xs font-semibold text-heading"
+        title="TIPs settled by 30 s, how each robot ends, and whether the two robots touch, in this look"
+      >
+        {#if result}<span
+            class="mr-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
+            >Result</span
+          >{result}{/if}
+      </p>
+      {#if controls.changed}
         <button
           type="button"
-          class={[
-            "rounded-md border px-2 py-0.5 transition",
-            controls.preset === preset.id
-              ? "border-primary bg-primary/15 text-heading"
-              : "border-border text-body hover:text-heading",
-          ]}
-          title={preset.title}
-          onclick={() =>
-            controls.apply(
-              preset,
-              robots.map((r) => r.file),
-              base,
-            )}>{preset.label}</button
+          class="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-body hover:text-heading"
+          title="Back to the team's timing, every TIP on its first try, every INIT choice as drawn and every robot running"
+          onclick={() => controls.reset()}>Reset</button
         >
-      {/each}
-      <button
-        type="button"
-        class="ml-auto rounded-md border border-warning/60 px-2 py-0.5 text-heading hover:bg-warning/10 disabled:opacity-50"
-        disabled={tipping.searching}
-        title="For every slider, the nearest value up and down where the match comes out differently: TIPs by 30 s, how a wait ends, or the endgame guard parking a robot. Marked on the slider; everything else held where it is."
-        onclick={findTicks}
-        >{tipping.searching
-          ? `Searching… ${Object.keys(tipping.ticks).length}`
-          : tipping.searched
-            ? "Tipping points ✓"
-            : "Find tipping points"}</button
-      >
-      <button
-        type="button"
-        class="rounded-md border border-border px-2 py-0.5 text-body hover:text-heading disabled:opacity-40"
-        disabled={!controls.changed}
-        title="Back to the team's timing.json, every trigger coming, every INIT choice as drawn and every robot moving"
-        onclick={() => controls.reset()}>Team values</button
-      >
+      {/if}
+      <Menu label="More" entries={moreEntries} align="end" />
     </div>
+    <div class="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
+      {@render tipRows()}
+      {#each robots as robot (robot.file)}
+        {@render robotQuestions(robot)}
+      {/each}
+    </div>
+    {#if tipping.searching || tipping.searched}
+      <p class="text-[10px] text-warning">
+        {tipping.searching
+          ? `Finding tipping points… ${Object.keys(tipping.ticks).length}`
+          : "Tipping points are marked on each robot's timing sliders."}
+      </p>
+    {/if}
     {#if part === "bar"}
       <!-- Only the bar: the robots are in the side panels, the HIVE behind its label. -->
     {:else if narrow}

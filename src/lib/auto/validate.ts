@@ -202,12 +202,16 @@ export function validateAuto(
       if (card.rows.some((row) => !row.label?.trim() || row.cards.length === 0))
         error(card.id, `${name}: each leg of the "${card.choice}" choice needs a name and at least one step.`);
       // A leg holds drives, commands and plain waits. It may end with the park, if the other leg
-      // does too: then each way parks by its own road and nothing follows the choice.
+      // does too: then each way parks by its own road and nothing follows the choice. Or it may
+      // end with a check whose every outcome parks (a wait that parks): the leg then holds the rest
+      // of its own route, as L-NoCross's "if no TIP 1: CROSS AND FIX IT or WAIT FOR PARTNER FIX" does.
       const isPark = (c: AutoCard) => c.kind === "path" && c.park;
-      const parkLast = (row: (typeof card.rows)[number]) =>
-        row.cards.length > 0 && isPark(row.cards[row.cards.length - 1]);
-      if (card.rows.some((row) => row.cards.some((c, i) => childLists(c).some((list) => list.length > 0) || (isPark(c) && i !== row.cards.length - 1) || c.kind === "rejoin")))
-        error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only, and may end with the park; a decision goes after it.`);
+      const parks = (c: AutoCard | undefined): boolean =>
+        !!c && (isPark(c) || (c.kind === "firstOf" && !c.choice && c.rows.every((row) => parks(row.cards[row.cards.length - 1]))));
+      const parkLast = (row: (typeof card.rows)[number]) => parks(row.cards[row.cards.length - 1]);
+      const flat = (c: AutoCard) => !childLists(c).some((list) => list.length > 0) && !isPark(c) && c.kind !== "rejoin";
+      if (card.rows.some((row) => row.cards.some((c, i) => !flat(c) && !(i === row.cards.length - 1 && parks(c)))))
+        error(card.id, `${name}: a leg of the "${card.choice}" choice holds drives, commands and plain waits only, and may end with the park or with a check whose every outcome parks; any other decision goes after it.`);
       if (card.rows.some(parkLast) && !card.rows.every(parkLast))
         error(card.id, `${name}: one leg of the "${card.choice}" choice ends with the park and the other does not; both park, or the park goes after the choice.`);
       if (card.shot || card.alongside || card.partnerWait)

@@ -107,7 +107,9 @@
     {/if}
 
     <!-- Fork: never squeezed to a sliver under a tall builder; the panel scrolls to it instead. -->
-    <div class="shrink-0">
+    <!-- Fork: in the Match view each side panel has its own Edit button; the list that picked
+         the Autos is only for picking them. -->
+    <div class={["shrink-0", auto.matchSides && "hidden"]}>
       <PanelSection
         title="Overlays"
         count={overlays.items.length || undefined}
@@ -116,6 +118,5 @@
         <OverlayList {overlays} />
       </PanelSection>
     </div>
-
   </div>
 </aside>
