@@ -562,6 +562,13 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   as the fallback. Upstream's plain box is `public/robot-plain.png`, "Plain" in the robot images.
   `RobotSettingsSection.svelte` — "Use our robot" sets the open file to `TEAM_ROBOT`, and the
   feature list.
+- `src/lib/components/RobotTurret.svelte`, `src/lib/simple/aim.ts` — our robot's turret is drawn by
+  the field, not in the robot's image, so it turns: straight ahead as an Auto holds it, on our CELL
+  at the robot's end of the field while a Pick flower and launch runs and on the drive before it
+  (`turretSpans`), with the line of the shot. The crosshair button on the field's toolbar
+  (`stores.ts` `turretTracks`) draws it on the CELL for the whole Auto, as the robot runs with
+  `BuiltAuto.turretTracks` turned on. The turret's place and the aim's numbers are biobuzz's
+  (`TurretSubsystem`, `TurretAim`): change one, change the other.
 - `src/lib/simple/` — the simple builder, the left panel's first view: a start (right or left),
   then steps from a palette (Launch all, Drive to a spot, Pick flower, Park), each an ordinary
   card, so files, preview and export are unchanged. A drive's heading turns from the step before
@@ -574,7 +581,13 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   square-up, the stick, the push along the line to 12 in from the FLOWER, the dwell and the
   back-out to where the push started, where it ends. A pick the robot would refuse (not in front of
   the FLOWER, more than 12 in off its line, or more than 30° from square) is marked red, and one that squares
-  up is marked so the spot can be moved onto the line. Its card gets an 8 s timeout. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
+  up is marked so the spot can be moved onto the line. Its card gets an 8 s timeout. Pick flower
+  and launch is biobuzz's `FlowerVolley` (the PickFlowerLaunch card, never run on a robot yet): the
+  same pick, with the load the robot arrived with fired from against the FLOWER and the FLOWER's
+  four following, for a robot whose turret aims. The preview runs it as a pick that lands two
+  volleys' worth (`timing/model.ts`, `volleysIn`), in two volleys' feeds and a second of moves; the
+  step is red where the turret has no shot (more than 26° off square to the HIVE: any FLOWER but the
+  one on the far wall), and the command joins an Auto's list only with its first such step. Garden gather is biobuzz's `GardenGather` (D-pad down and the GardenGather
   card, on the same sequence as the pick): `garden.ts` holds its numbers, and the preview draws the
   drive in to the nearest GARDEN, turning as a Pedro path does, the dwell and the drive back, its
   time from the distance at the robot's speed caps. The builder is the only editor: `src/state/auto.svelte.ts` — `simple` says

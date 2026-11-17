@@ -4,6 +4,7 @@
  *
  *   Launch all    an action card, LaunchAll
  *   Pick flower   an action card, PickFlower
+ *   Pick flower and launch   an action card, PickFlowerLaunch
  *   Drive to X    a path card whose path ends on the named point X
  *   Park at X     the same, marked as the park path
  *
@@ -42,7 +43,14 @@ import type {
 } from "../auto/types";
 import { robotFootprints } from "../../model/collision";
 import { ownHalf, pickFrom, type Flower } from "./flowers";
-import { aimFrom, type Aim } from "./aim";
+import {
+  aimFrom,
+  MAX_OFF_SQUARE_DEG,
+  PICK_FLOWER_LAUNCH,
+  turretAimFrom,
+  type Aim,
+  type TurretAim,
+} from "./aim";
 import {
   gardenFor,
   MAX_RANGE_IN as GARDEN_RANGE_IN,
@@ -53,6 +61,8 @@ export type StepKind =
   | "launch"
   | "spinup"
   | "pick"
+  /** Pick flower and launch: the pick that fires from the FLOWER (biobuzz FlowerVolley). */
+  | "pickLaunch"
   | "gather"
   /** A command the builder has no step of its own for: shown by its name, with its time limit. */
   | "command"
@@ -80,6 +90,11 @@ export interface Step {
   squares?: boolean;
   /** Pick flower, Garden gather: why the robot would refuse, or null when it will do it. */
   problem?: string | null;
+  /**
+   * Pick flower and launch: the turret's shot from against the FLOWER (aim.ts, turretAimFrom at the
+   * pick's contact point), for the step's line and its check.
+   */
+  shot?: TurretAim;
   /** Launch all: where it goes with the turret locked (aim.ts), and the spot it is launched from. */
   aim?: Aim;
   atSpot?: string | null;
@@ -149,6 +164,7 @@ export const LEG_KINDS: StepKind[] = [
   "launch",
   "spinup",
   "pick",
+  "pickLaunch",
   "gather",
   "drive",
   "wait",
@@ -272,6 +288,8 @@ export const LAUNCH_ALL = "LaunchAll";
 export const SPIN_UP = "SpinUp";
 export const PICK_FLOWER = "PickFlower";
 export const GARDEN_GATHER = "GardenGather";
+/** Pick flower and launch's typical seconds (biobuzz AutoRegistration.PICK_FLOWER_LAUNCH_TYPICAL_S, an estimate). */
+export const PICK_FLOWER_LAUNCH_TYPICAL_S = 6;
 /**
  * A pick's card timeout, seconds: longer than a pick, as the robot code asks (a card's default
  * 5 s can cut it short).
@@ -349,6 +367,39 @@ function walkSteps(
         timeoutS: card.timeoutS,
         flower: pick.flower,
         problem: pick.ok ? null : pick.why,
+        squares: pick.ok && pick.squares,
+      };
+    }
+    if (card.kind === "action" && card.name === PICK_FLOWER_LAUNCH) {
+      // The same pick, with the load fired from against the FLOWER: the turret must have a shot
+      // at our CELL from there, which only the FLOWER on the far wall gives (FlowerVolley).
+      const pick = pickFrom(at.here.x, at.here.y, at.here.h);
+      if (pick.ok && pick.squares)
+        at.here = {
+          x: pick.start.x,
+          y: pick.start.y,
+          h: pick.start.headingDeg,
+        };
+      const shot = pick.ok
+        ? turretAimFrom(
+            pick.contact.x,
+            pick.contact.y,
+            pick.start.headingDeg,
+            auto.drawnFor,
+          )
+        : undefined;
+      return {
+        ...base,
+        kind: "pickLaunch",
+        label: "Pick flower and launch",
+        timeoutS: card.timeoutS,
+        flower: pick.flower,
+        shot,
+        problem: !pick.ok
+          ? pick.why
+          : shot && shot.offSquareDeg > MAX_OFF_SQUARE_DEG
+            ? `From the ${pick.flower.name} our CELL is ${shot.offSquareDeg.toFixed(0)}° off square (at most ${MAX_OFF_SQUARE_DEG}): no shot from there`
+            : null,
         squares: pick.ok && pick.squares,
       };
     }
@@ -711,16 +762,37 @@ export function addStep(
       }
     } else if (kind === "spinup") {
       card = { id: makeCardId(), kind: "action", name: SPIN_UP };
-    } else if (kind === "launch" || kind === "pick" || kind === "gather") {
+    } else if (
+      kind === "launch" ||
+      kind === "pick" ||
+      kind === "pickLaunch" ||
+      kind === "gather"
+    ) {
       card =
         kind === "launch"
           ? { id: makeCardId(), kind: "action", name: LAUNCH_ALL }
           : {
               id: makeCardId(),
               kind: "action",
-              name: kind === "pick" ? PICK_FLOWER : GARDEN_GATHER,
+              name:
+                kind === "pick"
+                  ? PICK_FLOWER
+                  : kind === "pickLaunch"
+                    ? PICK_FLOWER_LAUNCH
+                    : GARDEN_GATHER,
               timeoutS: PICK_TIMEOUT_S,
             };
+      if (
+        kind === "pickLaunch" &&
+        !auto.registry.actions.includes(PICK_FLOWER_LAUNCH)
+      ) {
+        // An Auto whose command list was loaded before the robot had this card.
+        auto.registry.actions = [...auto.registry.actions, PICK_FLOWER_LAUNCH];
+        auto.registry.typicalS = {
+          ...auto.registry.typicalS,
+          [PICK_FLOWER_LAUNCH]: PICK_FLOWER_LAUNCH_TYPICAL_S,
+        };
+      }
     } else {
       const point = spot ? auto.points[spot] : undefined;
       if (!spot || !point) throw new Error(`No spot named ${spot ?? "(none)"}`);

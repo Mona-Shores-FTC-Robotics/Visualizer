@@ -23,6 +23,12 @@ import {
 } from "../src/lib/auto/simulate";
 import { generateAutoJava } from "../src/lib/codegen/auto/javaAuto";
 import {
+  fallbackValues,
+  hiveHistory,
+  previewTiming,
+} from "../src/lib/timing/model";
+import { volleysOf } from "../src/lib/timing/together";
+import {
   pickFrom,
   contactPose,
   flowerFor,
@@ -1895,6 +1901,88 @@ describe("steps the builder has no control of its own for", () => {
     expect(moved.auto!.cards[0]).toEqual(doc.auto!.cards.at(-1));
     expect(stepsOf(removeStep(doc, "old")).some((s) => s.kind === "other")).toBe(
       false,
+    );
+  });
+});
+
+// Fork: the pick that fires from the FLOWER (biobuzz FlowerVolley, the PickFlowerLaunch card).
+describe("Pick flower and launch", () => {
+  function eightShot(): ProjectDoc {
+    let doc = fresh();
+    doc = addSpot(doc, "WALL_PICK", 26.71, 47.36, 180);
+    doc = addSpot(doc, "FAR_PICK", 47.36, 114.79, 90);
+    doc = addSpot(doc, "PARK", 14, 100, 270);
+    doc = add(doc, "launch");
+    doc = add(doc, "drive", "WALL_PICK");
+    doc = add(doc, "pick");
+    doc = add(doc, "drive", "FAR_PICK");
+    doc = add(doc, "pickLaunch");
+    return add(doc, "park", "PARK");
+  }
+
+  it("is a step of its own, with the turret's shot from against the FAR FLOWER", () => {
+    const doc = eightShot();
+    const step = stepsOf(doc).find((s) => s.kind === "pickLaunch")!;
+    expect(step.label).toBe("Pick flower and launch");
+    expect(step.flower?.name).toBe("FAR FLOWER");
+    expect(step.problem).toBeNull();
+    expect(step.shot?.cell).toBe("SCORING");
+    expect(Math.abs(step.shot!.turretDeg)).toBeGreaterThan(160);
+    expect(isSimple(doc)).toBe(true);
+    // The Auto's own list gains the command; the robot's default list does not change for it.
+    expect(doc.auto!.registry.actions).toContain("PickFlowerLaunch");
+    expect(doc.auto!.registry.typicalS?.PickFlowerLaunch).toBe(6);
+    expect(teamRegistry().actions).not.toContain("PickFlowerLaunch");
+  });
+
+  it("is refused at the WALL FLOWER, where the CELL opens side-on", () => {
+    let doc = fresh();
+    doc = addSpot(doc, "WALL_PICK", 26.71, 47.36, 180);
+    doc = add(doc, "drive", "WALL_PICK");
+    doc = add(doc, "pickLaunch");
+    const step = stepsOf(doc).find((s) => s.kind === "pickLaunch")!;
+    expect(step.problem).toMatch(/off square/);
+  });
+
+  it("exports as one command and previews as a pick that lands two volleys' worth", () => {
+    const doc = eightShot();
+    const java = generateAutoJava({
+      auto: doc.auto!,
+      startPoint: doc.startPoint,
+      lines: relink(doc.startPoint, doc.lines, doc.auto!, settings).lines,
+      shapes: [],
+      settings,
+      sourceFileName: "eight-shot.pp",
+    });
+    expect(java.ok, JSON.stringify(java)).toBe(true);
+    if (java.ok) expect(java.source).toContain('kit.command("PickFlowerLaunch", 8)');
+
+    const result = preview(doc);
+    const run = result.actions.find((a) => a.command === "PickFlowerLaunch")!;
+    expect(run.t1 - run.t0).toBeCloseTo(6, 6);
+    // It drives in to the FLOWER and back, as a pick does.
+    expect(result.motions.some((m) => m.cardId === run.cardId)).toBe(true);
+    const volleys = volleysOf([result]);
+    expect(volleys.map((v) => v.volleys ?? 1)).toEqual([1, 2]);
+    // The preloads tip the HIVE; the eight then fill the CELL that raised, alone.
+    const values = fallbackValues();
+    const history = hiveHistory(volleys, values);
+    expect(history.tips.length).toBe(2);
+    expect(history.volleys[1].load).toBe(2 * values.volleyLoad);
+  });
+
+  it("takes two volleys' feeds and its moves with typical timing, and waits for the launcher", () => {
+    const values = fallbackValues();
+    const timing = previewTiming(values, []);
+    timing.commandRan?.("SpinUp", 0, 0);
+    expect(timing.actionSeconds("PickFlowerLaunch", 20)).toBeCloseTo(
+      1 + 2 * values.volleyS,
+      6,
+    );
+    const cold = previewTiming(values, []);
+    expect(cold.actionSeconds("PickFlowerLaunch", 0)).toBeCloseTo(
+      values.spinUpS + 1 + 2 * values.volleyS,
+      6,
     );
   });
 });

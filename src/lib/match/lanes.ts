@@ -12,7 +12,7 @@ import { pathDisplayNames } from "../auto/geometry";
 import {
   hiveHistory,
   TIP_CONDITIONS,
-  VOLLEY_COMMAND,
+  volleysIn,
   SPIN_UP_COMMAND,
   type CausedTip,
   type TimingValues,
@@ -124,7 +124,7 @@ export function laneName(filePath: string): string {
 }
 
 function segmentKind(command: string): SegmentKind {
-  if (command === VOLLEY_COMMAND) return "volley";
+  if (volleysIn(command) > 0) return "volley";
   if (command === SPIN_UP_COMMAND) return "spinup";
   if (command === "PickFlower") return "pick";
   if (command === "GardenGather") return "gather";
@@ -132,6 +132,7 @@ function segmentKind(command: string): SegmentKind {
 }
 
 const LABELS: Record<string, string> = {
+  PickFlowerLaunch: "Pick flower and launch",
   LaunchAll: "Launch all",
   PickFlower: "Pick flower",
   GardenGather: "Garden gather",
@@ -218,7 +219,7 @@ export function matchLanes(
     ].sort((a, b) => a.t0 - b.t0);
 
     const volleyRuns = [...preview.launches, ...preview.actions]
-      .filter((l) => l.command === VOLLEY_COMMAND && !l.unfired)
+      .filter((l) => volleysIn(l.command) > 0 && !l.unfired)
       .sort((a, b) => a.t1 - b.t1);
     const effects = history.volleys.filter((v) => v.robot === robot);
     const volleys = volleyRuns.map((run, i): VolleyMark => {

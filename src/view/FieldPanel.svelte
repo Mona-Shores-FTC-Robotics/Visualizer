@@ -35,6 +35,15 @@
   import FieldLoadingOverlay from "../lib/components/FieldLoadingOverlay.svelte";
   import RobotSprite from "../lib/components/RobotSprite.svelte";
   import RobotFeatures from "../lib/components/RobotFeatures.svelte";
+  import RobotTurret from "../lib/components/RobotTurret.svelte";
+  import { drawsTeamRobot } from "../lib/auto/teamRobot";
+  import {
+    turretAimFrom,
+    turretDegAt,
+    turretOnAt,
+    turretSpans,
+  } from "../lib/simple/aim";
+  import { turretTracks } from "../stores";
   import MathTools from "../lib/MathTools.svelte";
   import PathStrokes from "./scene/PathStrokes.svelte";
   import PathMarkers from "./scene/PathMarkers.svelte";
@@ -205,6 +214,27 @@
       };
     }),
   );
+
+  /**
+   * Fork: our robot's turret at the playhead: where a tracking turret would point from `pose`, and
+   * how far round it is (straight ahead, unless a card of `preview` aims it or the view's "turret
+   * tracks" is on).
+   */
+  const turretAt = (
+    pose: { x: number; y: number; heading: number },
+    preview: Parameters<typeof turretSpans>[0] | null | undefined,
+    alliance: "RED" | "BLUE" | undefined,
+  ) => {
+    const aim = turretAimFrom(pose.x, pose.y, pose.heading, alliance ?? "RED");
+    const spans = preview ? turretSpans(preview) : [];
+    const on = turretOnAt(matchSeconds, spans, $turretTracks);
+    return {
+      deg: turretDegAt(matchSeconds, aim.turretDeg, spans, $turretTracks),
+      // The line of the shot only while the turret is on the CELL.
+      aim: on === 1 ? aim : null,
+    };
+  };
+  let showTurret = $derived(drawsTeamRobot(settings));
 
   /** Screen pose for a robot sprite; sprites rotate clockwise. */
   const sprite = (pose: { x: number; y: number; heading: number }) => ({
@@ -547,6 +577,21 @@
             zIndex={20 - index}
             opacity={1 - index * 0.15}
           />
+          {#if showTurret}
+            {@const turret = turretAt(
+              pose,
+              auto.overlayTogether.previews.get(overlays.items[index]),
+              overlays.items[index]?.doc.auto?.drawnFor,
+            )}
+            <RobotTurret
+              {pose}
+              turretDeg={turret.deg}
+              aim={turret.aim}
+              {pixels}
+              zIndex={20 - index}
+              opacity={1 - index * 0.15}
+            />
+          {/if}
         {/each}
       {:else}
         {@const { xy, heading } = boxSprite(playback.robotPose)}
@@ -563,6 +608,19 @@
           onImageSettled={() => (loadedRobotImage = robotImageSrc)}
         />
         <RobotFeatures pose={playback.robotPose} robot={settings} {pixels} />
+        {#if showTurret}
+          {@const turret = turretAt(
+            playback.robotPose,
+            auto.preview,
+            doc.auto?.drawnFor,
+          )}
+          <RobotTurret
+            pose={playback.robotPose}
+            turretDeg={turret.deg}
+            aim={turret.aim}
+            {pixels}
+          />
+        {/if}
       {/if}
 
       <svg

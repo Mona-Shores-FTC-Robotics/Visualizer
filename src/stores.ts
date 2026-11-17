@@ -27,6 +27,12 @@ function createGridSizeStore() {
 export const gridSize = createGridSizeStore();
 export const currentFilePath = writable<string | null>(null);
 export const snapToGrid = writable(true);
+/**
+ * Fork: draw our robot's turret on our CELL for the whole Auto, as the robot runs it with
+ * BuiltAuto.turretTracks turned on in Panels. Off (the robot's default), the turret is straight
+ * ahead except while a card of the Auto aims it (lib/simple/aim.ts, turretSpans).
+ */
+export const turretTracks = writable(false);
 
 // Multiple paths visualization stores
 export const activePaths = writable<string[]>([]);
