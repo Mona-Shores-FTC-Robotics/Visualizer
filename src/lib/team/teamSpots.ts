@@ -306,24 +306,58 @@ export function aimMovedLaunchSpots(
   return isSimple(next) ? layHeadings(next) : next;
 }
 
+/** This Auto's own spots as last seen, and which a Launch all fired from: see {@link aimOwnLaunchSpots}. */
+export interface OwnSpotsSeen {
+  points: Readonly<Record<string, NamedPoint>>;
+  launchFrom: ReadonlySet<string>;
+}
+
+/** The spots of this Auto's own that a Launch all fires from (not team spots, not starts). */
+function ownLaunchSpots(doc: ProjectDoc): Set<string> {
+  const team = new Set(doc.auto?.teamSpots ?? []);
+  const out = new Set<string>();
+  for (const step of everyStep(stepsOf(doc)))
+    if (
+      step.kind === "launch" &&
+      step.atSpot &&
+      !team.has(step.atSpot) &&
+      !isStartName(step.atSpot)
+    )
+      out.add(step.atSpot);
+  return out;
+}
+
+/** What {@link aimOwnLaunchSpots} compares the next edit with. */
+export function ownSpotsSeen(doc: ProjectDoc): OwnSpotsSeen {
+  return { points: doc.auto?.points ?? {}, launchFrom: ownLaunchSpots(doc) };
+}
+
 /**
  * The document with each of this Auto's own spots that a Launch all fires from turned to aim at
- * its CELL (aim.ts launchSpotHeadingDeg), as an unlocked …_AUTO_… team spot is; `doc` itself when
- * each already does. biobuzz's AutoVolleySpotsTest holds every spot an Auto launches from to that
- * aim (AutoLaunchSpots.launchSpotProblem), so its heading is not the drawer's to set. Starts are
- * placed by the marks and team spots by the team, so neither turns here; nor does an Auto drawn
- * for BLUE, whose spots are not red's.
+ * its CELL (aim.ts launchSpotHeadingDeg) when it has just been made, moved, or become a spot a
+ * Launch all fires from since `seen`; `doc` itself when none has. biobuzz's AutoVolleySpotsTest
+ * holds every spot an Auto launches from to that aim (AutoLaunchSpots.launchSpotProblem). Only an
+ * edit turns one: a file opened as it is stays as it is (its launches show how far off they are).
+ * Starts are placed by the marks and team spots by the team, so neither turns here; nor does an
+ * Auto drawn for BLUE, whose spots are not red's.
  */
-export function aimOwnLaunchSpots(doc: ProjectDoc): ProjectDoc {
+export function aimOwnLaunchSpots(
+  doc: ProjectDoc,
+  seen: OwnSpotsSeen | null,
+): ProjectDoc {
   const auto = doc.auto;
-  if (!auto || auto.drawnFor === "BLUE") return doc;
-  const team = new Set(auto.teamSpots ?? []);
+  if (!auto || !seen || auto.drawnFor === "BLUE") return doc;
   let points: Record<string, NamedPoint> | null = null;
-  for (const step of everyStep(stepsOf(doc))) {
-    const name = step.kind === "launch" ? step.atSpot : null;
-    if (!name || team.has(name) || isStartName(name)) continue;
-    const point = (points ?? auto.points)[name];
+  for (const name of ownLaunchSpots(doc)) {
+    const point = auto.points[name];
+    const before = seen.points[name];
     if (!point) continue;
+    const touched =
+      !before ||
+      before[0] !== point[0] ||
+      before[1] !== point[1] ||
+      !seen.launchFrom.has(name);
+    if (!touched) continue;
     const heading = launchSpotHeadingDeg(point[0], point[1]);
     if (point[2] === heading) continue;
     points ??= { ...auto.points };
