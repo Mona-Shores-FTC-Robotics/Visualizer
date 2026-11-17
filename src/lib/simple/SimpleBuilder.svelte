@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toggleSpotLock } from "../team/spotUnlock";
   // Fork: the simple builder. An Auto as a short list of our robot's steps (lib/simple/steps.ts):
   // pick a start, then add Launch all, Drive to, Pick flower and Park from the palette, by click
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
@@ -45,7 +46,6 @@
     spotsStatus,
     saveSpotsOpen,
     savedSpots,
-    setSpotUnlocked,
     spotEdits,
     teamSpots,
     unlockedSpots,
@@ -245,7 +245,9 @@
 
   /** A list's key for drag-and-drop: the main list, or the wait whose Otherwise it is. */
   const listKey = (into: StepList) =>
-    into ? `${into.waitCardId}${into.leg === undefined ? "" : `/${into.leg}`}` : "";
+    into
+      ? `${into.waitCardId}${into.leg === undefined ? "" : `/${into.leg}`}`
+      : "";
 
   /**
    * Fork: team spots this Auto links that the team's list does not have: made as team spots on a
@@ -340,6 +342,11 @@
 
   function apply(next: typeof doc) {
     if (next !== doc) project.apply(() => next);
+  }
+
+  /** A team spot's lock: unlocking one other Autos use asks whether to move it for all (spotUnlock.ts). */
+  function lockSpot(name: string, unlocked: boolean) {
+    void toggleSpotLock(name, unlocked, () => project.doc, apply);
   }
 
   function chooseStart(name: string) {
@@ -707,7 +714,7 @@
               ? "Unlocked: dragging its end on the field moves this team spot. Lock it again"
               : "A team spot, locked. Unlock it to move it (every Auto that uses it moves with it once saved)"}
             aria-label={open ? "Lock team spot" : "Unlock team spot"}
-            onclick={() => setSpotUnlocked(step.spot!, !open)}
+            onclick={() => lockSpot(step.spot!, open)}
           >
             {#if open}<LockOpen class="size-3.5" />{:else}<Lock
                 class="size-3.5"
@@ -746,7 +753,8 @@
             title="If a partner parks where we planned to, the drive team picks another park in INIT with the D-pad's left and right. Every park path goes there instead."
           >
             <span
-              >Drive team may pick in INIT (Driver Station: <span class="font-mono"
+              >Drive team may pick in INIT (Driver Station: <span
+                class="font-mono"
                 >{initRow("choice", "Park", step.spot ?? "")}</span
               >):</span
             >
@@ -777,8 +785,8 @@
               ? `, leaving by ${fmt(by)} s at the latest`
               : ""}.{visits > 1
               ? ` All ${visits} drives to ${step.spot} share this park.`
-              : ""} To bend it, press Edit park path shape in the Step panel, add a
-            control point and drag it on the field.</span
+              : ""} To bend it, press Edit park path shape in the Step panel, add
+            a control point and drag it on the field.</span
           >
           <button type="button" class="simple-tile" onclick={closePark}
             >Done</button
@@ -857,277 +865,285 @@
         />
       </div>
       {#if step.waitFor === ALWAYS}
-      <!-- Fork: a clock check (steps.ts ALWAYS): it never waits, it takes one way or the other. -->
-      <div
-        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-      >
-        <span>If the match clock reads before</span>
-        <span class="inline-flex items-center gap-1">
-          <input
-            class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
-            type="number"
-            min="0"
-            step="0.5"
-            aria-label="Seconds"
-            value={step.waitS}
-            onchange={(e) =>
-              apply(
-                setWait(doc, step.cardId, {
-                  seconds: Number(e.currentTarget.value) || 0.1,
-                }),
-              )}
-          />s,
-        </span>
-        <span>the robot goes straight on with the steps below. It never waits here.</span>
-      </div>
-      <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body">
-        <button
-          type="button"
-          class={["simple-option", step.waitOption && "simple-option--on"]}
-          aria-pressed={!!step.waitOption}
-          title="The drive team may move this time in INIT: D-pad up and down pick its row, left and right change it."
-          onclick={() =>
-            apply(
-              setWait(doc, step.cardId, {
-                option: step.waitOption ? null : newTimeName(doc),
-              }),
-            )}
-          >{step.waitOption ? "✓ " : ""}Set in INIT</button
+        <!-- Fork: a clock check (steps.ts ALWAYS): it never waits, it takes one way or the other. -->
+        <div
+          class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
         >
-        {#if step.waitOption}
-          <span>as</span>
-          <input
-            class={[fieldClass, "!w-32 !py-0.5 text-xs"]}
-            aria-label="Name on the INIT menu"
-            value={step.waitOption}
-            onchange={(e) =>
-              apply(
-                setWait(doc, step.cardId, {
-                  option: e.currentTarget.value || step.waitOption,
-                }),
-              )}
-          />
-        {/if}
-      </div>
-      {#if step.waitOption}
-        <p class="mt-1 pl-6 text-xs text-body">
-          Driver Station: <span class="font-mono">{initRow("time", step.waitOption, step.waitS ?? 0)}</span>
-        </p>
-      {/if}
-      {:else}
-      <!-- One sentence: wait for [trigger] [at most | until] [N] s. -->
-      <div
-        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-      >
-        <select
-          class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-          aria-label="Wait for"
-          value={step.waitFor}
-          onchange={(e) =>
-            apply(
-              setWait(doc, step.cardId, {
-                waitFor: e.currentTarget.value,
-              }),
-            )}
-        >
-          {#if !WAIT_FOR.some((w) => w.trigger === step.waitFor)}<option
-              value={step.waitFor}>{step.waitFor}</option
-            >{/if}
-          {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
-              value={w.trigger}
-              disabled={w.trigger === TIME_ONLY && !!step.otherwise?.length}
-              title={w.trigger === TIME_ONLY && step.otherwise?.length
-                ? "Remove the Otherwise steps first: a wait for nothing always runs to its time"
-                : undefined}>{w.label}</option
-            >{/each}
-        </select>
-        <!-- Fork: a limit since the wait began, or a time on the match clock (types.ts). -->
-        <select
-          class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-          aria-label="Time limit"
-          title="At most: counted from when the wait begins. Until: a time on the match clock, however late the robot gets there"
-          value={step.waitClock ? "clock" : "most"}
-          onchange={(e) =>
-            apply(
-              setWait(doc, step.cardId, {
-                matchClock: e.currentTarget.value === "clock",
-              }),
-            )}
-        >
-          <option value="most">at most</option>
-          <option value="clock">until the clock reads</option>
-        </select>
-        <span class="inline-flex items-center gap-1">
-          <input
-            class={[fieldClass, "!w-14 !py-0.5 text-xs"]}
-            type="number"
-            min="0.1"
-            step="0.5"
-            aria-label="Seconds"
-            value={step.waitS}
-            onchange={(e) =>
-              apply(
-                setWait(doc, step.cardId, {
-                  seconds: Number(e.currentTarget.value) || 0.1,
-                }),
-              )}
-          />s
-        </span>
-      </div>
-      <div class="mt-1 flex flex-wrap items-center gap-1 pl-6">
-        <button
-          type="button"
-          class={["simple-option", step.spinUp && "simple-option--on"]}
-          aria-pressed={step.spinUp}
-          title="Spin up the launcher while waiting, so the next Launch all fires at once"
-          onclick={() =>
-            apply(setWait(doc, step.cardId, { spinUp: !step.spinUp }))}
-          >{step.spinUp ? "✓ " : ""}Spin up while waiting</button
-        >
-        {#if step.waitClock}
-          <button
-            type="button"
-            class={[
-              "simple-option",
-              step.waitAdjustable && "simple-option--on",
-            ]}
-            aria-pressed={step.waitAdjustable}
-            title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's left and right move that second. The time here is what it shows untouched. One wait per Auto."
-            onclick={() =>
-              apply(
-                setWait(doc, step.cardId, {
-                  adjustable: !step.waitAdjustable,
-                }),
-              )}
-            >{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
+          <span>If the match clock reads before</span>
+          <span class="inline-flex items-center gap-1">
+            <input
+              class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
+              type="number"
+              min="0"
+              step="0.5"
+              aria-label="Seconds"
+              value={step.waitS}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    seconds: Number(e.currentTarget.value) || 0.1,
+                  }),
+                )}
+            />s,
+          </span>
+          <span
+            >the robot goes straight on with the steps below. It never waits
+            here.</span
           >
-        {/if}
-      </div>
-      {#if step.waitAdjustable}
-        <!-- Fork: which TIP this wait is for, so the Driver Station's row can say so (types.ts tip). -->
+        </div>
         <div
           class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
         >
-          <span>It waits for</span>
+          <button
+            type="button"
+            class={["simple-option", step.waitOption && "simple-option--on"]}
+            aria-pressed={!!step.waitOption}
+            title="The drive team may move this time in INIT: D-pad up and down pick its row, left and right change it."
+            onclick={() =>
+              apply(
+                setWait(doc, step.cardId, {
+                  option: step.waitOption ? null : newTimeName(doc),
+                }),
+              )}>{step.waitOption ? "✓ " : ""}Set in INIT</button
+          >
+          {#if step.waitOption}
+            <span>as</span>
+            <input
+              class={[fieldClass, "!w-32 !py-0.5 text-xs"]}
+              aria-label="Name on the INIT menu"
+              value={step.waitOption}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    option: e.currentTarget.value || step.waitOption,
+                  }),
+                )}
+            />
+          {/if}
+        </div>
+        {#if step.waitOption}
+          <p class="mt-1 pl-6 text-xs text-body">
+            Driver Station: <span class="font-mono"
+              >{initRow("time", step.waitOption, step.waitS ?? 0)}</span
+            >
+          </p>
+        {/if}
+      {:else}
+        <!-- One sentence: wait for [trigger] [at most | until] [N] s. -->
+        <div
+          class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+        >
           <select
             class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-            aria-label="Which TIP"
-            title="Which TIP of the match this wait is for: the first, second or third time the HIVE tips"
-            value={String(step.waitTip ?? "")}
+            aria-label="Wait for"
+            value={step.waitFor}
             onchange={(e) =>
               apply(
                 setWait(doc, step.cardId, {
-                  tip: Number(e.currentTarget.value),
+                  waitFor: e.currentTarget.value,
                 }),
               )}
           >
-            {#if !step.waitTip}<option value="">the partner's TIP</option>{/if}
-            <option value="1">TIP 1</option>
-            <option value="2">TIP 2</option>
-            <option value="3">TIP 3</option>
+            {#if !WAIT_FOR.some((w) => w.trigger === step.waitFor)}<option
+                value={step.waitFor}>{step.waitFor}</option
+              >{/if}
+            {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
+                value={w.trigger}
+                disabled={w.trigger === TIME_ONLY && !!step.otherwise?.length}
+                title={w.trigger === TIME_ONLY && step.otherwise?.length
+                  ? "Remove the Otherwise steps first: a wait for nothing always runs to its time"
+                  : undefined}>{w.label}</option
+              >{/each}
           </select>
-        </div>
-        <p class="mt-1 pl-6 text-xs text-body">
-          Driver Station: <span class="font-mono"
-            >{initRow("partnerWait", "", step.waitS ?? 0, step.waitTip)}</span
-          >
-        </p>
-      {/if}
-      {/if}
-      {#if step.waitFor !== TIME_ONLY}
-      <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
-      {@const sub = { waitCardId: step.cardId }}
-      <div class="simple-otherwise mt-1.5 ml-2">
-        <div
-          class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
-        >
-          <span class="font-medium text-heading"
-            >{#if step.waitFor === ALWAYS}At {step.waitS} s or later:{:else}If no {trigger}
-              {step.waitClock ? "by" : "in"}
-              {step.waitS} s:{/if}</span
-          >
-          {#if step.otherwise?.length}
-            <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->
-            <span
-              class="simple-branch ml-auto"
-              role="group"
-              aria-label="Which branch the field draws"
-              title="Which way the field and the preview show this wait"
-            >
-              <button
-                type="button"
-                class:on={previewsTip(step.cardId)}
-                aria-pressed={previewsTip(step.cardId)}
-                onclick={() => previewTip(step.cardId, true)}>show ✓</button
-              >
-              <button
-                type="button"
-                class:on={!previewsTip(step.cardId)}
-                aria-pressed={!previewsTip(step.cardId)}
-                onclick={() => previewTip(step.cardId, false)}>show ✗</button
-              >
-            </span>
-          {/if}
-        </div>
-        <ol class="mt-1 flex flex-col gap-1" aria-label="Otherwise steps">
-          {#each step.otherwise ?? [] as other, i (other.cardId)}
-            {@render stepItem(other, i, sub)}
-          {/each}
-          <li
-            class={[
-              "simple-end !p-1 !text-left",
-              dropping(sub, step.otherwise?.length ?? 0) && "simple-step--drop",
-            ]}
-            ondragover={(e) => dragOver(e, step.otherwise?.length ?? 0, sub)}
-            ondragleave={() => (dropAt = null)}
-            ondrop={(e) => drop(e, step.otherwise?.length ?? 0, sub)}
-          >
-            <select
-              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-              aria-label="Add an Otherwise step"
-              title="Or drag a step from the Add row onto this line"
-              value=""
-              onchange={(e) => {
-                const kind = e.currentTarget.value as AddKind;
-                e.currentTarget.value = "";
-                if (kind) add(kind, step.otherwise?.length ?? 0, sub);
-              }}
-            >
-              <option value="">+ add a step…</option>
-              {#each PALETTE as tile (tile.kind)}
-                <option value={tile.kind}>{tile.label}</option>
-              {/each}
-            </select>
-          </li>
-        </ol>
-        <!-- Fork: after the Otherwise, go on with the steps below the wait, or run instead of them (steps.ts). -->
-        <label
-          class="mt-1 flex items-center gap-1 text-xs text-body"
-          title={step.insteadParks
-            ? "Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
-            : "Go on: after these steps the robot carries on with the steps below the wait. Skip: the steps below the wait, in this Otherwise, run only when the trigger comes; after these steps the robot leaves this Otherwise."}
-        >
-          then
+          <!-- Fork: a limit since the wait began, or a time on the match clock (types.ts). -->
           <select
             class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-            aria-label="After the Otherwise"
-            value={step.rejoin === false ? "park" : "goOn"}
+            aria-label="Time limit"
+            title="At most: counted from when the wait begins. Until: a time on the match clock, however late the robot gets there"
+            value={step.waitClock ? "clock" : "most"}
             onchange={(e) =>
               apply(
-                setWaitRejoin(
-                  doc,
-                  step.cardId,
-                  e.currentTarget.value !== "park",
-                ),
+                setWait(doc, step.cardId, {
+                  matchClock: e.currentTarget.value === "clock",
+                }),
               )}
           >
-            <option value="goOn">go on with the steps below</option>
-            <option value="park"
-              >{step.insteadParks ? "park" : "skip the steps below"}</option
-            >
+            <option value="most">at most</option>
+            <option value="clock">until the clock reads</option>
           </select>
-        </label>
-      </div>
+          <span class="inline-flex items-center gap-1">
+            <input
+              class={[fieldClass, "!w-14 !py-0.5 text-xs"]}
+              type="number"
+              min="0.1"
+              step="0.5"
+              aria-label="Seconds"
+              value={step.waitS}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    seconds: Number(e.currentTarget.value) || 0.1,
+                  }),
+                )}
+            />s
+          </span>
+        </div>
+        <div class="mt-1 flex flex-wrap items-center gap-1 pl-6">
+          <button
+            type="button"
+            class={["simple-option", step.spinUp && "simple-option--on"]}
+            aria-pressed={step.spinUp}
+            title="Spin up the launcher while waiting, so the next Launch all fires at once"
+            onclick={() =>
+              apply(setWait(doc, step.cardId, { spinUp: !step.spinUp }))}
+            >{step.spinUp ? "✓ " : ""}Spin up while waiting</button
+          >
+          {#if step.waitClock}
+            <button
+              type="button"
+              class={[
+                "simple-option",
+                step.waitAdjustable && "simple-option--on",
+              ]}
+              aria-pressed={step.waitAdjustable}
+              title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's left and right move that second. The time here is what it shows untouched. One wait per Auto."
+              onclick={() =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    adjustable: !step.waitAdjustable,
+                  }),
+                )}>{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
+            >
+          {/if}
+        </div>
+        {#if step.waitAdjustable}
+          <!-- Fork: which TIP this wait is for, so the Driver Station's row can say so (types.ts tip). -->
+          <div
+            class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
+          >
+            <span>It waits for</span>
+            <select
+              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+              aria-label="Which TIP"
+              title="Which TIP of the match this wait is for: the first, second or third time the HIVE tips"
+              value={String(step.waitTip ?? "")}
+              onchange={(e) =>
+                apply(
+                  setWait(doc, step.cardId, {
+                    tip: Number(e.currentTarget.value),
+                  }),
+                )}
+            >
+              {#if !step.waitTip}<option value="">the partner's TIP</option
+                >{/if}
+              <option value="1">TIP 1</option>
+              <option value="2">TIP 2</option>
+              <option value="3">TIP 3</option>
+            </select>
+          </div>
+          <p class="mt-1 pl-6 text-xs text-body">
+            Driver Station: <span class="font-mono"
+              >{initRow("partnerWait", "", step.waitS ?? 0, step.waitTip)}</span
+            >
+          </p>
+        {/if}
+      {/if}
+      {#if step.waitFor !== TIME_ONLY}
+        <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
+        {@const sub = { waitCardId: step.cardId }}
+        <div class="simple-otherwise mt-1.5 ml-2">
+          <div
+            class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
+          >
+            <span class="font-medium text-heading"
+              >{#if step.waitFor === ALWAYS}At {step.waitS} s or later:{:else}If
+                no {trigger}
+                {step.waitClock ? "by" : "in"}
+                {step.waitS} s:{/if}</span
+            >
+            {#if step.otherwise?.length}
+              <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->
+              <span
+                class="simple-branch ml-auto"
+                role="group"
+                aria-label="Which branch the field draws"
+                title="Which way the field and the preview show this wait"
+              >
+                <button
+                  type="button"
+                  class:on={previewsTip(step.cardId)}
+                  aria-pressed={previewsTip(step.cardId)}
+                  onclick={() => previewTip(step.cardId, true)}>show ✓</button
+                >
+                <button
+                  type="button"
+                  class:on={!previewsTip(step.cardId)}
+                  aria-pressed={!previewsTip(step.cardId)}
+                  onclick={() => previewTip(step.cardId, false)}>show ✗</button
+                >
+              </span>
+            {/if}
+          </div>
+          <ol class="mt-1 flex flex-col gap-1" aria-label="Otherwise steps">
+            {#each step.otherwise ?? [] as other, i (other.cardId)}
+              {@render stepItem(other, i, sub)}
+            {/each}
+            <li
+              class={[
+                "simple-end !p-1 !text-left",
+                dropping(sub, step.otherwise?.length ?? 0) &&
+                  "simple-step--drop",
+              ]}
+              ondragover={(e) => dragOver(e, step.otherwise?.length ?? 0, sub)}
+              ondragleave={() => (dropAt = null)}
+              ondrop={(e) => drop(e, step.otherwise?.length ?? 0, sub)}
+            >
+              <select
+                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+                aria-label="Add an Otherwise step"
+                title="Or drag a step from the Add row onto this line"
+                value=""
+                onchange={(e) => {
+                  const kind = e.currentTarget.value as AddKind;
+                  e.currentTarget.value = "";
+                  if (kind) add(kind, step.otherwise?.length ?? 0, sub);
+                }}
+              >
+                <option value="">+ add a step…</option>
+                {#each PALETTE as tile (tile.kind)}
+                  <option value={tile.kind}>{tile.label}</option>
+                {/each}
+              </select>
+            </li>
+          </ol>
+          <!-- Fork: after the Otherwise, go on with the steps below the wait, or run instead of them (steps.ts). -->
+          <label
+            class="mt-1 flex items-center gap-1 text-xs text-body"
+            title={step.insteadParks
+              ? "Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
+              : "Go on: after these steps the robot carries on with the steps below the wait. Skip: the steps below the wait, in this Otherwise, run only when the trigger comes; after these steps the robot leaves this Otherwise."}
+          >
+            then
+            <select
+              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
+              aria-label="After the Otherwise"
+              value={step.rejoin === false ? "park" : "goOn"}
+              onchange={(e) =>
+                apply(
+                  setWaitRejoin(
+                    doc,
+                    step.cardId,
+                    e.currentTarget.value !== "park",
+                  ),
+                )}
+            >
+              <option value="goOn">go on with the steps below</option>
+              <option value="park"
+                >{step.insteadParks ? "park" : "skip the steps below"}</option
+              >
+            </select>
+          </label>
+        </div>
       {/if}
     {:else if step.kind === "choice"}
       <!-- Fork: a route choice (steps.ts): the drive team picks one leg in INIT; both go on below. -->
@@ -1140,12 +1156,18 @@
           aria-label="Choice name"
           value={step.option}
           onchange={(e) =>
-            apply(setChoice(doc, step.cardId, { option: e.currentTarget.value }))}
+            apply(
+              setChoice(doc, step.cardId, { option: e.currentTarget.value }),
+            )}
         />
       </div>
       <p class="mt-1 pl-6 text-xs text-body">
         Driver Station: <span class="font-mono"
-          >{initRow("choice", step.option ?? "", step.legs?.[0]?.name ?? "")}</span
+          >{initRow(
+            "choice",
+            step.option ?? "",
+            step.legs?.[0]?.name ?? "",
+          )}</span
         >; left and right change it.
       </p>
       {#each step.legs ?? [] as leg, legIndex (legIndex)}
@@ -1160,7 +1182,9 @@
             >
             <input
               class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
-              aria-label={legIndex === 0 ? "First leg's name" : "Second leg's name"}
+              aria-label={legIndex === 0
+                ? "First leg's name"
+                : "Second leg's name"}
               value={leg.name}
               onchange={(e) =>
                 apply(
@@ -1353,7 +1377,7 @@
         ? "Unlocked: the START panel's X, Y and heading, or dragging the start, move this team spot. Then Save team spots"
         : "The start is a team spot, locked. Unlock it to move it (every Auto that starts here moves with it once saved)"}
       aria-label={open ? "Lock the start spot" : "Unlock the start spot"}
-      onclick={() => setSpotUnlocked(side!, !open)}
+      onclick={() => lockSpot(side!, open)}
     >
       {#if open}<LockOpen class="size-3.5" />
         {startLabel(side)} unlocked: move it, then Save team spots. Lock it again{:else}<Lock

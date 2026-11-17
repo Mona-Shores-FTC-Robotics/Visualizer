@@ -23,7 +23,7 @@ import { settleDoc } from "../auto/settle";
 import type { NamedPoint } from "../auto/types";
 import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { withSpotParks } from "../simple/parkFrom";
-import { isSimple, layHeadings } from "../simple/steps";
+import { isSimple, isStartName, layHeadings } from "../simple/steps";
 import { GENERATED_DIRS } from "../sim/biobuzz";
 import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
 
@@ -206,6 +206,72 @@ export function linkSpot(
       teamSpots: [...new Set([...(auto.teamSpots ?? []), name])].sort(),
     },
   };
+}
+
+/**
+ * A free name for this Auto's own copy of team spot `from`: `LEFT_AUTO_HIVE_2`, or for a start
+ * `RIGHT_2_START` (a start keeps its _START ending). `taken` holds every name in use.
+ */
+export function forkName(from: string, taken: ReadonlySet<string>): string {
+  const start = from.endsWith("_START");
+  const base = start ? from.slice(0, -"_START".length) : from;
+  for (let n = 2; ; n++) {
+    const name = start ? `${base}_${n}_START` : `${base}_${n}`;
+    if (!taken.has(name)) return name;
+  }
+}
+
+/**
+ * This Auto's own team spot `to`, a copy of team spot `from` where it is now: every end, the start,
+ * the park choices and the drives named after `from` go to `to`, and the Auto no longer links
+ * `from`, so moving `to` moves this Auto alone. The caller adds `to` to the team's list (editSpot).
+ */
+export function forkSpot(
+  doc: ProjectDoc,
+  from: string,
+  to: string,
+): { doc: ProjectDoc } | { problem: string } {
+  const auto = doc.auto;
+  const pose = auto?.points[from];
+  if (!auto || !pose || !auto.teamSpots?.includes(from))
+    return { problem: `${from} is not a team spot of this Auto.` };
+  if (!NAME.test(to))
+    return { problem: "A spot's name is capitals, digits and _." };
+  if (to === from || auto.points[to])
+    return { problem: `This Auto already has a spot ${to}.` };
+  if (isStartName(from) !== isStartName(to))
+    return {
+      problem: isStartName(from)
+        ? "A start's name ends in _START."
+        : "Only a start's name ends in _START.",
+    };
+  const points = { ...auto.points, [to]: [...pose] as NamedPoint };
+  delete points[from];
+  const pathEnds = Object.fromEntries(
+    Object.entries(auto.pathEnds).map(([id, end]) => [
+      id,
+      end === from ? to : end,
+    ]),
+  );
+  const next = {
+    ...auto,
+    points,
+    pathEnds,
+    teamSpots: [
+      ...new Set(auto.teamSpots.map((n) => (n === from ? to : n))),
+    ].sort(),
+  };
+  if (auto.startAt === from) next.startAt = to;
+  if (auto.parkChoices)
+    next.parkChoices = auto.parkChoices.map((n) => (n === from ? to : n));
+  const lines = doc.lines.map((line) =>
+    line.name === `to ${from}`
+      ? { ...line, name: `to ${to}` }
+      : line.name === `${from} park`
+        ? { ...line, name: `${to} park` }
+        : line,
+  );
+  return { doc: { ...doc, lines, auto: next } };
 }
 
 /** Unlinks a team spot: the Auto keeps the point, as its own, where it is. */

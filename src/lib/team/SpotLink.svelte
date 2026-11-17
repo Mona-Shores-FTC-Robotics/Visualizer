@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toggleSpotLock } from "./spotUnlock";
   // Fork: a path end's link to the team's spots, as PathPlanner links waypoints
   // (lib/team/teamSpots.ts). Linked: the spot's name, its lock, and unlink. Not linked: pick a
   // team spot (the end jumps to it and stays on it), or name this end as a new team spot.
@@ -14,7 +15,6 @@
   import {
     editSpot,
     saveSpotsOpen,
-    setSpotUnlocked,
     spotEdits,
     teamSpots,
     unlockedSpots,
@@ -109,7 +109,13 @@
             : "Unlock this team spot to move it (every Auto that uses it moves with it once saved)"}
           size="sm"
           active={unlocked}
-          onclick={() => setSpotUnlocked(pinned!, !unlocked)}
+          onclick={() =>
+            toggleSpotLock(
+              pinned!,
+              unlocked,
+              () => project.doc,
+              (next) => project.apply(() => next),
+            )}
         >
           {#if unlocked}<LockOpen />{:else}<Lock />{/if}
         </IconButton>

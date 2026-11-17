@@ -13,9 +13,12 @@ import { TEAM_ROBOT } from "../src/lib/auto/teamRobot";
 import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc } from "../src/lib/auto/links";
 import { addSpot, addStep, blankAuto } from "../src/lib/simple/steps";
+import { spotsUsedBy } from "../src/lib/team/spotUnlock";
 import {
   applyTeamSpots,
   changedSpots,
+  forkName,
+  forkSpot,
   linkSpot,
   parseTeamSpots,
   reexportWithSpots,
@@ -275,5 +278,51 @@ describe("sortSpotEdits", () => {
   it("a change to a spot the list has, but this Auto does not use, is elsewhere and not gone", () => {
     const result = sortSpotEdits({ RIGHT_PARK: [1, 2, 0] }, new Set(), saved);
     expect(result).toEqual({ here: [], elsewhere: ["RIGHT_PARK"], gone: [] });
+  });
+});
+
+describe("a new spot for this Auto only", () => {
+  it("names it after the spot, a start keeping _START", () => {
+    expect(forkName("PARK", new Set(["PARK"]))).toBe("PARK_2");
+    expect(forkName("PARK", new Set(["PARK", "PARK_2"]))).toBe("PARK_3");
+    expect(forkName("RIGHT_START", new Set())).toBe("RIGHT_2_START");
+  });
+
+  it("moves every use of the team spot to the new one, where it was", () => {
+    const doc = linked();
+    const parkLine = doc.auto!.cards.find(
+      (c) => c.kind === "path" && doc.auto!.pathEnds[c.lineId] === "PARK",
+    );
+    expect(parkLine).toBeDefined();
+    const out = forkSpot(doc, "PARK", "PARK_2");
+    if ("problem" in out) throw new Error(out.problem);
+    const auto = out.doc.auto!;
+    expect(auto.points.PARK).toBeUndefined();
+    expect(auto.points.PARK_2).toEqual(TEAM.PARK);
+    expect(auto.teamSpots).toContain("PARK_2");
+    expect(auto.teamSpots).not.toContain("PARK");
+    expect(Object.values(auto.pathEnds)).not.toContain("PARK");
+    expect(Object.values(auto.pathEnds)).toContain("PARK_2");
+    // The other team spot is untouched, so moving PARK_2 moves this Auto alone.
+    expect(auto.points.LAUNCH_LEFT).toEqual(TEAM.LAUNCH_LEFT);
+  });
+
+  it("refuses a name in use, a bad name, or a start without _START", () => {
+    const doc = linked();
+    expect(forkSpot(doc, "PARK", "LAUNCH_LEFT")).toHaveProperty("problem");
+    expect(forkSpot(doc, "PARK", "park 2")).toHaveProperty("problem");
+    expect(forkSpot(doc, "PARK", "PARK_START")).toHaveProperty("problem");
+    expect(forkSpot(doc, "WALL_PICK", "WALL_PICK_2")).toHaveProperty("problem");
+  });
+
+  it("finds the Autos that link a spot", () => {
+    const uses = serializeProject(linked(), { pretty: true });
+    const found = spotsUsedBy([
+      { file: "a.pp", text: uses },
+      { file: "b.pp", text: "not json" },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0].spots).toEqual(linked().auto!.teamSpots);
+    expect(found[0].spots).toContain("PARK");
   });
 });
