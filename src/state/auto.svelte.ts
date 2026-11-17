@@ -30,7 +30,12 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
-import { aimMovedLaunchSpots } from "../lib/team/teamSpots";
+import {
+  aimMovedLaunchSpots,
+  aimOwnLaunchSpots,
+  ownSpotsSeen,
+  type OwnSpotsSeen,
+} from "../lib/team/teamSpots";
 import {
   laneName,
   matchLanes,
@@ -85,6 +90,8 @@ export class AutoState {
   #unlocked = fromStore(unlockedSpots);
   /** The pins as they last held; see `resolvePins`. */
   #pinned: PinState | null = null;
+  /** The Auto's own spots as last seen (teamSpots.ts aimOwnLaunchSpots); null until a loaded file has been seen. */
+  #ownSeen: OwnSpotsSeen | null = null;
 
   auto = $derived.by(() => this.#project.doc.auto ?? null);
   /** Fork: the Auto is all simple-builder steps, so "← Simple" can show it there. */
@@ -312,6 +319,7 @@ export class AutoState {
       untrack(() => {
         resetAutoView();
         this.#pinned = null;
+        this.#ownSeen = null;
       });
     });
 
@@ -357,6 +365,15 @@ export class AutoState {
           project.amend(() => started);
           return;
         }
+        // A spot of this Auto's own that a Launch all fires from faces its CELL once made, moved
+        // or launched from, as biobuzz requires of every spot an Auto launches from
+        // (AutoVolleySpotsTest). Not on a load: #ownSeen is null until the file has been seen.
+        const own = aimOwnLaunchSpots(doc, this.#ownSeen);
+        if (own !== doc) {
+          project.amend(() => own);
+          return;
+        }
+        this.#ownSeen = ownSpotsSeen(doc);
         const auto = doc.auto;
         if (!auto?.teamSpots?.length) return;
         // An Auto launch spot being moved turns to aim at its CELL as it goes (aim.ts), so it is
