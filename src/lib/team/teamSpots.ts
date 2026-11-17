@@ -30,6 +30,13 @@ import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
 /** The file, in the team's Autos folder (TeamCode/autos). */
 export const SPOTS_FILE = "spots.json";
 export const SPOTS_PATH = `TeamCode/autos/${SPOTS_FILE}`;
+/**
+ * The Java twin of spots.json, written with it on every save of the team's spots, so the robot code
+ * that needs a spot (biobuzz's StartPositions and AutoLaunchSpots) reads it and keeps no copy of its
+ * own. biobuzz's TeamSpotsTest fails while the two differ.
+ */
+export const TEAM_SPOTS_JAVA_PATH =
+  "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/localization/generated/TeamSpots.java";
 /** Where the robot's generated Autos live (lib/sim/biobuzz.ts GENERATED_DIRS). */
 const GENERATED_DIR = GENERATED_DIRS[0];
 
@@ -85,6 +92,47 @@ export function serializeTeamSpots(spots: TeamSpots): string {
     '  "spots": {',
     ...rows,
     "  }",
+    "}",
+    "",
+  ].join("\n");
+}
+
+/** A number as a Java double literal: JavaScript's shortest form, which Java reads back the same. */
+function javaNumber(n: number): string {
+  return Number.isInteger(n) ? `${n}.0` : String(n);
+}
+
+/**
+ * TeamSpots.java's text for `spots`: one constant per spot, in spots.json's order, and `all()`. A
+ * spot with no heading gets NaN, which biobuzz's TeamSpot reads as "reached at any heading".
+ */
+export function teamSpotsJava(spots: TeamSpots): string {
+  const names = Object.keys(spots).sort();
+  const constants = names.map((name) => {
+    const [x, y, h] = spots[name];
+    const heading = h === undefined ? "Double.NaN" : javaNumber(h);
+    return `    public static final TeamSpot ${name} = new TeamSpot("${name}", ${javaNumber(x)}, ${javaNumber(y)}, ${heading});`;
+  });
+  return [
+    "// Written by the Visualizer from TeamCode/autos/spots.json, together with it, whenever the team's",
+    "// spots are saved. Never edit it by hand: move the spot in the Visualizer and save.",
+    "// TeamSpotsTest fails while this file and spots.json differ.",
+    "package org.firstinspires.ftc.teamcode.localization.generated;",
+    "",
+    "import org.firstinspires.ftc.teamcode.localization.TeamSpot;",
+    "",
+    "/** The team's spots, drawn for RED: x, y in inches, heading in degrees (NaN: reached at any heading). */",
+    "public final class TeamSpots {",
+    "",
+    "    private TeamSpots() {",
+    "    }",
+    "",
+    ...constants,
+    "",
+    "    /** Every spot, in spots.json's order. */",
+    "    public static TeamSpot[] all() {",
+    `        return new TeamSpot[] {${names.join(", ")}};`,
+    "    }",
     "}",
     "",
   ].join("\n");
@@ -287,7 +335,7 @@ export function reexportWithSpots(
 }
 
 /**
- * Every file saving `edits` writes: spots.json with the changes, and each Auto in TeamCode/autos
+ * Every file saving `edits` writes: spots.json with the changes, its Java twin (TeamSpots.java), and each Auto in TeamCode/autos
  * that links a changed spot, re-exported (.pp and Java). `read` reads a file at the commit the
  * save starts from; `files` lists that commit's paths.
  */
@@ -310,6 +358,7 @@ export async function teamSpotSave(
   const names = changedSpots(saved, spots);
   const out: Record<string, string> = {
     [SPOTS_PATH]: serializeTeamSpots(spots),
+    [TEAM_SPOTS_JAVA_PATH]: teamSpotsJava(spots),
   };
   const autos: string[] = [];
   const errors: string[] = [];

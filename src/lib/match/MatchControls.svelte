@@ -21,7 +21,17 @@
   } from "./whatIfs";
   import { switchKey } from "../auto/simulate";
   import { allCards } from "../auto/tree";
-  import type { TimingFact, TimingValues } from "../timing/model";
+  import {
+    TIP_CONDITIONS,
+    type TimingFact,
+    type TimingValues,
+  } from "../timing/model";
+  import {
+    tipChoiceHint,
+    tipChoiceLabel,
+    tipToggles,
+    type TipToggle,
+  } from "./tipToggles";
   import {
     clampFact,
     factStep,
@@ -186,10 +196,35 @@
     });
   }
 
-  /** Whether a condition comes: the controls only ever answer one for every wait on it. */
-  /** Each robot's stops, from its Auto and its paths (whatIfs.ts). */
+  /**
+   * Each robot's stops, from its Auto and its paths (whatIfs.ts), but not a wait for a CELL or a
+   * TIP: with the HIVE modelled, those follow the TIP rows (tipToggles.ts), so they are not asked
+   * again wait by wait.
+   */
   function stopsOf(robot: RobotInfo): Stop[] {
-    return stops(robot.auto, entries[robots.indexOf(robot)]?.lines ?? []);
+    return stops(
+      robot.auto,
+      entries[robots.indexOf(robot)]?.lines ?? [],
+    ).filter((stop) => !TIP_CONDITIONS.includes(stop.condition));
+  }
+
+  /** The TIPs the robots try for in this look, with what-ifs and all. */
+  let tips = $derived.by((): TipToggle[] => {
+    try {
+      return tipToggles(entries, values);
+    } catch (error) {
+      console.error("Could not list the TIPs:", error);
+      return [];
+    }
+  });
+  /** A robot's TIP rows: the TIPs its volleys try for first. */
+  function tipsOf(robot: RobotInfo): TipToggle[] {
+    const index = robots.indexOf(robot);
+    return tips.filter((t) => t.robot === index);
+  }
+  /** A TIP's choices: on try 1 … tries, then never. */
+  function tipChoices(t: TipToggle): number[] {
+    return [...Array.from({ length: t.tries }, (_, i) => i), Infinity];
   }
 
   /** Whether a stop's trigger comes in time in this look: its own answer, else its trigger's. */
@@ -388,28 +423,63 @@
           {/each}
         </div>
       {/if}
-      {#if stopsOf(robot).length}
-        <!-- Fork: one row per stop, the planned outcome first (whatIfs.ts stops). -->
+      {#if tipsOf(robot).length || stopsOf(robot).length}
+        <!-- Fork: the TIPs this robot tries for (tipToggles.ts), then its other stops (whatIfs.ts):
+             a name and ✓ / ✗ only; the field shows what each does. -->
         <div class="mt-1 flex flex-col gap-1.5 border-t border-border pt-1.5">
+          {#each tipsOf(robot) as t (t.tip)}
+            <div
+              class="flex flex-col gap-0.5 text-[11px]"
+              role="radiogroup"
+              aria-label={`TIP ${t.tip}`}
+            >
+              <span
+                class={[
+                  "truncate font-medium",
+                  t.misses === Infinity ? "text-danger" : "text-heading",
+                ]}>TIP {t.tip}</span
+              >
+              <div class="flex flex-wrap gap-1">
+                {#each tipChoices(t) as misses (misses)}
+                  {@const on = t.misses === misses}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    class={[
+                      "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
+                      on &&
+                        misses !== Infinity &&
+                        "border-primary bg-primary/15 text-heading",
+                      on &&
+                        misses === Infinity &&
+                        "border-danger bg-danger/10 text-danger",
+                      !on && "border-border text-body hover:text-heading",
+                    ]}
+                    title={tipChoiceHint(t.tip, misses)}
+                    onclick={() => controls.setTipMisses(t.tip, misses)}
+                    >{tipChoiceLabel(misses)}</button
+                  >
+                {/each}
+              </div>
+            </div>
+          {/each}
           {#each stopsOf(robot) as stop (stop.cardId)}
             {@const onTime = stopOnTime(robot, stop)}
             <div
               class="flex flex-col gap-0.5 text-[11px]"
               role="radiogroup"
-              aria-label={stop.name}
+              aria-label={triggerLabel(stop.condition)}
             >
               <span
                 class={[
                   "truncate font-medium",
                   onTime ? "text-heading" : "text-danger",
                 ]}
-                title={`${stop.name}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
-                >{stop.name}</span
+                title={`${stop.name} · ${stop.asks}\n${triggerHint(stop.condition, onTime)}${stop.own ? "" : `\nA wait with no steps of its own: this answers every wait on ${triggerLabel(stop.condition)}.`}`}
+                >{triggerLabel(stop.condition)}</span
               >
-              <span class="-mt-0.5 truncate text-[10px] text-body"
-                >{stop.asks}</span
-              >
-              <div class="grid grid-cols-2 gap-1">
+              <div class="flex flex-wrap gap-1">
                 {#each [true, false] as planned (planned)}
                   {@const on = onTime === planned}
                   <button
@@ -417,7 +487,7 @@
                     role="radio"
                     aria-checked={on}
                     class={[
-                      "min-w-0 rounded-md border px-1.5 py-0.5 text-left leading-tight transition",
+                      "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
                       on &&
                         planned &&
                         "border-primary bg-primary/15 text-heading",
@@ -427,17 +497,11 @@
                       !on && "border-border text-body hover:text-heading",
                     ]}
                     title={planned
-                      ? `In time: ${stop.planned}`
-                      : `Too late: ${stop.late}`}
+                      ? `It comes: ${stop.planned}`
+                      : `It does not come: ${stop.late}`}
                     onclick={() => setStop(robot, stop, planned)}
+                    >{planned ? "✓" : "✗"}</button
                   >
-                    <span class="block font-semibold"
-                      >{planned ? "✓ In time" : "✗ Too late"}</span
-                    >
-                    <span class="block"
-                      >{planned ? stop.planned : stop.late}</span
-                    >
-                  </button>
                 {/each}
               </div>
             </div>
