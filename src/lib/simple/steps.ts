@@ -46,6 +46,7 @@ import { ownHalf, pickFrom, type Flower } from "./flowers";
 import {
   aimFrom,
   MAX_OFF_SQUARE_DEG,
+  MIN_MEASURED_RANGE_IN,
   PICK_FLOWER_LAUNCH,
   turretAimFrom,
   type Aim,
@@ -92,7 +93,8 @@ export interface Step {
   problem?: string | null;
   /**
    * Pick flower and launch: the turret's shot from against the FLOWER (aim.ts, turretAimFrom at the
-   * pick's contact point), for the step's line and its check.
+   * pick's contact point), for the step's line and its check. Launch all, in an Auto drawn for a
+   * turret that aims: the turret's shot from where the robot is, in place of `aim`.
    */
   shot?: TurretAim;
   /** Launch all: where it goes with the turret locked (aim.ts), and the spot it is launched from. */
@@ -280,6 +282,27 @@ export function startLabel(name: string): string {
   return `${words.join(" ").replace(/^./, (c) => c.toUpperCase())} start`;
 }
 
+/** Sets whether the Auto is drawn for a turret that aims (AutoSection.turretAims). */
+export function setTurretAims(doc: ProjectDoc, on: boolean): ProjectDoc {
+  if (!doc.auto || !!doc.auto.turretAims === on) return doc;
+  const auto = structuredClone(doc.auto);
+  if (on) auto.turretAims = true;
+  else delete auto.turretAims;
+  return { ...doc, auto };
+}
+
+/**
+ * Why a turret's shot is not one to draw, or null when it is: too far off square to the HIVE for a
+ * CELL to take it, or nearer than the launcher's speed table has a row for (aim.ts).
+ */
+export function shotProblem(shot: TurretAim): string | null {
+  if (shot.offSquareDeg > MAX_OFF_SQUARE_DEG)
+    return `${shot.offSquareDeg.toFixed(0)}° off square to the HIVE (at most ${MAX_OFF_SQUARE_DEG}): the CELL does not take it`;
+  if (shot.rangeIn < MIN_MEASURED_RANGE_IN - 0.5)
+    return `${shot.rangeIn.toFixed(0)} in from the CELL, nearer than the speed table's first row (${MIN_MEASURED_RANGE_IN} in)`;
+  return null;
+}
+
 export const LAUNCH_ALL = "LaunchAll";
 /**
  * The robot's SpinUp: starts the launcher's wheels and finishes at once; the wheels keep spinning
@@ -337,12 +360,23 @@ function walkSteps(
   return cards.map((card, index): Step => {
     const base = { cardId: card.id, spot: null, lineId: null };
     if (card.kind === "action" && card.name === LAUNCH_ALL) {
-      // The turret stays locked straight ahead in an Auto: the heading is the aim (aim.ts).
+      // The turret stays locked straight ahead in an Auto: the heading is the aim (aim.ts). An
+      // Auto drawn for a turret that aims (AutoSection.turretAims) has the turret's shot instead.
       return {
         ...base,
         kind: "launch",
         label: "Launch all",
         aim: aimFrom(at.here.x, at.here.y, at.here.h, auto.drawnFor),
+        ...(auto.turretAims
+          ? {
+              shot: turretAimFrom(
+                at.here.x,
+                at.here.y,
+                at.here.h,
+                auto.drawnFor,
+              ),
+            }
+          : {}),
         atSpot: at.onSpot,
         timeoutS: card.timeoutS,
       };

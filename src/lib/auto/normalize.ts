@@ -230,6 +230,7 @@ export function normalizeAuto(raw: unknown): NormalizeResult {
   if (typeof raw.exportName === "string" && raw.exportName.trim()) {
     auto.exportName = raw.exportName.trim();
   }
+  if (raw.turretAims === true) auto.turretAims = true;
   if (raw.plays !== undefined)
     problems.push(
       "This file has plays for ladders of tries, which this editor no longer has; dropped them. The steps they built stay as they are.",
@@ -497,5 +498,6 @@ export function serializeAuto(auto: AutoSection): AutoSection {
         : {}),
     };
   if (auto.exportName) out.exportName = auto.exportName;
+  if (auto.turretAims) out.turretAims = true;
   return out;
 }

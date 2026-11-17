@@ -567,7 +567,12 @@ Hook edits to upstream files, each marked "Fork" in a comment:
   at the robot's end of the field while a Pick flower and launch runs and on the drive before it
   (`turretSpans`), with the line of the shot. The crosshair button on the field's toolbar
   (`stores.ts` `turretTracks`) draws it on the CELL for the whole Auto, as the robot runs with
-  `BuiltAuto.turretTracks` turned on. The turret's place and the aim's numbers are biobuzz's
+  `BuiltAuto.turretTracks` turned on. An Auto drawn for the turret says so itself: the builder's
+  "The turret aims" box sets `auto.turretAims` in the file, the turret is then drawn on the CELL
+  throughout, each Launch all is checked by the turret's shot (range against the speed table's
+  first row, angle off square to the HIVE: `steps.ts` `shotProblem`) and not by the robot's heading,
+  and the export adds `TURRET_AIMS = true`, which the Auto's OpMode hands to biobuzz
+  `BuiltAuto.needsTurret`. A file without it is unchanged, and so is its export. The turret's place and the aim's numbers are biobuzz's
   (`TurretSubsystem`, `TurretAim`): change one, change the other.
 - `src/lib/simple/` — the simple builder, the left panel's first view: a start (right or left),
   then steps from a palette (Launch all, Drive to a spot, Pick flower, Park), each an ordinary

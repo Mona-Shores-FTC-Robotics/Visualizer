@@ -179,6 +179,14 @@ export interface AutoSection {
   drawnFor: Alliance;
   /** Name of the generated class, before the `Auto` suffix. Defaults to the file name. */
   exportName?: string;
+  /**
+   * Fork: the Auto is drawn for a turret that aims. The robot then keeps the turret on our CELL at
+   * its end of the field for the whole Auto and its launches wait for the turret, not the chassis
+   * (biobuzz BuiltAuto.needsTurret, from the export's TURRET_AIMS), so a launch spot may face
+   * anywhere. A robot whose turret is locked does not run it. Unset: the turret stays straight
+   * ahead and the heading is the aim, as every Auto ran before.
+   */
+  turretAims?: boolean;
   registry: AutoRegistry;
   points: Record<string, NamedPoint>;
   /**

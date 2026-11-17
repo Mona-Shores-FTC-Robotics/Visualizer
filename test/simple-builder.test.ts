@@ -56,6 +56,8 @@ import {
   setWait,
   setWaitName,
   setWaitRejoin,
+  setTurretAims,
+  shotProblem,
   renameSpot,
   startName,
   DEFAULT_STARTS,
@@ -1986,5 +1988,62 @@ describe("Pick flower and launch", () => {
       values.spinUpS + 1 + 2 * values.volleyS,
       6,
     );
+  });
+});
+
+// Fork: an Auto drawn for a turret that aims (AutoSection.turretAims).
+describe("an Auto whose turret aims", () => {
+  function nosefirst(): ProjectDoc {
+    let doc = fresh();
+    // West of the far FLOWER's line, facing the wall: the chassis is nowhere near the CELL.
+    doc = addSpot(doc, "LEFT_FIRE", 38, 126, 90);
+    doc = add(doc, "launch");
+    doc = add(doc, "drive", "LEFT_FIRE");
+    return add(doc, "launch");
+  }
+
+  it("checks a Launch all by the turret's shot, not the heading", () => {
+    const locked = stepsOf(nosefirst()).filter((s) => s.kind === "launch");
+    expect(locked[1].aim!.on).toBe(false);
+    expect(locked[1].shot).toBeUndefined();
+
+    const doc = setTurretAims(nosefirst(), true);
+    const launches = stepsOf(doc).filter((s) => s.kind === "launch");
+    const shot = launches[1].shot!;
+    expect(shot.cell).toBe("SCORING");
+    expect(shotProblem(shot)).toBeNull();
+    expect(Math.abs(shot.turretDeg)).toBeGreaterThan(120);
+    // The same spot 12 in nearer the HIVE is under the speed table's first row.
+    const near = addSpot(setTurretAims(fresh(), true), "NEAR", 47.2, 119.3, 90);
+    const step = stepsOf(add(add(near, "drive", "NEAR"), "launch")).find(
+      (s) => s.kind === "launch",
+    )!;
+    expect(shotProblem(step.shot!)).toMatch(/nearer than the speed table/);
+  });
+
+  it("is saved in the file and exported as TURRET_AIMS, and nothing changes without it", () => {
+    const plain = nosefirst();
+    const doc = setTurretAims(plain, true);
+    expect(setTurretAims(doc, true)).toBe(doc);
+    const again = parseProject(serializeProject(doc), robotConfigOf(settings));
+    if (!again.ok) throw new Error(again.error);
+    expect(again.doc.auto!.turretAims).toBe(true);
+    expect(JSON.parse(serializeProject(plain)).auto.turretAims).toBeUndefined();
+    const java = (d: ProjectDoc) => {
+      const out = generateAutoJava({
+        auto: d.auto!,
+        startPoint: d.startPoint,
+        lines: relink(d.startPoint, d.lines, d.auto!, settings).lines,
+        shapes: [],
+        settings,
+        sourceFileName: "nose-first.pp",
+      });
+      if (!out.ok) throw new Error(JSON.stringify(out));
+      return out.source;
+    };
+    expect(java(doc)).toContain(
+      "public static final boolean TURRET_AIMS = true;",
+    );
+    expect(java(plain)).not.toContain("TURRET_AIMS");
   });
 });

@@ -224,12 +224,15 @@
     pose: { x: number; y: number; heading: number },
     preview: Parameters<typeof turretSpans>[0] | null | undefined,
     alliance: "RED" | "BLUE" | undefined,
+    /** The Auto is drawn for a turret that aims (AutoSection.turretAims): on the CELL throughout. */
+    aims = false,
   ) => {
     const aim = turretAimFrom(pose.x, pose.y, pose.heading, alliance ?? "RED");
     const spans = preview ? turretSpans(preview) : [];
-    const on = turretOnAt(matchSeconds, spans, $turretTracks);
+    const always = aims || $turretTracks;
+    const on = turretOnAt(matchSeconds, spans, always);
     return {
-      deg: turretDegAt(matchSeconds, aim.turretDeg, spans, $turretTracks),
+      deg: turretDegAt(matchSeconds, aim.turretDeg, spans, always),
       // The line of the shot only while the turret is on the CELL.
       aim: on === 1 ? aim : null,
     };
@@ -582,6 +585,7 @@
               pose,
               auto.overlayTogether.previews.get(overlays.items[index]),
               overlays.items[index]?.doc.auto?.drawnFor,
+              overlays.items[index]?.doc.auto?.turretAims,
             )}
             <RobotTurret
               {pose}
@@ -613,6 +617,7 @@
             playback.robotPose,
             auto.preview,
             doc.auto?.drawnFor,
+            doc.auto?.turretAims,
           )}
           <RobotTurret
             pose={playback.robotPose}

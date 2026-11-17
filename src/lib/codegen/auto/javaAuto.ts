@@ -820,6 +820,13 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     '    /** The alliance the Auto was drawn for ("RED" or "BLUE"); the other alliance runs it rotated half a turn about the field centre. */',
     `    public static final String DRAWN_FOR = ${javaString(auto.drawnFor)};`,
     "",
+    ...(auto.turretAims
+      ? [
+          "    /** Drawn for a turret that aims: the robot tracks our CELL for the whole Auto and its launches wait for the turret, not the chassis. A robot whose turret is locked does not run it. */",
+          "    public static final boolean TURRET_AIMS = true;",
+          "",
+        ]
+      : []),
     "    /** What the drive team may change during INIT, on gamepad 1's D-pad; nothing changed, the Auto runs as drawn. */",
     `    public static final AutoOption[] OPTIONS = {${options.join(", ")}};`,
     "",

@@ -69,6 +69,8 @@
     setWait,
     setChoice,
     setStepTimeout,
+    setTurretAims,
+    shotProblem,
     setWaitName,
     DEFAULT_TIMEOUT_S,
     everyStep,
@@ -821,6 +823,24 @@
           </p>
         {/if}
       {/if}
+    {:else if step.kind === "launch" && step.shot}
+      {@const shot = step.shot}
+      {@const problem = shotProblem(shot)}
+      {@render limitRow(step)}
+      <div class="mt-1 pl-6 text-xs">
+        <span class={problem ? "text-danger" : "text-body"}>
+          {#if problem}
+            The turret's shot is {problem}. Move the spot.
+          {:else}
+            The turret aims: at our {shot.cell === "AUDIENCE"
+              ? "audience"
+              : "scoring"} CELL, {Math.round(shot.rangeIn)} in away,
+            {Math.round(shot.offSquareDeg)}° off square, turned {Math.round(
+              Math.abs(shot.turretDeg),
+            )}° {shot.turretDeg >= 0 ? "left" : "right"} of the robot's nose.
+          {/if}
+        </span>
+      </div>
     {:else if step.kind === "launch" && step.aim}
       {@const aim = step.aim}
       {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
@@ -1404,6 +1424,19 @@
     Drawn for {doc.auto?.drawnFor === "BLUE" ? "BLUE" : "RED"}: the robot turns
     it for {doc.auto?.drawnFor === "BLUE" ? "RED" : "BLUE"}.
   </p>
+  <!-- Fork: an Auto drawn for a turret that aims (AutoSection.turretAims). -->
+  <label
+    class="flex items-start gap-1.5 text-xs text-body"
+    title="The robot keeps the turret on our CELL for the whole Auto and its launches wait for the turret, not the chassis, so a launch spot may face anywhere. A robot whose turret is locked does not run it."
+  >
+    <input
+      type="checkbox"
+      class="mt-0.5"
+      checked={!!doc.auto?.turretAims}
+      onchange={(e) => apply(setTurretAims(doc, e.currentTarget.checked))}
+    />
+    <span>The turret aims (a robot whose turret is unlocked only)</span>
+  </label>
   {#if side && linkedSpots.has(side)}
     {@const open = $unlockedSpots.has(side)}
     <button
