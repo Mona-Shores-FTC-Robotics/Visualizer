@@ -7,12 +7,17 @@
  * change the other. An Auto's card (what the preview shows) does not line up first: it drives in to
  * the nearest GARDEN's gather pose from wherever it is called, the intake on, dwells, and drives
  * back to where it started.
- *   red's GARDEN: gather at (9.5, 10.96) facing the audience, lined up at (9.5, 20.56): the Autos'
- *     GARDEN and GARDEN_IN, from their drawings; blue's is red's turned half a turn;
- *   only a GARDEN on the robot's own half (an Auto may not cross the centre line), within 160 in
- *     (maxRangeIn);
- *   in at 0.5 of the robot's top path speed (inSpeed), back at 0.6 (backSpeed), dwell 1.5 s
- *     (dwellMs).
+ *   red's GARDEN: gather at (8.5, 9.5) facing the audience, lined up at (8.5, 19.1), 9.6 in
+ *     behind it (GardenFieldPoints.RED, from the robot's size: the nose at the audience wall, the
+ *     side 0.4 in off the red-side wall); blue's is red's turned half a turn;
+ *   only a GARDEN on the robot's own half (an Auto may not cross the centre line), within 45 in
+ *     (maxRangeIn; 45 since 14 Nov 2026, the whole half before). An Auto's card starts at the team
+ *     spot GARDEN_STAGING, about 13 in away;
+ *   in at the robot's top path speed (inSpeed 1.0, since 14 Nov 2026), back at 0.8 (backSpeed,
+ *     since 6 Nov 2026), dwell 0.4 s (dwellMs, since 6 Nov 2026): the dwell's cap, which a full
+ *     lane ends sooner.
+ * Not drawn here: the robot's 1 in past the gather pose (extraDepthIn) and its curve toward the
+ * side wall on the way in and back (curveToWall, curveBackOut).
  */
 import { FIELD_SIZE } from "../../config/defaults";
 import type { BasePoint } from "../../types";
@@ -34,8 +39,8 @@ const turned = (p: { x: number; y: number; headingDeg: number }) => ({
 });
 const RED: Garden = {
   name: "red GARDEN",
-  gather: { x: 9.5, y: 10.96, headingDeg: 270 },
-  lineUp: { x: 9.5, y: 20.56, headingDeg: 270 },
+  gather: { x: 8.5, y: 9.5, headingDeg: 270 },
+  lineUp: { x: 8.5, y: 19.1, headingDeg: 270 },
 };
 export const GARDENS: Garden[] = [
   RED,
@@ -46,13 +51,13 @@ export const GARDENS: Garden[] = [
   },
 ];
 
-/** GardenGather.maxRangeIn: the whole half, since in an Auto the centre line is the limit. */
-export const MAX_RANGE_IN = 160;
+/** GardenGather.maxRangeIn: only a GARDEN this close is gathered from, inches. */
+export const MAX_RANGE_IN = 45;
 /** GardenGather.inSpeed and backSpeed: fractions of the robot's top path speed. */
-const IN_SPEED = 0.5;
-const BACK_SPEED = 0.6;
-/** GardenGather.dwellMs, in seconds. */
-const DWELL_S = 1.5;
+const IN_SPEED = 1.0;
+const BACK_SPEED = 0.8;
+/** GardenGather.dwellMs (the dwell's cap), in seconds. */
+const DWELL_S = 0.4;
 /** The robot's top path speed, inches/s, and the time a short path spends speeding up and slowing down: estimates. */
 const TOP_IN_PER_S = 60;
 const RAMP_S = 0.4;
