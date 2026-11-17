@@ -346,14 +346,14 @@ describe("the simple builder", () => {
     // In to red's GARDEN, facing the audience, mid-dwell; back at FIRE_G at the end.
     const dwell = gather[8];
     const there = motionPoseAt(run, (dwell.t0 + dwell.t1) / 2)!;
-    expect([there.x, there.y, there.headingDeg]).toEqual([9.5, 10.96, 270]);
+    expect([there.x, there.y, there.headingDeg]).toEqual([8.5, 9.5, 270]);
     const end = motionPoseAt(run, gather[gather.length - 1].t1)!;
     expect([end.x, end.y]).toEqual([45, 29]);
-    // In and back at the robot's speed caps, plus the 1.5 s dwell: longer from farther away.
+    // In and back at the robot's speed caps, plus the 0.4 s dwell: longer from farther away.
     const seconds = gather[gather.length - 1].t1 - gather[0].t0;
-    expect(seconds).toBeGreaterThan(1.5 + 1);
+    expect(seconds).toBeGreaterThan(0.4 + 1);
     let far = fresh();
-    far = addSpot(far, "FAR", 70, 60, 90);
+    far = addSpot(far, "FAR", 40, 40, 90); // 43.8 in from the GARDEN, FIRE_G is 41.4
     far = add(far, "drive", "FAR");
     far = add(far, "gather");
     const farRun = preview(far);
@@ -368,13 +368,15 @@ describe("the simple builder", () => {
   });
 
   it("keeps an Auto's grabs and spots on its own half of the field", () => {
-    // From LEFT_FIRE blue's GARDEN is nearer, but an Auto may not cross the centre line.
+    // From LEFT_FIRE no GARDEN is within the robot's 45 in: red's is 128 in away, and blue's,
+    // nearer at 73 in, is across the centre line. The gather is marked, as the robot refuses it.
     let doc = fresh();
     doc = addSpot(doc, "LEFT_FIRE", 59.87, 127, 270);
     doc = add(doc, "drive", "LEFT_FIRE");
     doc = add(doc, "gather");
     expect(stepsOf(doc)[0].problem).toBeNull();
-    expect(stepsOf(doc)[1].garden?.name).toBe("red GARDEN");
+    expect(stepsOf(doc)[1].garden).toBeNull();
+    expect(stepsOf(doc)[1].problem).toMatch(/No GARDEN on our side of the centre line within 45 in/);
     // A spot whose robot reaches across x = 70.75 is marked.
     let over = fresh();
     over = addSpot(over, "OVER", 66, 70, 90); // 16 in wide: its right side is at 74
