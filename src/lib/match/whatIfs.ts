@@ -264,6 +264,8 @@ function stepWord(card: AutoCard, here: Here): string | null {
       if (card.name === "LaunchOne")
         return cell ? `shoot one at ${cell}` : "shoot one";
       if (card.name === "PickFlower") return "pick a FLOWER";
+      if (card.name === "PickFlowerLaunch")
+        return cell ? `pick a FLOWER and shoot ${cell}` : "pick a FLOWER and shoot";
       if (card.name === "GardenGather") return "GARDEN gather";
       if (card.name === "SpinUp") return null;
       return card.name;

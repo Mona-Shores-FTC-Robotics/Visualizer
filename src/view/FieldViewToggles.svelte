@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     Angle,
+    Crosshair,
     Grid3x3,
     Lock,
     LockOpen,
@@ -16,6 +17,7 @@
     showProtractor,
     showRuler,
     snapToGrid,
+    turretTracks,
   } from "../stores";
   import {
     cycleGrid,
@@ -23,6 +25,7 @@
     toggleProtractorLock,
     toggleRuler,
     toggleSnap,
+    toggleTurretTracks,
   } from "./viewOptions";
 </script>
 
@@ -76,4 +79,13 @@
       {#if $protractorLockToRobot}<Lock />{:else}<LockOpen />{/if}
     </IconButton>
   {/if}
+  <IconButton
+    label={$turretTracks
+      ? "Turret: on our CELL for the whole Auto (the robot with BuiltAuto.turretTracks on)"
+      : "Turret: straight ahead, except while a step aims it (as the robot runs an Auto)"}
+    active={$turretTracks}
+    onclick={toggleTurretTracks}
+  >
+    <Crosshair />
+  </IconButton>
 </div>

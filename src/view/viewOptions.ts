@@ -6,6 +6,7 @@ import {
   showProtractor,
   showRuler,
   snapToGrid,
+  turretTracks,
 } from "../stores";
 
 /** Grid spacings in inches, in the order the grid button steps through them. */
@@ -24,6 +25,7 @@ export function cycleGrid() {
 }
 
 export const toggleSnap = () => snapToGrid.update((on) => !on);
+export const toggleTurretTracks = () => turretTracks.update((on) => !on);
 export const toggleRuler = () => showRuler.update((on) => !on);
 export const toggleProtractor = () => showProtractor.update((on) => !on);
 export const toggleProtractorLock = () =>

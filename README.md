@@ -15,7 +15,7 @@ What the fork adds:
   See [Working on Belding autos](docs/local-workspace.md) for the workflow and limits.
 
 - **The Auto Builder** (what opens). An Auto as a short list of our robot's steps: a start, then
-  Launch all, Drive to a spot, Pick flower, Garden gather, Spin up, Wait (for TIP or CELL up, or
+  Launch all, Drive to a spot, Pick flower, Pick flower and launch, Garden gather, Spin up, Wait (for TIP or CELL up, or
   intake full, at most N s, with an Otherwise list for when it doesn't come, which may hold a Wait
   with an Otherwise of its own) and Park. Each step is
   an ordinary card, so the file, the preview and the Java export are the same as for any Auto.

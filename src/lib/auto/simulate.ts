@@ -39,6 +39,16 @@ import {
 export const FEEDING_LAUNCHES: ReadonlySet<string> = new Set([
   "LaunchAll",
   "LaunchOne",
+  "PickFlowerLaunch",
+]);
+
+/**
+ * Fork: the commands that are the robot's FLOWER pick (biobuzz FlowerPicker): the pick itself, and
+ * the pick that fires from the FLOWER (FlowerVolley). Both square up, push in and back out.
+ */
+export const FLOWER_PICKS: ReadonlySet<string> = new Set([
+  "PickFlower",
+  "PickFlowerLaunch",
 ]);
 
 /**
@@ -338,6 +348,7 @@ interface Guard {
  */
 export const GRAB_COMMANDS: ReadonlySet<string> = new Set([
   "PickFlower",
+  "PickFlowerLaunch",
   "GardenGather",
 ]);
 
@@ -726,7 +737,7 @@ export function simulateAuto(
         // its FLOWER's line if needed, push and back out, in the command's own time. A pick the robot
         // would refuse just takes its time here; the builder marks it.
         const pick =
-          card.name === "PickFlower" ? pickFrom(pos.x, pos.y, heading) : null;
+          FLOWER_PICKS.has(card.name) ? pickFrom(pos.x, pos.y, heading) : null;
         const stickDownAt = pick ? stickDownOnDriveBefore(prev) : null;
         if (gather) motions.push(...gather.motions);
         if (pick?.ok) {

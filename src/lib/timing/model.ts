@@ -146,6 +146,20 @@ export const ROBOT_FACTS: readonly string[] = [
 export const VOLLEY_COMMAND = "LaunchAll";
 /** The FLOWER pick and the GARDEN gather, timed by `pickFlowerS` and `gardenGatherS`. */
 export const PICK_COMMAND = "PickFlower";
+/**
+ * Pick flower and launch (biobuzz FlowerVolley, the PickFlowerLaunch card): the robot fires its
+ * load from against the FLOWER while the stick and intake bring the FLOWER's four in behind it,
+ * so one step lands two volleys' worth. Its time is the push in and the back-out
+ * (PICK_LAUNCH_MOVES_S) and two volleys' feeds; an estimate until the robot has run it.
+ */
+export const PICK_LAUNCH_COMMAND = "PickFlowerLaunch";
+export const PICK_LAUNCH_MOVES_S = 1.0;
+/** How many volleys' worth of pieces a command's run lands in the raised CELL; 0 for a command that launches nothing. */
+export function volleysIn(command: string): number {
+  if (command === VOLLEY_COMMAND) return 1;
+  if (command === PICK_LAUNCH_COMMAND) return 2;
+  return 0;
+}
 export const GATHER_COMMAND = "GardenGather";
 /** The command that starts the launcher and finishes at once (biobuzz LaunchCards.spinUp). */
 export const SPIN_UP_COMMAND = "SpinUp";
@@ -238,6 +252,8 @@ export interface Volley {
   robot: number;
   /** What it lands in the raised CELL, when its robot's differs from `volleyLoad`. */
   load?: number;
+  /** How many volleys' worth it is, when not one (a Pick flower and launch is two). */
+  volleys?: number;
 }
 
 /** What one volley did to the HIVE. */
@@ -297,7 +313,7 @@ export function hiveHistory(
       effects.push({ ...volley, counted: false, load, tip: null });
       continue;
     }
-    const landed = volley.load ?? values.volleyLoad;
+    const landed = (volley.load ?? values.volleyLoad) * (volley.volleys ?? 1);
     if (
       load + landed >= values.tipLoad - 1e-9 &&
       missed < tipMisses(values, tips.length + 1)
@@ -388,12 +404,9 @@ export function previewTiming(
   let spunAt: number | null = null;
   return {
     commandRan(name, t0, _t1, fed = true) {
-      if (
-        (name === SPIN_UP_COMMAND || name === VOLLEY_COMMAND) &&
-        spunAt === null
-      )
+      if ((name === SPIN_UP_COMMAND || volleysIn(name) > 0) && spunAt === null)
         spunAt = t0;
-      if (name === VOLLEY_COMMAND && fed) full = false;
+      if (volleysIn(name) > 0 && fed) full = false;
     },
     becameTrue(condition) {
       if (condition === "IntakeFull") full = true;
@@ -402,6 +415,12 @@ export function previewTiming(
       if (name === SPIN_UP_COMMAND) return 0;
       if (name === PICK_COMMAND) return values.pickFlowerS;
       if (name === GATHER_COMMAND) return values.gardenGatherS;
+      if (name === PICK_LAUNCH_COMMAND) {
+        const ready = (spunAt ?? t0) + values.spinUpS;
+        return (
+          Math.max(0, ready - t0) + PICK_LAUNCH_MOVES_S + 2 * values.volleyS
+        );
+      }
       if (name === VOLLEY_COMMAND) {
         // A launch waits for speed first: the rest of the spin-up from when it was asked, or all
         // of it from rest.
@@ -412,7 +431,7 @@ export function previewTiming(
     },
     feedStartsAt(name, t0) {
       // The feeder runs once the launcher is at speed (the settle is counted with the feed).
-      if (name !== VOLLEY_COMMAND) return undefined;
+      if (volleysIn(name) === 0) return undefined;
       return Math.max(t0, (spunAt ?? t0) + values.spinUpS);
     },
     trueAt(condition, t0, at) {

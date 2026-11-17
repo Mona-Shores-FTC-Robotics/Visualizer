@@ -19,7 +19,7 @@ import {
   previewTiming,
   ROBOT_FACTS,
   TIP_CONDITIONS,
-  VOLLEY_COMMAND,
+  volleysIn,
   type Tip,
   type TimingValues,
   type Volley,
@@ -109,8 +109,13 @@ export function volleysOf(
 ): Volley[] {
   return previews.flatMap((p, robot) =>
     [...p.launches, ...p.actions]
-      .filter((l) => l.command === VOLLEY_COMMAND && !l.unfired)
-      .map((l) => ({ t: l.t1, robot, load: loads[robot] })),
+      .filter((l) => volleysIn(l.command) > 0 && !l.unfired)
+      .map((l) => ({
+        t: l.t1,
+        robot,
+        load: loads[robot],
+        ...(volleysIn(l.command) === 1 ? {} : { volleys: volleysIn(l.command) }),
+      })),
   );
 }
 

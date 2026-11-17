@@ -34,7 +34,9 @@ export const TEAM_ROBOT: Pick<
  * GardenGather are its FlowerPicker and GardenGather, the driver's D-pad up and down). The ones the
  * simple builder offers come first, since they head the command list. An Auto with no list of its
  * own starts with this one, so the dropdowns are never empty; "Load the robot's commands and
- * triggers…" in Setup still replaces it.
+ * triggers…" in Setup still replaces it. PickFlowerLaunch is not here: the builder adds it to an
+ * Auto's list with the first Pick flower and launch step (steps.ts), so no other Auto's file
+ * changes for it.
  */
 export function teamRegistry(): AutoRegistry {
   return {
@@ -78,6 +80,11 @@ export function isTeamRobot(
   );
 }
 
+/** Whether `settings` draws our robot (the turret overlay is only for it). */
+export function drawsTeamRobot(settings: { robotImage?: string }): boolean {
+  return (settings.robotImage || TEAM_ROBOT_IMAGE) === TEAM_ROBOT_IMAGE;
+}
+
 /** The "Our robot" image: drawn from the box's numbers (`teamRobotImage`), not a fixed picture. */
 export const TEAM_ROBOT_IMAGE = "/robot.png";
 
@@ -94,7 +101,8 @@ export function robotImageSrc(
  * A top view of our robot's chassis filling a `rLength` x `rWidth` drive base, front to the right
  * (the field draws the image facing right), as an SVG data URL. The parts the team measured sit
  * where they are on the robot, from the wheelbase's centre (`rForward` behind the box's middle, in
- * an older file): the turret 3.33 in behind and 1.87 in right (TurretSubsystem), the Limelight
+ * an older file): the turret 3.33 in behind and 2.68 in right (TurretSubsystem; its ring only, the barrel is
+ * RobotTurret's, drawn by the field so it can turn), the Limelight
  * 4.0 in ahead on the centre line (CameraMount). The rest follows the box: wheels at the corners,
  * intake across the front, flush with the wheels. So a new Length or Width redraws the chassis to fit, and a part that
  * would land outside it is left out rather than drawn wrong. Features (the poker) are drawn by
@@ -183,12 +191,11 @@ export function teamRobotImage(
       `<rect x="${X(0.35)}" y="${Y(-3.75)}" width="3" height="7.5" rx="0.4" fill="#a9cbe6" stroke="#5b7f9e" stroke-width="0.1"/>`,
     );
 
-  // Turret: its ring at the launcher's axis, the barrel pointing forward (locked at home).
-  if (fits(-3.33, 1.87, 2.9))
+  // Turret: its ring at the launcher's axis. The barrel is not part of the image: the field draws
+  // it on top (RobotTurret), so it can turn.
+  if (fits(-3.33, 2.68, 2.9))
     add(
-      `<circle cx="${X(-3.33)}" cy="${Y(1.87)}" r="2.9" fill="#e8743b" stroke="#1d1f23" stroke-width="0.15"/>` +
-        `<rect x="${X(-3.33)}" y="${Y(1.87 - 0.45)}" width="3.4" height="0.9" rx="0.2" fill="#1d1f23"/>` +
-        `<circle cx="${X(-3.33)}" cy="${Y(1.87)}" r="0.45" fill="#1d1f23"/>`,
+      `<circle cx="${X(-3.33)}" cy="${Y(2.68)}" r="2.9" fill="#e8743b" stroke="#1d1f23" stroke-width="0.15"/>`,
     );
 
   // Limelight: facing forward, pitched up at the HIVE.

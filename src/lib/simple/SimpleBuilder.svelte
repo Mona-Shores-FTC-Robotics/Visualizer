@@ -5,6 +5,7 @@
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
     Clock,
+    Flower,
     Flower2,
     Hourglass,
     Link2,
@@ -129,6 +130,13 @@
       hint: "The robot's D-pad up pick: squares up on the nearest FLOWER's line if it needs to, pushes in and backs out",
     },
     {
+      kind: "pickLaunch",
+      short: "Pick+launch",
+      label: "Pick flower and launch",
+      icon: Flower,
+      hint: "At the FAR FLOWER, with a load aboard and a turret that aims: fires the load from against the FLOWER while it picks, eight in a row. Never run on a robot yet",
+    },
+    {
       kind: "gather",
       short: "Gather",
       label: "Garden gather",
@@ -169,6 +177,7 @@
     spinup: Fan,
     drive: Navigation,
     pick: Flower2,
+    pickLaunch: Flower,
     gather: Sprout,
     command: Terminal,
     wait: Hourglass,
@@ -1259,6 +1268,36 @@
         {:else}
           <span class="text-danger"
             >{step.problem}: the robot won't gather from here.</span
+          >
+        {/if}
+      </div>
+    {:else if step.kind === "pickLaunch"}
+      {@render limitRow(step)}
+      <div class="mt-1 pl-6 text-xs">
+        {#if step.flower && !step.problem && step.shot}
+          <span class="text-body"
+            >at the {step.flower.name}: the load goes from against it at our
+            {step.shot.cell === "AUDIENCE" ? "audience" : "scoring"} CELL,
+            {Math.round(step.shot.rangeIn)} in away and
+            {Math.round(step.shot.offSquareDeg)}° off square, with the turret
+            turned {Math.round(Math.abs(step.shot.turretDeg))}° round, and the
+            FLOWER's four follow.</span
+          >
+          <span class="block text-warning"
+            >For a robot whose turret aims (20245). Not run on a robot yet: its
+            time is an estimate, and whether a fifth piece is ever aboard
+            (G407) is not settled.</span
+          >
+          {#if step.squares}
+            <span class="block text-warning"
+              >This spot is off the FLOWER's line or not square to it: the robot
+              squares up first.</span
+            >
+          {/if}
+        {:else}
+          <span class="text-danger"
+            >{step.problem}: the robot won't do this here. Drive to a spot on
+            the FAR FLOWER's line.</span
           >
         {/if}
       </div>
