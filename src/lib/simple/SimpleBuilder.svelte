@@ -241,6 +241,8 @@
     into: StepList;
     at: { x: number; y: number } | null;
     name: string;
+    /** A new spot for an existing step (its Spot list's "New spot…"), not a new step. */
+    replace?: string;
   } | null>(null);
 
   /** A list's key for drag-and-drop: the main list, or the wait whose Otherwise it is. */
@@ -335,9 +337,18 @@
     spot: string,
     into: StepList = null,
   ) {
+    if (pending?.replace)
+      return moveTo(pending.replace, withTeamSpot(doc, spot), spot);
     const result = addStep(withTeamSpot(doc, spot), kind, index, spot, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
+    stopPicking();
+  }
+
+  /** An existing step goes to `spot` instead (its Spot list, or a new spot for it). */
+  function moveTo(cardId: string, base: typeof doc, spot: string) {
+    apply(setStepSpot(base, cardId, spot));
+    selectedCardId.set(cardId);
     stopPicking();
   }
 
@@ -345,8 +356,9 @@
     kind: "drive" | "park",
     index: number,
     into: StepList = null,
+    replace?: string,
   ) {
-    pending = { kind, index, into, at: null, name: "" };
+    pending = { kind, index, into, at: null, name: "", replace };
     spotPicker.set((at) => {
       if (!pending || !doc.auto) return;
       pending = {
@@ -407,6 +419,7 @@
         withSpot = linkSpot(withSpot, name, point);
       }
     }
+    if (pending.replace) return moveTo(pending.replace, withSpot, name);
     const result = addStep(withSpot, kind, index, name, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
@@ -495,6 +508,8 @@
   }
 
   const fmt = (s: number) => s.toFixed(1);
+  /** The Spot list's first entry: make a new spot for this step by clicking the field. */
+  const NEW_SPOT = "__new_spot__";
 
   /** A step's title on its card. A drive's spot is in its dropdown, so the title doesn't say it. */
   function cardTitle(step: Step): string {
@@ -689,9 +704,20 @@
             value={step.spot}
             onchange={(e) => {
               const name = e.currentTarget.value;
+              if (name === NEW_SPOT) {
+                e.currentTarget.value = step.spot ?? "";
+                startPicking(
+                  step.kind === "park" ? "park" : "drive",
+                  index,
+                  into,
+                  step.cardId,
+                );
+                return;
+              }
               apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
             }}
           >
+            <option value={NEW_SPOT}>+ New spot (click the field)…</option>
             {@render spotOptions()}
           </select>
           {#if $unlockedSpots.has(step.spot!)}
@@ -858,6 +884,9 @@
 <!-- Under a step, only what needs fixing: a launch that misses, a pick off its line, a drive that
      runs into something. -->
 {#snippet notes(step: Step)}
+  {#if pending?.replace === step.cardId}
+    <div class="mt-1.5">{@render pendingBox()}</div>
+  {/if}
   {#if step.problem && step.kind !== "pickLaunch"}
     <p class="simple-note text-danger">{step.problem}.</p>
   {/if}
@@ -904,6 +933,72 @@
     </p>
   {:else if step.kind === "gather" && !step.garden && !step.problem}
     <p class="simple-note text-danger">No GARDEN in range.</p>
+  {/if}
+{/snippet}
+
+{#snippet pendingBox()}
+  {#if pending}
+    <div class="simple-pending" role="status">
+      {#if !pending.at}
+        <p class="text-heading">
+          {pending.replace
+            ? "New spot"
+            : pending.kind === "park"
+              ? "Park"
+              : "Drive to"}:
+          <b>click the field</b>
+          where the robot should go{spots.length ? ", or pick a spot:" : "."}
+        </p>
+        {#if spots.length}
+          <select
+            class={[fieldClass, "mt-1.5 text-xs"]}
+            aria-label="Existing spot"
+            onchange={(e) =>
+              pending &&
+              addAt(
+                pending.kind,
+                pending.index,
+                e.currentTarget.value,
+                pending.into,
+              )}
+          >
+            <option value="">choose a spot…</option>
+            {@render spotOptions()}
+          </select>
+        {/if}
+      {:else}
+        <form
+          class="flex items-center gap-1.5"
+          onsubmit={(e) => {
+            e.preventDefault();
+            nameAndAdd();
+          }}
+        >
+          <label class="shrink-0 text-heading" for="simple-spot-name"
+            >Name this spot</label
+          >
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            id="simple-spot-name"
+            class={[fieldClass, "text-xs"]}
+            bind:value={pending.name}
+            autofocus
+          />
+          <button type="submit" class="simple-tile !min-h-0 !py-1"
+            >{pending.replace ? "Go there" : "Add"}</button
+          >
+        </form>
+        <label class="mt-1 flex items-center gap-1.5 text-xs text-body">
+          <input type="checkbox" bind:checked={asTeamSpot} />
+          Also a team spot, for every Auto
+        </label>
+      {/if}
+      <button
+        type="button"
+        class="mt-1.5 text-xs text-body underline"
+        onclick={stopPicking}>Cancel</button
+      >
+    </div>
   {/if}
 {/snippet}
 
@@ -1068,62 +1163,8 @@
     </li>
   </ol>
 
-  {#if pending}
-    <div class="simple-pending" role="status">
-      {#if !pending.at}
-        <p class="text-heading">
-          {pending.kind === "park" ? "Park" : "Drive to"}:
-          <b>click the field</b>
-          where the robot should go{spots.length ? ", or pick a spot:" : "."}
-        </p>
-        {#if spots.length}
-          <select
-            class={[fieldClass, "mt-1.5 text-xs"]}
-            aria-label="Existing spot"
-            onchange={(e) =>
-              pending &&
-              addAt(
-                pending.kind,
-                pending.index,
-                e.currentTarget.value,
-                pending.into,
-              )}
-          >
-            <option value="">choose a spot…</option>
-            {@render spotOptions()}
-          </select>
-        {/if}
-      {:else}
-        <form
-          class="flex items-center gap-1.5"
-          onsubmit={(e) => {
-            e.preventDefault();
-            nameAndAdd();
-          }}
-        >
-          <label class="shrink-0 text-heading" for="simple-spot-name"
-            >Name this spot</label
-          >
-          <!-- svelte-ignore a11y_autofocus -->
-          <input
-            id="simple-spot-name"
-            class={[fieldClass, "text-xs"]}
-            bind:value={pending.name}
-            autofocus
-          />
-          <button type="submit" class="simple-tile !min-h-0 !py-1">Add</button>
-        </form>
-        <label class="mt-1 flex items-center gap-1.5 text-xs text-body">
-          <input type="checkbox" bind:checked={asTeamSpot} />
-          Also a team spot, for every Auto
-        </label>
-      {/if}
-      <button
-        type="button"
-        class="mt-1.5 text-xs text-body underline"
-        onclick={stopPicking}>Cancel</button
-      >
-    </div>
+  {#if pending && !pending.replace}
+    {@render pendingBox()}
   {/if}
 
   <div
@@ -1240,6 +1281,12 @@
     color: var(--heading);
     background: color-mix(in srgb, var(--body) 10%, transparent);
     cursor: pointer;
+  }
+  .simple-spot option,
+  .simple-spot optgroup,
+  .simple-add option {
+    background-color: var(--base);
+    color: var(--heading);
   }
   .simple-spot:hover,
   .simple-spot:focus {
