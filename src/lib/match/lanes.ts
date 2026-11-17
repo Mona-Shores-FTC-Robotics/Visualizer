@@ -319,3 +319,30 @@ export function robotSummary(robot: RobotLane): string {
   if (robot.guard) parts.push(`endgame guard parked at ${fmt(robot.guard.t)}`);
   return parts.join(" · ");
 }
+
+/** One robot's end of the match, as the Match view's result line says it. */
+export function robotOutcome(robot: RobotLane): string {
+  if (robot.still) return "no-show";
+  if (robot.stalled) return "stuck in a wait";
+  if (robot.unparked) return "not parked";
+  if (robot.spareS < 0) return `over 30 s by ${(-robot.spareS).toFixed(1)} s`;
+  if (robot.guard) return `parked by the guard at ${robot.guard.t.toFixed(1)} s`;
+  return `parked at ${robot.endTime.toFixed(1)} s`;
+}
+
+/**
+ * Fork: the Match view's answer, one line: the TIPs settled by 30 s, how each robot ends, and
+ * whether the two touch (`contactAt`, from AutoState.matchContactAt; null: they never do).
+ * "1 TIP · r-no-cross parked at 24.9 s · l-no-cross parked by the guard at 27.0 s · no contact".
+ */
+export function matchResult(
+  lanes: MatchLanes,
+  contactAt: number | null,
+): string {
+  const tips = lanes.hive.tipsInAuto;
+  return [
+    `${tips} TIP${tips === 1 ? "" : "s"}`,
+    ...lanes.robots.map((robot) => `${robot.name} ${robotOutcome(robot)}`),
+    contactAt === null ? "no contact" : `contact at ${contactAt.toFixed(1)} s`,
+  ].join(" · ");
+}

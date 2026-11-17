@@ -30,7 +30,14 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
-import { laneName, matchLanes, type MatchLanes } from "../lib/match/lanes";
+import {
+  laneName,
+  matchLanes,
+  matchResult,
+  type MatchLanes,
+} from "../lib/match/lanes";
+import { robotFootprint } from "../model/collision";
+import { polygonsOverlap } from "../utils/geometry";
 import { MatchControls } from "../lib/match/controls.svelte";
 import { isSimple } from "../lib/simple/steps";
 import { withSpotParks } from "../lib/simple/parkFrom";
@@ -237,6 +244,49 @@ export class AutoState {
       shown.map((overlay) => overlay.color),
     );
   });
+
+  /**
+   * Fork: when the Autos shown together first touch, seconds after PLAY, or null when they never
+   * do in the 30 s Auto: each robot's frame (no safety margin) where the field draws it, every
+   * tenth of a second. The Match view's result line says it.
+   */
+  matchContactAt = $derived.by((): number | null => {
+    const { previews, shown } = this.overlayTogether;
+    if (shown.length < 2) return null;
+    const robots = shown.flatMap((overlay) => {
+      const preview = previews.get(overlay);
+      if (!preview) return [];
+      const settings = {
+        ...this.#overlays.settingsFor(overlay),
+        safetyMargin: 0,
+      };
+      return [{ overlay, preview, settings }];
+    });
+    if (robots.length < 2) return null;
+    for (let i = 0; i <= 300; i++) {
+      const t = i / 10;
+      const frames = robots.map(({ overlay, preview, settings }) =>
+        robotFootprint(
+          previewPose(
+            preview,
+            Math.min(t, preview.endTime),
+            overlay.doc,
+            settings,
+          ),
+          settings,
+        ),
+      );
+      for (let a = 0; a < frames.length; a++)
+        for (let b = a + 1; b < frames.length; b++)
+          if (polygonsOverlap(frames[a], frames[b])) return t;
+    }
+    return null;
+  });
+
+  /** Fork: the Match view's answer in one line (lanes.ts matchResult); null outside it. */
+  matchResultLine = $derived(
+    this.matchLanes ? matchResult(this.matchLanes, this.matchContactAt) : null,
+  );
 
   constructor(
     project: ProjectStore,

@@ -4,7 +4,7 @@ import { normalizePaths, normalizeStartPose } from "../../utils/normalize";
 import { DEFAULT_SETTINGS } from "../../config";
 import { fallbackValues, hiveHistory, tipsFrom } from "../timing/model";
 import { previewTogether, type FieldEntry } from "../timing/together";
-import { matchLanes } from "./lanes";
+import { matchLanes, matchResult, robotOutcome } from "./lanes";
 // The team's pair as of 3 Nov 2026 (biobuzz TeamCode/autos): simple-builder Autos, whose volleys
 // are Launch all steps and whose one wait is CellUp.
 import leftText from "./fixtures/l-partner.pp?raw";
@@ -217,4 +217,18 @@ test("a wait until a match-clock time is outlined to that time, not from when it
     `limit at 9 s, not ${bar.limitAt}`,
   );
   assert(Math.abs(bar.t1 - 9) < 1e-6, "it ends at 9 s");
+});
+
+test("the result line: the TIPs by 30 s, how each robot ends, and contact", () => {
+  const lanes = lanesOf([entry(leftText), entry(rightText)]);
+  const line = matchResult(lanes, null);
+  const tips = lanes.hive.tipsInAuto;
+  assert(line.startsWith(`${tips} TIP${tips === 1 ? "" : "s"} · LEFT `), line);
+  assert(line.includes(`RIGHT ${robotOutcome(lanes.robots[1])}`), line);
+  assert(line.endsWith("· no contact"), line);
+  assert(matchResult(lanes, 12.46).endsWith("· contact at 12.5 s"), "contact time");
+  const still = { ...lanes.robots[0], still: true };
+  assertEqual(robotOutcome(still), "no-show");
+  const guarded = { ...lanes.robots[0], still: false, stalled: false, unparked: false, spareS: 3, guard: { t: 27, label: "" } };
+  assertEqual(robotOutcome(guarded), "parked by the guard at 27.0 s");
 });

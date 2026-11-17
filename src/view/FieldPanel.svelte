@@ -798,6 +798,9 @@
           entries={auto.overlayTogether.entries}
           values={auto.matchValues}
           show="all"
+          result={auto.matchResultLine}
+          untaken={auto.overlayUntaken}
+          onUntaken={(on) => (auto.overlayUntaken = on)}
         />
       </div>
     {/if}
