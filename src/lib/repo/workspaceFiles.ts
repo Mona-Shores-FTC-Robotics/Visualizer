@@ -7,7 +7,14 @@ import {
   listRepoDrafts,
   repoSaveFiles,
 } from "./repoFolder";
-import { SPOTS_PATH, teamSpotSave, type TeamSpots } from "../team/teamSpots";
+import {
+  SPOTS_PATH,
+  TEAM_SPOTS_JAVA_PATH,
+  parseTeamSpots,
+  teamSpotSave,
+  teamSpotsJava,
+  type TeamSpots,
+} from "../team/teamSpots";
 
 export const LOCAL_DIR = "TeamCode/.auto-workspace";
 const JOURNAL = `${LOCAL_DIR}/pending.json`;
@@ -42,6 +49,7 @@ export async function autoAssetPaths(folder: Folder): Promise<string[]> {
   }
   for (const path of [
     SPOTS_PATH,
+    TEAM_SPOTS_JAVA_PATH,
     `${TEAM_DIR}/timing.json`,
     "TeamCode/auto-registry.json",
   ]) {
@@ -58,6 +66,7 @@ function assetPath(path: string): boolean {
     ) ||
       [
         SPOTS_PATH,
+        TEAM_SPOTS_JAVA_PATH,
         `${TEAM_DIR}/timing.json`,
         "TeamCode/auto-registry.json",
       ].includes(path) ||
@@ -285,7 +294,14 @@ export async function restoreCheckpoint(
     false,
   );
   const restore: FileSet = { ...files };
+  // A checkpoint from before TeamSpots.java was written has spots.json alone: its Java twin is
+  // written from it, so the robot code keeps compiling and agrees with the spots restored.
+  const spotsText = files[SPOTS_PATH];
+  if (!(TEAM_SPOTS_JAVA_PATH in files) && typeof spotsText === "string") {
+    const parsed = parseTeamSpots(spotsText);
+    if (parsed.ok) restore[TEAM_SPOTS_JAVA_PATH] = teamSpotsJava(parsed.spots);
+  }
   for (const path of Object.keys(backup.files))
-    if (!(path in files)) restore[path] = null;
+    if (!(path in restore)) restore[path] = null;
   await writeTransaction(folder, restore, backup.files);
 }

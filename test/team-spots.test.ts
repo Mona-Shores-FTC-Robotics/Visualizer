@@ -22,7 +22,9 @@ import {
   serializeTeamSpots,
   sortSpotEdits,
   startSpotFollowsStart,
+  TEAM_SPOTS_JAVA_PATH,
   teamSpotSave,
+  teamSpotsJava,
   unlinkSpot,
   type TeamSpots,
 } from "../src/lib/team/teamSpots";
@@ -170,8 +172,13 @@ describe("saving team spots", () => {
     expect(Object.keys(plan.files).sort()).toEqual([
       "TeamCode/autos/spots.json",
       "TeamCode/autos/uses-park.pp",
+      TEAM_SPOTS_JAVA_PATH,
       "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/opmodes/auto/generated/UsesParkAuto.java",
     ]);
+    // The robot code's copy moves with the list, in the same commit.
+    expect(plan.files[TEAM_SPOTS_JAVA_PATH]).toContain(
+      'public static final TeamSpot PARK = new TeamSpot("PARK", 20.0, 90.0, 270.0);',
+    );
     const spots = parseTeamSpots(plan.files["TeamCode/autos/spots.json"]);
     expect(spots.ok && spots.spots.PARK).toEqual([20, 90, 270]);
     expect(spots.ok && spots.spots.LAUNCH_LEFT).toEqual(TEAM.LAUNCH_LEFT);
@@ -181,7 +188,32 @@ describe("saving team spots", () => {
     const plan = await teamSpotSave(async () => null, [], { PARK: [1, 2, 3] });
     expect(plan.ok && Object.keys(plan.files)).toEqual([
       "TeamCode/autos/spots.json",
+      TEAM_SPOTS_JAVA_PATH,
     ]);
+  });
+});
+
+describe("TeamSpots.java, spots.json's twin in the robot code", () => {
+  it("writes one constant a spot, in the list's order, and all()", () => {
+    const java = teamSpotsJava({
+      RIGHT_START: [55.6, 7.7, 90],
+      LEFT_PARK: [14.5, -0.25],
+    });
+    expect(java).toContain(
+      "package org.firstinspires.ftc.teamcode.localization.generated;",
+    );
+    expect(java).toContain(
+      'public static final TeamSpot RIGHT_START = new TeamSpot("RIGHT_START", 55.6, 7.7, 90.0);',
+    );
+    // No heading: reached at any heading, which biobuzz's TeamSpot reads as NaN.
+    expect(java).toContain(
+      'public static final TeamSpot LEFT_PARK = new TeamSpot("LEFT_PARK", 14.5, -0.25, Double.NaN);',
+    );
+    expect(java).toContain("return new TeamSpot[] {LEFT_PARK, RIGHT_START};");
+    expect(java.indexOf("LEFT_PARK =")).toBeLessThan(
+      java.indexOf("RIGHT_START ="),
+    );
+    expect(java.endsWith("}\n")).toBe(true);
   });
 });
 

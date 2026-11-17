@@ -55,6 +55,8 @@
     type SimResult,
   } from "./biobuzz";
   import SimEntries from "./SimEntries.svelte";
+  import { spotEdits } from "../team/spotsStore";
+  import { teamSpotSave, type TeamSpots } from "../team/teamSpots";
 
   interface Props {
     isOpen?: boolean;
@@ -172,6 +174,28 @@
     if (isOpen) void opened();
     else stopPolling();
   });
+
+  /**
+   * The team spots this Auto uses that were moved in this browser and not saved: a save takes them
+   * with it, in the same commit (spots.json, TeamSpots.java and every other Auto that uses one,
+   * re-exported), so one save is one pull request. A spot moved here that this Auto does not use
+   * stays for Save team spots, or for the Auto that uses it.
+   */
+  function movedSpots(text: string, edits: TeamSpots): TeamSpots {
+    let used: unknown;
+    try {
+      used = JSON.parse(text)?.auto?.teamSpots;
+    } catch {
+      return {};
+    }
+    if (!Array.isArray(used)) return {};
+    return Object.fromEntries(
+      Object.entries(edits).filter(([name]) => used.includes(name)),
+    );
+  }
+  let moved = $derived(
+    isOpen ? Object.keys(movedSpots(projectText(), $spotEdits)).sort() : [],
+  );
 
   function loadJson<T>(key: string, fallback: T): T {
     try {
@@ -361,6 +385,7 @@
     saving = true;
     try {
       const text = projectText();
+      const spots = movedSpots(text, $spotEdits);
       const exported = generateAutoJavaFromText(text, baseName(ppPath));
       if (!exported.ok) {
         blocked = exported.errors;
@@ -398,12 +423,32 @@
       }
       const existing = await listFiles(token, head);
       const javaPath = generatedPathFor(ppPath, exported.fileName, existing);
+      // Moved team spots ride along: spots.json, TeamSpots.java and the other Autos that use them,
+      // as of the commit being built on. This Auto is the one on screen, written below.
+      let spotFiles: Record<string, string> = {};
+      let spotAutos: string[] = [];
+      if (Object.keys(spots).length) {
+        const auth = token;
+        const at = head;
+        const spotPlan = await teamSpotSave(
+          (p) => readText(auth, p, at),
+          existing.filter((p) => p !== ppPath),
+          spots,
+        );
+        if (!spotPlan.ok) {
+          blocked = spotPlan.errors;
+          return;
+        }
+        spotFiles = spotPlan.files;
+        spotAutos = spotPlan.autos;
+      }
       const spec = simSpec(exported.className);
       // biobuzz's request for this Auto, as of the commit being built on: its runs are kept.
       const previous = await existingRequest(ppPath, head);
       plan = simPlan(previous?.request ?? null);
       planFrom = previous?.from ?? null;
       const files = {
+        ...spotFiles,
         [ppPath]: text,
         [javaPath]: exported.source,
         [simRequestPath(ppPath, viaFastLane)]: simRequestText({
@@ -414,7 +459,17 @@
         }),
       };
       const simulates = `${spec}: ${plan.map((r) => r.name).join(", ")}`;
-      const message = `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${simulates}.`;
+      const spotNames = Object.keys(spots).sort();
+      const spotWords = spotNames.length
+        ? `Moves team spot${spotNames.length > 1 ? "s" : ""} ${spotNames.join(", ")} (spots.json and TeamSpots.java)` +
+          (spotAutos.length
+            ? `, re-exporting ${spotAutos.join(", ")}, which use${spotAutos.length > 1 ? "" : "s"} ${spotNames.length > 1 ? "them" : "it"}.`
+            : "; no other Auto uses " +
+              (spotNames.length > 1 ? "them." : "it."))
+        : "";
+      const message =
+        `Auto Builder: ${baseName(ppPath)}\n\nSaved from the Visualizer by ${login}; simulates ${simulates}.` +
+        (spotWords ? `\n\n${spotWords}` : "");
       let sha: string;
       try {
         sha = await commitFiles(token, target, head, files, message);
@@ -439,6 +494,7 @@
             FAST_LANE_BASE,
             `Auto: ${baseName(ppPath)}`,
             `Saved from the Visualizer by ${login}: \`${ppPath}\`, its generated Java and its simulation request (simulates ${simulates}).\n\n` +
+              (spotWords ? `${spotWords}\n\n` : "") +
               "Fast lane: an Auto-only change, so it needs no issue or review. Try it on the robot; merge it here if it is better than master's. Simulated points are shown, never enforced.",
           );
         }
@@ -704,7 +760,8 @@
       — the runs in <code>{simOwnRequestPath(path.trim())}</code> on {planFrom},
       on the robot and seeds it names. A save keeps its partners as they are.{:else}
       — biobuzz has no simulation request for this Auto yet, so it runs alone
-      (the real robot, {SAVE_SEEDS} seeds, RED). A mentor curates the partners in biobuzz.{/if}
+      (the real robot, {SAVE_SEEDS} seeds, RED). A mentor curates the partners in
+      biobuzz.{/if}
   </p>
   <datalist id="gh-files">
     {#each ppFiles as f (f)}
@@ -727,8 +784,12 @@
           {/if}
           <code>{path}</code>
           {#if isNew}<strong class="text-warning">(a new file)</strong
-            >{:else}(updated){/if}, its Java, and the simulation request. GitHub
-          then simulates {plan.length === 1
+            >{:else}(updated){/if}, its Java, and the simulation request{#if moved.length},
+            and the team spot{moved.length > 1 ? "s" : ""} you moved (<strong
+              >{moved.join(", ")}</strong
+            >), with every other Auto that uses {moved.length > 1
+              ? "them"
+              : "it"}{/if}. GitHub then simulates {plan.length === 1
             ? "the Auto alone"
             : `the ${plan.length} runs`}, usually in 1–6 minutes; you can keep
           working meanwhile.
@@ -855,263 +916,265 @@
         />
       {/if}
       {#if !withEntries}
-      <table class="w-full text-xs" data-testid="gh-runs">
-        <thead class="text-body text-left">
-          <tr>
-            <th class="py-1">Run</th>
-            <th>Best</th>
-            <th>Average</th>
-            <th>TIPs at (s)</th>
-            <th>LEAVE / PARK</th>
-            <th>Simulated</th>
-            <th>Log</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each rows as row (row.key)}
-            <tr
-              class="border-t border-border cursor-pointer hover:bg-white/5 {selectedRow ===
-              row
-                ? 'bg-white/5'
-                : ''}"
-              onclick={() => {
-                selected = !selected;
-                expanded = null;
-              }}
-            >
-              <td class="py-1 font-semibold">{row.name}</td>
-              {#if row.shown === null}
-                <td colspan="4" class="text-body"
-                  >{waiting ? "simulating…" : "not simulated yet"}</td
-                >
-                <td></td>
-                <td></td>
-              {:else}
-                {#if row.shown.error}
-                  <td colspan="4" class="text-danger">{row.shown.error}</td>
-                {:else if row.summary.best}
-                  <td><strong>{row.summary.best.points}</strong> pts</td>
-                  <td
-                    >{row.summary.meanPoints.toFixed(1)} over {row.summary.runs}
-                    seeds{#if row.summary.withProblems}<span
-                        class="text-warning"
-                        >, problems in {row.summary.withProblems}</span
-                      >{/if}</td
-                  >
-                  <td
-                    >{row.summary.best.autoTips
-                      ? row.summary.best.tipsAt
-                          .slice(0, row.summary.best.autoTips)
-                          .map(secs)
-                          .join(", ")
-                      : "none"}</td
-                  >
-                  <td
-                    >{row.summary.best.robots
-                      .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
-                      .join(" · ")}</td
-                  >
-                {:else}
-                  <td colspan="4" class="text-body">no seed ran</td>
-                {/if}
-                <td class="whitespace-nowrap">
-                  <a
-                    class="underline"
-                    href={commitUrl(row.shown.commit)}
-                    target="_blank"
-                    rel="noreferrer"
-                    onclick={(e) => e.stopPropagation()}
-                    ><code>{row.shown.commit.slice(0, 7)}</code></a
-                  >
-                  on {row.shown.branch}, {when(row.shown.finishedAt)} ·
-                  <a
-                    class="underline"
-                    href={row.shown.runUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onclick={(e) => e.stopPropagation()}>run</a
-                  >
-                </td>
-                <td class="whitespace-nowrap">
-                  {#each Object.entries(row.shown.logs) as [seed, file] (seed)}
-                    {#if Number(seed) === bestSeed(row)}
-                      <button
-                        class="console-action console-action--accent text-xs"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          void download(row.shown!, file);
-                        }}
-                        title={file}>WPILOG (best)</button
-                      >
-                    {/if}
-                  {/each}
-                </td>
-              {/if}
+        <table class="w-full text-xs" data-testid="gh-runs">
+          <thead class="text-body text-left">
+            <tr>
+              <th class="py-1">Run</th>
+              <th>Best</th>
+              <th>Average</th>
+              <th>TIPs at (s)</th>
+              <th>LEAVE / PARK</th>
+              <th>Simulated</th>
+              <th>Log</th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
-
-      {#if selectedRow?.shown}
-        {@const shown = selectedRow.shown}
-        {@const summary = selectedRow.summary}
-        {@const runs = shown.runs ?? []}
-        <div class="mt-4 border-t border-border pt-3">
-          <p class="mb-2">
-            <strong>{selectedRow.name}</strong>:
-            <code>{shown.spec ?? shown.auto}</code>
-                        on {shown.design ?? "the usual robot"} ·
-            <button class="underline" onclick={() => copyVersionLink(shown)}
-              >copy a link to this version</button
-            >
-          </p>
-          {#if shown.error}
-            <p class="text-danger mb-2">{shown.error}</p>
-          {/if}
-          {#if runs.length}
-            {#if summary.best}
-              <p class="mb-1 text-base">
-                Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
-                  .best.seed}),
-                {summary.best.autoTips} TIP{summary.best.autoTips === 1
-                  ? ""
-                  : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
-                    .slice(0, summary.best.autoTips)
-                    .map(secs)
-                    .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
-                  .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
-                  .join(" · ")}.
-              </p>
-            {/if}
-            <p class="mb-3 text-body">
-              Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points on
-              average.
-              {summary.tips
-                .map(
-                  (tip, i) =>
-                    `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
-                )
-                .join(" ")}
-              LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
-              {#if summary.withProblems}<span class="text-warning"
-                  >Problems in {summary.withProblems} of {summary.runs} seeds.</span
-                >{/if}
-            </p>
-            <div class="flex flex-wrap gap-2 mb-3">
-              {#each Object.entries(shown.logs) as [seed, file] (seed)}
-                <button
-                  class="console-action {Number(seed) === bestSeed(selectedRow)
-                    ? 'console-action--accent'
-                    : ''}"
-                  onclick={() => download(shown, file)}
-                  title={file}
-                  >Download WPILOG ({logLabel(
-                    selectedRow,
-                    Number(seed),
-                  )})</button
-                >
-              {/each}
-            </div>
-            <p class="text-xs text-body mb-3">
-              Then drag the file onto AdvantageScope's window (or File → Open
-              Logs…). A web page cannot open AdvantageScope by itself, so it is
-              download, then drag.
-            </p>
-            <table class="w-full text-xs">
-              <thead class="text-body text-left">
-                <tr>
-                  <th class="py-1">Seed</th>
-                  <th>Points</th>
-                  <th>TIPs at (s)</th>
-                  <th>LEAVE / PARK</th>
-                  <th>Problems</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each runs as r (r.seed)}
-                  <tr
-                    class="border-t border-border cursor-pointer hover:bg-white/5"
-                    onclick={() =>
-                      (expanded = expanded === r.seed ? null : r.seed)}
+          </thead>
+          <tbody>
+            {#each rows as row (row.key)}
+              <tr
+                class="border-t border-border cursor-pointer hover:bg-white/5 {selectedRow ===
+                row
+                  ? 'bg-white/5'
+                  : ''}"
+                onclick={() => {
+                  selected = !selected;
+                  expanded = null;
+                }}
+              >
+                <td class="py-1 font-semibold">{row.name}</td>
+                {#if row.shown === null}
+                  <td colspan="4" class="text-body"
+                    >{waiting ? "simulating…" : "not simulated yet"}</td
                   >
-                    <td class="py-1"
-                      >{r.seed}{r.seed === bestSeed(selectedRow)
-                        ? " ▲"
-                        : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
-                    >
-                    <td>{r.points}</td>
+                  <td></td>
+                  <td></td>
+                {:else}
+                  {#if row.shown.error}
+                    <td colspan="4" class="text-danger">{row.shown.error}</td>
+                  {:else if row.summary.best}
+                    <td><strong>{row.summary.best.points}</strong> pts</td>
                     <td
-                      >{r.tipsAt.length
-                        ? r.tipsAt.map(secs).join(", ")
+                      >{row.summary.meanPoints.toFixed(1)} over {row.summary
+                        .runs}
+                      seeds{#if row.summary.withProblems}<span
+                          class="text-warning"
+                          >, problems in {row.summary.withProblems}</span
+                        >{/if}</td
+                    >
+                    <td
+                      >{row.summary.best.autoTips
+                        ? row.summary.best.tipsAt
+                            .slice(0, row.summary.best.autoTips)
+                            .map(secs)
+                            .join(", ")
                         : "none"}</td
                     >
                     <td
-                      >{r.robots
+                      >{row.summary.best.robots
                         .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
                         .join(" · ")}</td
                     >
-                    <td class="text-warning">{runProblems(r).join("; ")}</td>
-                  </tr>
-                  {#if expanded === r.seed}
-                    <tr>
-                      <td colspan="5" class="pb-2">
-                        {#each r.robots as robot (robot.auto)}
-                          <p class="mt-2 font-semibold">
-                            {robot.auto}: launched {robot.launched},
-                            {robot.finishedAt === null
-                              ? "still running at 30 s"
-                              : `finished at ${secs(robot.finishedAt)} s`}
-                            {#each robotProblems(robot) as p, i (i)}<span
-                                class="text-warning">; {p}</span
-                              >{/each}
-                          </p>
-                          <pre
-                            class="whitespace-pre-wrap text-body">{robot.timeline.join(
-                              "\n",
-                            )}</pre>
-                        {/each}
-                      </td>
-                    </tr>
+                  {:else}
+                    <td colspan="4" class="text-body">no seed ran</td>
                   {/if}
-                {/each}
-              </tbody>
-            </table>
-            <p class="text-xs text-body mt-3">
-              ▲ the best seed, ★ the median one: both logs are published. AUTO
-              starts 10 s into the log; its Metadata tab names the commit and
-              .pp it simulated.
-            </p>
-            <details class="text-xs text-body mt-3">
-              <summary class="cursor-pointer text-heading"
-                >Set up AdvantageScope on this laptop (once)</summary
+                  <td class="whitespace-nowrap">
+                    <a
+                      class="underline"
+                      href={commitUrl(row.shown.commit)}
+                      target="_blank"
+                      rel="noreferrer"
+                      onclick={(e) => e.stopPropagation()}
+                      ><code>{row.shown.commit.slice(0, 7)}</code></a
+                    >
+                    on {row.shown.branch}, {when(row.shown.finishedAt)} ·
+                    <a
+                      class="underline"
+                      href={row.shown.runUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onclick={(e) => e.stopPropagation()}>run</a
+                    >
+                  </td>
+                  <td class="whitespace-nowrap">
+                    {#each Object.entries(row.shown.logs) as [seed, file] (seed)}
+                      {#if Number(seed) === bestSeed(row)}
+                        <button
+                          class="console-action console-action--accent text-xs"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            void download(row.shown!, file);
+                          }}
+                          title={file}>WPILOG (best)</button
+                        >
+                      {/if}
+                    {/each}
+                  </td>
+                {/if}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+
+        {#if selectedRow?.shown}
+          {@const shown = selectedRow.shown}
+          {@const summary = selectedRow.summary}
+          {@const runs = shown.runs ?? []}
+          <div class="mt-4 border-t border-border pt-3">
+            <p class="mb-2">
+              <strong>{selectedRow.name}</strong>:
+              <code>{shown.spec ?? shown.auto}</code>
+              on {shown.design ?? "the usual robot"} ·
+              <button class="underline" onclick={() => copyVersionLink(shown)}
+                >copy a link to this version</button
               >
-              <ol class="list-decimal ml-5 mt-2 flex flex-col gap-1">
-                <li>
-                  Install <a
-                    class="underline"
-                    href="https://github.com/Mechanical-Advantage/AdvantageScope/releases"
-                    target="_blank"
-                    rel="noreferrer">AdvantageScope</a
-                  > (v27 alpha 6 or newer).
-                </li>
-                <li>
-                  <button class="underline" onclick={downloadLayout}
-                    >Download the team layout</button
-                  >, then in AdvantageScope File → Import Layout… and pick it.
-                  It is the same layout as for the robot's real match logs, so a
-                  simulated run and a real one look alike.
-                </li>
-                <li>
-                  The team's robot model (optional): in your biobuzz checkout,
-                  double-click <code
-                    >tools/advantagescope/setup-advantagescope.cmd</code
-                  >, then restart AdvantageScope.
-                </li>
-              </ol>
-            </details>
-          {/if}
-        </div>
-      {/if}
+            </p>
+            {#if shown.error}
+              <p class="text-danger mb-2">{shown.error}</p>
+            {/if}
+            {#if runs.length}
+              {#if summary.best}
+                <p class="mb-1 text-base">
+                  Best: <strong>{summary.best.points}</strong> AUTO points (seed {summary
+                    .best.seed}),
+                  {summary.best.autoTips} TIP{summary.best.autoTips === 1
+                    ? ""
+                    : "s"}{#if summary.best.autoTips}&nbsp;at {summary.best.tipsAt
+                      .slice(0, summary.best.autoTips)
+                      .map(secs)
+                      .join(", ")} s{/if}, LEAVE / PARK {summary.best.robots
+                    .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+                    .join(" · ")}.
+                </p>
+              {/if}
+              <p class="mb-3 text-body">
+                Over {summary.runs} seeds: {summary.meanPoints.toFixed(1)} points
+                on average.
+                {summary.tips
+                  .map(
+                    (tip, i) =>
+                      `TIP ${i + 1} in ${tip.count} of ${summary.runs}, at ${secs(tip.meanAt)} s.`,
+                  )
+                  .join(" ")}
+                LEAVE and PARK: {summary.parked} of {summary.robots} robot runs.
+                {#if summary.withProblems}<span class="text-warning"
+                    >Problems in {summary.withProblems} of {summary.runs} seeds.</span
+                  >{/if}
+              </p>
+              <div class="flex flex-wrap gap-2 mb-3">
+                {#each Object.entries(shown.logs) as [seed, file] (seed)}
+                  <button
+                    class="console-action {Number(seed) ===
+                    bestSeed(selectedRow)
+                      ? 'console-action--accent'
+                      : ''}"
+                    onclick={() => download(shown, file)}
+                    title={file}
+                    >Download WPILOG ({logLabel(
+                      selectedRow,
+                      Number(seed),
+                    )})</button
+                  >
+                {/each}
+              </div>
+              <p class="text-xs text-body mb-3">
+                Then drag the file onto AdvantageScope's window (or File → Open
+                Logs…). A web page cannot open AdvantageScope by itself, so it
+                is download, then drag.
+              </p>
+              <table class="w-full text-xs">
+                <thead class="text-body text-left">
+                  <tr>
+                    <th class="py-1">Seed</th>
+                    <th>Points</th>
+                    <th>TIPs at (s)</th>
+                    <th>LEAVE / PARK</th>
+                    <th>Problems</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each runs as r (r.seed)}
+                    <tr
+                      class="border-t border-border cursor-pointer hover:bg-white/5"
+                      onclick={() =>
+                        (expanded = expanded === r.seed ? null : r.seed)}
+                    >
+                      <td class="py-1"
+                        >{r.seed}{r.seed === bestSeed(selectedRow)
+                          ? " ▲"
+                          : ""}{r.seed === shown.typicalSeed ? " ★" : ""}</td
+                      >
+                      <td>{r.points}</td>
+                      <td
+                        >{r.tipsAt.length
+                          ? r.tipsAt.map(secs).join(", ")
+                          : "none"}</td
+                      >
+                      <td
+                        >{r.robots
+                          .map((x) => `${yesNo(x.leave)} / ${yesNo(x.park)}`)
+                          .join(" · ")}</td
+                      >
+                      <td class="text-warning">{runProblems(r).join("; ")}</td>
+                    </tr>
+                    {#if expanded === r.seed}
+                      <tr>
+                        <td colspan="5" class="pb-2">
+                          {#each r.robots as robot (robot.auto)}
+                            <p class="mt-2 font-semibold">
+                              {robot.auto}: launched {robot.launched},
+                              {robot.finishedAt === null
+                                ? "still running at 30 s"
+                                : `finished at ${secs(robot.finishedAt)} s`}
+                              {#each robotProblems(robot) as p, i (i)}<span
+                                  class="text-warning">; {p}</span
+                                >{/each}
+                            </p>
+                            <pre
+                              class="whitespace-pre-wrap text-body">{robot.timeline.join(
+                                "\n",
+                              )}</pre>
+                          {/each}
+                        </td>
+                      </tr>
+                    {/if}
+                  {/each}
+                </tbody>
+              </table>
+              <p class="text-xs text-body mt-3">
+                ▲ the best seed, ★ the median one: both logs are published. AUTO
+                starts 10 s into the log; its Metadata tab names the commit and
+                .pp it simulated.
+              </p>
+              <details class="text-xs text-body mt-3">
+                <summary class="cursor-pointer text-heading"
+                  >Set up AdvantageScope on this laptop (once)</summary
+                >
+                <ol class="list-decimal ml-5 mt-2 flex flex-col gap-1">
+                  <li>
+                    Install <a
+                      class="underline"
+                      href="https://github.com/Mechanical-Advantage/AdvantageScope/releases"
+                      target="_blank"
+                      rel="noreferrer">AdvantageScope</a
+                    > (v27 alpha 6 or newer).
+                  </li>
+                  <li>
+                    <button class="underline" onclick={downloadLayout}
+                      >Download the team layout</button
+                    >, then in AdvantageScope File → Import Layout… and pick it.
+                    It is the same layout as for the robot's real match logs, so
+                    a simulated run and a real one look alike.
+                  </li>
+                  <li>
+                    The team's robot model (optional): in your biobuzz checkout,
+                    double-click <code
+                      >tools/advantagescope/setup-advantagescope.cmd</code
+                    >, then restart AdvantageScope.
+                  </li>
+                </ol>
+              </details>
+            {/if}
+          </div>
+        {/if}
       {/if}
     </div>
   {/if}
