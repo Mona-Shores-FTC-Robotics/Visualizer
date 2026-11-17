@@ -9,8 +9,8 @@
  *   a CELL's row is at our HIVE's x (HiveFieldPoints.hiveX: the centre less half of
  *     HiveGeometry.HIVE_CENTER_TO_CENTER_IN, 25.5, for red) and 12.34 in from the axle, between the
  *     raised row (13.10) and the lowered one (11.58), which aim within a fraction of a degree;
- *   the turret's axis sits 3.33 in behind the robot's centre and 1.87 in to its right
- *     (TurretSubsystem.turretForwardIn -3.33, turretLeftIn -1.87);
+ *   the turret's axis sits 3.33 in behind the robot's centre and 2.68 in to its right
+ *     (TurretSubsystem.turretForwardIn -3.33, turretLeftIn -2.68);
  *   a shot is on when the heading is within 3 degrees (PathEndSettle.aimToleranceDeg,
  *     TeleOpConfig.aimToleranceDeg).
  */
@@ -21,9 +21,45 @@ const CENTRE = FIELD_SIZE / 2;
 const HIVE_CENTRE_TO_CENTRE_IN = 25.5;
 const ROW_FROM_AXLE_IN = (13.1 + 11.58) / 2;
 const TURRET_FORWARD_IN = -3.33;
-const TURRET_LEFT_IN = -1.87;
+const TURRET_LEFT_IN = -2.68;
+/** A raised CELL's row from the axle (HiveFieldPoints.UP_ROW_FROM_AXLE_IN): what an Auto launch spot aims at. */
+const RAISED_ROW_FROM_AXLE_IN = 13.1;
 /** How far off the CELL a launch may face and still be on, degrees. */
 export const AIM_TOLERANCE_DEG = 3;
+
+/** The heading that points the turret at (tx, ty) from a robot centred at (x, y), radians. */
+function aimAt(x: number, y: number, tx: number, ty: number): number {
+  // The turret's axis moves as the robot turns, so the heading that aims it is found by settling.
+  let th = Math.atan2(ty - y, tx - x);
+  for (let i = 0; i < 30; i++) {
+    const ax =
+      x + TURRET_FORWARD_IN * Math.cos(th) - TURRET_LEFT_IN * Math.sin(th);
+    const ay =
+      y + TURRET_FORWARD_IN * Math.sin(th) + TURRET_LEFT_IN * Math.cos(th);
+    th = Math.atan2(ty - ay, tx - ax);
+  }
+  return th;
+}
+
+/** Whether a team spot is an Auto launch spot: every one named …_AUTO_… is (biobuzz AutoLaunchSpots). */
+export function isLaunchSpotName(name: string): boolean {
+  return name.includes("_AUTO_");
+}
+
+/**
+ * The heading an Auto launch spot at (x, y), drawn for RED, faces: the turret, locked, on the
+ * raised row of the CELL at its end, as biobuzz's AutoLaunchSpotsTest checks it (within 0.3°).
+ * Degrees in [0, 360), to a tenth, as spots.json keeps them.
+ */
+export function launchSpotHeadingDeg(x: number, y: number): number {
+  const ty =
+    y < CENTRE
+      ? CENTRE - RAISED_ROW_FROM_AXLE_IN
+      : CENTRE + RAISED_ROW_FROM_AXLE_IN;
+  const deg =
+    (aimAt(x, y, CENTRE - HIVE_CENTRE_TO_CENTRE_IN / 2, ty) * 180) / Math.PI;
+  return Math.round((((deg % 360) + 360) % 360) * 10) / 10;
+}
 
 export interface Aim {
   /** "AUDIENCE" or "SCORING": which of our CELLs the launch is at. */

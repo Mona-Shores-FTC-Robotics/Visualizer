@@ -14,7 +14,9 @@ import { buildPathCatalog } from "../src/lib/auto/geometry";
 import { layOutDoc } from "../src/lib/auto/links";
 import { addSpot, addStep, blankAuto } from "../src/lib/simple/steps";
 import { spotsUsedBy } from "../src/lib/team/spotUnlock";
+import { launchSpotHeadingDeg } from "../src/lib/simple/aim";
 import {
+  aimMovedLaunchSpots,
   applyTeamSpots,
   changedSpots,
   forkName,
@@ -324,5 +326,35 @@ describe("a new spot for this Auto only", () => {
     expect(found).toHaveLength(1);
     expect(found[0].spots).toEqual(linked().auto!.teamSpots);
     expect(found[0].spots).toContain("PARK");
+  });
+});
+
+describe("an Auto launch spot aims itself as it moves", () => {
+  it("faces the CELL at its end as biobuzz places the five launch spots", () => {
+    // biobuzz TeamCode/autos/spots.json, 16 Nov 2026: AutoLaunchSpotsTest holds them to 0.3°.
+    const placed: Record<string, [number, number, number]> = {
+      LEFT_AUTO_HIVE: [61.9, 120.4, 268.1],
+      LEFT_AUTO_OFFSET: [40.7, 121.1, 298.7],
+      RIGHT_AUTO_HIVE: [59.2, 20.9, 96.1],
+      RIGHT_AUTO_OFFSET: [32.1, 16.4, 61],
+      RIGHT_AUTO_FIX_TIP: [55.3, 25.7, 90],
+    };
+    for (const [x, y, h] of Object.values(placed))
+      expect(launchSpotHeadingDeg(x, y)).toBe(h);
+  });
+
+  it("turns an unlocked _AUTO_ spot, and nothing else", () => {
+    let doc = linked();
+    doc = linkSpot(doc, "LEFT_AUTO_HIVE_2", [50, 120, 0]);
+    const unlocked = new Set(["LEFT_AUTO_HIVE_2", "PARK"]);
+    const aimed = aimMovedLaunchSpots(doc, unlocked);
+    expect(aimed.auto!.points.LEFT_AUTO_HIVE_2[2]).toBe(
+      launchSpotHeadingDeg(50, 120),
+    );
+    expect(aimed.auto!.points.PARK).toEqual(doc.auto!.points.PARK);
+    // Already aimed: nothing to do.
+    expect(aimMovedLaunchSpots(aimed, unlocked)).toBe(aimed);
+    // Locked: the team's list decides, not the drag.
+    expect(aimMovedLaunchSpots(doc, new Set())).toBe(doc);
   });
 });

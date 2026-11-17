@@ -23,6 +23,7 @@ import { settleDoc } from "../auto/settle";
 import type { NamedPoint } from "../auto/types";
 import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { withSpotParks } from "../simple/parkFrom";
+import { isLaunchSpotName, launchSpotHeadingDeg } from "../simple/aim";
 import { isSimple, isStartName, layHeadings } from "../simple/steps";
 import { GENERATED_DIRS } from "../sim/biobuzz";
 import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
@@ -272,6 +273,31 @@ export function forkSpot(
         : line,
   );
   return { doc: { ...doc, lines, auto: next } };
+}
+
+/**
+ * The document with each unlocked Auto launch spot (…_AUTO_…) it links turned to aim at its CELL
+ * from where it is now (aim.ts launchSpotHeadingDeg); `doc` itself when each already does. A
+ * simple Auto's drives to it turn with it.
+ */
+export function aimMovedLaunchSpots(
+  doc: ProjectDoc,
+  unlocked: ReadonlySet<string>,
+): ProjectDoc {
+  const auto = doc.auto;
+  if (!auto?.teamSpots?.length) return doc;
+  let points: Record<string, NamedPoint> | null = null;
+  for (const name of auto.teamSpots) {
+    const point = auto.points[name];
+    if (!point || !unlocked.has(name) || !isLaunchSpotName(name)) continue;
+    const heading = launchSpotHeadingDeg(point[0], point[1]);
+    if (point[2] === heading) continue;
+    points ??= { ...auto.points };
+    points[name] = [point[0], point[1], heading];
+  }
+  if (!points) return doc;
+  const next = { ...doc, auto: { ...auto, points } };
+  return isSimple(next) ? layHeadings(next) : next;
 }
 
 /** Unlinks a team spot: the Auto keeps the point, as its own, where it is. */

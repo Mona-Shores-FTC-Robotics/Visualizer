@@ -11,7 +11,6 @@ import { choiceDialog, promptDialog } from "../dialog";
 import { listPartners } from "../repo/workspaceFiles";
 import { listRepoAutos, listRepoDrafts } from "../repo/repoFolder";
 import { repoFolder } from "../repo/repoStore";
-import { isStartName } from "../simple/steps";
 import {
   DEFAULT_REF,
   fetchText,
@@ -97,11 +96,6 @@ async function otherUsers(
   }
 }
 
-/** Whether a spot is one a new copy of needs more than the Visualizer for: a start or a launch spot. */
-function needsRobotCode(name: string): boolean {
-  return isStartName(name) || name.includes("_AUTO_");
-}
-
 /**
  * The lock button: locks an unlocked spot; unlocking one that other Autos use first asks whether
  * the move is for all of them or for this Auto alone. `current` is the open project and `apply`
@@ -126,9 +120,6 @@ export async function toggleSpotLock(
     ...Object.keys(doc.auto?.points ?? {}),
   ]);
   const suggested = forkName(name, taken);
-  const robotCode = needsRobotCode(name)
-    ? ` A new ${isStartName(name) ? "start" : "launch spot"} also needs adding to biobuzz's ${isStartName(name) ? "StartPositions" : "AutoLaunchSpots"} before this Auto can go to master.`
-    : "";
   /** "r-clockwise, r-no-cross and 9 drafts or stand-ins": the Autos by name, the rest counted. */
   const usedBy = (files: string[]): string => {
     const autos = files.filter((f) => !f.includes("/"));
@@ -160,7 +151,7 @@ export async function toggleSpotLock(
       {
         id: "own",
         label: "A new spot for this Auto only",
-        hint: `This Auto gets its own spot, ${suggested}, where ${name} is now, and moves that. The others keep ${name}.${robotCode}`,
+        hint: `This Auto gets its own spot, ${suggested}, where ${name} is now, and moves that. The others keep ${name}.`,
       },
     ],
   });
