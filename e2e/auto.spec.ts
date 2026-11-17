@@ -94,7 +94,7 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
   await page.mouse.click(field.x + (26.7 / 141.5) * field.width, field.y + (1 - 47.4 / 141.5) * field.height);
   await page.fill("#simple-spot-name", "wall pick");
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await palette.getByRole("button", { name: "Pick flower" }).click();
+  await palette.getByRole("button", { name: "Pick flower", exact: true }).click();
   await expect
     .poll(() =>
       steps
