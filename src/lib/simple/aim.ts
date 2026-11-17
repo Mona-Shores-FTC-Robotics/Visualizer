@@ -31,8 +31,44 @@ export const TURRET_AXIS = {
 export const MAX_OFF_SQUARE_DEG = 26;
 /** The launcher's speed table's nearest measured row, inches (LaunchSpeedTable.row1RangeIn). */
 export const MIN_MEASURED_RANGE_IN = 42.4;
+/** A raised CELL's row from the axle (HiveFieldPoints.UP_ROW_FROM_AXLE_IN): what an Auto launch spot aims at. */
+const RAISED_ROW_FROM_AXLE_IN = 13.1;
 /** How far off the CELL a launch may face and still be on, degrees. */
 export const AIM_TOLERANCE_DEG = 3;
+
+/** The heading that points the turret at (tx, ty) from a robot centred at (x, y), radians. */
+function aimAt(x: number, y: number, tx: number, ty: number): number {
+  // The turret's axis moves as the robot turns, so the heading that aims it is found by settling.
+  let th = Math.atan2(ty - y, tx - x);
+  for (let i = 0; i < 30; i++) {
+    const ax =
+      x + TURRET_FORWARD_IN * Math.cos(th) - TURRET_LEFT_IN * Math.sin(th);
+    const ay =
+      y + TURRET_FORWARD_IN * Math.sin(th) + TURRET_LEFT_IN * Math.cos(th);
+    th = Math.atan2(ty - ay, tx - ax);
+  }
+  return th;
+}
+
+/** Whether a team spot is an Auto launch spot: every one named …_AUTO_… is (biobuzz AutoLaunchSpots). */
+export function isLaunchSpotName(name: string): boolean {
+  return name.includes("_AUTO_");
+}
+
+/**
+ * The heading an Auto launch spot at (x, y), drawn for RED, faces: the turret, locked, on the
+ * raised row of the CELL at its end, as biobuzz's AutoLaunchSpotsTest checks it (within 0.3°).
+ * Degrees in [0, 360), to a tenth, as spots.json keeps them.
+ */
+export function launchSpotHeadingDeg(x: number, y: number): number {
+  const ty =
+    y < CENTRE
+      ? CENTRE - RAISED_ROW_FROM_AXLE_IN
+      : CENTRE + RAISED_ROW_FROM_AXLE_IN;
+  const deg =
+    (aimAt(x, y, CENTRE - HIVE_CENTRE_TO_CENTRE_IN / 2, ty) * 180) / Math.PI;
+  return Math.round((((deg % 360) + 360) % 360) * 10) / 10;
+}
 
 export interface Aim {
   /** "AUDIENCE" or "SCORING": which of our CELLs the launch is at. */

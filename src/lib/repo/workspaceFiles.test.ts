@@ -12,6 +12,7 @@ import {
   writeTransaction,
 } from "./workspaceFiles";
 import { checkoutBranch } from "./repoStore";
+import { TEAM_SPOTS_JAVA_PATH, teamSpotsJava } from "../team/teamSpots";
 
 const PP = "TeamCode/autos/hive-rush.pp";
 const JAVA =
@@ -109,6 +110,37 @@ describe("local event workspace", () => {
     const points = await listCheckpoints(checkout);
     expect(points).toHaveLength(2);
     expect(points.find((p) => !p.tested)?.files[PP]).toBe("experiment");
+  });
+
+  it("writes TeamSpots.java with a spot moved in a save, over the one on disk", async () => {
+    const checkout = folder();
+    await checkout.writeText(TEAM_SPOTS_JAVA_PATH, teamSpotsJava({}));
+    const plan = await workspaceSavePlan(checkout, "hive-rush.pp", sample, {
+      PARK: [10, 20, 0],
+    });
+    expect(plan.files[TEAM_SPOTS_JAVA_PATH]).toContain(
+      '"PARK", 10.0, 20.0, 0.0',
+    );
+    const baseline = await readFiles(checkout, Object.keys(plan.files));
+    await writeTransaction(checkout, plan.files, baseline);
+    expect(await checkout.readText(TEAM_SPOTS_JAVA_PATH)).toBe(
+      plan.files[TEAM_SPOTS_JAVA_PATH],
+    );
+  });
+
+  it("restores TeamSpots.java from spots.json for a checkpoint made before it existed", async () => {
+    const checkout = folder();
+    const old = await createCheckpoint(checkout, "old", "Belding", true);
+    expect(old.files[TEAM_SPOTS_JAVA_PATH]).toBeUndefined();
+    await writeTransaction(checkout, {
+      [SPOTS]: '{"spots":{"PARK":[3,4,5]}}',
+      [TEAM_SPOTS_JAVA_PATH]: teamSpotsJava({ PARK: [3, 4, 5] }),
+    });
+    await restoreCheckpoint(checkout, old, "Belding");
+    expect(await checkout.readText(SPOTS)).toBe('{"spots":{}}');
+    expect(await checkout.readText(TEAM_SPOTS_JAVA_PATH)).toBe(
+      teamSpotsJava({}),
+    );
   });
 
   it("keeps an interrupted save journal on its original branch during recovery", async () => {

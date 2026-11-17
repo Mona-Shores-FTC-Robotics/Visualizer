@@ -15,6 +15,7 @@ import { contactPose, FLOWERS } from "../src/lib/simple/flowers";
 import { stepsOf } from "../src/lib/simple/steps";
 
 describe("the aim with the turret locked", () => {
+  // The turret's axis 2.68 in right of centre (biobuzz TurretSubsystem, from 1.87 in 77e4608).
   it("finds the heading onto our CELL at the robot's end of the field", () => {
     const start = aimFrom(54.06, 7.72, 90, "RED");
     expect(start.cell).toBe("AUDIENCE");

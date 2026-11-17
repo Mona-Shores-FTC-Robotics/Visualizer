@@ -10,6 +10,7 @@ import { setTrigger, switchKey, type Scenario } from "../auto/simulate";
 import {
   FACTS,
   ROBOT_FACTS,
+  tipMissesKey,
   type TimingFact,
   type TimingValues,
 } from "../timing/model";
@@ -77,6 +78,11 @@ export class MatchControls {
   scenario = $state<Record<string, Scenario>>({});
   /** Robots that do not move, by file. */
   still = $state<Record<string, boolean>>({});
+  /**
+   * Fork: the TIP what-ifs, by TIP number (1-based): how many tries at it miss before one TIPs it
+   * (Infinity: it never comes). Unset: the first try does, as the HIVE model says.
+   */
+  tips = $state<Record<number, number>>({});
   /** The preset last applied, while nothing else has been changed since. */
   preset = $state<string | null>(null);
 
@@ -86,7 +92,8 @@ export class MatchControls {
       Object.keys(this.hive).length > 0 ||
       Object.values(this.own).some((o) => Object.keys(o).length > 0) ||
       Object.values(this.scenario).some((s) => Object.keys(s).length > 0) ||
-      Object.values(this.still).some(Boolean)
+      Object.values(this.still).some(Boolean) ||
+      Object.keys(this.tips).length > 0
     );
   }
 
@@ -95,7 +102,26 @@ export class MatchControls {
     const out = { ...base };
     for (const [id, v] of Object.entries(this.hive))
       if (typeof v === "number") out[id] = v;
+    for (const [tip, misses] of Object.entries(this.tips))
+      out[tipMissesKey(Number(tip))] = misses;
     return out;
+  }
+
+  /** How many tries TIP `tip` misses in this look (0: the first one TIPs it). */
+  tipMisses(tip: number): number {
+    return this.tips[tip] ?? 0;
+  }
+
+  /**
+   * Fork: TIP `tip` comes on try `misses + 1` (0, the default: the first), or never (Infinity).
+   * A later TIP's answer is kept: it is about that TIP, whichever volley comes to it.
+   */
+  setTipMisses(tip: number, misses: number) {
+    const next = { ...this.tips };
+    if (misses > 0) next[tip] = misses;
+    else delete next[tip];
+    this.tips = next;
+    this.preset = null;
   }
 
   setHive(id: string, value: number | null) {
@@ -148,6 +174,7 @@ export class MatchControls {
     this.own = {};
     this.scenario = {};
     this.still = {};
+    this.tips = {};
     this.preset = null;
   }
 

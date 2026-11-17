@@ -30,6 +30,7 @@ import {
   type PreviewResult,
 } from "../lib/auto/simulate";
 import { previewTogether, type FieldEntry } from "../lib/timing/together";
+import { aimMovedLaunchSpots } from "../lib/team/teamSpots";
 import { laneName, matchLanes, type MatchLanes } from "../lib/match/lanes";
 import { MatchControls } from "../lib/match/controls.svelte";
 import { isSimple } from "../lib/simple/steps";
@@ -308,6 +309,13 @@ export class AutoState {
         }
         const auto = doc.auto;
         if (!auto?.teamSpots?.length) return;
+        // An Auto launch spot being moved turns to aim at its CELL as it goes (aim.ts), so it is
+        // always one biobuzz takes; its heading is not the drawer's to set.
+        const aimed = aimMovedLaunchSpots(doc, unlocked);
+        if (aimed !== doc) {
+          project.amend(() => aimed);
+          return;
+        }
         const locked: TeamSpots = {};
         for (const name of auto.teamSpots) {
           const copy = auto.points[name];

@@ -23,13 +23,21 @@ import { settleDoc } from "../auto/settle";
 import type { NamedPoint } from "../auto/types";
 import { generateAutoJava } from "../codegen/auto/javaAuto";
 import { withSpotParks } from "../simple/parkFrom";
-import { isSimple, layHeadings } from "../simple/steps";
+import { isLaunchSpotName, launchSpotHeadingDeg } from "../simple/aim";
+import { isSimple, isStartName, layHeadings } from "../simple/steps";
 import { GENERATED_DIRS } from "../sim/biobuzz";
 import { fetchText, teamRawUrl, type FetchText } from "./teamAutos";
 
 /** The file, in the team's Autos folder (TeamCode/autos). */
 export const SPOTS_FILE = "spots.json";
 export const SPOTS_PATH = `TeamCode/autos/${SPOTS_FILE}`;
+/**
+ * The Java twin of spots.json, written with it on every save of the team's spots, so the robot code
+ * that needs a spot (biobuzz's StartPositions and AutoLaunchSpots) reads it and keeps no copy of its
+ * own. biobuzz's TeamSpotsTest fails while the two differ.
+ */
+export const TEAM_SPOTS_JAVA_PATH =
+  "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/localization/generated/TeamSpots.java";
 /** Where the robot's generated Autos live (lib/sim/biobuzz.ts GENERATED_DIRS). */
 const GENERATED_DIR = GENERATED_DIRS[0];
 
@@ -85,6 +93,47 @@ export function serializeTeamSpots(spots: TeamSpots): string {
     '  "spots": {',
     ...rows,
     "  }",
+    "}",
+    "",
+  ].join("\n");
+}
+
+/** A number as a Java double literal: JavaScript's shortest form, which Java reads back the same. */
+function javaNumber(n: number): string {
+  return Number.isInteger(n) ? `${n}.0` : String(n);
+}
+
+/**
+ * TeamSpots.java's text for `spots`: one constant per spot, in spots.json's order, and `all()`. A
+ * spot with no heading gets NaN, which biobuzz's TeamSpot reads as "reached at any heading".
+ */
+export function teamSpotsJava(spots: TeamSpots): string {
+  const names = Object.keys(spots).sort();
+  const constants = names.map((name) => {
+    const [x, y, h] = spots[name];
+    const heading = h === undefined ? "Double.NaN" : javaNumber(h);
+    return `    public static final TeamSpot ${name} = new TeamSpot("${name}", ${javaNumber(x)}, ${javaNumber(y)}, ${heading});`;
+  });
+  return [
+    "// Written by the Visualizer from TeamCode/autos/spots.json, together with it, whenever the team's",
+    "// spots are saved. Never edit it by hand: move the spot in the Visualizer and save.",
+    "// TeamSpotsTest fails while this file and spots.json differ.",
+    "package org.firstinspires.ftc.teamcode.localization.generated;",
+    "",
+    "import org.firstinspires.ftc.teamcode.localization.TeamSpot;",
+    "",
+    "/** The team's spots, drawn for RED: x, y in inches, heading in degrees (NaN: reached at any heading). */",
+    "public final class TeamSpots {",
+    "",
+    "    private TeamSpots() {",
+    "    }",
+    "",
+    ...constants,
+    "",
+    "    /** Every spot, in spots.json's order. */",
+    "    public static TeamSpot[] all() {",
+    `        return new TeamSpot[] {${names.join(", ")}};`,
+    "    }",
     "}",
     "",
   ].join("\n");
@@ -158,6 +207,97 @@ export function linkSpot(
       teamSpots: [...new Set([...(auto.teamSpots ?? []), name])].sort(),
     },
   };
+}
+
+/**
+ * A free name for this Auto's own copy of team spot `from`: `LEFT_AUTO_HIVE_2`, or for a start
+ * `RIGHT_2_START` (a start keeps its _START ending). `taken` holds every name in use.
+ */
+export function forkName(from: string, taken: ReadonlySet<string>): string {
+  const start = from.endsWith("_START");
+  const base = start ? from.slice(0, -"_START".length) : from;
+  for (let n = 2; ; n++) {
+    const name = start ? `${base}_${n}_START` : `${base}_${n}`;
+    if (!taken.has(name)) return name;
+  }
+}
+
+/**
+ * This Auto's own team spot `to`, a copy of team spot `from` where it is now: every end, the start,
+ * the park choices and the drives named after `from` go to `to`, and the Auto no longer links
+ * `from`, so moving `to` moves this Auto alone. The caller adds `to` to the team's list (editSpot).
+ */
+export function forkSpot(
+  doc: ProjectDoc,
+  from: string,
+  to: string,
+): { doc: ProjectDoc } | { problem: string } {
+  const auto = doc.auto;
+  const pose = auto?.points[from];
+  if (!auto || !pose || !auto.teamSpots?.includes(from))
+    return { problem: `${from} is not a team spot of this Auto.` };
+  if (!NAME.test(to))
+    return { problem: "A spot's name is capitals, digits and _." };
+  if (to === from || auto.points[to])
+    return { problem: `This Auto already has a spot ${to}.` };
+  if (isStartName(from) !== isStartName(to))
+    return {
+      problem: isStartName(from)
+        ? "A start's name ends in _START."
+        : "Only a start's name ends in _START.",
+    };
+  const points = { ...auto.points, [to]: [...pose] as NamedPoint };
+  delete points[from];
+  const pathEnds = Object.fromEntries(
+    Object.entries(auto.pathEnds).map(([id, end]) => [
+      id,
+      end === from ? to : end,
+    ]),
+  );
+  const next = {
+    ...auto,
+    points,
+    pathEnds,
+    teamSpots: [
+      ...new Set(auto.teamSpots.map((n) => (n === from ? to : n))),
+    ].sort(),
+  };
+  if (auto.startAt === from) next.startAt = to;
+  if (auto.parkChoices)
+    next.parkChoices = auto.parkChoices.map((n) => (n === from ? to : n));
+  const lines = doc.lines.map((line) =>
+    line.name === `to ${from}`
+      ? { ...line, name: `to ${to}` }
+      : line.name === `${from} park`
+        ? { ...line, name: `${to} park` }
+        : line,
+  );
+  return { doc: { ...doc, lines, auto: next } };
+}
+
+/**
+ * The document with each unlocked Auto launch spot (…_AUTO_…) it links turned to aim at its CELL
+ * from where it is now (aim.ts launchSpotHeadingDeg); `doc` itself when each already does. A
+ * simple Auto's drives to it turn with it.
+ */
+export function aimMovedLaunchSpots(
+  doc: ProjectDoc,
+  unlocked: ReadonlySet<string>,
+): ProjectDoc {
+  const auto = doc.auto;
+  if (!auto?.teamSpots?.length) return doc;
+  let points: Record<string, NamedPoint> | null = null;
+  for (const name of auto.teamSpots) {
+    const point = auto.points[name];
+    if (!point || !unlocked.has(name) || !isLaunchSpotName(name)) continue;
+    const heading = launchSpotHeadingDeg(point[0], point[1]);
+    if (point[2] === heading) continue;
+    points ??= { ...auto.points };
+    points[name] = [point[0], point[1], heading];
+  }
+  if (!points) return doc;
+  const next = { ...doc, auto: { ...auto, points } };
+  return isSimple(next) ? layHeadings(next) : next;
 }
 
 /** Unlinks a team spot: the Auto keeps the point, as its own, where it is. */
@@ -287,7 +427,7 @@ export function reexportWithSpots(
 }
 
 /**
- * Every file saving `edits` writes: spots.json with the changes, and each Auto in TeamCode/autos
+ * Every file saving `edits` writes: spots.json with the changes, its Java twin (TeamSpots.java), and each Auto in TeamCode/autos
  * that links a changed spot, re-exported (.pp and Java). `read` reads a file at the commit the
  * save starts from; `files` lists that commit's paths.
  */
@@ -310,6 +450,7 @@ export async function teamSpotSave(
   const names = changedSpots(saved, spots);
   const out: Record<string, string> = {
     [SPOTS_PATH]: serializeTeamSpots(spots),
+    [TEAM_SPOTS_JAVA_PATH]: teamSpotsJava(spots),
   };
   const autos: string[] = [];
   const errors: string[] = [];
