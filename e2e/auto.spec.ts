@@ -102,9 +102,9 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
         .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value)),
     )
     .toContain("WALL_PICK");
-  await expect(steps.getByText("at the WALL FLOWER")).toBeVisible();
+  await expect(steps.getByText("Pick WALL FLOWER")).toBeVisible();
   await page.getByTitle("Undo").click();
-  await expect(steps.getByText("Pick flower")).toHaveCount(0);
+  await expect(steps.getByText("Pick WALL FLOWER")).toHaveCount(0);
 });
 
 test("a Drive step opens the Step panel; Edit path shape opens the path editor", async ({ page }) => {

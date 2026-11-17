@@ -4,14 +4,13 @@
   // pick a start, then add Launch all, Drive to, Pick flower and Park from the palette, by click
   // or by dragging into the list. Everything else the Auto Builder does is under Advanced.
   import {
+    ChevronRight,
     Clock,
     Flower,
     Flower2,
     Hourglass,
-    Link2,
     Lock,
     LockOpen,
-    Pencil,
     Sprout,
     Terminal,
     GripVertical,
@@ -33,13 +32,14 @@
     selectedCardId,
     spotPicker,
   } from "../auto/store";
-  import { AUTO_LENGTH_S, guardSeconds, switchKey } from "../auto/simulate";
+  import { AUTO_LENGTH_S, switchKey } from "../auto/simulate";
   import { fieldClass } from "../components/ui/styles";
   import { flowerLinedUp, pickSpot } from "./flowers";
   import { spotParks } from "./parkFrom";
   import { stepCollisions, type StepHits } from "./collide";
   import { useEditor } from "../../state/editor.svelte";
   import { linkSpot, sortSpotEdits } from "../team/teamSpots";
+  import { faceCell, withTeamSpot } from "./spotEdits";
   import {
     dropSpotEdits,
     editSpot,
@@ -59,28 +59,19 @@
     moveStep,
     pruneUnusedPaths,
     removeStep,
-    setSpotHeading,
     setStart,
     isStartName,
     startLabel,
     startName,
     startsFrom,
     setStepSpot,
-    setWait,
-    setChoice,
-    setStepTimeout,
-    setWaitName,
     DEFAULT_TIMEOUT_S,
     everyStep,
     initRow,
-    newTimeName,
     ALWAYS,
     LEG_KINDS,
-    setParkChoice,
-    setWaitRejoin,
     sideSpot,
-    renameSpot,
-    WAIT_FOR,
+    waitShort,
     TIME_ONLY,
     stepsOf,
     type Step,
@@ -274,72 +265,6 @@
     for (const name of missingSpots) editSpot(name, doc.auto!.points[name]);
   }
 
-  /**
-   * Fork: turns the spot a launch is made from to face our CELL (aim.ts). A team spot changes for
-   * every Auto that uses it, once saved.
-   */
-  function faceCell(spot: string, needDeg: number) {
-    const point = doc.auto?.points[spot];
-    if (!point) return;
-    const h = ((Math.round(needDeg) % 360) + 360) % 360;
-    if (linkedSpots.has(spot)) editSpot(spot, [point[0], point[1], h]);
-    apply(setSpotHeading(doc, spot, h));
-  }
-
-  /** Fork: a spot being renamed, on the step it was started from. */
-  let renaming = $state<{
-    cardId: string;
-    from: string;
-    text: string;
-    problem: string | null;
-  } | null>(null);
-
-  function finishRename() {
-    if (!renaming) return;
-    const result = renameSpot(doc, renaming.from, renaming.text);
-    if ("problem" in result) {
-      renaming.problem = result.problem;
-      return;
-    }
-    apply(result.doc);
-    renaming = null;
-  }
-
-  /** Fork: one of this Auto's own spots becomes a team spot (saved with Save team spots). */
-  function makeTeamSpot(name: string) {
-    const pose = doc.auto?.points[name];
-    if (!pose) return;
-    if (
-      $teamSpots[name] &&
-      !confirm(
-        `The team already has a spot ${name}. Move it to where this Auto has it?`,
-      )
-    )
-      return;
-    editSpot(name, pose);
-    apply(linkSpot(doc, name, pose));
-  }
-
-  /**
-   * Fork: the other PARK spots the drive team could pick in INIT instead of `spot`: the team's
-   * _PARK spots, and any this Auto already has (types.ts parkChoices).
-   */
-  function parkOffers(spot: string | null): string[] {
-    const names = new Set<string>([
-      ...Object.keys($teamSpots),
-      ...Object.keys(doc.auto?.points ?? {}),
-    ]);
-    return [...names]
-      .filter(
-        (name) => (name === "PARK" || name.endsWith("_PARK")) && name !== spot,
-      )
-      .sort();
-  }
-
-  function toggleParkChoice(name: string, on: boolean) {
-    apply(setParkChoice(on ? withTeamSpot(doc, name) : doc, name, on));
-  }
-
   /** Fork: a spot named from a field click is also saved as a team spot. */
   let asTeamSpot = $state(false);
 
@@ -402,12 +327,6 @@
     const result = addStep(doc, kind, index, undefined, into);
     apply(result.doc);
     selectedCardId.set(result.cardId);
-  }
-
-  /** The document with the team spot `name` linked in, if it is one and is not yet. */
-  function withTeamSpot(base: typeof doc, name: string): typeof doc {
-    const pose = $teamSpots[name];
-    return pose && !base.auto?.points[name] ? linkSpot(base, name, pose) : base;
   }
 
   function addAt(
@@ -545,12 +464,6 @@
       untrack(closePark);
   });
 
-  /** The latest the guard sends the robot to park from a spot, along that spot's park. */
-  function spotLeaveBy(lineId: string): number | null {
-    const path = auto.catalog?.byId.get(lineId);
-    return path ? AUTO_LENGTH_S - guardSeconds(path) : null;
-  }
-
   // --- dragging: palette tiles into the list, and steps within it ---------------------------------
 
   /** Where a dragged step would land: which list (listKey) and the index in it. */
@@ -583,20 +496,151 @@
 
   const fmt = (s: number) => s.toFixed(1);
 
-  /** A drive's spot shows in its Spot dropdown, so the title doesn't say it again. */
-  const title = (step: Step) =>
-    (step.kind === "drive" || step.kind === "park") &&
-    step.spot &&
-    doc.auto?.points[step.spot]
-      ? step.kind === "park"
-        ? "Park at"
-        : "Drive to"
-      : step.label;
+  /** A step's title on its card. A drive's spot is in its dropdown, so the title doesn't say it. */
+  function cardTitle(step: Step): string {
+    switch (step.kind) {
+      case "drive":
+      case "park":
+        return step.spot && doc.auto?.points[step.spot]
+          ? step.kind === "park"
+            ? "Park at"
+            : "Drive to"
+          : step.label;
+      case "wait":
+        if (step.waitFor === TIME_ONLY) return step.label;
+        if (step.name) return step.name;
+        return step.waitFor === ALWAYS
+          ? `If before ${step.waitS} s`
+          : `Wait for ${waitShort(step.waitFor)}`;
+      case "choice":
+        return step.option || step.label;
+      case "pick":
+        return step.flower ? `Pick ${step.flower.name}` : step.label;
+      case "pickLaunch":
+        return step.flower
+          ? `Pick and launch at ${step.flower.name}`
+          : step.label;
+      case "gather":
+        return step.garden ? `Gather in ${step.garden.name}` : step.label;
+      default:
+        return step.label;
+    }
+  }
+
+  /** A step in one line, for a folded Otherwise: "Park at LEFT_PARK". */
+  const oneLine = (step: Step) =>
+    (step.kind === "drive" || step.kind === "park") && step.spot
+      ? `${step.kind === "park" ? "Park at" : "Drive to"} ${step.spot}`
+      : cardTitle(step);
+
+  type Tag = { text: string; title: string; tone?: "init" | "warn" };
+  /** The few facts a card shows at the right of its line: its limit, and whether INIT sets it. */
+  function tagsOf(step: Step): Tag[] {
+    const tags: Tag[] = [];
+    const limit = (s: number) =>
+      tags.push({
+        text: `≤ ${s} s`,
+        title: "At most this long: the robot then stops it and goes on",
+      });
+    switch (step.kind) {
+      case "launch":
+      case "command":
+        limit(step.timeoutS ?? DEFAULT_TIMEOUT_S);
+        break;
+      case "pick":
+      case "gather":
+        if (step.timeoutS !== undefined) limit(step.timeoutS);
+        break;
+      case "pickLaunch":
+        if (step.timeoutS !== undefined) limit(step.timeoutS);
+        tags.push({
+          text: "untried",
+          tone: "warn",
+          title:
+            "For a robot whose turret aims (20245). Never run on a robot: its time is an estimate",
+        });
+        break;
+      case "wait":
+        if (step.waitFor === TIME_ONLY) break;
+        if (step.waitFor === ALWAYS) {
+          if (step.name)
+            tags.push({
+              text: `before ${step.waitS} s`,
+              title: "A look at the match clock: it never waits",
+            });
+          if (step.waitOption)
+            tags.push({
+              text: "INIT",
+              tone: "init",
+              title: `Driver Station: ${initRow("time", step.waitOption, step.waitS ?? 0)}`,
+            });
+          break;
+        }
+        tags.push(
+          step.waitClock
+            ? {
+                text: `until ${step.waitS} s`,
+                title: `Gives up at ${step.waitS} s on the match clock`,
+              }
+            : {
+                text: `≤ ${step.waitS} s`,
+                title: `Gives up ${step.waitS} s after it starts waiting`,
+              },
+        );
+        if (step.waitAdjustable)
+          tags.push({
+            text: "INIT",
+            tone: "init",
+            title: `Driver Station: ${initRow("partnerWait", "", step.waitS ?? 0, step.waitTip)}`,
+          });
+        break;
+      case "choice":
+        tags.push({
+          text: "INIT",
+          tone: "init",
+          title: `Driver Station: ${initRow("choice", step.option ?? "", step.legs?.[0]?.name ?? "")}`,
+        });
+        break;
+      case "park": {
+        const others = doc.auto?.parkChoices ?? [];
+        if (others.length)
+          tags.push({
+            text: "INIT",
+            tone: "init",
+            title: `The drive team may pick ${others.join(" or ")} instead, in INIT`,
+          });
+        break;
+      }
+    }
+    return tags;
+  }
+
+  /** The card's longer description, on hover. */
+  function hover(step: Step): string | undefined {
+    if (step.kind === "launch" && step.aim?.on)
+      return `At our ${step.aim.cell === "AUDIENCE" ? "audience" : "scoring"} CELL, ${Math.round(step.aim.rangeIn)} in away, ${Math.abs(step.aim.offDeg).toFixed(1)}° off`;
+    if (step.kind === "wait" && step.name) return step.label;
+    if (step.kind === "choice") return step.label;
+    return undefined;
+  }
+
+  /** The heading of a wait's Otherwise: "If no CELL up by 23 s". */
+  function otherwiseHead(step: Step): string {
+    if (step.waitFor === ALWAYS) return `At ${step.waitS} s or later`;
+    return `If no ${waitShort(step.waitFor)} ${step.waitClock ? "by" : "within"} ${step.waitS} s`;
+  }
 </script>
 
+<!-- Fork: a step is one line: what it does, its spot, and a tag or two (its time limit, INIT).
+     Everything that sets it up is in the Step panel on the right (StepPanel, StepSide). Only
+     what needs fixing shows under it. -->
 {#snippet stepItem(step: Step, index: number, into: StepList)}
   {@const Icon =
     step.kind === "wait" && step.waitFor === ALWAYS ? Clock : ICONS[step.kind]}
+  {@const spotStep =
+    (step.kind === "drive" || step.kind === "park") &&
+    !!step.spot &&
+    !!doc.auto?.points[step.spot]}
   <li
     class={[
       "simple-step",
@@ -610,29 +654,61 @@
     ondragleave={() => (dropAt = null)}
     ondrop={(e) => drop(e, index, into)}
   >
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5">
       <GripVertical class="size-3.5 shrink-0 cursor-grab text-body" />
-      <button
-        type="button"
-        class="flex min-w-0 flex-1 items-center gap-2 text-left"
-        onclick={() => select(step)}
+      <!-- The title and a drive's spot: the spot drops under the title when the line is short. -->
+      <div
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5"
       >
-        <span class="w-4 shrink-0 text-right font-mono text-xs text-body"
-          >{index + 1}</span
-        >
-        {#if Icon}<Icon class="size-4 shrink-0 text-primary" />{/if}
-        <span
+        <button
+          type="button"
           class={[
-            "min-w-0 [overflow-wrap:anywhere]",
-            step.kind === "other" ? "text-body" : "text-heading",
+            "flex min-w-0 items-center gap-2 text-left",
+            !spotStep && "flex-1",
           ]}
-          ><!-- Spot names break after an underscore, never mid-word. -->{#each title(step).split("_") as part, i (i)}{#if i}_<wbr
-              />{/if}{part}{/each}</span
+          title={hover(step)}
+          onclick={() => select(step)}
         >
-        {#if step.kind === "other"}<span class="text-[10px] text-body"
-            >not a builder step</span
-          >{/if}
-      </button>
+          <span class="w-4 shrink-0 text-right font-mono text-xs text-body"
+            >{index + 1}</span
+          >
+          {#if Icon}<Icon class="size-4 shrink-0 text-primary" />{/if}
+          <span
+            class={[
+              "min-w-0 [overflow-wrap:anywhere]",
+              step.kind === "other" ? "text-body" : "text-heading",
+            ]}
+            ><!-- Spot names break after an underscore, never mid-word. -->{#each cardTitle(step).split("_") as part, i (i)}{#if i}_<wbr
+                />{/if}{part}{/each}</span
+          >
+        </button>
+        {#if spotStep}
+          <select
+            class="simple-spot"
+            aria-label="Spot"
+            value={step.spot}
+            onchange={(e) => {
+              const name = e.currentTarget.value;
+              apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
+            }}
+          >
+            {@render spotOptions()}
+          </select>
+          {#if $unlockedSpots.has(step.spot!)}
+            <span
+              class="text-warning"
+              title="Unlocked: dragging its end on the field moves this team spot for every Auto, once saved. Lock it again in the Step panel"
+              ><LockOpen class="size-3.5" /></span
+            >
+          {/if}
+        {/if}
+      </div>
+      {#each tagsOf(step) as tag (tag.text)}
+        <span
+          class={["simple-tag", tag.tone && `simple-tag--${tag.tone}`]}
+          title={tag.title}>{tag.text}</span
+        >
+      {/each}
       {#if parks.has(step.cardId)}
         <button
           type="button"
@@ -653,707 +729,182 @@
       >
     </div>
 
-    {#if (step.kind === "drive" || step.kind === "park") && step.spot && doc.auto?.points[step.spot]}
-      {@const point = doc.auto.points[step.spot]}
-      <div
-        class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-body"
-      >
-        {#if renaming?.cardId === step.cardId}
-          <form
-            class="flex items-center gap-1"
-            onsubmit={(e) => {
-              e.preventDefault();
-              finishRename();
-            }}
-          >
-            <!-- svelte-ignore a11y_autofocus -->
-            <input
-              class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
-              aria-label="New name"
-              bind:value={renaming.text}
-              autofocus
-              onkeydown={(e) => e.key === "Escape" && (renaming = null)}
-            />
-            <button type="submit" class="simple-tile !min-h-0 !py-0.5"
-              >Rename</button
-            >
-          </form>
-        {:else}
-          <select
-            class={[fieldClass, "!w-auto max-w-full shrink-0 !py-0.5 text-xs"]}
-            aria-label="Spot"
-            value={step.spot}
-            onchange={(e) => {
-              const name = e.currentTarget.value;
-              apply(setStepSpot(withTeamSpot(doc, name), step.cardId, name));
-            }}
-          >
-            {@render spotOptions()}
-          </select>
-        {/if}
-        {#if !linkedSpots.has(step.spot) && !isStartName(step.spot) && renaming?.cardId !== step.cardId}
-          <button
-            type="button"
-            class="simple-icon"
-            title={`Rename ${step.spot} (every step that goes there follows)`}
-            aria-label={`Rename ${step.spot}`}
-            onclick={() =>
-              (renaming = {
-                cardId: step.cardId,
-                from: step.spot!,
-                text: step.spot!,
-                problem: null,
-              })}><Pencil class="size-3.5" /></button
-          >
-          <button
-            type="button"
-            class="simple-icon"
-            title={`Make ${step.spot} a team spot, for every Auto (then Save team spots)`}
-            aria-label={`Make ${step.spot} a team spot`}
-            onclick={() => makeTeamSpot(step.spot!)}
-            ><Link2 class="size-3.5" /></button
-          >
-        {/if}
-        {#if linkedSpots.has(step.spot)}
-          {@const open = $unlockedSpots.has(step.spot)}
-          <button
-            type="button"
-            class={["simple-icon", open && "!text-warning"]}
-            title={open
-              ? "Unlocked: dragging its end on the field moves this team spot. Lock it again"
-              : "A team spot, locked. Unlock it to move it (every Auto that uses it moves with it once saved)"}
-            aria-label={open ? "Lock team spot" : "Unlock team spot"}
-            onclick={() => lockSpot(step.spot!, open)}
-          >
-            {#if open}<LockOpen class="size-3.5" />{:else}<Lock
-                class="size-3.5"
-              />{/if}
-          </button>
-        {/if}
-        <label class="flex items-center gap-1">
-          facing
-          <input
-            class={[fieldClass, "!w-20 !py-0.5 text-xs"]}
-            type="number"
-            step="5"
-            value={point[2] ?? 0}
-            disabled={linkedSpots.has(step.spot) &&
-              !$unlockedSpots.has(step.spot)}
-            onchange={(e) =>
-              apply(
-                setSpotHeading(
-                  doc,
-                  step.spot!,
-                  Number(e.currentTarget.value) || 0,
-                ),
-              )}
-          />°
-        </label>
-      </div>
-      {#if renaming?.cardId === step.cardId && renaming.problem}
-        <p class="mt-1 pl-6 text-xs text-danger">{renaming.problem}</p>
-      {/if}
-      {#if step.kind === "park"}
-        <!-- Fork: another park the drive team may pick at the field (types.ts parkChoices). -->
-        {@const offers = parkOffers(step.spot)}
-        {#if offers.length}
-          <div
-            class="mt-1 flex flex-wrap items-center gap-x-3 pl-6 text-xs text-body"
-            title="If a partner parks where we planned to, the drive team picks another park in INIT with the D-pad's left and right. Every park path goes there instead."
-          >
-            <span
-              >Drive team may pick in INIT (Driver Station: <span
-                class="font-mono"
-                >{initRow("choice", "Park", step.spot ?? "")}</span
-              >):</span
-            >
-            {#each offers as name (name)}
-              <label class="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={doc.auto?.parkChoices?.includes(name) ?? false}
-                  onchange={(e) =>
-                    toggleParkChoice(name, e.currentTarget.checked)}
-                />
-                <span class="font-mono">{name}</span>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      {/if}
-      {#if focusedCard === step.cardId}
-        {@const park = parks.get(step.cardId)!}
-        {@const by = spotLeaveBy(park.lineId)}
-        {@const visits = [...parks.values()].filter(
-          (p) => p.lineId === park.lineId,
-        ).length}
-        <div class="mt-1.5 flex items-center gap-2 pl-6 text-xs text-body">
-          <span class="flex-1"
-            >Planned to leave here at {fmt(park.leaveS)} s. If the robot runs behind
-            and time runs short here, it parks along this path{by !== null
-              ? `, leaving by ${fmt(by)} s at the latest`
-              : ""}.{visits > 1
-              ? ` All ${visits} drives to ${step.spot} share this park.`
-              : ""} To bend it, press Edit park path shape in the Step panel, add
-            a control point and drag it on the field.</span
-          >
-          <button type="button" class="simple-tile" onclick={closePark}
-            >Done</button
-          >
-        </div>
-      {/if}
-      {#if step.problem}
-        <p class="mt-1 pl-6 text-xs text-danger">{step.problem}.</p>
-      {/if}
-      {#if hits.get(step.cardId)}
-        {@const hit = hits.get(step.cardId)!}
-        {#if hit.drive.length}
-          <p class="mt-1 pl-6 text-xs text-danger">
-            The drive here touches {hit.drive.join(" and ")} (within the robot's
-            {doc.robot.safetyMargin} in safety margin). Move the spot, or bend the
-            path with a control point.
-          </p>
-        {/if}
-        {#if hit.park.length}
-          <p class="mt-1 pl-6 text-xs text-warning">
-            Its park path (P) touches {hit.park.join(" and ")}: press P and bend
-            it.
-          </p>
-        {/if}
-      {/if}
-    {:else if step.kind === "launch" && step.aim}
-      {@const aim = step.aim}
-      {@const cell = aim.cell === "AUDIENCE" ? "audience" : "scoring"}
-      {@render limitRow(step)}
-      <div class="mt-1 flex items-center gap-2 pl-6 text-xs">
-        <span class={["flex-1", aim.on ? "text-body" : "text-danger"]}>
-          {#if aim.on}
-            At our {cell} CELL, {Math.round(aim.rangeIn)} in away, {Math.abs(
-              aim.offDeg,
-            ).toFixed(1)}° off: on, with the turret locked.
-          {:else}
-            Faces {Math.abs(aim.offDeg).toFixed(0)}° off our {cell} CELL (it needs
-            {Math.round(aim.needDeg)}°): with the turret locked, this misses.
-          {/if}
-        </span>
-        {#if !aim.on && step.atSpot && !isStartName(step.atSpot)}
-          <button
-            type="button"
-            class="simple-tile !min-h-0 !py-0.5"
-            title={`Turn ${step.atSpot} to face the CELL (${Math.round(aim.needDeg)}°)`}
-            onclick={() => faceCell(step.atSpot!, aim.needDeg)}
-            >Face the CELL</button
-          >
-        {/if}
-      </div>
-      {#if !aim.on && (!step.atSpot || isStartName(step.atSpot))}
-        <p class="mt-1 pl-6 text-xs text-body">
-          {step.atSpot && isStartName(step.atSpot)
-            ? "The start's heading is set by the marks: drive to a launch spot first, and aim that."
-            : "Drive to a spot first, and aim that."}
-        </p>
-      {/if}
-    {:else if step.kind === "wait"}
-      {@const trigger =
-        WAIT_FOR.find((w) => w.trigger === step.waitFor)?.label ??
-        step.waitFor ??
-        "TIP"}
-      <!-- Fork: a name of its own for the match log (steps.ts setWaitName); empty, its title. -->
-      <div
-        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-      >
-        <span>Name</span>
-        <input
-          class={[fieldClass, "!w-44 !py-0.5 text-xs"]}
-          aria-label="Name in the match log"
-          title="What the match log calls this step. Leave it empty to go by its title."
-          placeholder={step.label}
-          value={step.name ?? ""}
-          onchange={(e) =>
-            apply(setWaitName(doc, step.cardId, e.currentTarget.value))}
-        />
-      </div>
-      {#if step.waitFor === ALWAYS}
-        <!-- Fork: a clock check (steps.ts ALWAYS): it never waits, it takes one way or the other. -->
-        <div
-          class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-        >
-          <span>If the match clock reads before</span>
-          <span class="inline-flex items-center gap-1">
-            <input
-              class={[fieldClass, "!w-16 !py-0.5 text-xs"]}
-              type="number"
-              min="0"
-              step="0.5"
-              aria-label="Seconds"
-              value={step.waitS}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    seconds: Number(e.currentTarget.value) || 0.1,
-                  }),
-                )}
-            />s,
-          </span>
-          <span
-            >the robot goes straight on with the steps below. It never waits
-            here.</span
-          >
-        </div>
-        <div
-          class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-        >
-          <button
-            type="button"
-            class={["simple-option", step.waitOption && "simple-option--on"]}
-            aria-pressed={!!step.waitOption}
-            title="The drive team may move this time in INIT: D-pad up and down pick its row, left and right change it."
-            onclick={() =>
-              apply(
-                setWait(doc, step.cardId, {
-                  option: step.waitOption ? null : newTimeName(doc),
-                }),
-              )}>{step.waitOption ? "✓ " : ""}Set in INIT</button
-          >
-          {#if step.waitOption}
-            <span>as</span>
-            <input
-              class={[fieldClass, "!w-32 !py-0.5 text-xs"]}
-              aria-label="Name on the INIT menu"
-              value={step.waitOption}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    option: e.currentTarget.value || step.waitOption,
-                  }),
-                )}
-            />
-          {/if}
-        </div>
-        {#if step.waitOption}
-          <p class="mt-1 pl-6 text-xs text-body">
-            Driver Station: <span class="font-mono"
-              >{initRow("time", step.waitOption, step.waitS ?? 0)}</span
-            >
-          </p>
-        {/if}
-      {:else}
-        <!-- One sentence: wait for [trigger] [at most | until] [N] s. -->
-        <div
-          class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-        >
-          <select
-            class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-            aria-label="Wait for"
-            value={step.waitFor}
-            onchange={(e) =>
-              apply(
-                setWait(doc, step.cardId, {
-                  waitFor: e.currentTarget.value,
-                }),
-              )}
-          >
-            {#if !WAIT_FOR.some((w) => w.trigger === step.waitFor)}<option
-                value={step.waitFor}>{step.waitFor}</option
-              >{/if}
-            {#each WAIT_FOR.filter((w) => !w.legacy || w.trigger === step.waitFor) as w (w.trigger)}<option
-                value={w.trigger}
-                disabled={w.trigger === TIME_ONLY && !!step.otherwise?.length}
-                title={w.trigger === TIME_ONLY && step.otherwise?.length
-                  ? "Remove the Otherwise steps first: a wait for nothing always runs to its time"
-                  : undefined}>{w.label}</option
-              >{/each}
-          </select>
-          <!-- Fork: a limit since the wait began, or a time on the match clock (types.ts). -->
-          <select
-            class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-            aria-label="Time limit"
-            title="At most: counted from when the wait begins. Until: a time on the match clock, however late the robot gets there"
-            value={step.waitClock ? "clock" : "most"}
-            onchange={(e) =>
-              apply(
-                setWait(doc, step.cardId, {
-                  matchClock: e.currentTarget.value === "clock",
-                }),
-              )}
-          >
-            <option value="most">at most</option>
-            <option value="clock">until the clock reads</option>
-          </select>
-          <span class="inline-flex items-center gap-1">
-            <input
-              class={[fieldClass, "!w-14 !py-0.5 text-xs"]}
-              type="number"
-              min="0.1"
-              step="0.5"
-              aria-label="Seconds"
-              value={step.waitS}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    seconds: Number(e.currentTarget.value) || 0.1,
-                  }),
-                )}
-            />s
-          </span>
-        </div>
-        <div class="mt-1 flex flex-wrap items-center gap-1 pl-6">
-          <button
-            type="button"
-            class={["simple-option", step.spinUp && "simple-option--on"]}
-            aria-pressed={step.spinUp}
-            title="Spin up the launcher while waiting, so the next Launch all fires at once"
-            onclick={() =>
-              apply(setWait(doc, step.cardId, { spinUp: !step.spinUp }))}
-            >{step.spinUp ? "✓ " : ""}Spin up while waiting</button
-          >
-          {#if step.waitClock}
-            <button
-              type="button"
-              class={[
-                "simple-option",
-                step.waitAdjustable && "simple-option--on",
-              ]}
-              aria-pressed={step.waitAdjustable}
-              title="At the field the Driver Station reads 'waiting for partner's TIP until N s', and the D-pad's left and right move that second. The time here is what it shows untouched. One wait per Auto."
-              onclick={() =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    adjustable: !step.waitAdjustable,
-                  }),
-                )}>{step.waitAdjustable ? "✓ " : ""}Set in INIT</button
-            >
-          {/if}
-        </div>
-        {#if step.waitAdjustable}
-          <!-- Fork: which TIP this wait is for, so the Driver Station's row can say so (types.ts tip). -->
-          <div
-            class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-          >
-            <span>It waits for</span>
-            <select
-              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-              aria-label="Which TIP"
-              title="Which TIP of the match this wait is for: the first, second or third time the HIVE tips"
-              value={String(step.waitTip ?? "")}
-              onchange={(e) =>
-                apply(
-                  setWait(doc, step.cardId, {
-                    tip: Number(e.currentTarget.value),
-                  }),
-                )}
-            >
-              {#if !step.waitTip}<option value="">the partner's TIP</option
-                >{/if}
-              <option value="1">TIP 1</option>
-              <option value="2">TIP 2</option>
-              <option value="3">TIP 3</option>
-            </select>
-          </div>
-          <p class="mt-1 pl-6 text-xs text-body">
-            Driver Station: <span class="font-mono"
-              >{initRow("partnerWait", "", step.waitS ?? 0, step.waitTip)}</span
-            >
-          </p>
-        {/if}
-      {/if}
-      {#if step.waitFor !== TIME_ONLY}
-        <!-- Fork: the Otherwise list, the steps that run only if the wait times out (steps.ts). -->
-        {@const sub = { waitCardId: step.cardId }}
-        <div class="simple-otherwise mt-1.5 ml-2">
-          <div
-            class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
-          >
-            <span class="font-medium text-heading"
-              >{#if step.waitFor === ALWAYS}At {step.waitS} s or later:{:else}If
-                no {trigger}
-                {step.waitClock ? "by" : "in"}
-                {step.waitS} s:{/if}</span
-            >
-            {#if step.otherwise?.length}
-              <!-- The field draws one branch at a time: this picks which (lib/auto/simulate.ts). -->
-              <span
-                class="simple-branch ml-auto"
-                role="group"
-                aria-label="Which branch the field draws"
-                title="Which way the field and the preview show this wait"
-              >
-                <button
-                  type="button"
-                  class:on={previewsTip(step.cardId)}
-                  aria-pressed={previewsTip(step.cardId)}
-                  onclick={() => previewTip(step.cardId, true)}>show ✓</button
-                >
-                <button
-                  type="button"
-                  class:on={!previewsTip(step.cardId)}
-                  aria-pressed={!previewsTip(step.cardId)}
-                  onclick={() => previewTip(step.cardId, false)}>show ✗</button
-                >
-              </span>
-            {/if}
-          </div>
-          <ol class="mt-1 flex flex-col gap-1" aria-label="Otherwise steps">
-            {#each step.otherwise ?? [] as other, i (other.cardId)}
-              {@render stepItem(other, i, sub)}
-            {/each}
-            <li
-              class={[
-                "simple-end !p-1 !text-left",
-                dropping(sub, step.otherwise?.length ?? 0) &&
-                  "simple-step--drop",
-              ]}
-              ondragover={(e) => dragOver(e, step.otherwise?.length ?? 0, sub)}
-              ondragleave={() => (dropAt = null)}
-              ondrop={(e) => drop(e, step.otherwise?.length ?? 0, sub)}
-            >
-              <select
-                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-                aria-label="Add an Otherwise step"
-                title="Or drag a step from the Add row onto this line"
-                value=""
-                onchange={(e) => {
-                  const kind = e.currentTarget.value as AddKind;
-                  e.currentTarget.value = "";
-                  if (kind) add(kind, step.otherwise?.length ?? 0, sub);
-                }}
-              >
-                <option value="">+ add a step…</option>
-                {#each PALETTE as tile (tile.kind)}
-                  <option value={tile.kind}>{tile.label}</option>
-                {/each}
-              </select>
-            </li>
-          </ol>
-          <!-- Fork: after the Otherwise, go on with the steps below the wait, or run instead of them (steps.ts). -->
-          <label
-            class="mt-1 flex items-center gap-1 text-xs text-body"
-            title={step.insteadParks
-              ? "Go on: after these steps the robot carries on with the steps below the wait. Park: these steps end with their own Park, and the steps below the wait run only when the trigger comes."
-              : "Go on: after these steps the robot carries on with the steps below the wait. Skip: the steps below the wait, in this Otherwise, run only when the trigger comes; after these steps the robot leaves this Otherwise."}
-          >
-            then
-            <select
-              class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-              aria-label="After the Otherwise"
-              value={step.rejoin === false ? "park" : "goOn"}
-              onchange={(e) =>
-                apply(
-                  setWaitRejoin(
-                    doc,
-                    step.cardId,
-                    e.currentTarget.value !== "park",
-                  ),
-                )}
-            >
-              <option value="goOn">go on with the steps below</option>
-              <option value="park"
-                >{step.insteadParks ? "park" : "skip the steps below"}</option
-              >
-            </select>
-          </label>
-        </div>
-      {/if}
+    {@render notes(step)}
+
+    {#if step.kind === "wait" && step.waitFor !== TIME_ONLY}
+      <!-- Fork: the Otherwise list, the steps that run only if the wait gives up (steps.ts). The
+           field draws one way at a time; the way not drawn folds to one line, and opening it
+           draws it. -->
+      {@const sub = { waitCardId: step.cardId }}
+      {@const count = step.otherwise?.length ?? 0}
+      {@render branch(
+        step,
+        sub,
+        otherwiseHead(step),
+        step.otherwise ?? [],
+        !count || !previewsTip(step.cardId),
+        () => previewTip(step.cardId, !previewsTip(step.cardId)),
+        count && step.rejoin !== false
+          ? "then go on with the steps below"
+          : count && !step.insteadParks
+            ? "then skip the steps below"
+            : null,
+        "Otherwise steps",
+        PALETTE,
+      )}
     {:else if step.kind === "choice"}
-      <!-- Fork: a route choice (steps.ts): the drive team picks one leg in INIT; both go on below. -->
-      <div
-        class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-      >
-        <span>On the INIT menu as</span>
-        <input
-          class={[fieldClass, "!w-28 !py-0.5 text-xs"]}
-          aria-label="Choice name"
-          value={step.option}
-          onchange={(e) =>
-            apply(
-              setChoice(doc, step.cardId, { option: e.currentTarget.value }),
-            )}
-        />
-      </div>
-      <p class="mt-1 pl-6 text-xs text-body">
-        Driver Station: <span class="font-mono"
-          >{initRow(
-            "choice",
-            step.option ?? "",
-            step.legs?.[0]?.name ?? "",
-          )}</span
-        >; left and right change it.
-      </p>
       {#each step.legs ?? [] as leg, legIndex (legIndex)}
         {@const sub = { waitCardId: step.cardId, leg: legIndex as 0 | 1 }}
-        {@const shown = previewsTip(step.cardId) === (legIndex === 0)}
-        <div class="simple-otherwise mt-1.5 ml-2">
-          <div
-            class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-body"
-          >
-            <span class="font-medium text-heading"
-              >{legIndex === 0 ? "Drawn:" : "Or:"}</span
-            >
-            <input
-              class={[fieldClass, "!w-32 !py-0.5 font-mono text-xs"]}
-              aria-label={legIndex === 0
-                ? "First leg's name"
-                : "Second leg's name"}
-              value={leg.name}
-              onchange={(e) =>
-                apply(
-                  setChoice(doc, step.cardId, {
-                    leg: legIndex as 0 | 1,
-                    name: e.currentTarget.value,
-                  }),
-                )}
-            />
-            <span
-              class="simple-branch ml-auto"
-              title="Which leg the field and the preview show"
-            >
-              <button
-                type="button"
-                class:on={shown}
-                aria-pressed={shown}
-                onclick={() => previewTip(step.cardId, legIndex === 0)}
-                >show</button
-              >
-            </span>
-          </div>
-          <ol class="mt-1 flex flex-col gap-1" aria-label={`${leg.name} steps`}>
-            {#each leg.steps as other, i (other.cardId)}
-              {@render stepItem(other, i, sub)}
-            {/each}
-            <li
-              class={[
-                "simple-end !p-1 !text-left",
-                dropping(sub, leg.steps.length) && "simple-step--drop",
-              ]}
-              ondragover={(e) => dragOver(e, leg.steps.length, sub)}
-              ondragleave={() => (dropAt = null)}
-              ondrop={(e) => drop(e, leg.steps.length, sub)}
-            >
-              <select
-                class={[fieldClass, "!w-auto !py-0.5 text-xs"]}
-                aria-label={`Add a step to ${leg.name}`}
-                title="Or drag a step from the Add row onto this line"
-                value=""
-                onchange={(e) => {
-                  const kind = e.currentTarget.value as AddKind;
-                  e.currentTarget.value = "";
-                  if (kind) add(kind, leg.steps.length, sub);
-                }}
-              >
-                <option value="">+ add a step…</option>
-                {#each PALETTE.filter((t) => LEG_KINDS.includes(t.kind) || (t.kind === "park" && step.legsMayPark)) as tile (tile.kind)}
-                  <option value={tile.kind}>{tile.label}</option>
-                {/each}
-              </select>
-            </li>
-          </ol>
-        </div>
+        {@render branch(
+          step,
+          sub,
+          leg.name,
+          leg.steps,
+          previewsTip(step.cardId) === (legIndex === 0),
+          () => previewTip(step.cardId, legIndex === 0),
+          null,
+          `${leg.name} steps`,
+          PALETTE.filter(
+            (t) =>
+              LEG_KINDS.includes(t.kind) ||
+              (t.kind === "park" && step.legsMayPark),
+          ),
+        )}
       {/each}
-      <p class="mt-1 pl-6 text-xs text-body">
-        {#if step.legs?.some((leg) => leg.steps.some((s) => s.kind === "park"))}
-          Each way ends with its own Park, and nothing follows.
-        {:else}
-          Both ways end on the same spot, and the steps below follow either.
-        {/if}
-      </p>
-    {:else if step.kind === "command"}
-      {@render limitRow(step)}
-    {:else if step.kind === "gather"}
-      {@render limitRow(step)}
-      <div class="mt-1 pl-6 text-xs">
-        {#if step.garden}
-          <span class="text-body"
-            >into the {step.garden.name} and back to this spot</span
-          >
-        {:else}
-          <span class="text-danger"
-            >{step.problem}: the robot won't gather from here.</span
-          >
-        {/if}
-      </div>
-    {:else if step.kind === "pickLaunch"}
-      {@render limitRow(step)}
-      <div class="mt-1 pl-6 text-xs">
-        {#if step.flower && !step.problem && step.shot}
-          <span class="text-body"
-            >at the {step.flower.name}: the load goes from against it at our
-            {step.shot.cell === "AUDIENCE" ? "audience" : "scoring"} CELL,
-            {Math.round(step.shot.rangeIn)} in away and
-            {Math.round(step.shot.offSquareDeg)}° off square, with the turret
-            turned {Math.round(Math.abs(step.shot.turretDeg))}° round, and the
-            FLOWER's four follow.</span
-          >
-          <span class="block text-warning"
-            >For a robot whose turret aims (20245). Not run on a robot yet: its
-            time is an estimate, and whether a fifth piece is ever aboard
-            (G407) is not settled.</span
-          >
-          {#if step.squares}
-            <span class="block text-warning"
-              >This spot is off the FLOWER's line or not square to it: the robot
-              squares up first.</span
-            >
-          {/if}
-        {:else}
-          <span class="text-danger"
-            >{step.problem}: the robot won't do this here. Drive to a spot on
-            the FAR FLOWER's line.</span
-          >
-        {/if}
-      </div>
-    {:else if step.kind === "pick"}
-      {@render limitRow(step)}
-      <div class="mt-1 pl-6 text-xs">
-        {#if step.flower && !step.problem}
-          <span class="text-body"
-            >at the {step.flower.name}, along its line and back{step.squares
-              ? ""
-              : " to this spot"}</span
-          >
-          {#if step.squares}
-            <span class="block text-warning"
-              >This spot is off the FLOWER's line or not square to it: the robot
-              squares up first. Put the spot on its line (click on the line) to
-              save that time.</span
-            >
-          {/if}
-        {:else}
-          <span class="text-danger"
-            >{step.problem}: the robot won't pick here. Drive to a spot on a
-            FLOWER's line (click on its line to make one).</span
-          >
-        {/if}
-      </div>
     {/if}
   </li>
 {/snippet}
 
-<!-- Fork: the most a command may take (steps.ts setStepTimeout); empty, the robot's own 5 s. -->
-{#snippet limitRow(step: Step)}
+<!-- One way out of a wait or a choice: its heading (a button that draws it), and when drawn, its
+     steps and a line to add one. -->
+{#snippet branch(
+  step: Step,
+  sub: { waitCardId: string; leg?: 0 | 1 },
+  head: string,
+  list: Step[],
+  open: boolean,
+  show: () => void,
+  then: string | null,
+  label: string,
+  offer: typeof PALETTE,
+)}
   <div
-    class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-6 text-xs text-body"
-    title="If the step has not finished by then, the robot stops it and goes on. A launch that has started feeding always finishes."
+    class={["simple-otherwise mt-1 ml-2", !open && "simple-otherwise--shut"]}
   >
-    <span>at most</span>
-    <input
-      class={[fieldClass, "!w-14 !py-0.5 text-xs"]}
-      type="number"
-      min="0.1"
-      step="0.5"
-      aria-label="Time limit, seconds"
-      placeholder={String(DEFAULT_TIMEOUT_S)}
-      value={step.timeoutS ?? ""}
-      onchange={(e) =>
-        apply(
-          setStepTimeout(
-            doc,
-            step.cardId,
-            e.currentTarget.value === "" ? null : Number(e.currentTarget.value),
-          ),
-        )}
-    />
-    <span>s</span>
+    <button
+      type="button"
+      class="simple-branch-head"
+      aria-expanded={open}
+      title={open
+        ? "Drawn on the field"
+        : "Draw this way on the field, and open it"}
+      onclick={() => !open && show()}
+    >
+      <ChevronRight
+        class={["size-3 shrink-0 transition-transform", open && "rotate-90"]}
+      />
+      <span
+        class={[
+          "shrink-0 font-medium",
+          step.kind === "choice" ? "font-mono" : "",
+          open ? "text-heading" : "text-body",
+        ]}>{head}{!open && list.length ? ":" : ""}</span
+      >
+      {#if !open && list.length}
+        <span class="min-w-0 truncate text-body"
+          >{list.map(oneLine).join(" → ")}</span
+        >
+      {/if}
+    </button>
+    {#if open}
+      <ol class="mt-1 flex flex-col gap-1" aria-label={label}>
+        {#each list as other, i (other.cardId)}
+          {@render stepItem(other, i, sub)}
+        {/each}
+        <li
+          class={[
+            "simple-end !border-0 !p-0 !text-left",
+            dropping(sub, list.length) && "simple-step--drop",
+          ]}
+          ondragover={(e) => dragOver(e, list.length, sub)}
+          ondragleave={() => (dropAt = null)}
+          ondrop={(e) => drop(e, list.length, sub)}
+        >
+          <select
+            class="simple-add"
+            aria-label={step.kind === "choice"
+              ? `Add a step to ${head}`
+              : "Add an Otherwise step"}
+            title="Or drag a step from the Add row onto this line"
+            value=""
+            onchange={(e) => {
+              const kind = e.currentTarget.value as AddKind;
+              e.currentTarget.value = "";
+              if (kind) add(kind, list.length, sub);
+            }}
+          >
+            <option value="">+ add a step</option>
+            {#each offer as tile (tile.kind)}
+              <option value={tile.kind}>{tile.label}</option>
+            {/each}
+          </select>
+        </li>
+      </ol>
+      {#if then}<p class="mt-0.5 text-[11px] text-body">{then}</p>{/if}
+    {/if}
   </div>
+{/snippet}
+
+<!-- Under a step, only what needs fixing: a launch that misses, a pick off its line, a drive that
+     runs into something. -->
+{#snippet notes(step: Step)}
+  {#if step.problem && step.kind !== "pickLaunch"}
+    <p class="simple-note text-danger">{step.problem}.</p>
+  {/if}
+  {#if (step.kind === "drive" || step.kind === "park") && hits.get(step.cardId)}
+    {@const hit = hits.get(step.cardId)!}
+    {#if hit.drive.length}
+      <p class="simple-note text-danger">
+        Touches {hit.drive.join(" and ")}: move the spot or bend the path.
+      </p>
+    {/if}
+    {#if hit.park.length}
+      <p class="simple-note text-warning">
+        Its park path (P) touches {hit.park.join(" and ")}.
+      </p>
+    {/if}
+  {:else if step.kind === "launch" && step.aim && !step.aim.on}
+    {@const aim = step.aim}
+    <div class="simple-note flex items-center gap-2">
+      <span class="flex-1 text-danger"
+        >Misses: {Math.abs(aim.offDeg).toFixed(0)}° off the CELL{step.atSpot &&
+        isStartName(step.atSpot)
+          ? ". Drive to a launch spot first"
+          : !step.atSpot
+            ? ". Drive to a spot first"
+            : ""}</span
+      >
+      {#if step.atSpot && !isStartName(step.atSpot)}
+        <button
+          type="button"
+          class="simple-tile !min-h-0 !py-0.5 text-xs"
+          title={`Turn ${step.atSpot} to face the CELL (${Math.round(aim.needDeg)}°)`}
+          onclick={() => apply(faceCell(doc, step.atSpot!, aim.needDeg))}
+          >Face the CELL</button
+        >
+      {/if}
+    </div>
+  {:else if (step.kind === "pick" || step.kind === "pickLaunch") && step.squares && !step.problem}
+    <p class="simple-note text-warning">
+      Off the FLOWER's line: it squares up first.
+    </p>
+  {:else if step.kind === "pickLaunch" && step.problem}
+    <p class="simple-note text-danger">
+      {step.problem}: drive to a spot on the FAR FLOWER's line.
+    </p>
+  {:else if step.kind === "gather" && !step.garden && !step.problem}
+    <p class="simple-note text-danger">No GARDEN in range.</p>
+  {/if}
 {/snippet}
 
 {#snippet spotOptions()}
@@ -1398,12 +949,6 @@
       >
     {/each}
   </div>
-  <!-- Fork: the alliance the Auto is drawn for. The team's starts and spots are RED's, and the
-       robot turns the whole Auto half a turn for BLUE, so the builder shows it and does not ask. -->
-  <p class="text-xs text-body">
-    Drawn for {doc.auto?.drawnFor === "BLUE" ? "BLUE" : "RED"}: the robot turns
-    it for {doc.auto?.drawnFor === "BLUE" ? "RED" : "BLUE"}.
-  </p>
   {#if side && linkedSpots.has(side)}
     {@const open = $unlockedSpots.has(side)}
     <button
@@ -1631,36 +1176,6 @@
   .simple-step--drop {
     box-shadow: 0 -2px 0 var(--primary);
   }
-  .simple-branch {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-    font-size: 0.7rem;
-  }
-  .simple-branch button {
-    padding: 1px 8px;
-    background: var(--base);
-    color: var(--body);
-  }
-  .simple-branch button.on {
-    background: color-mix(in srgb, var(--primary) 14%, transparent);
-    color: var(--heading);
-    font-weight: 600;
-  }
-  .simple-option {
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    padding: 0.05rem 0.5rem;
-    font-size: 0.7rem;
-    color: var(--body);
-  }
-  .simple-option--on {
-    border-color: var(--primary);
-    color: var(--heading);
-    font-weight: 600;
-    background: color-mix(in srgb, var(--primary) 35%, transparent);
-  }
   .simple-otherwise {
     border-left: 2px solid color-mix(in srgb, var(--warning) 60%, transparent);
     padding-left: 0.5rem;
@@ -1670,9 +1185,6 @@
   .simple-otherwise .simple-step {
     padding-left: 0.375rem;
     padding-right: 0.375rem;
-  }
-  .simple-otherwise :global(.pl-6) {
-    padding-left: 0.25rem;
   }
   .simple-end {
     border-radius: 0.6rem;
@@ -1716,6 +1228,80 @@
   .simple-chip:hover,
   .simple-start:hover {
     border-color: var(--primary);
+  }
+  .simple-spot {
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid transparent;
+    border-radius: 0.4rem;
+    padding: 0.05rem 0.2rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.75rem;
+    color: var(--heading);
+    background: color-mix(in srgb, var(--body) 10%, transparent);
+    cursor: pointer;
+  }
+  .simple-spot:hover,
+  .simple-spot:focus {
+    border-color: var(--primary);
+    outline: none;
+  }
+  .simple-tag {
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 0 0.4rem;
+    font-size: 0.68rem;
+    line-height: 1.1rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--body);
+    background: color-mix(in srgb, var(--body) 12%, transparent);
+  }
+  .simple-tag--init {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    font-weight: 600;
+  }
+  .simple-tag--warn {
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+  }
+  .simple-note {
+    margin-top: 0.25rem;
+    padding-left: 1.6rem;
+    font-size: 0.75rem;
+  }
+  .simple-otherwise .simple-note {
+    padding-left: 0.25rem;
+  }
+  .simple-branch-head {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    text-align: left;
+  }
+  .simple-otherwise--shut {
+    border-left-color: var(--border);
+  }
+  .simple-otherwise--shut .simple-branch-head {
+    cursor: pointer;
+  }
+  .simple-otherwise--shut .simple-branch-head:hover span {
+    color: var(--heading);
+  }
+  .simple-add {
+    border: 0;
+    background: transparent;
+    padding: 0.1rem 0;
+    font-size: 0.72rem;
+    color: var(--body);
+    cursor: pointer;
+  }
+  .simple-add:hover {
+    color: var(--primary);
   }
   .simple-icon {
     display: inline-flex;

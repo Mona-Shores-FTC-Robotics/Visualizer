@@ -24,7 +24,16 @@
   import PathInspector from "../../view/inspector/PathInspector.svelte";
   import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
   import { spotParks } from "./parkFrom";
-  import { addSpot, stepForLine, stepsOf, everyStep } from "./steps";
+  import {
+    addSpot,
+    initRow,
+    isStartName,
+    renameSpot,
+    stepForLine,
+    stepsOf,
+    everyStep,
+  } from "./steps";
+  import { makeTeamSpot, parkOffers, toggleParkChoice } from "./spotEdits";
   import { saveSpotsOpen, spotEdits, unlockedSpots } from "../team/spotsStore";
 
   interface Props {
@@ -106,6 +115,29 @@
     auto.editingPark = true;
     editor.select([park.lineId]);
   }
+
+  /** This Auto's own spot, being renamed: the text typed, and why it was refused. */
+  let renaming = $state<{ text: string; problem: string | null } | null>(null);
+  $effect(() => {
+    void spot;
+    renaming = null;
+  });
+
+  function finishRename() {
+    if (!renaming || !spot) return;
+    const result = renameSpot(doc, spot, renaming.text);
+    if ("problem" in result) {
+      renaming.problem = result.problem;
+      return;
+    }
+    project.apply(() => result.doc);
+    renaming = null;
+  }
+
+  /** A Park step: the other PARK spots the drive team may pick in INIT (types.ts parkChoices). */
+  let offers = $derived(
+    step?.kind === "park" && !found?.viaPark ? parkOffers(doc, spot) : [],
+  );
 
   const POSE = [
     { axis: 0, label: "X", unit: "in", step: 0.5 },
@@ -212,7 +244,78 @@
           {visits} steps go here, and all of them move with it.{/if}
         Pedro's field frame: inches from the corner, degrees counterclockwise.
       </p>
+      {#if !team && !isStartName(spot) && !found?.viaPark}
+        {#if renaming}
+          <form
+            class="flex items-center gap-1.5"
+            onsubmit={(e) => {
+              e.preventDefault();
+              finishRename();
+            }}
+          >
+            <!-- svelte-ignore a11y_autofocus -->
+            <input
+              class={[fieldClass, "font-mono text-xs"]}
+              aria-label="New name"
+              bind:value={renaming.text}
+              autofocus
+              onkeydown={(e) => e.key === "Escape" && (renaming = null)}
+            />
+            <Button size="sm" variant="secondary" type="submit">Rename</Button>
+          </form>
+          {#if renaming.problem}
+            <p class="text-xs text-danger">{renaming.problem}</p>
+          {/if}
+        {:else}
+          <div class="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant="secondary"
+              title="Every step that goes here follows"
+              onclick={() => (renaming = { text: spot!, problem: null })}
+              >Rename</Button
+            >
+            <Button
+              size="sm"
+              variant="secondary"
+              title="For every Auto, once you Save team spots"
+              onclick={() => {
+                const next = makeTeamSpot(project.doc, spot!);
+                if (next !== project.doc) project.apply(() => next);
+              }}>Make it a team spot</Button
+            >
+          </div>
+        {/if}
+      {/if}
     </div>
+
+    {#if offers.length}
+      <div class="flex flex-col gap-1.5">
+        <span class={labelClass}>Other parks in INIT</span>
+        <div class="flex flex-wrap gap-x-3 gap-y-1">
+          {#each offers as name (name)}
+            <label class="flex items-center gap-1.5 text-xs text-heading">
+              <input
+                type="checkbox"
+                checked={doc.auto?.parkChoices?.includes(name) ?? false}
+                onchange={(e) =>
+                  project.apply((current) =>
+                    toggleParkChoice(current, name, e.currentTarget.checked),
+                  )}
+              />
+              <span class="font-mono">{name}</span>
+            </label>
+          {/each}
+        </div>
+        <p class="text-xs text-body">
+          If a partner parks where we planned to, the drive team picks another
+          with the D-pad's left and right. Driver Station: <span
+            class="font-mono text-heading"
+            >{initRow("choice", "Park", spot)}</span
+          >
+        </p>
+      </div>
+    {/if}
 
     {#if park}
       <div class="flex flex-col gap-1.5">
