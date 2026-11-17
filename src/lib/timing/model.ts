@@ -242,8 +242,13 @@ export interface Volley {
 
 /** What one volley did to the HIVE. */
 export interface VolleyEffect extends Volley {
-  /** False when it landed mid-swing, so its pieces did not count. */
+  /** False when it landed mid-swing, or missed (`missed`), so its pieces did not count. */
   counted: boolean;
+  /**
+   * Fork: the TIP (index in `tips`, counting it as if it came) this volley would have started but
+   * missed, because the Match view's what-if says that TIP misses this try (see {@link tipMisses}).
+   */
+  missed?: number;
   /** Weight in the raised CELL just after it landed (before the TIP it may start). */
   load: number;
   /** The TIP it started, by index in `tips`, or null. */
@@ -256,8 +261,25 @@ export interface CausedTip extends Tip {
 }
 
 /**
+ * Fork: the Match view's TIP what-ifs ride in the facts as `tip<n>Misses`: how many of the volleys
+ * that would start TIP n (1-based) miss before one TIPs it. 0 (unset): the first one does; 1: it
+ * comes on the retry; Infinity: it never comes. A missed volley's pieces do not land, so the CELL
+ * stays where it was and every wait reads the HIVE as it really would be.
+ */
+export function tipMissesKey(tip: number): string {
+  return `tip${tip}Misses`;
+}
+
+/** How many tries TIP `tip` (1-based) misses in `values` (0 unless the Match view says). */
+export function tipMisses(values: TimingValues, tip: number): number {
+  const v = values[tipMissesKey(tip)];
+  return typeof v === "number" && v > 0 ? v : 0;
+}
+
+/**
  * The HIVE over the Auto: each volley ending on a settled HIVE adds to the raised CELL, and the one
- * that brings it to `tipLoad` TIPs it. Volleys come back sorted by time.
+ * that brings it to `tipLoad` TIPs it, unless the Match view says that try misses
+ * ({@link tipMisses}). Volleys come back sorted by time.
  */
 export function hiveHistory(
   volleys: Volley[],
@@ -267,17 +289,36 @@ export function hiveHistory(
   const effects: VolleyEffect[] = [];
   let settledAt = -Infinity;
   let load = values.startLoad;
+  /** Tries the next TIP has missed so far. */
+  let missed = 0;
   for (const volley of [...volleys].sort((a, b) => a.t - b.t)) {
     if (volley.t < settledAt - 1e-9) {
       // Mid-swing: the pieces do not count.
       effects.push({ ...volley, counted: false, load, tip: null });
       continue;
     }
-    load += volley.load ?? values.volleyLoad;
+    const landed = volley.load ?? values.volleyLoad;
+    if (
+      load + landed >= values.tipLoad - 1e-9 &&
+      missed < tipMisses(values, tips.length + 1)
+    ) {
+      // This try at the TIP misses: its pieces do not land.
+      missed += 1;
+      effects.push({
+        ...volley,
+        counted: false,
+        load,
+        tip: null,
+        missed: tips.length,
+      });
+      continue;
+    }
+    load += landed;
     const effect: VolleyEffect = { ...volley, counted: true, load, tip: null };
     effects.push(effect);
     if (load < values.tipLoad - 1e-9) continue;
     load = 0;
+    missed = 0;
     const start = Math.max(0, volley.t + values.tipStartS);
     const settled = start + Math.max(0, values.tipSwingS);
     effect.tip = tips.length;

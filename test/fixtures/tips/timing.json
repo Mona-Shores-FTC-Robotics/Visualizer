@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "facts": {
+    "driveSpeed": {
+      "value": 1.0,
+      "source": "measured, 20245 full robot, 1-2 Nov 2026",
+      "note": "Logged drive time ÷ the drawing's time; 0.83-1.25 on 2 Nov (1.5 was the light chassis)."
+    },
+    "spinUpS": {
+      "value": 1.1,
+      "source": "measured, 20245, 1-2 Nov 2026",
+      "note": "Median of 83 spin-ups to launch speed; 0.9-2.1 s, slowest on a low battery."
+    },
+    "volleyS": {
+      "value": 2.5,
+      "source": "plan (mentor, 12 Nov 2026), from the Belding films: the fourth ball leaves 2.0-2.5 s after the gate opens",
+      "note": "A volley that ends on its fourth ball. With the set 3.5 s feed running out, as at Belding when the shot counter undercounted, it measured 3.6-4.6 s, median 4.0."
+    },
+    "cellCheckS": {
+      "value": 0.75,
+      "source": "measured, 20245, 3-4 Nov 2026",
+      "note": "Quick-check limit for \"Wait for TIP or CELL up\" on arrival: the camera saw the CELL up 0.22-0.44 s after the drive ended."
+    },
+    "intakeFullS": {
+      "value": 1.9,
+      "source": "estimate from 20245 logs, 29 Oct-2 Nov 2026",
+      "note": "Last piece a median 1.5 s after the push starts, plus about 0.4 s to latch full."
+    },
+    "tipStartS": {
+      "value": 2.6,
+      "source": "Belding films, 7 Nov 2026, for a volley that ends on its fourth ball",
+      "note": "With tipSwingS 1.6: the last ball to CellUp is the films' 4.1 s for a CELL at its tipping weight (a counted feed ends 0.1 s after its last ball). Was 1.4 with the 4.0 s volley."
+    },
+    "tipSwingS": {
+      "value": 1.6,
+      "source": "measured, Belding Qualifier video and L-NoCross logs, 7 Nov 2026",
+      "note": "Swing 1.0-1.4 s, then 0.3-0.5 s for the camera to read the CELL up. With tipStartS: last ball to CellUp about 4.2 s."
+    },
+    "tipLoad": {
+      "value": 8,
+      "source": "measured",
+      "note": "Field Setup Guide 12.3: an empty raised CELL tips on 8 POLLEN."
+    },
+    "startLoad": {
+      "value": 5,
+      "source": "measured",
+      "note": "3 NECTAR start in the raised CELL, so the 3rd POLLEN tips it."
+    },
+    "volleyLoad": {
+      "value": 4,
+      "source": "estimate",
+      "note": "4 POLLEN if every shot lands; lower it for misses."
+    },
+    "pickFlowerS": {
+      "value": 3.6,
+      "source": "measured, 19429 and 20245 Auto logs, 29 Oct-14 Nov 2026 (events/2026-11-belding and logs/*)",
+      "note": "PickFlower step, start to end: median 3.58 s over 107 Auto picks. The lane read full a median 2.6 s after the step began (61 picks, 1.5-4.7 s; 2.7 s at Belding); 43 never read full and ran a median 3.7 s. The guard still plans 4.0 s (AutoRegistration.PICK_FLOWER_TYPICAL_S)."
+    },
+    "gardenGatherS": {
+      "value": 4.4,
+      "source": "measured, 19429 and 20245 Auto logs, 3-14 Nov 2026: only 10 gathers, so re-measure",
+      "note": "GardenGather step, start to end: median 4.42 s. The lane read full in 3 of them, 2.85-3.53 s after the step began. The guard still plans 5.0 s (AutoRegistration.GARDEN_GATHER_TYPICAL_S)."
+    },
+    "partnerTipLagS": {
+      "value": 5.5,
+      "source": "measured, Belding Qualifier films, 7 Nov 2026 (re-measured 11 Nov)",
+      "note": "Partner's last ball leaving to our CellUp, as a give-up limit: catches 11 of 13 at-weight TIPs (median lag 4.1 s; 4.5 caught 9; 6.7 catches all)."
+    }
+  }
+}
