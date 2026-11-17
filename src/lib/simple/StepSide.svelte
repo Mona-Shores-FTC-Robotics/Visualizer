@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toggleSpotLock } from "../team/spotUnlock";
   /**
    * Fork: the right panel for a Drive or Park step of a simple Auto (steps.ts isSimple), in place
    * of upstream's path editor: the spot the step goes to (x, y and facing, in Pedro's field frame),
@@ -24,12 +25,7 @@
   import { AUTO_LENGTH_S, guardSeconds } from "../auto/simulate";
   import { spotParks } from "./parkFrom";
   import { addSpot, stepForLine, stepsOf, everyStep } from "./steps";
-  import {
-    saveSpotsOpen,
-    setSpotUnlocked,
-    spotEdits,
-    unlockedSpots,
-  } from "../team/spotsStore";
+  import { saveSpotsOpen, spotEdits, unlockedSpots } from "../team/spotsStore";
 
   interface Props {
     /** The selected path: a Drive or Park step's, or a spot's park path. */
@@ -162,7 +158,13 @@
             size="sm"
             active={unlocked}
             class={unlocked ? "text-warning!" : ""}
-            onclick={() => setSpotUnlocked(spot!, !unlocked)}
+            onclick={() =>
+              toggleSpotLock(
+                spot!,
+                unlocked,
+                () => project.doc,
+                (next) => project.apply(() => next),
+              )}
           >
             {#if unlocked}<LockOpen />{:else}<Lock />{/if}
           </IconButton>
