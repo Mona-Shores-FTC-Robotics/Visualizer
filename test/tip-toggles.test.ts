@@ -125,3 +125,14 @@ describe("R-Solo beside a still partner", () => {
     ]);
   });
 });
+
+describe("each try is named by its volley", () => {
+  it("R-Solo: its preloads, then the FLOWER load it brings back to RIGHT", () => {
+    const [tip1] = tipToggles(entries(), teamValues());
+    expect(tip1.tryList.map((t) => [t.robot, t.what])).toEqual([
+      [0, "preloads"],
+      [0, "FLOWER"],
+    ]);
+    expect(tip1.tryList[0].t).toBeLessThan(tip1.tryList[1].t);
+  });
+});

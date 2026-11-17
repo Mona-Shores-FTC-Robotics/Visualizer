@@ -591,15 +591,20 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     const fromHere = (cards: AutoCard[]): string | null => {
       for (const card of cards) {
         if (card.kind === "path") return card.park ? card.lineId : null;
+        // A route choice whose legs end with a wait that parks: as its default leg starts.
+        if (card.kind === "firstOf" && card.choice && !parkCardOf(legsOf(card)[0].cards))
+          return fromHere(legsOf(card)[0].cards);
         if (card.kind === "firstOf") return parkOfLastWait([card]);
         if (card.kind === "rejoin") return null;
       }
       return null;
     };
-    // A route choice whose legs each end with the park: the drawing's default leg's.
+    // A route choice whose legs each end with the park, or with a wait that parks: the drawing's
+    // default leg's.
     if (last.choice) {
-      const legPark = parkCardOf(legsOf(last)[0].cards);
-      if (legPark) return legPark.lineId;
+      const leg = legsOf(last)[0].cards;
+      const legPark = parkCardOf(leg)?.lineId ?? parkOfLastWait(leg);
+      if (legPark) return legPark;
     }
     const rows = [...last.rows].sort(
       (a, b) => Number("when" in a) - Number("when" in b),

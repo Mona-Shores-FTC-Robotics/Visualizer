@@ -217,14 +217,16 @@
       return [];
     }
   });
-  /** A robot's TIP rows: the TIPs its volleys try for first. */
-  function tipsOf(robot: RobotInfo): TipToggle[] {
-    const index = robots.indexOf(robot);
-    return tips.filter((t) => t.robot === index);
-  }
   /** A TIP's choices: on try 1 … tries, then never. */
   function tipChoices(t: TipToggle): number[] {
     return [...Array.from({ length: t.tries }, (_, i) => i), Infinity];
+  }
+  /** A try's button: whose volley, what it fires, when it lands ("r-no-cross FLOWER 11 s"). */
+  function tryLabel(t: TipToggle, misses: number): string {
+    if (misses === Infinity) return "never";
+    const at = t.tryList[misses];
+    if (!at) return tipChoiceLabel(misses);
+    return `${robots[at.robot]?.name ?? `robot ${at.robot + 1}`} ${at.what} ${Math.round(at.t)} s`;
   }
 
   /** Whether a stop's trigger comes in time in this look: its own answer, else its trigger's. */
@@ -423,47 +425,10 @@
           {/each}
         </div>
       {/if}
-      {#if tipsOf(robot).length || stopsOf(robot).length}
-        <!-- Fork: the TIPs this robot tries for (tipToggles.ts), then its other stops (whatIfs.ts):
-             a name and ✓ / ✗ only; the field shows what each does. -->
+      {#if stopsOf(robot).length}
+        <!-- Fork: this robot's stops (whatIfs.ts): a name and ✓ / ✗ only; the field shows what
+             each does. The TIPs are the HIVE's, above the field (tipRows). -->
         <div class="mt-1 flex flex-col gap-1.5 border-t border-border pt-1.5">
-          {#each tipsOf(robot) as t (t.tip)}
-            <div
-              class="flex flex-col gap-0.5 text-[11px]"
-              role="radiogroup"
-              aria-label={`TIP ${t.tip}`}
-            >
-              <span
-                class={[
-                  "truncate font-medium",
-                  t.misses === Infinity ? "text-danger" : "text-heading",
-                ]}>TIP {t.tip}</span
-              >
-              <div class="flex flex-wrap gap-1">
-                {#each tipChoices(t) as misses (misses)}
-                  {@const on = t.misses === misses}
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    class={[
-                      "rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
-                      on &&
-                        misses !== Infinity &&
-                        "border-primary bg-primary/15 text-heading",
-                      on &&
-                        misses === Infinity &&
-                        "border-danger bg-danger/10 text-danger",
-                      !on && "border-border text-body hover:text-heading",
-                    ]}
-                    title={tipChoiceHint(t.tip, misses)}
-                    onclick={() => controls.setTipMisses(t.tip, misses)}
-                    >{tipChoiceLabel(misses)}</button
-                  >
-                {/each}
-              </div>
-            </div>
-          {/each}
           {#each stopsOf(robot) as stop (stop.cardId)}
             {@const onTime = stopOnTime(robot, stop)}
             <div
@@ -510,6 +475,52 @@
       {/if}
     </div>
   </section>
+{/snippet}
+
+{#snippet tipRows()}
+  <!-- Fork: the TIPs the robots try for (tipToggles.ts), the HIVE's and not one robot's: for each,
+       which volley TIPs it, named by whose it is and when it lands, or never. The field and the
+       timeline show what each robot then does. -->
+  {#each tips as t (t.tip)}
+    <div
+      class="flex flex-wrap items-center gap-1 text-[11px]"
+      role="radiogroup"
+      aria-label={`TIP ${t.tip}`}
+    >
+      <span
+        class={[
+          "font-medium",
+          t.misses === Infinity ? "text-danger" : "text-heading",
+        ]}>TIP {t.tip} comes on</span
+      >
+      {#each tipChoices(t) as misses (misses)}
+        {@const on = t.misses === misses}
+        {@const at = t.tryList[misses]}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={on}
+          class={[
+            "flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold leading-tight transition",
+            on &&
+              misses !== Infinity &&
+              "border-primary bg-primary/15 text-heading",
+            on &&
+              misses === Infinity &&
+              "border-danger bg-danger/10 text-danger",
+            !on && "border-border text-body hover:text-heading",
+          ]}
+          title={tipChoiceHint(t.tip, misses)}
+          onclick={() => controls.setTipMisses(t.tip, misses)}
+        >
+          {#if at && robots[at.robot]}<span
+              class="inline-block size-2 shrink-0 rounded-full"
+              style={`background: ${robots[at.robot].color}`}
+            ></span>{/if}{tryLabel(t, misses)}</button
+        >
+      {/each}
+    </div>
+  {/each}
 {/snippet}
 
 {#snippet hivePanel()}
@@ -580,6 +591,7 @@
         onclick={() => controls.reset()}>Team values</button
       >
     </div>
+    {@render tipRows()}
     {#if part === "bar"}
       <!-- Only the bar: the robots are in the side panels, the HIVE behind its label. -->
     {:else if narrow}

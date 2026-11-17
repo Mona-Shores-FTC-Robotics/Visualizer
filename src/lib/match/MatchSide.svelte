@@ -31,9 +31,9 @@
   />
   {#if index === 0}
     <p class="px-1 text-[11px] text-body">
-      Match view: each robot's what-ifs are beside the field; the HIVE's open
-      from its label on the timeline. To edit an Auto again, untick the Autos
-      under Overlays.
+      Match view: each robot's what-ifs are beside the field; which volley makes
+      each TIP is above it, and the HIVE's sliders open from its label on the
+      timeline. To edit an Auto again, untick the Autos under Overlays.
     </p>
   {/if}
 </div>

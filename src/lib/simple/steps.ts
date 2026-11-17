@@ -377,7 +377,14 @@ function walkSteps(
         }));
         const legs = choice.legs.map((leg, i) => ({
           name: leg.label ?? "",
-          steps: walkSteps(doc, leg.cards, ends[i], parking, false),
+          // A leg of the last step parks on its own when it ends with a Wait that parks.
+          steps: walkSteps(
+            doc,
+            leg.cards,
+            ends[i],
+            parking,
+            terminal && index === cards.length - 1,
+          ),
         }));
         at.here = ends[0].here;
         at.onSpot = ends[0].onSpot;
@@ -1523,9 +1530,13 @@ export function unfold(auto: AutoSection): Set<string> {
       list.push(...when.cards);
       when.cards = [];
     }
-    for (const card of list)
-      if (card.kind === "firstOf" && waitOf(card))
+    for (const card of list) {
+      if (card.kind !== "firstOf") continue;
+      // A leg of a choice may end with a Wait that parks (validate.ts): open it like a list.
+      if (choiceOf(card)) for (const row of card.rows) open(row.cards);
+      else if (waitOf(card))
         for (const row of card.rows) if ("afterMs" in row) open(row.cards);
+    }
   };
   open(auto.cards);
   return parking;
@@ -1536,7 +1547,8 @@ export function refold(auto: AutoSection, parking: Set<string>): void {
   const close = (list: AutoCard[]) => {
     for (const card of list)
       if (card.kind === "firstOf")
-        for (const row of card.rows) if ("afterMs" in row) close(row.cards);
+        for (const row of card.rows)
+          if ("afterMs" in row || choiceOf(card)) close(row.cards);
     for (let i = list.length - 1; i >= 0; i--) {
       const card = list[i];
       if (card.kind !== "firstOf" || !parking.has(card.id)) continue;
