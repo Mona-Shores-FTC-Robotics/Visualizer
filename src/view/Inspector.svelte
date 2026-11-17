@@ -50,28 +50,44 @@
       : null;
   });
   /**
-   * Fork: a simple Auto's selected step that has no spot (a launch, a wait, a choice...): its
-   * settings, which its card in the builder leaves out.
+   * Fork: the builder's selected step (any Auto the builder shows, by its card): a launch, wait,
+   * choice... gets its settings (StepPanel), which its card leaves out; a Drive or Park on a spot
+   * gets StepSide, whether its path is one segment or a group.
    */
-  let cardStep = $derived.by(() => {
-    if (!isSimple(project.doc)) return null;
+  let selectedStep = $derived.by(() => {
+    if (!auto.auto) return null;
     const { cardId } = parseSelection($selectedCardId);
     if (!cardId) return null;
     const step = everyStep(stepsOf(project.doc)).find(
       (s) => s.cardId === cardId,
     );
-    return step && step.kind !== "drive" && step.kind !== "park" ? step : null;
+    return step && step.kind !== "other" ? step : null;
   });
+  let cardStep = $derived(
+    selectedStep &&
+      selectedStep.kind !== "drive" &&
+      selectedStep.kind !== "park"
+      ? selectedStep
+      : null,
+  );
+  let spotCard = $derived(
+    selectedStep &&
+      (selectedStep.kind === "drive" || selectedStep.kind === "park") &&
+      selectedStep.spot &&
+      project.doc.auto?.points[selectedStep.spot]
+      ? selectedStep
+      : null,
+  );
   let title = $derived(
     // Fork: in the Match view with two Autos, the right panel is the second robot's what-ifs.
     auto.matchSides
       ? "Match"
-      : cardStep
-        ? "Step"
-        : editor.selectedShape
-          ? "Obstacle"
-          : several
-            ? "Selection"
+      : editor.selectedShape
+        ? "Obstacle"
+        : several
+          ? "Selection"
+          : cardStep || spotCard || simpleStep
+            ? "Step"
             : selectedGroup
               ? "Group"
               : editor.selectedLine
@@ -100,16 +116,20 @@
   <div class="min-h-0 flex-1 overflow-y-auto px-1 pb-1">
     {#if auto.matchSides}
       <MatchSide index={1} />
-    {:else if cardStep}
-      <StepPanel step={cardStep} />
     {:else if editor.selectedShape}
       <ObstacleInspector shape={editor.selectedShape} />
     {:else if several}
       <SelectionInspector />
+    {:else if cardStep}
+      <StepPanel step={cardStep} />
+    {:else if spotCard || simpleStep}
+      <StepSide
+        line={editor.selectedLine}
+        group={selectedGroup}
+        cardStep={spotCard}
+      />
     {:else if selectedGroup}
       <GroupInspector group={selectedGroup} />
-    {:else if editor.selectedLine && simpleStep}
-      <StepSide line={editor.selectedLine} />
     {:else if editor.selectedLine}
       <PathInspector line={editor.selectedLine} />
     {:else}

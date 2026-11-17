@@ -13,7 +13,8 @@
     Navigation,
     SquareParking,
   } from "@lucide/svelte";
-  import type { AtomicPath } from "../../types";
+  import type { AtomicPath, CompoundPath } from "../../types";
+  import GroupInspector from "../../view/inspector/GroupInspector.svelte";
   import { FIELD_SIZE } from "../../config";
   import { useProject } from "../../state/project.svelte";
   import { useAuto } from "../../state/auto.svelte";
@@ -32,23 +33,34 @@
     stepForLine,
     stepsOf,
     everyStep,
+    type Step,
   } from "./steps";
   import { makeTeamSpot, parkOffers, toggleParkChoice } from "./spotEdits";
   import { saveSpotsOpen, spotEdits, unlockedSpots } from "../team/spotsStore";
 
   interface Props {
     /** The selected path: a Drive or Park step's, or a spot's park path. */
-    line: AtomicPath;
+    line: AtomicPath | null;
+    /** The selected path when it is a group of segments (an Auto drawn with one). */
+    group?: CompoundPath | null;
+    /** The selected card's step, when it is a Drive or Park on a spot. */
+    cardStep?: Step | null;
   }
 
-  let { line }: Props = $props();
+  let { line, group = null, cardStep = null }: Props = $props();
 
   const project = useProject();
   const auto = useAuto();
   const editor = useEditor();
 
   let doc = $derived(project.doc);
-  let found = $derived(stepForLine(doc, line.id));
+  /** The step: a park path's drive when that path is selected (P), else the selected card's. */
+  let found = $derived.by(() => {
+    const byLine = line ? stepForLine(doc, line.id) : null;
+    if (byLine?.viaPark) return byLine;
+    if (cardStep) return { step: cardStep, viaPark: false };
+    return byLine;
+  });
   let step = $derived(found?.step ?? null);
   let spot = $derived(step?.spot ?? null);
   let point = $derived(spot ? (doc.auto?.points[spot] ?? null) : null);
@@ -79,7 +91,7 @@
   let shape = $state(false);
   // Keyed on the id alone: every edit replaces `line` with a new object of the same id, and an
   // effect that read `line.id` directly reran on each one, closing the path editor mid-typing.
-  let lineId = $derived(line.id);
+  let lineId = $derived(line?.id ?? group?.id ?? null);
   $effect(() => {
     void lineId;
     shape = false;
@@ -156,7 +168,9 @@
     >
       <ArrowLeft class="size-3.5" /> Step
     </Button>
-    <PathInspector {line} />
+    {#if line}<PathInspector {line} />{:else if group}<GroupInspector
+        {group}
+      />{/if}
   </div>
 {:else if step && spot && point}
   <div class="flex flex-col gap-3 text-sm">
@@ -347,6 +361,8 @@
       >Edit {found?.viaPark ? "park " : ""}path shape →</Button
     >
   </div>
-{:else}
+{:else if line}
   <PathInspector {line} />
+{:else if group}
+  <GroupInspector {group} />
 {/if}
