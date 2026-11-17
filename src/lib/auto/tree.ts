@@ -54,7 +54,10 @@ export function locateCard(
   return null;
 }
 
-export function findCard(cards: AutoCard[], id: string | null): AutoCard | null {
+export function findCard(
+  cards: AutoCard[],
+  id: string | null,
+): AutoCard | null {
   if (!id) return null;
   const location = locateCard(cards, id);
   return location ? location.list[location.index] : null;
@@ -99,8 +102,7 @@ export function usedNames(auto: AutoSection): {
 export function parkCardOf(list: AutoCard[]): PathCard | null {
   return (
     (list.find((card) => card.kind === "path" && card.park) as
-      | PathCard
-      | undefined) ?? null
+      PathCard | undefined) ?? null
   );
 }
 
@@ -158,10 +160,14 @@ export function cardTitle(card: AutoCard, pathName?: string): string {
 }
 
 /** Label used for a card list's endgame guard and in the editor. */
-export function listLabel(parent: { card: AutoCard; rowIndex: number } | null): string {
+export function listLabel(
+  parent: { card: AutoCard; rowIndex: number } | null,
+): string {
   if (!parent) return "Auto";
   const { card, rowIndex } = parent;
-  return card.kind === "firstOf" ? rowLabel(card.rows[rowIndex]) : cardTitle(card);
+  return card.kind === "firstOf"
+    ? rowLabel(card.rows[rowIndex])
+    : cardTitle(card);
 }
 
 /** True when no row has cards: shown as a "Wait for" card, not a decision. */
@@ -178,7 +184,13 @@ export function isPlainWait(card: FirstOfCard): boolean {
 export function rejoinTail(
   cards: AutoCard[],
   targetId: string,
-): { list: AutoCard[]; index: number; target: PathCard; through: PathCard[]; join: PathCard } | null {
+): {
+  list: AutoCard[];
+  index: number;
+  target: PathCard;
+  through: PathCard[];
+  join: PathCard;
+} | null {
   const location = locateCard(cards, targetId);
   if (!location) return null;
   const target = location.list[location.index];
@@ -194,4 +206,65 @@ export function rejoinTail(
     index++;
   }
   return { list: location.list, index, target, through, join };
+}
+
+/** Fork: a route choice's legs, the drawing's default (its trigger row) first. */
+export function choiceLegs(card: FirstOfCard): AutoRow[] {
+  return [...card.rows].sort(
+    (a, b) => ("when" in a ? 0 : 1) - ("when" in b ? 0 : 1),
+  );
+}
+
+/**
+ * Fork: the park for a list whose last card is a wait that parks, from the spot that wait is on: a
+ * Park step that comes before any drive in one of the wait's outcomes (its Otherwise first), else
+ * the spot's own park (`parkFrom` of the drive that brought the robot there). The export guards
+ * such a list with it (codegen/auto/javaAuto.ts), and the preview does the same (simulate.ts).
+ */
+export function waitParkLine(
+  auto: AutoSection,
+  list: AutoCard[],
+): string | null {
+  const last = list[list.length - 1];
+  if (last?.kind !== "firstOf") return null;
+  const fromHere = (cards: AutoCard[]): string | null => {
+    for (const card of cards) {
+      if (card.kind === "path") return card.park ? card.lineId : null;
+      // A route choice whose legs end with a wait that parks: as its default leg starts.
+      if (
+        card.kind === "firstOf" &&
+        card.choice &&
+        !parkCardOf(choiceLegs(card)[0].cards)
+      )
+        return fromHere(choiceLegs(card)[0].cards);
+      if (card.kind === "firstOf") return waitParkLine(auto, [card]);
+      if (card.kind === "rejoin") return null;
+    }
+    return null;
+  };
+  // A route choice whose legs each end with the park, or with a wait that parks: the drawing's
+  // default leg's.
+  if (last.choice) {
+    const leg = choiceLegs(last)[0].cards;
+    const legPark = parkCardOf(leg)?.lineId ?? waitParkLine(auto, leg);
+    if (legPark) return legPark;
+  }
+  const rows = [...last.rows].sort(
+    (a, b) => Number("when" in a) - Number("when" in b),
+  );
+  for (const row of rows) {
+    const park = fromHere(row.cards);
+    if (park) return park;
+  }
+  if (
+    !allCards(last.rows.flatMap((row) => row.cards)).some(
+      (card) => card.kind === "path" && card.park,
+    )
+  )
+    return null;
+  for (let i = list.length - 2; i >= 0; i--) {
+    const card = list[i];
+    if (card.kind === "path") return auto.parkFrom?.[card.id] ?? null;
+  }
+  return null;
 }
