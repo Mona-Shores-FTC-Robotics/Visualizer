@@ -83,6 +83,46 @@ export interface Aim {
   on: boolean;
 }
 
+/**
+ * Fork: a launch from (x, y), facing `headingDeg`, drawn on the field (AutoFieldOverlay): where the
+ * turret's axis is, and where its line meets the CELL's raised row (the row a launch spot aims at,
+ * aim.ts launchSpotHeadingDeg). The line runs straight out along the heading, as the locked turret
+ * shoots, for the range to that row.
+ */
+export function launchLine(
+  x: number,
+  y: number,
+  headingDeg: number,
+  alliance: Alliance,
+): {
+  axis: { x: number; y: number };
+  end: { x: number; y: number };
+  row: { x: number; y: number };
+} {
+  const h = (headingDeg * Math.PI) / 180;
+  const axis = {
+    x: x + TURRET_FORWARD_IN * Math.cos(h) - TURRET_LEFT_IN * Math.sin(h),
+    y: y + TURRET_FORWARD_IN * Math.sin(h) + TURRET_LEFT_IN * Math.cos(h),
+  };
+  const hiveX =
+    alliance === "BLUE"
+      ? CENTRE + HIVE_CENTRE_TO_CENTRE_IN / 2
+      : CENTRE - HIVE_CENTRE_TO_CENTRE_IN / 2;
+  const row = {
+    x: hiveX,
+    y:
+      y < CENTRE
+        ? CENTRE - RAISED_ROW_FROM_AXLE_IN
+        : CENTRE + RAISED_ROW_FROM_AXLE_IN,
+  };
+  const range = Math.hypot(row.x - axis.x, row.y - axis.y);
+  return {
+    axis,
+    end: { x: axis.x + range * Math.cos(h), y: axis.y + range * Math.sin(h) },
+    row,
+  };
+}
+
 /** Where a launch from (x, y), facing `headingDeg`, goes with the turret locked. */
 export function aimFrom(
   x: number,
