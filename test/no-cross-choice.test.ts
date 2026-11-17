@@ -1,5 +1,5 @@
 // Fork: a route choice inside a wait's Otherwise whose legs each end with a wait that parks
-// (biobuzz L-NoCross: "waiting for TIP 1 until 9 s, then: CROSS AND FIX IT or KEEP WAITING").
+// (biobuzz L-NoCross: "waiting for TIP 1 until 9 s, if no TIP 1: CROSS AND FIX IT or WAIT FOR PARTNER FIX").
 // Each leg holds the rest of its own route, so the drive team's pick decides what the robot does
 // when TIP 1 does not come: cross under the HIVE and fix it, or stay and give the partner time.
 import { readFileSync } from "node:fs";
@@ -33,7 +33,7 @@ describe("a choice whose legs end with a wait that parks", () => {
       readFileSync(`${DIR}/LNoCrossAuto.java`, "utf8").replace(SAVED, ""),
     );
     expect(result.source).toContain(
-      'AutoOption.choice("then", "CROSS AND FIX IT", "KEEP WAITING")',
+      'AutoOption.choice("if no TIP 1", "CROSS AND FIX IT", "WAIT FOR PARTNER FIX")',
     );
   });
 
@@ -54,7 +54,7 @@ describe("a choice whose legs end with a wait that parks", () => {
     const choice = wait.otherwise!.find((s) => s.kind === "choice")!;
     expect(choice.legs!.map((leg) => leg.name)).toEqual([
       "CROSS AND FIX IT",
-      "KEEP WAITING",
+      "WAIT FOR PARTNER FIX",
     ]);
     // CROSS AND FIX IT: under the HIVE, RIGHT up?, fix TIP 1, the scoring FLOWER, back, LEFT.
     expect(choice.legs![0].steps.map((s) => s.kind)).toEqual([
@@ -68,7 +68,7 @@ describe("a choice whose legs end with a wait that parks", () => {
       "launch",
       "park",
     ]);
-    // KEEP WAITING: wait at the left end for LEFT up, then the route TIP 1 would have started.
+    // WAIT FOR PARTNER FIX: wait at the left end for LEFT up, then the route TIP 1 would have started.
     expect(choice.legs![1].steps.map((s) => s.kind)).toEqual([
       "wait",
       "launch",

@@ -204,7 +204,7 @@ export function validateAuto(
       // A leg holds drives, commands and plain waits. It may end with the park, if the other leg
       // does too: then each way parks by its own road and nothing follows the choice. Or it may
       // end with a check whose every outcome parks (a wait that parks): the leg then holds the rest
-      // of its own route, as L-NoCross's "then: CROSS AND FIX IT or KEEP WAITING" does.
+      // of its own route, as L-NoCross's "if no TIP 1: CROSS AND FIX IT or WAIT FOR PARTNER FIX" does.
       const isPark = (c: AutoCard) => c.kind === "path" && c.park;
       const parks = (c: AutoCard | undefined): boolean =>
         !!c && (isPark(c) || (c.kind === "firstOf" && !c.choice && c.rows.every((row) => parks(row.cards[row.cards.length - 1]))));

@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "timestamp": "2026-11-17T16:35:30.000Z",
+  "timestamp": "2026-11-17T16:47:43.000Z",
   "startPoint": {
     "x": 62.3,
     "y": 133.8,
@@ -1295,12 +1295,12 @@
               {
                 "id": "c-lnc-then",
                 "kind": "firstOf",
-                "label": "then: CROSS AND FIX IT or KEEP WAITING",
-                "choice": "then",
+                "label": "if no TIP 1: CROSS AND FIX IT or WAIT FOR PARTNER FIX",
+                "choice": "if no TIP 1",
                 "rows": [
                   {
                     "when": [
-                      "then"
+                      "if no TIP 1"
                     ],
                     "label": "CROSS AND FIX IT",
                     "cards": [
@@ -1486,7 +1486,7 @@
                   },
                   {
                     "afterMs": 0,
-                    "label": "KEEP WAITING",
+                    "label": "WAIT FOR PARTNER FIX",
                     "cards": [
                       {
                         "id": "c-mwdn0a03-lnv2c-keep",
