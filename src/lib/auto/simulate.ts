@@ -710,6 +710,7 @@ export function simulateAuto(
                 gatherTotal === undefined
                   ? undefined
                   : Math.min(gatherTotal, card.timeoutS ?? DEFAULT_TIMEOUT_S),
+                catalog.settings.rWidth / 2,
               )
             : null;
         const busy = gather
