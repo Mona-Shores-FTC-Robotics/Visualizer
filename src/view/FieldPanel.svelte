@@ -57,6 +57,7 @@
   import { lockToAxis, snapPoint } from "./snap";
   import { useAuto } from "../state/auto.svelte";
   import AutoFieldOverlay from "../lib/auto/components/AutoFieldOverlay.svelte";
+  import { everyStep, stepsOf } from "../lib/simple/steps";
   import FieldRuler from "../lib/components/FieldRuler.svelte";
   import AutoFieldBar from "./AutoFieldBar.svelte";
   import MatchTimeline from "../lib/match/MatchTimeline.svelte";
@@ -146,6 +147,14 @@
   let { x, y } = $derived(viewport);
 
   let doc = $derived(project.doc);
+  /** Fork: the spots a Launch all fires from, for the selected spot's aim line (AutoFieldOverlay). */
+  let launchSpots = $derived(
+    new Set(
+      everyStep(stepsOf(doc)).flatMap((step) =>
+        step.kind === "launch" && step.atSpot ? [step.atSpot] : [],
+      ),
+    ),
+  );
   let obstaclesOn = $derived(Boolean(settings.experimentalFeatures?.obstacles));
   let fieldMapSrc = $derived(fieldMapSource(settings, scheme));
   let robotImageSrc = $derived(settings.robotImage || "/robot.png");
@@ -535,6 +544,9 @@
             {x}
             {y}
             focusLine={auto.focusedPark}
+            robotLength={settings.rLength}
+            robotWidth={settings.rWidth}
+            {launchSpots}
           />
         {/if}
 
