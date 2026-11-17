@@ -4,9 +4,10 @@
    * others' on the right, as they sit on the timeline. What-ifs for this look only
    * (controls.svelte.ts): the team's facts are never changed from here.
    *
-   * Fork: with two Autos, each robot's sliders go in a side panel (`show` is its index) and only
-   * the What-if bar sits above the field (`show="bar"`) and the HIVE's sliders open from its label
-   * on the timeline (`show="hive"`); with more, `show="all"`.
+   * Fork: with two Autos, the whole match goes in the left panel (`show="panel"`: the result, the
+   * TIPs, then each robot's questions, timing and Edit button) and the HIVE's sliders open from its
+   * label on the timeline (`show="hive"`); with more, `show="all"`. `show="bar"` and a robot's
+   * index are the older layout's top bar and side panels.
    */
   import type { AutoSection } from "../auto/types";
   import {
@@ -63,8 +64,12 @@
     entries: FieldEntry[];
     /** The shared facts previewed now (the team's, with the HIVE what-ifs). */
     values: TimingValues;
-    /** Every panel, the What-if bar and the HIVE only, or one robot's panel by index. */
-    show?: "all" | "bar" | "hive" | number;
+    /**
+     * Every panel, the What-if bar and the HIVE only, one robot's panel by index, or (Fork: the
+     * Match view with two Autos) the whole match in one side panel: the result, the TIPs, and each
+     * robot's questions, timing and Edit button.
+     */
+    show?: "all" | "bar" | "hive" | "panel" | number;
     /** A robot's panel: its result in words, under its name (lanes.ts robotSummary). */
     summary?: string;
     /** The bar: the match's result in one line (lanes.ts matchResult). */
@@ -72,6 +77,10 @@
     /** The bar's More menu: whether the branches not taken are drawn, faint. */
     untaken?: boolean;
     onUntaken?: (on: boolean) => void;
+    /** The side panel: each robot's result in words, by index (lanes.ts robotSummary). */
+    summaries?: (string | undefined)[];
+    /** The side panel: leave the Match view to edit robot `index`'s Auto. */
+    onEdit?: (index: number) => void;
   }
 
   let {
@@ -85,6 +94,8 @@
     result = null,
     untaken = false,
     onUntaken,
+    summaries = [],
+    onEdit,
   }: Props = $props();
 
   /** The bar's More menu: the what-ifs and views a look seldom needs. */
@@ -118,9 +129,9 @@
 
   const keyOf = (knob: Knob) => `${knob.robot ?? "hive"}:${knob.id}`;
   /** In a side panel: each slider under its name, so it fits a narrow panel. */
-  let stacked = $derived(typeof part === "number");
+  let stacked = $derived(typeof part === "number" || part === "panel");
   /** The panel that runs the search also clears it; a robot's panel only reads it. */
-  let searches = $derived(part === "all" || part === "bar");
+  let searches = $derived(part === "all" || part === "bar" || part === "panel");
 
   // Any change to what is previewed makes the ticks stale.
   $effect(() => {
@@ -429,7 +440,6 @@
 {#snippet robotQuestions(robot: RobotInfo)}
   <!-- Fork: what can happen to one robot in the match: it runs or is a no-show, its INIT picks
        (the Driver Station's rows), and its stops other than the TIPs (whatIfs.ts). -->
-  {@const still = controls.still[robot.file] ?? false}
   <span
     class="flex min-w-0 items-center gap-1 text-[11px] font-medium whitespace-nowrap text-heading"
   >
@@ -439,6 +449,11 @@
     ></span>
     {robot.name}
   </span>
+  {@render robotAnswers(robot)}
+{/snippet}
+
+{#snippet robotAnswers(robot: RobotInfo)}
+  {@const still = controls.still[robot.file] ?? false}
   <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
     <div class="flex gap-1" role="radiogroup" aria-label={`${robot.name} runs`}>
       {#each [false, true] as noShow (noShow)}
@@ -594,47 +609,126 @@
   </section>
 {/snippet}
 
+{#snippet resultHead()}
+  <!-- Fork: the answer first, then the questions that change it (mentor, 17 Nov 2026: the
+       Match view had grown a control for every idea; what is left asks about the match). -->
+  <div class="flex items-center gap-2">
+    <p
+      class="min-w-0 flex-1 text-xs font-semibold text-heading"
+      title="TIPs settled by 30 s, how each robot ends, and whether the two robots touch, in this look"
+    >
+      {#if result}<span
+          class="mr-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
+          >Result</span
+        >{result}{/if}
+    </p>
+    {#if controls.changed}
+      <button
+        type="button"
+        class="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-body hover:text-heading"
+        title="Back to the team's timing, every TIP on its first try, every INIT choice as drawn and every robot running"
+        onclick={() => controls.reset()}>Reset</button
+      >
+    {/if}
+    <Menu label="More" entries={moreEntries} align="end" />
+  </div>
+{/snippet}
+
+{#snippet tippingNote()}
+  {#if tipping.searching || tipping.searched}
+    <p class="text-[10px] text-warning">
+      {tipping.searching
+        ? `Finding tipping points… ${Object.keys(tipping.ticks).length}`
+        : "Tipping points are marked on each robot's timing sliders."}
+    </p>
+  {/if}
+{/snippet}
+
+{#snippet matchPanel()}
+  <!-- Fork: the Match view with two Autos, in the left panel (mentor, 17 Nov 2026): the result,
+       the TIPs, then each robot with everything about it in one block, so the field above the
+       timeline gets the window's height. -->
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-1">
+      {@render resultHead()}
+    </div>
+    <section class="flex flex-col gap-1" aria-label="TIPs">
+      <div class="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
+        {@render tipRows()}
+      </div>
+    </section>
+    {#each robots as robot, index (robot.file)}
+      {@const still = controls.still[robot.file] ?? false}
+      {@const changed = Object.keys(controls.own[robot.file] ?? {}).length}
+      <section
+        class="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-base/60 p-2"
+        aria-label={robot.name}
+      >
+        <header class="flex items-center gap-2">
+          <span
+            class="inline-block size-2.5 shrink-0 rounded-full"
+            style={`background: ${robot.color}`}
+          ></span>
+          <span
+            class="min-w-0 flex-1 truncate text-xs font-semibold text-heading"
+            title={robot.file}>{robot.name}</span
+          >
+          {#if onEdit}
+            <button
+              type="button"
+              class="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[11px] text-body hover:text-heading"
+              title="Leave the Match view and open this Auto in the builder"
+              onclick={() => onEdit(index)}>Edit</button
+            >
+          {/if}
+        </header>
+        {#if summaries[index]}
+          <p class="-mt-1 text-[11px] text-body">{summaries[index]}</p>
+        {/if}
+        {@render robotAnswers(robot)}
+        {#if !still}
+          <details class="group text-[11px]" open={changed > 0 || undefined}>
+            <summary
+              class="cursor-pointer select-none text-body hover:text-heading"
+              title="How long this robot takes to spin up, launch, pick and drive, for this look only. The team's values are in Timing → Facts, outside the Match view."
+            >
+              Robot timing{changed ? ` · ${changed} changed` : ""}
+            </summary>
+            <div class="mt-1.5 flex flex-col gap-1">
+              {#each robotFacts(robot) as fact (fact.id)}
+                {@render slider(
+                  fact,
+                  robotValue(robot, fact),
+                  controls.own[robot.file]?.[fact.id] !== undefined,
+                  (v) => controls.setOwn(robot.file, fact.id, v),
+                  { robot: index, id: fact.id },
+                )}
+              {/each}
+            </div>
+          </details>
+        {/if}
+      </section>
+    {/each}
+    {@render tippingNote()}
+  </div>
+{/snippet}
+
 {#if typeof part === "number"}
   {#if robots[part]}{@render robotPanel(robots[part])}{/if}
+{:else if part === "panel"}
+  {@render matchPanel()}
 {:else if part === "hive"}
   {@render hivePanel()}
 {:else}
   <div class="flex flex-col gap-1.5" bind:clientWidth={width}>
-    <!-- Fork: the answer first, then the questions that change it (mentor, 17 Nov 2026: the
-         Match view had grown a control for every idea; what is left asks about the match). -->
-    <div class="flex items-center gap-2">
-      <p
-        class="min-w-0 flex-1 text-xs font-semibold text-heading"
-        title="TIPs settled by 30 s, how each robot ends, and whether the two robots touch, in this look"
-      >
-        {#if result}<span
-            class="mr-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
-            >Result</span
-          >{result}{/if}
-      </p>
-      {#if controls.changed}
-        <button
-          type="button"
-          class="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-body hover:text-heading"
-          title="Back to the team's timing, every TIP on its first try, every INIT choice as drawn and every robot running"
-          onclick={() => controls.reset()}>Reset</button
-        >
-      {/if}
-      <Menu label="More" entries={moreEntries} align="end" />
-    </div>
+    {@render resultHead()}
     <div class="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
       {@render tipRows()}
       {#each robots as robot (robot.file)}
         {@render robotQuestions(robot)}
       {/each}
     </div>
-    {#if tipping.searching || tipping.searched}
-      <p class="text-[10px] text-warning">
-        {tipping.searching
-          ? `Finding tipping points… ${Object.keys(tipping.ticks).length}`
-          : "Tipping points are marked on each robot's timing sliders."}
-      </p>
-    {/if}
+    {@render tippingNote()}
     {#if part === "bar"}
       <!-- Only the bar: the robots are in the side panels, the HIVE behind its label. -->
     {:else if narrow}

@@ -66,8 +66,11 @@
       (playback.playing || editor.tool === "pen"),
   );
   let leftHidden = $derived(layout.leftHidden || busy);
+  // Fork: the Match view with two Autos has no right panel: its questions are in the left one,
+  // so the field and its timeline get the width (mentor, 17 Nov 2026).
   let rightHidden = $derived(
-    layout.rightHidden ||
+    auto.matchSides ||
+      layout.rightHidden ||
       busy ||
       (Boolean(prefs.settings.autoCollapsePanels) &&
         editor.selectedPathIds.length === 0 &&
@@ -192,12 +195,16 @@
         bind:pixels={fieldPixels}
       />
 
-      <PanelDivider
-        side="right"
-        hidden={rightHidden}
-        onResizeStart={(side, event) => layout.beginResize(side, event)}
-        onRestore={() => layout.show("right")}
-      />
+      {#if auto.matchSides}
+        <div></div>
+      {:else}
+        <PanelDivider
+          side="right"
+          hidden={rightHidden}
+          onResizeStart={(side, event) => layout.beginResize(side, event)}
+          onRestore={() => layout.show("right")}
+        />
+      {/if}
 
       <Inspector
         {prefs}

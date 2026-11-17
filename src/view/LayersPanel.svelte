@@ -63,8 +63,8 @@
 
   <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
     {#if auto.matchSides}
-      <!-- Fork: the Match view with two Autos: the first robot's what-ifs, in place of the builder. -->
-      <MatchSide index={0} />
+      <!-- Fork: the Match view with two Autos: the result and every question, in place of the builder. -->
+      <MatchSide />
     {:else if auto.auto && auto.catalog}
       <!-- Fork: the Auto, in place of the path list; its cards drive the paths. -->
       <div class="flex flex-col">

@@ -10,7 +10,6 @@
   import PathInspector from "./inspector/PathInspector.svelte";
   import SelectionInspector from "./inspector/SelectionInspector.svelte";
   import { useAuto } from "../state/auto.svelte";
-  import MatchSide from "../lib/match/MatchSide.svelte";
   import StepSide from "../lib/simple/StepSide.svelte";
   import StepPanel from "../lib/simple/StepPanel.svelte";
   import {
@@ -79,22 +78,19 @@
       : null,
   );
   let title = $derived(
-    // Fork: in the Match view with two Autos, the right panel is the second robot's what-ifs.
-    auto.matchSides
-      ? "Match"
-      : editor.selectedShape
-        ? "Obstacle"
-        : several
-          ? "Selection"
-          : cardStep || spotCard || simpleStep
-            ? "Step"
-            : selectedGroup
-              ? "Group"
-              : editor.selectedLine
-                ? simpleStep
-                  ? "Step"
-                  : "Path"
-                : "Project",
+    editor.selectedShape
+      ? "Obstacle"
+      : several
+        ? "Selection"
+        : cardStep || spotCard || simpleStep
+          ? "Step"
+          : selectedGroup
+            ? "Group"
+            : editor.selectedLine
+              ? simpleStep
+                ? "Step"
+                : "Path"
+              : "Project",
   );
 </script>
 
@@ -114,9 +110,7 @@
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto px-1 pb-1">
-    {#if auto.matchSides}
-      <MatchSide index={1} />
-    {:else if editor.selectedShape}
+    {#if editor.selectedShape}
       <ObstacleInspector shape={editor.selectedShape} />
     {:else if several}
       <SelectionInspector />
