@@ -1,12 +1,7 @@
 <script lang="ts">
   import type { BasePoint, Settings } from "../types";
   import { FIELD_SIZE, LINE_WIDTH, type ColorScheme } from "../config/defaults";
-  import {
-    currentFilePath,
-    gridSize,
-    showGrid,
-    snapToGrid,
-  } from "../stores";
+  import { currentFilePath, gridSize, showGrid, snapToGrid } from "../stores";
   import { fieldHover, spotPicker } from "../lib/auto/store";
   import {
     pointAt,
@@ -115,7 +110,9 @@
       return new Set(
         overlay.doc.lines
           .filter((line) => !driven.has(line.id))
-          .flatMap((line) => atomicSegments([line]).map((segment) => segment.id)),
+          .flatMap((line) =>
+            atomicSegments([line]).map((segment) => segment.id),
+          ),
       );
     }),
   );
@@ -124,7 +121,9 @@
       const untaken = overlayUntaken[index];
       return new Set(
         overlay.doc.lines
-          .flatMap((line) => atomicSegments([line]).map((segment) => segment.id))
+          .flatMap((line) =>
+            atomicSegments([line]).map((segment) => segment.id),
+          )
           .filter((id) => !untaken.has(id)),
       );
     }),
@@ -480,331 +479,335 @@
 </script>
 
 <main class={[surfaceClass, "flex min-h-0 flex-col gap-2 p-2"]}>
-  {#if auto.auto}<AutoFieldBar {overlays} />{/if}
+  <!-- Fork: in the Match view with two Autos the bar's questions are in the left panel. -->
+  {#if auto.auto && !auto.matchSides}<AutoFieldBar {overlays} />{/if}
   <div
     class="relative flex min-h-0 flex-1 items-center justify-center rounded-xl bg-body/10"
     bind:clientWidth={stageWidth}
     bind:clientHeight={stageHeight}
   >
-    <div class="absolute top-2 left-2 z-50"><ToolRail /></div>
-    <div class="absolute top-2 right-2 z-50"><FieldViewToggles /></div>
+    <!-- Fork: the Match view edits nothing on the field, so its drawing tools step aside. -->
+    {#if !auto.matchSides}
+      <div class="absolute top-2 left-2 z-50"><ToolRail /></div>
+      <div class="absolute top-2 right-2 z-50"><FieldViewToggles /></div>
+    {/if}
 
     <div class="relative">
-    <FieldRuler {x} {y} {pixels} />
-    <div
-      bind:this={element}
-      class="relative overflow-clip rounded-lg bg-base select-none"
-      role="application"
-      style={`width: ${pixels}px; height: ${pixels}px; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; -webkit-touch-callout: none;`}
-      oncontextmenu={onContextMenu}
-    >
-      <FieldMapImage
-        src={fieldMapSrc}
-        fieldMapName={settings.fieldMap}
-        onSettled={() => (loadedFieldMap = fieldMapSrc)}
-      />
-
-      <svg
-        class="pointer-events-none absolute inset-0 z-15"
-        viewBox={`0 0 ${FIELD_SIZE} ${FIELD_SIZE}`}
-        width={pixels}
-        height={pixels}
-        aria-hidden="true"
+      <FieldRuler {x} {y} {pixels} />
+      <div
+        bind:this={element}
+        class="relative overflow-clip rounded-lg bg-base select-none"
+        role="application"
+        style={`width: ${pixels}px; height: ${pixels}px; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; -webkit-touch-callout: none;`}
+        oncontextmenu={onContextMenu}
       >
-        <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
-          {#each doc.fieldPoints as point, i (i)}
-            <circle
-              cx={point.x}
-              cy={point.y}
-              r={(Math.max(0.6, point.radius ?? 2.2) * FIELD_SIZE) / pixels}
-              fill={point.color || FIELD_POINT_COLOR}
-              opacity={Math.max(0, Math.min(1, point.opacity ?? 1))}
-            />
-          {/each}
-        </g>
-      </svg>
+        <FieldMapImage
+          src={fieldMapSrc}
+          fieldMapName={settings.fieldMap}
+          onSettled={() => (loadedFieldMap = fieldMapSrc)}
+        />
 
-      {#if autoActive && auto.auto && auto.catalog}
-        <AutoFieldOverlay
-          auto={auto.auto}
-          catalog={auto.catalog}
-          preview={auto.preview}
+        <svg
+          class="pointer-events-none absolute inset-0 z-15"
+          viewBox={`0 0 ${FIELD_SIZE} ${FIELD_SIZE}`}
+          width={pixels}
+          height={pixels}
+          aria-hidden="true"
+        >
+          <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
+            {#each doc.fieldPoints as point, i (i)}
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={(Math.max(0.6, point.radius ?? 2.2) * FIELD_SIZE) / pixels}
+                fill={point.color || FIELD_POINT_COLOR}
+                opacity={Math.max(0, Math.min(1, point.opacity ?? 1))}
+              />
+            {/each}
+          </g>
+        </svg>
+
+        {#if autoActive && auto.auto && auto.catalog}
+          <AutoFieldOverlay
+            auto={auto.auto}
+            catalog={auto.catalog}
+            preview={auto.preview}
+            {x}
+            {y}
+            focusLine={auto.focusedPark}
+          />
+        {/if}
+
+        {#if editor.tool === "coordinate" && editor.coordinateHover}
+          <div
+            class="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-full rounded bg-black/85 px-2 py-1 text-[11px] font-medium whitespace-nowrap text-white shadow"
+            style={`left: ${x(editor.coordinateHover.x)}px; top: ${y(editor.coordinateHover.y)}px;`}
+          >
+            <span class="mr-1 text-primary">+</span>
+            {editor.coordinateHover.x.toFixed(2)}, {editor.coordinateHover.y.toFixed(
+              2,
+            )}
+          </div>
+        {/if}
+
+        <MathTools
           {x}
           {y}
-          focusLine={auto.focusedPark}
+          fieldElement={element}
+          robotXY={sprite(playback.robotPose).xy}
         />
-      {/if}
 
-      {#if editor.tool === "coordinate" && editor.coordinateHover}
-        <div
-          class="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-full rounded bg-black/85 px-2 py-1 text-[11px] font-medium whitespace-nowrap text-white shadow"
-          style={`left: ${x(editor.coordinateHover.x)}px; top: ${y(editor.coordinateHover.y)}px;`}
-        >
-          <span class="mr-1 text-primary">+</span>
-          {editor.coordinateHover.x.toFixed(2)}, {editor.coordinateHover.y.toFixed(
-            2,
-          )}
-        </div>
-      {/if}
-
-      <MathTools
-        {x}
-        {y}
-        fieldElement={element}
-        robotXY={sprite(playback.robotPose).xy}
-      />
-
-      {#if overlays.active}
-        {#each playback.overlayPoses as pose, index (index)}
-          {@const { xy, heading } = boxSprite(pose)}
+        {#if overlays.active}
+          {#each playback.overlayPoses as pose, index (index)}
+            {@const { xy, heading } = boxSprite(pose)}
+            <RobotSprite
+              {xy}
+              {heading}
+              widthPx={x(settings.rLength)}
+              heightPx={x(settings.rWidth)}
+              {settings}
+              alt="Robot {index + 1}"
+              zIndex={20 - index}
+              arrowZIndex={20 - index}
+              opacity={1 - index * 0.15}
+              arrowId="arrowhead-{index}"
+              onImageSettled={() => (loadedRobotImage = robotImageSrc)}
+            />
+            <RobotFeatures
+              {pose}
+              robot={settings}
+              {pixels}
+              zIndex={20 - index}
+              opacity={1 - index * 0.15}
+            />
+            {#if showTurret}
+              {@const turret = turretAt(
+                pose,
+                auto.overlayTogether.previews.get(overlays.items[index]),
+                overlays.items[index]?.doc.auto?.drawnFor,
+              )}
+              <RobotTurret
+                {pose}
+                turretDeg={turret.deg}
+                aim={turret.aim}
+                {pixels}
+                zIndex={20 - index}
+                opacity={1 - index * 0.15}
+              />
+            {/if}
+          {/each}
+        {:else}
+          {@const { xy, heading } = boxSprite(playback.robotPose)}
           <RobotSprite
             {xy}
             {heading}
             widthPx={x(settings.rLength)}
             heightPx={x(settings.rWidth)}
             {settings}
-            alt="Robot {index + 1}"
-            zIndex={20 - index}
-            arrowZIndex={20 - index}
-            opacity={1 - index * 0.15}
-            arrowId="arrowhead-{index}"
+            alt="Robot"
+            zIndex={20}
+            arrowZIndex={21}
+            arrowId="arrowhead-main"
             onImageSettled={() => (loadedRobotImage = robotImageSrc)}
           />
-          <RobotFeatures
-            {pose}
-            robot={settings}
-            {pixels}
-            zIndex={20 - index}
-            opacity={1 - index * 0.15}
-          />
+          <RobotFeatures pose={playback.robotPose} robot={settings} {pixels} />
           {#if showTurret}
             {@const turret = turretAt(
-              pose,
-              auto.overlayTogether.previews.get(overlays.items[index]),
-              overlays.items[index]?.doc.auto?.drawnFor,
+              playback.robotPose,
+              auto.preview,
+              doc.auto?.drawnFor,
             )}
             <RobotTurret
-              {pose}
+              pose={playback.robotPose}
               turretDeg={turret.deg}
               aim={turret.aim}
               {pixels}
-              zIndex={20 - index}
-              opacity={1 - index * 0.15}
             />
           {/if}
-        {/each}
-      {:else}
-        {@const { xy, heading } = boxSprite(playback.robotPose)}
-        <RobotSprite
-          {xy}
-          {heading}
-          widthPx={x(settings.rLength)}
-          heightPx={x(settings.rWidth)}
-          {settings}
-          alt="Robot"
-          zIndex={20}
-          arrowZIndex={21}
-          arrowId="arrowhead-main"
-          onImageSettled={() => (loadedRobotImage = robotImageSrc)}
-        />
-        <RobotFeatures pose={playback.robotPose} robot={settings} {pixels} />
-        {#if showTurret}
-          {@const turret = turretAt(
-            playback.robotPose,
-            auto.preview,
-            doc.auto?.drawnFor,
-          )}
-          <RobotTurret
-            pose={playback.robotPose}
-            turretDeg={turret.deg}
-            aim={turret.aim}
-            {pixels}
-          />
         {/if}
-      {/if}
 
-      <svg
-        class={[
-          "absolute inset-0 z-30",
-          (editor.tool !== "select" || $spotPicker) && "cursor-crosshair",
-          drag && "cursor-grabbing",
-        ]}
-        viewBox={`0 0 ${FIELD_SIZE} ${FIELD_SIZE}`}
-        width={pixels}
-        height={pixels}
-        role="presentation"
-        onpointerdown={onPointerDown}
-        onpointermove={onPointerMove}
-        onpointerup={onPointerUp}
-        onlostpointercapture={onPointerUp}
-        onpointerleave={() => {
-          editor.coordinateHover = null;
-          fieldHover.set(null);
-        }}
-        ondblclick={onDoubleClick}
-      >
-        <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
-          {#if obstaclesOn}
-            <Obstacles
-              shapes={doc.shapes}
-              selectedId={editor.selectedShape?.id}
-              onShapeDown={onShapePress}
-              onVertexDown={(address, event) => {
-                if (editor.tool !== "select" || address.kind !== "vertex") {
-                  return;
-                }
-                onShapePress(address.shapeId, event);
-                if (event.button === 0) {
-                  beginDrag({ kind: "project", address }, event);
-                }
-              }}
-            />
-          {/if}
+        <svg
+          class={[
+            "absolute inset-0 z-30",
+            (editor.tool !== "select" || $spotPicker) && "cursor-crosshair",
+            drag && "cursor-grabbing",
+          ]}
+          viewBox={`0 0 ${FIELD_SIZE} ${FIELD_SIZE}`}
+          width={pixels}
+          height={pixels}
+          role="presentation"
+          onpointerdown={onPointerDown}
+          onpointermove={onPointerMove}
+          onpointerup={onPointerUp}
+          onlostpointercapture={onPointerUp}
+          onpointerleave={() => {
+            editor.coordinateHover = null;
+            fieldHover.set(null);
+          }}
+          ondblclick={onDoubleClick}
+        >
+          <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
+            {#if obstaclesOn}
+              <Obstacles
+                shapes={doc.shapes}
+                selectedId={editor.selectedShape?.id}
+                onShapeDown={onShapePress}
+                onVertexDown={(address, event) => {
+                  if (editor.tool !== "select" || address.kind !== "vertex") {
+                    return;
+                  }
+                  onShapePress(address.shapeId, event);
+                  if (event.button === 0) {
+                    beginDrag({ kind: "project", address }, event);
+                  }
+                }}
+              />
+            {/if}
 
-          {#if ghost.length >= 3}
-            <path
-              d={polylinePath(ghost, true)}
-              fill={GHOST_COLOR}
-              stroke={GHOST_COLOR}
-              stroke-width={0.5}
-              opacity={0.15}
-              pointer-events="none"
-            />
-          {/if}
-          {#each overlayGhosts as outline, index (index)}
-            {#if outline.length >= 3}
+            {#if ghost.length >= 3}
               <path
-                d={polylinePath(outline, true)}
-                fill={overlays.items[index]?.color ?? GHOST_COLOR}
-                stroke={overlays.items[index]?.color ?? GHOST_COLOR}
+                d={polylinePath(ghost, true)}
+                fill={GHOST_COLOR}
+                stroke={GHOST_COLOR}
                 stroke-width={0.5}
                 opacity={0.15}
                 pointer-events="none"
               />
             {/if}
-          {/each}
-          {#each onionLayers as layer, index (index)}
-            <path
-              d={polylinePath(layer.corners, true)}
-              fill="none"
-              stroke={settings.onionColor || "#dc2626"}
-              stroke-width={0.28}
-              opacity={0.9}
-              pointer-events="none"
-            />
-          {/each}
+            {#each overlayGhosts as outline, index (index)}
+              {#if outline.length >= 3}
+                <path
+                  d={polylinePath(outline, true)}
+                  fill={overlays.items[index]?.color ?? GHOST_COLOR}
+                  stroke={overlays.items[index]?.color ?? GHOST_COLOR}
+                  stroke-width={0.5}
+                  opacity={0.15}
+                  pointer-events="none"
+                />
+              {/if}
+            {/each}
+            {#each onionLayers as layer, index (index)}
+              <path
+                d={polylinePath(layer.corners, true)}
+                fill="none"
+                stroke={settings.onionColor || "#dc2626"}
+                stroke-width={0.28}
+                opacity={0.9}
+                pointer-events="none"
+              />
+            {/each}
 
-          {#if penPreview.length >= 2}
-            <path
-              d={polylinePath(penPreview)}
-              fill="none"
-              stroke={PEN_PREVIEW_COLOR}
-              stroke-width={LINE_WIDTH * 0.9}
-              stroke-dasharray="0.6 0.6"
-              opacity={0.35}
-              pointer-events="none"
-            />
-          {/if}
+            {#if penPreview.length >= 2}
+              <path
+                d={polylinePath(penPreview)}
+                fill="none"
+                stroke={PEN_PREVIEW_COLOR}
+                stroke-width={LINE_WIDTH * 0.9}
+                stroke-dasharray="0.6 0.6"
+                opacity={0.35}
+                pointer-events="none"
+              />
+            {/if}
 
-          {#if overlays.active}
-            {#if auto.overlayUntaken}
+            {#if overlays.active}
+              {#if auto.overlayUntaken}
+                {#each overlays.items as overlay, index (overlay.filePath)}
+                  <PathStrokes
+                    startPoint={overlay.doc.startPoint}
+                    lines={overlay.doc.lines}
+                    idPrefix={`additional-path-${index}-untaken`}
+                    color={overlay.color}
+                    opacity={(settings.pathOpacity || 1) * 0.25}
+                    honorLocked={false}
+                    hidden={union(overlayLinks[index], overlayTaken[index])}
+                  />
+                {/each}
+              {/if}
               {#each overlays.items as overlay, index (overlay.filePath)}
                 <PathStrokes
                   startPoint={overlay.doc.startPoint}
                   lines={overlay.doc.lines}
-                  idPrefix={`additional-path-${index}-untaken`}
+                  idPrefix={`additional-path-${index}-line`}
                   color={overlay.color}
-                  opacity={(settings.pathOpacity || 1) * 0.25}
+                  opacity={(settings.pathOpacity || 1) * (1 - index * 0.1)}
                   honorLocked={false}
-                  hidden={union(overlayLinks[index], overlayTaken[index])}
+                  hidden={union(overlayLinks[index], overlayUntaken[index])}
                 />
               {/each}
-            {/if}
-            {#each overlays.items as overlay, index (overlay.filePath)}
+              {#each overlays.items as overlay, index (overlay.filePath)}
+                <PathMarkers
+                  startPoint={overlay.doc.startPoint}
+                  lines={overlay.doc.lines}
+                  hidden={auto.overlayUntaken
+                    ? overlayLinks[index]
+                    : union(overlayLinks[index], overlayUntaken[index])}
+                  idPrefix={`additional-path-${index}-point`}
+                  color={overlay.color}
+                  radiusScale={0.9}
+                  opacity={0.8}
+                  onPointDown={(address, locked, event) => {
+                    if (overlay.filePath === $currentFilePath) {
+                      onProjectPointDown(address, locked, event);
+                      return;
+                    }
+                    if (editor.tool !== "select") return;
+                    event.stopPropagation();
+                    if (!locked && event.button === 0)
+                      beginDrag({ kind: "overlay", index, address }, event);
+                  }}
+                />
+              {/each}
+            {:else}
+              <!-- In Auto mode the overlay draws the paths; these stay to be clicked. -->
               <PathStrokes
-                startPoint={overlay.doc.startPoint}
-                lines={overlay.doc.lines}
-                idPrefix={`additional-path-${index}-line`}
-                color={overlay.color}
-                opacity={(settings.pathOpacity || 1) * (1 - index * 0.1)}
-                honorLocked={false}
-                hidden={union(overlayLinks[index], overlayUntaken[index])}
+                startPoint={doc.startPoint}
+                lines={doc.lines}
+                idPrefix="line"
+                opacity={autoActive ? 0 : settings.pathOpacity || 1}
+                selectedId={editor.selectedLineId}
+                hidden={auto.hiddenIds}
+                {onSegmentDown}
               />
-            {/each}
-            {#each overlays.items as overlay, index (overlay.filePath)}
+              {#each collisionMarks as mark, index (index)}
+                <path
+                  d={polylinePath(mark.trace)}
+                  fill="none"
+                  stroke={COLLISION_COLOR}
+                  stroke-width={LINE_WIDTH * 2.2}
+                  stroke-linecap="round"
+                  opacity={0.55}
+                  pointer-events="none"
+                />
+                <path
+                  d={polylinePath(mark.footprint, true)}
+                  fill="none"
+                  stroke={COLLISION_COLOR}
+                  stroke-width={0.35}
+                  stroke-dasharray="1 0.6"
+                  pointer-events="none"
+                />
+              {/each}
               <PathMarkers
-                startPoint={overlay.doc.startPoint}
-                lines={overlay.doc.lines}
-                hidden={auto.overlayUntaken
-                  ? overlayLinks[index]
-                  : union(overlayLinks[index], overlayUntaken[index])}
-                idPrefix={`additional-path-${index}-point`}
-                color={overlay.color}
-                radiusScale={0.9}
-                opacity={0.8}
-                onPointDown={(address, locked, event) => {
-                  if (overlay.filePath === $currentFilePath) {
-                    onProjectPointDown(address, locked, event);
-                    return;
-                  }
-                  if (editor.tool !== "select") return;
-                  event.stopPropagation();
-                  if (!locked && event.button === 0)
-                    beginDrag({ kind: "overlay", index, address }, event);
+                startPoint={doc.startPoint}
+                lines={doc.lines}
+                idPrefix="point"
+                selection={{
+                  lineId: editor.selectedLineId,
+                  index: editor.selectedPointIndex,
                 }}
+                showAll={settings.showAllPoints}
+                handlesFor={autoActive ? auto.handleSegments : undefined}
+                hidden={auto.hiddenIds}
+                onPointDown={onProjectPointDown}
               />
-            {/each}
-          {:else}
-            <!-- In Auto mode the overlay draws the paths; these stay to be clicked. -->
-            <PathStrokes
-              startPoint={doc.startPoint}
-              lines={doc.lines}
-              idPrefix="line"
-              opacity={autoActive ? 0 : settings.pathOpacity || 1}
-              selectedId={editor.selectedLineId}
-              hidden={auto.hiddenIds}
-              {onSegmentDown}
-            />
-            {#each collisionMarks as mark, index (index)}
-              <path
-                d={polylinePath(mark.trace)}
-                fill="none"
-                stroke={COLLISION_COLOR}
-                stroke-width={LINE_WIDTH * 2.2}
-                stroke-linecap="round"
-                opacity={0.55}
-                pointer-events="none"
-              />
-              <path
-                d={polylinePath(mark.footprint, true)}
-                fill="none"
-                stroke={COLLISION_COLOR}
-                stroke-width={0.35}
-                stroke-dasharray="1 0.6"
-                pointer-events="none"
-              />
-            {/each}
-            <PathMarkers
-              startPoint={doc.startPoint}
-              lines={doc.lines}
-              idPrefix="point"
-              selection={{
-                lineId: editor.selectedLineId,
-                index: editor.selectedPointIndex,
-              }}
-              showAll={settings.showAllPoints}
-              handlesFor={autoActive ? auto.handleSegments : undefined}
-              hidden={auto.hiddenIds}
-              onPointDown={onProjectPointDown}
-            />
-          {/if}
-        </g>
-      </svg>
+            {/if}
+          </g>
+        </svg>
 
-      {#if !assetsReady}
-        <FieldLoadingOverlay />
-      {/if}
-    </div>
+        {#if !assetsReady}
+          <FieldLoadingOverlay />
+        {/if}
+      </div>
     </div>
   </div>
 
