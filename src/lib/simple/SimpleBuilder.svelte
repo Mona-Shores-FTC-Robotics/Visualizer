@@ -814,6 +814,9 @@
   label: string,
   offer: typeof PALETTE,
 )}
+  <!-- A wait's open Otherwise folds again: a second click draws the way the trigger came. A
+       choice's leg has no such click, since opening the other leg is how it shuts. -->
+  {@const folds = open && step.kind === "wait" && list.length > 0}
   <div
     class={["simple-otherwise mt-1 ml-2", !open && "simple-otherwise--shut"]}
   >
@@ -821,10 +824,12 @@
       type="button"
       class="simple-branch-head"
       aria-expanded={open}
-      title={open
-        ? "Drawn on the field"
-        : "Draw this way on the field, and open it"}
-      onclick={() => !open && show()}
+      title={folds
+        ? "Drawn on the field. Fold it, and draw the way the wait is met"
+        : open
+          ? "Drawn on the field"
+          : "Draw this way on the field, and open it"}
+      onclick={() => (!open ? show() : folds && previewTip(step.cardId, true))}
     >
       <ChevronRight
         class={["size-3 shrink-0 transition-transform", open && "rotate-90"]}
