@@ -124,8 +124,8 @@
         "L-RightUnderHive"
       ],
       "files": [
-        "drafts/r-right-under-hive.pp",
-        "drafts/l-right-under-hive.pp"
+        "r-right-under-hive.pp",
+        "l-right-under-hive.pp"
       ],
       "switches": [
         {
@@ -170,7 +170,7 @@
             "r": "rightunder--00--r",
             "l": "rightunder--00--l"
           },
-          "caption": "Best case \u00b7 2 TIPs \u00b7 R parked at 25.1 s \u00b7 L parked at 26.9 s \u00b7 no contact",
+          "caption": "Best case \u00b7 2 TIPs \u00b7 R parked at 25.0 s \u00b7 L parked at 26.9 s \u00b7 no contact",
           "contact": null
         },
         "01": {
