@@ -1,6 +1,13 @@
 #!/usr/bin/env node
-// Writes the Team Autos page's animations (public/autos.html): public/autos/<id>--<key>.gif, one
-// per scenario that drives differently, and public/autos/manifest.json, which the page reads.
+// Writes the Auto Strategy page's animations (public/autos.html):
+// public/autos/<id>--<key>--<show>--<red|blue>.gif, one per scenario that drives differently, per
+// view (both robots, or one with the other not drawn), per alliance; and
+// public/autos/manifest.json, which the page reads.
+//
+// The frame is the whole field, wall to wall: the field image's own bounds plus a few pixels, with
+// the field square's clipping lifted and everything else on the page hidden. Blue is red turned
+// half a turn about the field's centre (the field is rotationally symmetric, not a mirror), so its
+// frames are the red ones rotated 180°; the clock is drawn after, by ffmpeg, so it stays upright.
 //
 // Each Auto (or pair) is opened from biobuzz master in the Visualizer's dev server, and its
 // switches are derived from the Autos themselves, not picked by hand:
@@ -41,15 +48,24 @@ export const CARDS = [
   {
     id: "lane",
     group: "pair",
-    name: "LeftUnderHive pair",
+    name: "R-LeftUnderHive + L-LeftUnderHive",
     files: ["r-outside-lane.pp", "l-under-hive.pp"],
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
-    use: "L goes under the HIVE, R takes the outside lane · on the Driver Station as R‑OutsideLane and L‑UnderHive until the rename",
+    use: "L goes under the HIVE, R takes the outside lane",
+    note: "Driver Station: R-OutsideLane / L-UnderHive until the rename",
+  },
+  {
+    id: "rightunder",
+    group: "pair",
+    name: "R-RightUnderHive + L-RightUnderHive",
+    files: ["drafts/r-right-under-hive.pp", "drafts/l-right-under-hive.pp"],
+    halves: ["R-RightUnderHive", "L-RightUnderHive"],
+    use: "R goes under the HIVE and makes every fix; L takes the outside lane",
   },
   {
     id: "clockwise",
     group: "pair",
-    name: "Clockwise pair",
+    name: "R-Clockwise + L-Clockwise",
     files: ["r-clockwise.pp", "l-clockwise.pp"],
     halves: ["R-Clockwise", "L-Clockwise"],
     use: "One loop, both robots the same way round",
@@ -57,7 +73,7 @@ export const CARDS = [
   {
     id: "nocross",
     group: "pair",
-    name: "NoCross pair",
+    name: "R-NoCross + L-NoCross",
     files: ["r-no-cross.pp", "l-no-cross.pp"],
     halves: ["R-NoCross", "L-NoCross"],
     use: "Each robot stays on its own end",
@@ -69,30 +85,6 @@ export const CARDS = [
     files: ["r-solo.pp"],
     tag: "Default",
     use: "Partner off the far start by 10 s, parks at the far end",
-  },
-  {
-    id: "r-no-cross",
-    group: "solo",
-    name: "R-NoCross",
-    files: ["r-no-cross.pp"],
-    tag: "Fallback",
-    use: "Partner sits on the far start",
-  },
-  {
-    id: "l-no-cross",
-    group: "solo",
-    name: "L-NoCross",
-    files: ["l-no-cross.pp"],
-    tag: "Fallback",
-    use: "Partner insists on the near start",
-  },
-  {
-    id: "l-assist",
-    group: "trial",
-    name: "L-Assist",
-    files: ["drafts/l-assist.pp"],
-    tag: "Trial",
-    use: "Partner runs its whole route from the near start",
   },
 ];
 const MAX_SWITCHES = 4;
@@ -244,9 +236,9 @@ async function pageLook(look) {
   // drawing's own words ("LEFT up before 9 s, otherwise cross under the HIVE, …").
   const names = v.overlays.active
     ? v.overlays.items.map((o) =>
-        /(^|\/)(biobuzz-)?r-/.test(o.filePath)
+        /(^|\/)(biobuzz-)?((drafts|partners)[-/])?r-/.test(o.filePath)
           ? "R"
-          : /(^|\/)(biobuzz-)?l-/.test(o.filePath)
+          : /(^|\/)(biobuzz-)?((drafts|partners)[-/])?l-/.test(o.filePath)
             ? "L"
             : "",
       )
@@ -265,22 +257,27 @@ async function pageLook(look) {
         );
     }
   });
-  const signature = JSON.stringify(
-    previews.map((p) =>
+  // Each robot's drives (in the overlays' order): a view with one robot drawn changes only when
+  // that robot's do.
+  const robotSignatures = previews.map((p) =>
+    JSON.stringify(
       (p.drives ?? []).map((d) => `${d.pathId}@${d.t0.toFixed(1)}`),
     ),
   );
+  const signature = JSON.stringify(robotSignatures);
   let result;
   if (v.overlays.active) {
     result = a.matchResultLine;
     v.overlays.items.forEach((o) => {
-      const name = o.filePath
+      // As the result line names it ("drafts-r-right-under-hive"), and its side from the Auto's own name.
+      const raw = o.filePath
         .replace(/^.*\//, "")
         .replace(/^biobuzz-/, "")
         .replace(/\.pp$/, "");
+      const name = raw.replace(/^(drafts|partners)-/, "");
       result = result
-        .split(name)
-        .join(name.startsWith("r-") ? "R" : name.startsWith("l-") ? "L" : name);
+        .split(raw)
+        .join(name.startsWith("r-") ? "R" : name.startsWith("l-") ? "L" : raw);
     });
   } else {
     const p = previews[0];
@@ -302,6 +299,7 @@ async function pageLook(look) {
   const contact = v.overlays.active ? (a.matchContactAt ?? null) : null;
   return {
     signature,
+    robotSignatures,
     result,
     did,
     contact,
@@ -399,6 +397,7 @@ async function scenarios(page, card) {
       look,
       contact: seen.contact,
       signature: seen.signature,
+      robotSignatures: seen.robotSignatures,
       caption:
         bits === 0
           ? `Best case · ${seen.result}`
@@ -437,20 +436,36 @@ async function scenarios(page, card) {
 
 // ---- Capture -----------------------------------------------------------------------------------
 
-async function capture(page, card, look, target) {
+/** The ffmpeg filter that draws the clock on frame n (n × STEP tenths of a second). */
+function clockFilter(step, size) {
+  const font = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf";
+  const fontfile = existsSync(font) ? `fontfile=${font}:` : "";
+  const tenths = `n*${step}`;
+  return (
+    `drawtext=${fontfile}text='%{eif\\:floor(${tenths}/10)\\:d}.%{eif\\:mod(${tenths}\\,10)\\:d} s':` +
+    `fontsize=${Math.round(size * 0.042)}:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:` +
+    `x=${Math.round(size * 0.02)}:y=h-th-${Math.round(size * 0.025)}`
+  );
+}
+
+/** Captures one look (`hide`: the overlay index not drawn, or null), red and blue. */
+async function capture(page, card, look, hide, targets) {
   await page.evaluate(pageLook, look);
-  const field = page.locator("svg.absolute.inset-0.z-30").first();
-  const box = await field.boundingBox();
-  if (!box) throw new Error(`${card.id}: no field`);
+  await page.evaluate((h) => {
+    window.__visualizer.overlays.drawHidden = h;
+  }, hide);
+  const box = await page.evaluate(() => window.__gifBox);
   const dir = mkdtempSync(join(tmpdir(), `gif-${card.id}-`));
   const frames = Math.round((AUTO_S * FPS) / SPEED);
+  const step = (AUTO_S * 10) / frames;
+  if (!Number.isInteger(step))
+    throw new Error(`the clock needs whole tenths per frame (${step})`);
   for (let i = 0; i <= frames; i++) {
     const t = (i / frames) * AUTO_S;
     await page.evaluate(async (s) => {
       const p = window.__visualizer.playback;
       if (p.playing) p.toggle();
       p.seek(p.duration > 0 ? Math.min(100, (s / p.duration) * 100) : 0);
-      document.getElementById("gif-clock").textContent = `${s.toFixed(1)} s`;
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r)),
       );
@@ -460,22 +475,26 @@ async function capture(page, card, look, target) {
       clip: box,
     });
   }
-  // Hold the last frame before the loop starts again.
-  execFileSync("ffmpeg", [
-    "-y",
-    "-loglevel",
-    "error",
-    "-framerate",
-    String(FPS),
-    "-i",
-    join(dir, "f%04d.png"),
-    "-vf",
-    `tpad=stop_mode=clone:stop_duration=1.2,scale=${WIDTH}:-1:flags=lanczos,split[a][b];` +
-      "[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
-    "-loop",
-    "0",
-    target,
-  ]);
+  for (const [alliance, target] of Object.entries(targets)) {
+    // Blue: the frame turned half a turn, then the clock. Hold the last frame before the loop.
+    const turn = alliance === "blue" ? "hflip,vflip," : "";
+    execFileSync("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-framerate",
+      String(FPS),
+      "-i",
+      join(dir, "f%04d.png"),
+      "-vf",
+      `${turn}${clockFilter(step, box.width)},tpad=stop_mode=clone:stop_duration=1.2,` +
+        `scale=${WIDTH}:-1:flags=lanczos,split[a][b];` +
+        "[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
+      "-loop",
+      "0",
+      target,
+    ]);
+  }
   rmSync(dir, { recursive: true, force: true });
 }
 
@@ -499,36 +518,43 @@ async function open(browser, card) {
   );
   await page.waitForTimeout(1500);
   await page.keyboard.press("Escape");
-  const field = page.locator("svg.absolute.inset-0.z-30").first();
-  const box = await field.boundingBox();
-  // Hide the editor's tool rails and bars over the field's edges, and draw the match clock.
-  await field.evaluate((el, b) => {
-    const square = el.parentElement;
-    for (const fx of [0.02, 0.5, 0.98])
-      for (const fy of [0.02, 0.5, 0.98])
-        for (const hit of document.elementsFromPoint(
-          b.x + b.width * fx,
-          b.y + b.height * fy,
-        )) {
-          if (square.contains(hit) || hit.contains(square)) break;
-          hit.style.visibility = "hidden";
-        }
-    const clock = document.createElement("div");
-    clock.id = "gif-clock";
-    Object.assign(clock.style, {
-      position: "absolute",
-      left: "8px",
-      bottom: "8px",
-      zIndex: "60",
-      font: "600 22px ui-monospace, Menlo, monospace",
-      color: "#fff",
-      background: "rgba(0,0,0,.65)",
-      padding: "2px 10px",
-      borderRadius: "6px",
-    });
-    square.appendChild(clock);
-  }, box);
+  // The whole field: the field image's bounds, a few pixels out, with the square's clipping
+  // lifted and everything that is not the field (rails, bars, axis labels) hidden.
+  await page.evaluate(() => {
+    const square = document.querySelector(
+      "svg.absolute.inset-0.z-30",
+    ).parentElement;
+    square.style.overflow = "visible";
+    for (const el of document.body.querySelectorAll("*"))
+      if (!el.contains(square) && !square.contains(el))
+        el.style.visibility = "hidden";
+    const field = [...square.children].find(
+      (c) =>
+        c.tagName === "IMG" && /fields\//.test(c.getAttribute("src") ?? ""),
+    );
+    const b = field.getBoundingClientRect();
+    const m = 4;
+    window.__gifBox = {
+      x: Math.floor(b.x - m),
+      y: Math.floor(b.y - m),
+      width: Math.ceil(b.width + 2 * m),
+      height: Math.ceil(b.height + 2 * m),
+    };
+  });
   return page;
+}
+
+/** Which overlay draws each of the card's files (index in overlays.items). */
+async function overlayIndexes(page, card) {
+  return page.evaluate(
+    (files) =>
+      files.map((f) =>
+        window.__visualizer.overlays.items.findIndex((o) =>
+          o.filePath.endsWith(f.replace(/^.*\//, "")),
+        ),
+      ),
+    card.files,
+  );
 }
 
 const browser = await chromium.launch();
@@ -541,31 +567,52 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
   const page = await open(browser, card);
   const { switches, looks } = await scenarios(page, card);
   if (process.env.DRY) console.log(card.id, JSON.stringify(switches));
-  const gifs = {};
-  const bySignature = new Map();
-  for (const l of looks) {
-    let gif = bySignature.get(l.signature);
-    if (!gif) {
-      gif = `${card.id}--${l.key}.gif`;
-      bySignature.set(l.signature, gif);
-      const keep = KEEP_GIFS && existsSync(join(OUT, gif));
-      if (!process.env.DRY && !keep)
-        await capture(page, card, l.look, join(OUT, gif));
-      if (!process.env.DRY)
-        console.log(
-          `${gif}: ${(statSync(join(OUT, gif)).size / 1024).toFixed(0)} KB · ${l.caption}`,
-        );
-    }
-    gifs[l.key] = {
-      gif,
+  const pair = card.files.length > 1;
+  const index = pair ? await overlayIndexes(page, card) : [0];
+  if (pair && index.some((i) => i < 0))
+    throw new Error(`${card.id}: an overlay is missing (${index})`);
+  // Views: both robots; for a pair, also R alone and L alone (the other not drawn). A view shares a
+  // GIF with every look whose drawn robots drive the same.
+  const views = pair
+    ? [
+        { show: "both", hide: null, sig: (l) => l.signature },
+        { show: "r", hide: index[1], sig: (l) => l.robotSignatures[index[0]] },
+        { show: "l", hide: index[0], sig: (l) => l.robotSignatures[index[1]] },
+      ]
+    : [{ show: "both", hide: null, sig: (l) => l.signature }];
+  const scenarios_ = {};
+  for (const l of looks)
+    scenarios_[l.key] = {
+      gif: {},
       caption: l.caption,
       contact: l.contact,
       ...(l.warn.length ? { warn: l.warn } : {}),
     };
-    if (process.env.DRY) console.log(card.id, l.key, gif, l.caption);
+  for (const view of views) {
+    const seen = new Map();
+    for (const l of looks) {
+      let base = seen.get(view.sig(l));
+      if (!base) {
+        base = `${card.id}--${l.key}--${view.show}`;
+        seen.set(view.sig(l), base);
+        const targets = {
+          red: join(OUT, `${base}--red.gif`),
+          blue: join(OUT, `${base}--blue.gif`),
+        };
+        const keep =
+          KEEP_GIFS && Object.values(targets).every((t) => existsSync(t));
+        if (!process.env.DRY && !keep)
+          await capture(page, card, l.look, view.hide, targets);
+        if (!process.env.DRY)
+          console.log(
+            `${base}: ${(statSync(targets.red).size / 1024).toFixed(0)} + ${(statSync(targets.blue).size / 1024).toFixed(0)} KB · ${l.caption}`,
+          );
+      }
+      scenarios_[l.key].gif[view.show] = base;
+    }
   }
   const { files, ...rest } = card;
-  manifest.cards.push({ ...rest, files, switches, scenarios: gifs });
+  manifest.cards.push({ ...rest, files, switches, scenarios: scenarios_ });
   await page.close();
 }
 await browser.close();
@@ -574,7 +621,14 @@ if (!ONLY?.length) {
   // Drop GIFs no scenario names any more.
   if (process.env.DRY) process.exit(0);
   const keep = new Set(
-    manifest.cards.flatMap((c) => Object.values(c.scenarios).map((s) => s.gif)),
+    manifest.cards.flatMap((c) =>
+      Object.values(c.scenarios).flatMap((s) =>
+        Object.values(s.gif).flatMap((b) => [
+          `${b}--red.gif`,
+          `${b}--blue.gif`,
+        ]),
+      ),
+    ),
   );
   for (const f of readdirSync(OUT))
     if (f.endsWith(".gif") && !keep.has(f)) unlinkSync(join(OUT, f));

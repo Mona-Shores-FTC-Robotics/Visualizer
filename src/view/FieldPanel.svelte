@@ -571,41 +571,43 @@
 
         {#if overlays.active}
           {#each playback.overlayPoses as pose, index (index)}
-            {@const { xy, heading } = boxSprite(pose)}
-            <RobotSprite
-              {xy}
-              {heading}
-              widthPx={x(settings.rLength)}
-              heightPx={x(settings.rWidth)}
-              {settings}
-              alt="Robot {index + 1}"
-              zIndex={20 - index}
-              arrowZIndex={20 - index}
-              opacity={1 - index * 0.15}
-              arrowId="arrowhead-{index}"
-              onImageSettled={() => (loadedRobotImage = robotImageSrc)}
-            />
-            <RobotFeatures
-              {pose}
-              robot={settings}
-              {pixels}
-              zIndex={20 - index}
-              opacity={1 - index * 0.15}
-            />
-            {#if showTurret}
-              {@const turret = turretAt(
-                pose,
-                auto.overlayTogether.previews.get(overlays.items[index]),
-                overlays.items[index]?.doc.auto?.drawnFor,
-              )}
-              <RobotTurret
+            {#if overlays.drawHidden !== index}
+              {@const { xy, heading } = boxSprite(pose)}
+              <RobotSprite
+                {xy}
+                {heading}
+                widthPx={x(settings.rLength)}
+                heightPx={x(settings.rWidth)}
+                {settings}
+                alt="Robot {index + 1}"
+                zIndex={20 - index}
+                arrowZIndex={20 - index}
+                opacity={1 - index * 0.15}
+                arrowId="arrowhead-{index}"
+                onImageSettled={() => (loadedRobotImage = robotImageSrc)}
+              />
+              <RobotFeatures
                 {pose}
-                turretDeg={turret.deg}
-                aim={turret.aim}
+                robot={settings}
                 {pixels}
                 zIndex={20 - index}
                 opacity={1 - index * 0.15}
               />
+              {#if showTurret}
+                {@const turret = turretAt(
+                  pose,
+                  auto.overlayTogether.previews.get(overlays.items[index]),
+                  overlays.items[index]?.doc.auto?.drawnFor,
+                )}
+                <RobotTurret
+                  {pose}
+                  turretDeg={turret.deg}
+                  aim={turret.aim}
+                  {pixels}
+                  zIndex={20 - index}
+                  opacity={1 - index * 0.15}
+                />
+              {/if}
             {/if}
           {/each}
         {:else}
@@ -687,7 +689,7 @@
               />
             {/if}
             {#each overlayGhosts as outline, index (index)}
-              {#if outline.length >= 3}
+              {#if outline.length >= 3 && overlays.drawHidden !== index}
                 <path
                   d={polylinePath(outline, true)}
                   fill={overlays.items[index]?.color ?? GHOST_COLOR}
@@ -724,50 +726,56 @@
             {#if overlays.active}
               {#if auto.overlayUntaken}
                 {#each overlays.items as overlay, index (overlay.filePath)}
-                  <PathStrokes
-                    startPoint={overlay.doc.startPoint}
-                    lines={overlay.doc.lines}
-                    idPrefix={`additional-path-${index}-untaken`}
-                    color={overlay.color}
-                    opacity={(settings.pathOpacity || 1) * 0.25}
-                    honorLocked={false}
-                    hidden={union(overlayLinks[index], overlayTaken[index])}
-                  />
+                  {#if overlays.drawHidden !== index}
+                    <PathStrokes
+                      startPoint={overlay.doc.startPoint}
+                      lines={overlay.doc.lines}
+                      idPrefix={`additional-path-${index}-untaken`}
+                      color={overlay.color}
+                      opacity={(settings.pathOpacity || 1) * 0.25}
+                      honorLocked={false}
+                      hidden={union(overlayLinks[index], overlayTaken[index])}
+                    />
+                  {/if}
                 {/each}
               {/if}
               {#each overlays.items as overlay, index (overlay.filePath)}
-                <PathStrokes
-                  startPoint={overlay.doc.startPoint}
-                  lines={overlay.doc.lines}
-                  idPrefix={`additional-path-${index}-line`}
-                  color={overlay.color}
-                  opacity={(settings.pathOpacity || 1) * (1 - index * 0.1)}
-                  honorLocked={false}
-                  hidden={union(overlayLinks[index], overlayUntaken[index])}
-                />
+                {#if overlays.drawHidden !== index}
+                  <PathStrokes
+                    startPoint={overlay.doc.startPoint}
+                    lines={overlay.doc.lines}
+                    idPrefix={`additional-path-${index}-line`}
+                    color={overlay.color}
+                    opacity={(settings.pathOpacity || 1) * (1 - index * 0.1)}
+                    honorLocked={false}
+                    hidden={union(overlayLinks[index], overlayUntaken[index])}
+                  />
+                {/if}
               {/each}
               {#each overlays.items as overlay, index (overlay.filePath)}
-                <PathMarkers
-                  startPoint={overlay.doc.startPoint}
-                  lines={overlay.doc.lines}
-                  hidden={auto.overlayUntaken
-                    ? overlayLinks[index]
-                    : union(overlayLinks[index], overlayUntaken[index])}
-                  idPrefix={`additional-path-${index}-point`}
-                  color={overlay.color}
-                  radiusScale={0.9}
-                  opacity={0.8}
-                  onPointDown={(address, locked, event) => {
-                    if (overlay.filePath === $currentFilePath) {
-                      onProjectPointDown(address, locked, event);
-                      return;
-                    }
-                    if (editor.tool !== "select") return;
-                    event.stopPropagation();
-                    if (!locked && event.button === 0)
-                      beginDrag({ kind: "overlay", index, address }, event);
-                  }}
-                />
+                {#if overlays.drawHidden !== index}
+                  <PathMarkers
+                    startPoint={overlay.doc.startPoint}
+                    lines={overlay.doc.lines}
+                    hidden={auto.overlayUntaken
+                      ? overlayLinks[index]
+                      : union(overlayLinks[index], overlayUntaken[index])}
+                    idPrefix={`additional-path-${index}-point`}
+                    color={overlay.color}
+                    radiusScale={0.9}
+                    opacity={0.8}
+                    onPointDown={(address, locked, event) => {
+                      if (overlay.filePath === $currentFilePath) {
+                        onProjectPointDown(address, locked, event);
+                        return;
+                      }
+                      if (editor.tool !== "select") return;
+                      event.stopPropagation();
+                      if (!locked && event.button === 0)
+                        beginDrag({ kind: "overlay", index, address }, event);
+                    }}
+                  />
+                {/if}
               {/each}
             {:else}
               <!-- In Auto mode the overlay draws the paths; these stay to be clicked. -->

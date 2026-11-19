@@ -34,6 +34,11 @@ export class Overlays {
     ),
   );
   active = $derived(this.items.length > 0);
+  /**
+   * The overlay (by index) not drawn on the field: robot, paths and points. It still runs in the
+   * match. Only scripts/make-auto-gifs.mjs sets it, through the dev server's window.__visualizer.
+   */
+  drawHidden = $state<number | null>(null);
 
   #project: ProjectStore;
   #getSettings: () => Settings;
