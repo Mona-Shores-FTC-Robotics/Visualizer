@@ -41,10 +41,10 @@ export const CARDS = [
   {
     id: "lane",
     group: "pair",
-    name: "Lane pair",
+    name: "LeftUnderHive pair",
     files: ["r-outside-lane.pp", "l-under-hive.pp"],
-    halves: ["R-OutsideLane", "L-UnderHive"],
-    use: "Both our robots",
+    halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
+    use: "L goes under the HIVE, R takes the outside lane · on the Driver Station as R‑OutsideLane and L‑UnderHive until the rename",
   },
   {
     id: "clockwise",
@@ -52,7 +52,7 @@ export const CARDS = [
     name: "Clockwise pair",
     files: ["r-clockwise.pp", "l-clockwise.pp"],
     halves: ["R-Clockwise", "L-Clockwise"],
-    use: "Both our robots · 20245 as R",
+    use: "One loop, both robots the same way round",
   },
   {
     id: "nocross",
@@ -60,7 +60,7 @@ export const CARDS = [
     name: "NoCross pair",
     files: ["r-no-cross.pp", "l-no-cross.pp"],
     halves: ["R-NoCross", "L-NoCross"],
-    use: "Both our robots, simplest",
+    use: "Each robot stays on its own end",
   },
   {
     id: "r-solo",
