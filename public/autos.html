@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Team Autos</title>
+<title>Auto Strategy</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <style>
 /* Every biobuzz Auto on master, as an animation with its switches: flip a TIP or an INIT choice
@@ -64,7 +64,7 @@ section > h2{margin:0;font-size:20px}
 .seg button[aria-pressed="true"]{background:var(--seg-on);color:var(--seg-on-ink);box-shadow:0 1px 2px rgba(0,0,0,.18)}
 .seg button.off[aria-pressed="true"]{background:#c9472f;color:#fff}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-@media (max-width:480px){.sw{grid-template-columns:1fr;gap:4px}.seg button{white-space:normal;line-height:1.25}}
+@media (max-width:480px){.sw:not(.alliance){grid-template-columns:1fr;gap:4px}.seg button{white-space:normal;line-height:1.25}}
 .actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px 16px}
 .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:38px;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;background:var(--seg);color:var(--ink);border:1px solid var(--line)}
 .btn.primary{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -82,6 +82,13 @@ section > h2{margin:0;font-size:20px}
 .brand .ir{background:linear-gradient(90deg,#B0101E,#FF6A00)}
 .brand .uv{background:linear-gradient(90deg,#3A0CA3,#B14EFF)}
 .brand h1{margin:0;font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
+.titlebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
+.alliance{grid-template-columns:auto 12em}
+.alliance button[data-alliance="red"][aria-pressed="true"]{background:#c62828;color:#fff}
+.alliance button[data-alliance="blue"][aria-pressed="true"]{background:#1f5fd6;color:#fff}
+.seg.three{grid-template-columns:repeat(3,1fr)}
+.sw.view{padding-bottom:4px;border-bottom:1px dashed var(--line);margin-bottom:2px}
+.ds{flex-basis:100%;margin:0;color:var(--muted);font-size:12px;font-style:italic}
 </style>
 </head>
 <body>
@@ -91,12 +98,16 @@ section > h2{margin:0;font-size:20px}
     <span class="team ir"><b>19429</b> INFRARED</span>
     <span class="team uv"><b>20245</b> ULTRAVIOLET</span>
   </div>
-  <h1>Auto Strategy</h1>
+  <div class="titlebar">
+    <h1>Auto Strategy</h1>
+    <div class="sw alliance" role="group" aria-label="Alliance"><span>Alliance</span>
+      <div class="seg"><button type="button" data-alliance="red" aria-pressed="true">Red</button><button type="button" data-alliance="blue" aria-pressed="false">Blue</button></div>
+    </div>
+  </div>
 </header>
 
 <section id="pair"><h2>Pairs</h2><div class="grid"></div></section>
 <section id="solo"><h2>Solo Autos</h2><p class="lead">One robot, beside any partner.</p><div class="grid"></div></section>
-<section id="trial"><h2>Utility trials</h2><p class="lead">On the Utility menu, until they have run on the robot.</p><div class="grid"></div></section>
 
 <section>
   <h2>Drafts</h2>
@@ -110,13 +121,30 @@ section > h2{margin:0;font-size:20px}
   <div class="list" id="partners"><span class="note">Loading…</span></div>
 </section>
 
-<p class="note" id="foot">Animations: the Visualizer's preview, played from <code>scripts/make-auto-gifs.mjs</code>. A TIP that misses is its first volley missing; a fix can still TIP it.</p>
+<p class="note" id="foot">Animations: the Visualizer's preview, played from <code>scripts/make-auto-gifs.mjs</code>. A TIP that misses is its first volley missing; a fix can still TIP it. A red dot marks the pick that makes the robots touch, with the TIPs as set. Blue is the red match turned half a turn about the field's centre.</p>
 </div>
 
 <script>
 const T = p => "./#team=master/" + p;
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const ROBOT = f => f.replace(/^.*\//, "").replace(/\.pp$/, "").replace(/(^|-)([a-z])/g, (_, d, c) => d + c.toUpperCase());
+const VIEWS = [["both", "Both"], ["r", "R"], ["l", "L"]];
+/** Red or Blue for every card, remembered in this browser. */
+let alliance = "red";
+try { if (localStorage.getItem("autos-alliance") === "blue") alliance = "blue"; } catch (e) {}
+const shows = [];
+function setAlliance(a) {
+  alliance = a;
+  try { localStorage.setItem("autos-alliance", a); } catch (e) {}
+  document.querySelectorAll("button[data-alliance]").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.alliance === a)));
+  shows.forEach(f => f());
+}
+document.querySelector(".alliance").addEventListener("click", e => {
+  const b = e.target.closest("button[data-alliance]");
+  if (b) setAlliance(b.dataset.alliance);
+});
+setAlliance(alliance);
 const preloaded = new Set();
 function preload(src) { if (!preloaded.has(src)) { preloaded.add(src); const i = new Image(); i.src = src; } }
 
@@ -135,16 +163,21 @@ function captionHtml(text) {
 function renderCard(card) {
   const el = document.createElement("article");
   el.className = "card";
+  const pair = card.files.length > 1;
   const tagClass = card.tag === "Trial" ? " trial" : card.tag === "Fallback" ? " fallback" : "";
   const halves = card.files.length > 1
     ? card.files.map((f, i) => `<a class="btn" href="${T(f)}">${esc(card.halves?.[i] ?? ROBOT(f))}</a>`).join("") : "";
   el.innerHTML = `
     <div class="top"><h3>${esc(card.name)}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}
-      ${card.use ? `<p class="use">${esc(card.use)}</p>` : ""}</div>
+      ${card.use ? `<p class="use">${esc(card.use)}</p>` : ""}${card.note ? `<p class="ds">${esc(card.note)}</p>` : ""}</div>
     <a class="shot" href="${T(card.files.join(","))}" aria-label="Open ${esc(card.name)} in the Visualizer">
       <img alt="" width="480" height="480" loading="lazy" decoding="async"></a>
     <p class="caption" aria-live="polite"></p>
-    <div class="switches">${card.switches.map((s, i) => `
+    <div class="switches">${pair ? `
+      <div class="sw view" role="group" aria-label="Show"><span>Show</span>
+        <div class="seg three">${VIEWS.map(([v, label]) =>
+          `<button type="button" data-view="${v}" aria-pressed="${v === "both"}">${esc(label)}</button>`).join("")}</div>
+      </div>` : ""}${card.switches.map((s, i) => `
       <div class="sw" role="group" aria-label="${esc(s.label)}"><span>${esc(s.label)}</span>
         <div class="seg">${s.options.map((o, j) =>
           `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}<span class="dot" hidden title="Touches the partner here"></span></button>`).join("")}</div>
@@ -153,35 +186,48 @@ function renderCard(card) {
   const img = el.querySelector("img");
   const cap = el.querySelector(".caption");
   const state = card.switches.map(() => 0);
+  let view = "both";
   const keyOf = st => st.join("") || "0";
+  const src = (sc, v = view, a = alliance) => `autos/${sc.gif[v] ?? sc.gif.both}--${a}.gif`;
   const show = () => {
     const sc = card.scenarios[keyOf(state)];
-    img.src = "autos/" + sc.gif;
+    img.src = src(sc);
     img.alt = `${card.name}: ${sc.caption}`;
     cap.innerHTML = captionHtml(sc.caption);
     // A dot on the pick that touches the partner with the other switches as they are.
     const warn = new Set(sc.warn ?? []);
-    el.querySelectorAll(".seg button").forEach(b => {
+    el.querySelectorAll("button[data-i]").forEach(b => {
       b.setAttribute("aria-pressed", String(state[+b.dataset.i] === +b.dataset.j));
       const risky = warn.has(`${b.dataset.i}:${b.dataset.j}`);
       b.querySelector(".dot").hidden = !risky;
       b.setAttribute("aria-label", b.firstChild.textContent + (risky ? " (touches the partner)" : ""));
       b.title = risky ? "With these settings, this pick touches the partner" : "";
     });
-    // The one-flip neighbours, so the next switch swaps at once.
+    el.querySelectorAll("button[data-view]").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  };
+  // Only the shown GIF loads; its one-flip neighbours (each switch, each view) load once a pointer
+  // or the keyboard comes to the card, so the next flip swaps at once.
+  const neighbours = () => {
+    const sc = card.scenarios[keyOf(state)];
     state.forEach((_, i) => {
       const next = state.slice(); next[i] = 1 - next[i];
       const n = card.scenarios[keyOf(next)];
-      if (n) preload("autos/" + n.gif);
+      if (n) preload(src(n));
     });
+    if (pair) VIEWS.forEach(([v]) => preload(src(sc, v)));
   };
+  el.addEventListener("pointerenter", neighbours);
+  el.addEventListener("focusin", neighbours);
   el.querySelector(".switches").addEventListener("click", e => {
+    const v = e.target.closest("button[data-view]");
+    if (v) view = v.dataset.view;
     const b = e.target.closest("button[data-i]");
-    if (!b) return;
-    state[+b.dataset.i] = +b.dataset.j;
-    show();
+    if (b) state[+b.dataset.i] = +b.dataset.j;
+    if (v || b) { show(); neighbours(); }
   });
   show();
+  shows.push(show);
   return el;
 }
 
