@@ -14,17 +14,19 @@
   --bg:#f4f5f7; --panel:#ffffff; --ink:#15181d; --muted:#5d6470; --line:#dcdfe5;
   --accent:#2f6fde; --accent-ink:#ffffff; --seg:#eceff4; --seg-on:#ffffff; --seg-on-ink:#15181d;
   --tag:#e8f0fd; --tag-ink:#1f4fa8; --trial:#fbe9cf; --trial-ink:#8a5a12; --fb:#ece7fb; --fb-ink:#5a3fb0;
-  --field:#2b2b2b;
+  --field:#2b2b2b; --warn-bg:#fde8e4; --warn-ink:#a3220e; --warn-line:#f2b8ad; --warn-dot:#d9381e;
   --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
   --accent:#6ea0ff; --accent-ink:#0d1117; --seg:#11151a; --seg-on:#2c3440; --seg-on-ink:#ffffff;
-  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff; color-scheme:dark}}
+  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff;
+  --warn-bg:#3a1a14; --warn-ink:#ffb4a3; --warn-line:#6b2a1e; --warn-dot:#ff7a5c; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
   --accent:#6ea0ff; --accent-ink:#0d1117; --seg:#11151a; --seg-on:#2c3440; --seg-on-ink:#ffffff;
-  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff; color-scheme:dark}
+  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff;
+  --warn-bg:#3a1a14; --warn-ink:#ffb4a3; --warn-line:#6b2a1e; --warn-dot:#ff7a5c; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
@@ -49,6 +51,11 @@ section > h2{margin:0;font-size:20px}
 .shot img{display:block;width:100%;height:100%;object-fit:cover}
 .caption{margin:0;padding:10px 16px;font-size:13.5px;border-bottom:1px solid var(--line);min-height:3.6em}
 .caption b{font-weight:700}
+.contact{display:inline-block;font-weight:700;font-size:12.5px;padding:1px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);white-space:nowrap}
+.quiet{color:var(--muted)}
+.legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn-dot);vertical-align:1px}
+.seg button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn-dot);margin-left:6px;vertical-align:1px}
+.seg button .dot[hidden]{display:none}
 .switches{display:grid;gap:8px;padding:12px 16px 4px}
 .sw{display:grid;grid-template-columns:7.5em 1fr;align-items:center;gap:10px}
 .sw > span{font-size:13px;font-weight:700;color:var(--muted)}
@@ -57,6 +64,7 @@ section > h2{margin:0;font-size:20px}
 .seg button[aria-pressed="true"]{background:var(--seg-on);color:var(--seg-on-ink);box-shadow:0 1px 2px rgba(0,0,0,.18)}
 .seg button.off[aria-pressed="true"]{background:#c9472f;color:#fff}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:480px){.sw{grid-template-columns:1fr;gap:4px}.seg button{white-space:normal;line-height:1.25}}
 .actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px 16px}
 .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:38px;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;background:var(--seg);color:var(--ink);border:1px solid var(--line)}
 .btn.primary{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -79,7 +87,7 @@ section > h2{margin:0;font-size:20px}
   <a class="open-vis" href="./">Open the Visualizer →</a>
 </header>
 
-<section id="pair"><h2>Pairs</h2><p class="lead">Both our robots on one alliance.</p><div class="grid"></div></section>
+<section id="pair"><h2>Pairs</h2><p class="lead">Both our robots on one alliance. A <span class="legend-dot" aria-hidden="true"></span> marks the pick that makes them touch, with the TIPs as set.</p><div class="grid"></div></section>
 <section id="solo"><h2>Solo Autos</h2><p class="lead">One of ours beside any partner.</p><div class="grid"></div></section>
 <section id="trial"><h2>Utility trials</h2><p class="lead">On the Utility menu, until they have run on the robot.</p><div class="grid"></div></section>
 
@@ -105,10 +113,16 @@ const ROBOT = f => f.replace(/^.*\//, "").replace(/\.pp$/, "").replace(/(^|-)([a
 const preloaded = new Set();
 function preload(src) { if (!preloaded.has(src)) { preloaded.add(src); const i = new Image(); i.src = src; } }
 
-/** A caption: "Best case" or the drawing's own words in bold, then the result. */
+/** The result: contact as a warning badge, "no contact" quietly. */
+function resultHtml(text) {
+  return esc(text)
+    .replace(/ · no contact$/, ' · <span class="quiet">no contact</span>')
+    .replace(/contact at ([\d.]+) s/, '<span class="contact">⚠ contact $1 s</span>');
+}
+/** A caption: "Best case" or what changed in bold, then the result. */
 function captionHtml(text) {
   const m = text.match(/^(Best case) · (.*)$/) || text.match(/^(.*?)\. (\d+ TIPs?.*)$/);
-  return m ? `<b>${esc(m[1])}.</b> ${esc(m[2])}` : esc(text);
+  return m ? `<b>${esc(m[1])}.</b> ${resultHtml(m[2])}` : resultHtml(text);
 }
 
 function renderCard(card) {
@@ -126,7 +140,7 @@ function renderCard(card) {
     <div class="switches">${card.switches.map((s, i) => `
       <div class="sw" role="group" aria-label="${esc(s.label)}"><span>${esc(s.label)}</span>
         <div class="seg">${s.options.map((o, j) =>
-          `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}</button>`).join("")}</div>
+          `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}<span class="dot" hidden title="Touches the partner here"></span></button>`).join("")}</div>
       </div>`).join("")}</div>
     <div class="actions"><a class="btn primary" href="${T(card.files.join(","))}">${card.files.length > 1 ? "Open the pair" : "Open"}</a>${halves}</div>`;
   const img = el.querySelector("img");
@@ -138,8 +152,15 @@ function renderCard(card) {
     img.src = "autos/" + sc.gif;
     img.alt = `${card.name}: ${sc.caption}`;
     cap.innerHTML = captionHtml(sc.caption);
-    el.querySelectorAll(".seg button").forEach(b =>
-      b.setAttribute("aria-pressed", String(state[+b.dataset.i] === +b.dataset.j)));
+    // A dot on the pick that touches the partner with the other switches as they are.
+    const warn = new Set(sc.warn ?? []);
+    el.querySelectorAll(".seg button").forEach(b => {
+      b.setAttribute("aria-pressed", String(state[+b.dataset.i] === +b.dataset.j));
+      const risky = warn.has(`${b.dataset.i}:${b.dataset.j}`);
+      b.querySelector(".dot").hidden = !risky;
+      b.setAttribute("aria-label", b.firstChild.textContent + (risky ? " (touches the partner)" : ""));
+      b.title = risky ? "With these settings, this pick touches the partner" : "";
+    });
     // The one-flip neighbours, so the next switch swaps at once.
     state.forEach((_, i) => {
       const next = state.slice(); next[i] = 1 - next[i];
