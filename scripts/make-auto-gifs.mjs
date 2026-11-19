@@ -17,8 +17,10 @@
 // Run with the dev server up:   pnpm dev --port 5179 &   node scripts/make-auto-gifs.mjs
 // It reads the app through window.__visualizer, which App.svelte sets on the dev server only.
 // Needs Playwright and ffmpeg. Options: --base URL  --only lane,r-solo  --fps 10  --speed 3  --width 480
+// --keep-gifs (rewrite the manifest; capture only the GIFs that are missing)
 import { execFileSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -104,6 +106,8 @@ const BASE = arg("base", "http://localhost:5179/");
 const FPS = Number(arg("fps", "10"));
 const SPEED = Number(arg("speed", "3"));
 const WIDTH = Number(arg("width", "480"));
+// --keep-gifs: rewrite the manifest, and capture only GIFs that are not there yet.
+const KEEP_GIFS = process.argv.includes("--keep-gifs");
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
 const OUT = new URL("../public/autos/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -221,6 +225,21 @@ async function pageLook(look) {
     : [a.auto]
   ).forEach((x) => walk(x?.cards));
   for (const id of Object.keys(waits)) if (!branching.has(id)) delete waits[id];
+  // Waits that ask about a CELL: only their "otherwise" words describe a fallback (a hold or a
+  // route choice's leg has words of its own that do not read as one).
+  const cellWaits = new Set();
+  const walkCells = (cards) => {
+    for (const c of cards ?? []) {
+      if (c.kind !== "firstOf") continue;
+      if (!c.choice && c.rows.some((r) => r.when?.some((w) => /Cell/.test(w))))
+        cellWaits.add(c.id);
+      for (const r of c.rows) walkCells(r.cards);
+    }
+  };
+  (v.overlays.active
+    ? v.overlays.items.map((o) => o.doc.auto)
+    : [a.auto]
+  ).forEach((x) => walkCells(x?.cards));
   // What the robots did differently: each wait that timed out says what it does then, in the
   // drawing's own words ("LEFT up before 9 s, otherwise cross under the HIVE, …").
   const names = v.overlays.active
@@ -236,6 +255,7 @@ async function pageLook(look) {
   previews.forEach((p, pi) => {
     for (const e of p.log ?? []) {
       if (e.kind !== "row" || / true\)$/.test(e.text)) continue;
+      if (!cellWaits.has(e.cardId)) continue;
       const m = e.text.match(/otherwise (.+?) → /);
       if (m)
         did.push(
@@ -279,7 +299,15 @@ async function pageLook(look) {
   const tipRows = [...document.querySelectorAll("span")]
     .filter((s) => /^TIP \d+ comes on$/.test(s.textContent.trim()))
     .map((s) => Number(s.textContent.match(/\d+/)[0]));
-  return { signature, result, did, waits, tipRows: [...new Set(tipRows)] };
+  const contact = v.overlays.active ? (a.matchContactAt ?? null) : null;
+  return {
+    signature,
+    result,
+    did,
+    contact,
+    waits,
+    tipRows: [...new Set(tipRows)],
+  };
 }
 
 // ---- Scenarios ---------------------------------------------------------------------------------
@@ -356,10 +384,20 @@ async function scenarios(page, card) {
       else look.tips[s.tip] = !flip;
     });
     const seen = await page.evaluate(pageLook, look);
-    const did = [...new Set(seen.did)].join("; ");
+    // A choice made says itself ("Pickup: Garden"); a TIP that misses says what the drawing does.
+    const picked = shown
+      .map((sw, i) =>
+        sw.kind === "choice" && (bits >> i) & 1
+          ? `${sw.label}: ${sw.options[1]}`
+          : null,
+      )
+      .filter(Boolean);
+    const did = [...picked, ...new Set(seen.did)].join("; ");
     looks.push({
       key,
+      bits,
       look,
+      contact: seen.contact,
       signature: seen.signature,
       caption:
         bits === 0
@@ -367,6 +405,24 @@ async function scenarios(page, card) {
           : did
             ? `${did}. ${seen.result}`
             : seen.result,
+    });
+  }
+  // Which choice option touches the partner: for each look, an option of a choice switch whose
+  // look (this one, with that switch set to it) has contact while the other option's has none.
+  // Read from the previews.
+  const byKey = new Map(looks.map((l) => [l.key, l]));
+  for (const l of looks) {
+    l.warn = [];
+    shown.forEach((sw, i) => {
+      if (sw.kind !== "choice") return;
+      const touches = [0, 1].map((j) => {
+        const k = l.key.split("");
+        k[i] = String(j);
+        return byKey.get(k.join(""))?.contact != null;
+      });
+      // Only when the other option avoids it: then this pick is the one that touches.
+      for (const j of [0, 1])
+        if (touches[j] && !touches[1 - j]) l.warn.push(`${i}:${j}`);
     });
   }
   return {
@@ -492,13 +548,20 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
     if (!gif) {
       gif = `${card.id}--${l.key}.gif`;
       bySignature.set(l.signature, gif);
-      if (!process.env.DRY) await capture(page, card, l.look, join(OUT, gif));
+      const keep = KEEP_GIFS && existsSync(join(OUT, gif));
+      if (!process.env.DRY && !keep)
+        await capture(page, card, l.look, join(OUT, gif));
       if (!process.env.DRY)
         console.log(
           `${gif}: ${(statSync(join(OUT, gif)).size / 1024).toFixed(0)} KB · ${l.caption}`,
         );
     }
-    gifs[l.key] = { gif, caption: l.caption };
+    gifs[l.key] = {
+      gif,
+      caption: l.caption,
+      contact: l.contact,
+      ...(l.warn.length ? { warn: l.warn } : {}),
+    };
     if (process.env.DRY) console.log(card.id, l.key, gif, l.caption);
   }
   const { files, ...rest } = card;
