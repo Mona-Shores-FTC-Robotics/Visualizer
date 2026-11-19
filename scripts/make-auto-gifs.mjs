@@ -56,7 +56,7 @@ export const CARDS = [
     id: "rightunder",
     group: "pair",
     name: "R-RightUnderHive + L-RightUnderHive",
-    files: ["drafts/r-right-under-hive.pp", "drafts/l-right-under-hive.pp"],
+    files: ["r-right-under-hive.pp", "l-right-under-hive.pp"],
     halves: ["R-RightUnderHive", "L-RightUnderHive"],
   },
   {
@@ -629,7 +629,10 @@ if (!ONLY?.length) {
   if (process.env.DRY) process.exit(0);
   writeFileSync(
     join(OUT, "manifest.json"),
-    JSON.stringify(manifest, null, 2) + "\n",
+    JSON.stringify(manifest, null, 2).replace(
+      /[\u0080-\uffff]/g,
+      (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+    ) + "\n",
   );
   const total = [...keep].reduce((s, f) => s + statSync(join(OUT, f)).size, 0);
   console.log(`${keep.size} GIFs, ${(total / 1e6).toFixed(1)} MB`);
