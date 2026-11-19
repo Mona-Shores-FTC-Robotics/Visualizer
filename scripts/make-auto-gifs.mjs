@@ -53,13 +53,6 @@ export const CARDS = [
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
   },
   {
-    id: "rightunder",
-    group: "pair",
-    name: "R-RightUnderHive + L-RightUnderHive",
-    files: ["r-right-under-hive.pp", "l-right-under-hive.pp"],
-    halves: ["R-RightUnderHive", "L-RightUnderHive"],
-  },
-  {
     id: "clockwise",
     group: "pair",
     name: "R-Clockwise + L-Clockwise",
@@ -172,6 +165,10 @@ async function pageLook(look) {
     for (const [id, n] of Object.entries(look.waitTips))
       if (look.tips[n] === false) scenario[`wait:${id}`] = false;
     store.previewScenario.set(scenario);
+    // The TIP misses on the HIVE too (its volley's pieces do not land), as in a pair.
+    a.match.reset();
+    for (const [n, comes] of Object.entries(look.tips))
+      if (!comes) a.match.setTipMisses(Number(n), 1);
   }
   await new Promise((r) =>
     requestAnimationFrame(() => requestAnimationFrame(r)),

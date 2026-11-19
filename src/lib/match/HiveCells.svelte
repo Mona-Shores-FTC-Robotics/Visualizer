@@ -6,7 +6,14 @@
    * dark and empty, since what was in it spilled out. A TIP crossfades the two over its swing.
    * Drawn inside the field's own group: inches, Pedro's frame.
    */
-  import { hiveAt, RED_CELLS, type Cell, type HiveHistory } from "./hiveView";
+  import {
+    hiveAt,
+    missesAt,
+    RED_CELLS,
+    type Cell,
+    type HiveHistory,
+    type MissView,
+  } from "./hiveView";
   import type { TimingValues } from "../timing/model";
 
   interface Props {
@@ -17,6 +24,27 @@
   let { history, values, seconds }: Props = $props();
 
   let view = $derived(hiveAt(history, values, seconds));
+  let misses = $derived(missesAt(history, values, seconds));
+  /**
+   * A volley that does not count: its pieces hit the CELL's outer edge (where the shots come from:
+   * LEFT's from the scoring end, RIGHT's from the other) and fall away from it, fading; a red ✕
+   * marks the miss. The CELL itself does not change.
+   */
+  function missDrawing(miss: MissView) {
+    const box = RED_CELLS[miss.cell];
+    const out = miss.cell === "left" ? 1 : -1;
+    const edge = miss.cell === "left" ? box.y + box.h : box.y;
+    const fall = 1.8 + 8 * miss.age;
+    const pieces = Array.from({ length: Math.min(8, miss.pieces) }, (_, i) => {
+      const spread = (i - (miss.pieces - 1) / 2) * 3.4;
+      return {
+        x: box.x + box.w / 2 + spread * (1 + 0.6 * miss.age),
+        y: edge + out * (fall + (i % 2) * 1.2),
+      };
+    });
+    const cross = { x: box.x + box.w / 2, y: edge + out * 0.2, r: 2.6 };
+    return { pieces, cross, opacity: 1 - miss.age };
+  }
   const CELLS: Cell[] = ["left", "right"];
   /** The CELL's pieces, NECTAR first: two rows of four. */
   function pieces(cell: Cell, nectar: boolean, pollen: number) {
@@ -78,5 +106,27 @@
         opacity={1 - state.down}
       />
     {/each}
+  {/each}
+  {#each misses as miss, m (m)}
+    {@const drawing = missDrawing(miss)}
+    <g opacity={drawing.opacity}>
+      {#each drawing.pieces as piece, i (i)}
+        <circle
+          cx={piece.x}
+          cy={piece.y}
+          r={1.5}
+          fill="#ffd23f"
+          fill-opacity={0.55}
+          stroke="#e03131"
+          stroke-width={0.45}
+        />
+      {/each}
+      <path
+        d={`M ${drawing.cross.x - drawing.cross.r} ${drawing.cross.y - drawing.cross.r} L ${drawing.cross.x + drawing.cross.r} ${drawing.cross.y + drawing.cross.r} M ${drawing.cross.x - drawing.cross.r} ${drawing.cross.y + drawing.cross.r} L ${drawing.cross.x + drawing.cross.r} ${drawing.cross.y - drawing.cross.r}`}
+        stroke="#ff3b30"
+        stroke-width={1.1}
+        stroke-linecap="round"
+      />
+    </g>
   {/each}
 </g>
