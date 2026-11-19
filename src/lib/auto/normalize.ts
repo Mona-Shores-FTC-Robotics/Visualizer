@@ -56,9 +56,14 @@ function upgradeTeamRegistry(registry: AutoRegistry): void {
     ...registry.conditions,
     ...team.conditions.filter((name) => !registry.conditions.includes(name)),
   ];
-  if (missingActions.length && registry.typicalS) {
-    for (const name of missingActions) {
-      const seconds = team.typicalS?.[name];
+  // Our robot's typical seconds win over the ones an Auto was saved with: they are measured on the
+  // robot (AutoRegistration's), and an Auto's file keeps whatever the list held when it was first
+  // made, so a re-save alone never brought a new number in (GardenGather was still 5 or 6 in every
+  // file after the robot's went to 4.0, then 3.0).
+  if (team.typicalS) {
+    registry.typicalS = { ...(registry.typicalS ?? {}) };
+    for (const name of registry.actions) {
+      const seconds = team.typicalS[name];
       if (seconds !== undefined) registry.typicalS[name] = seconds;
     }
   }
