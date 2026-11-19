@@ -75,20 +75,27 @@ section > h2{margin:0;font-size:20px}
 .list a:hover{border-color:var(--accent)}
 .note{color:var(--muted);font-size:13px}
 .lead{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.brand{display:block}
+.brand .teams{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.brand .team{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:999px;color:#fff;font-weight:800;font-size:13px;letter-spacing:.12em}
+.brand .team b{font-size:15px;letter-spacing:.02em}
+.brand .ir{background:linear-gradient(90deg,#B0101E,#FF6A00)}
+.brand .uv{background:linear-gradient(90deg,#3A0CA3,#B14EFF)}
+.brand h1{margin:0;font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header>
-  <div>
-    <h1>Team Autos</h1>
-    <p>Every Auto on biobuzz <code>master</code>. Flip a switch to see that match play out: a TIP that misses, or a choice made in INIT. TIP counts are the Visualizer's preview, which tips a CELL whenever the drawing says it should; the HIVE's real weights make TIP 3 much harder (the Java simulator's numbers are in the Auto Picker).</p>
+<header class="brand">
+  <div class="teams">
+    <span class="team ir"><b>19429</b> INFRARED</span>
+    <span class="team uv"><b>20245</b> ULTRAVIOLET</span>
   </div>
-  <a class="open-vis" href="./">Open the Visualizer →</a>
+  <h1>Auto Strategy</h1>
 </header>
 
-<section id="pair"><h2>Pairs</h2><p class="lead">Both our robots on one alliance. A <span class="legend-dot" aria-hidden="true"></span> marks the pick that makes them touch, with the TIPs as set.</p><div class="grid"></div></section>
-<section id="solo"><h2>Solo Autos</h2><p class="lead">One of ours beside any partner.</p><div class="grid"></div></section>
+<section id="pair"><h2>Pairs</h2><div class="grid"></div></section>
+<section id="solo"><h2>Solo Autos</h2><p class="lead">One robot, beside any partner.</p><div class="grid"></div></section>
 <section id="trial"><h2>Utility trials</h2><p class="lead">On the Utility menu, until they have run on the robot.</p><div class="grid"></div></section>
 
 <section>
@@ -99,7 +106,7 @@ section > h2{margin:0;font-size:20px}
 
 <section>
   <h2>Partner stand-ins</h2>
-  <p class="lead">Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, to open beside one of ours.</p>
+  <p class="lead">Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, to open beside a solo Auto.</p>
   <div class="list" id="partners"><span class="note">Loading…</span></div>
 </section>
 
