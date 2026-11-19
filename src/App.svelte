@@ -58,6 +58,14 @@
   provideAuto(auto);
   provideLinks(links);
   files.autosaveSession();
+  // The dev server only: scripts/make-auto-gifs.mjs drives the preview's answers and the clock.
+  if (import.meta.env.DEV)
+    (window as unknown as { __visualizer: unknown }).__visualizer = {
+      project,
+      auto,
+      playback,
+      overlays,
+    };
 
   // Auto-collapse makes room while the field is busy, without touching the
   // panels' own shown/hidden state.

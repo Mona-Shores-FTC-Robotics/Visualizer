@@ -6,49 +6,59 @@
 <title>Team Autos</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <style>
-/* One page that opens every biobuzz Auto on master in this Visualizer: pairs first, then the
-   solo Autos and the Utility trials, each with its best-case GIF (scripts/make-auto-gifs.mjs),
-   then every draft and partner stand-in, listed live from GitHub. */
+/* Every biobuzz Auto on master, as an animation with its switches: flip a TIP or an INIT choice
+   and the animation shows that match. The cards, switches and GIFs come from
+   autos/manifest.json, written by scripts/make-auto-gifs.mjs; the drafts and partners lists are
+   read live from GitHub. */
 :root{
   --bg:#f4f5f7; --panel:#ffffff; --ink:#15181d; --muted:#5d6470; --line:#dcdfe5;
-  --accent:#2f6fde; --accent-ink:#ffffff; --chip:#eef1f6; --tag:#e8f0fd; --tag-ink:#1f4fa8;
-  --trial:#fbe9cf; --trial-ink:#8a5a12; --field:#2b2b2b;
+  --accent:#2f6fde; --accent-ink:#ffffff; --seg:#eceff4; --seg-on:#ffffff; --seg-on-ink:#15181d;
+  --tag:#e8f0fd; --tag-ink:#1f4fa8; --trial:#fbe9cf; --trial-ink:#8a5a12; --fb:#ece7fb; --fb-ink:#5a3fb0;
+  --field:#2b2b2b;
   --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
-  --accent:#6ea0ff; --accent-ink:#0d1117; --chip:#232932; --tag:#1c2638; --tag-ink:#9cc0ff;
-  --trial:#33291a; --trial-ink:#f0c47a; color-scheme:dark}}
+  --accent:#6ea0ff; --accent-ink:#0d1117; --seg:#11151a; --seg-on:#2c3440; --seg-on-ink:#ffffff;
+  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
-  --accent:#6ea0ff; --accent-ink:#0d1117; --chip:#232932; --tag:#1c2638; --tag-ink:#9cc0ff;
-  --trial:#33291a; --trial-ink:#f0c47a; color-scheme:dark}
+  --accent:#6ea0ff; --accent-ink:#0d1117; --seg:#11151a; --seg-on:#2c3440; --seg-on-ink:#ffffff;
+  --tag:#1c2638; --tag-ink:#9cc0ff; --trial:#33291a; --trial-ink:#f0c47a; --fb:#251f38; --fb-ink:#c4b3ff; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
 .wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 24px;justify-content:space-between}
 h1{margin:0;font-size:clamp(26px,4vw,34px);letter-spacing:-.01em}
-header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
-.open{color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap}
-.open:hover{text-decoration:underline}
+header p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.open-vis{color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap}
+.open-vis:hover{text-decoration:underline}
 section{display:grid;gap:14px}
-.head h2{margin:0;font-size:20px}
-.head p{margin:2px 0 0;color:var(--muted);font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
-.shot{display:block;aspect-ratio:1/1;background:var(--field);border-bottom:1px solid var(--line)}
-.shot img{display:block;width:100%;height:100%;object-fit:cover}
-.body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:1}
-.title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.title h3{margin:0;font-size:17px}
-.tag{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--tag);color:var(--tag-ink)}
+section > h2{margin:0;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:baseline;gap:8px 10px;flex-wrap:wrap;padding:14px 16px 10px}
+.top h3{margin:0;font-size:19px}
+.tag{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--tag);color:var(--tag-ink)}
 .tag.trial{background:var(--trial);color:var(--trial-ink)}
-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
-dt{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding-top:2px;white-space:nowrap}
-dd{margin:0}
-.actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:38px;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+.tag.fallback{background:var(--fb);color:var(--fb-ink)}
+.use{flex-basis:100%;margin:0;color:var(--muted);font-size:13px}
+.shot{display:block;aspect-ratio:1/1;background:var(--field)}
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+.caption{margin:0;padding:10px 16px;font-size:13.5px;border-bottom:1px solid var(--line);min-height:3.6em}
+.caption b{font-weight:700}
+.switches{display:grid;gap:8px;padding:12px 16px 4px}
+.sw{display:grid;grid-template-columns:7.5em 1fr;align-items:center;gap:10px}
+.sw > span{font-size:13px;font-weight:700;color:var(--muted)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--seg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;min-width:0}
+.seg button{font:inherit;font-size:13px;font-weight:600;border:0;border-radius:6px;padding:6px 8px;background:transparent;color:var(--muted);cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--seg-on);color:var(--seg-on-ink);box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.seg button.off[aria-pressed="true"]{background:#c9472f;color:#fff}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px 16px}
+.btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:38px;padding:8px 10px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;background:var(--seg);color:var(--ink);border:1px solid var(--line)}
 .btn.primary{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn:hover{border-color:var(--accent)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -56,7 +66,7 @@ dd{margin:0}
 .list a{padding:5px 10px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-family:var(--mono);font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .list a:hover{border-color:var(--accent)}
 .note{color:var(--muted);font-size:13px}
-@media (max-width:420px){.grid{grid-template-columns:1fr}}
+.lead{margin:-8px 0 0;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -64,93 +74,95 @@ dd{margin:0}
 <header>
   <div>
     <h1>Team Autos</h1>
-    <p>Every Auto on biobuzz <code>master</code>. Each animation is the best case: every TIP comes when the Auto waits for it. The buttons open it in the Visualizer, always the latest.</p>
+    <p>Every Auto on biobuzz <code>master</code>. Flip a switch to see that match play out: a TIP that misses, or a choice made in INIT. TIP counts are the Visualizer's preview, which tips a CELL whenever the drawing says it should; the HIVE's real weights make TIP 3 much harder (the Java simulator's numbers are in the Auto Picker).</p>
   </div>
-  <a class="open" href="./">Open the Visualizer →</a>
+  <a class="open-vis" href="./">Open the Visualizer →</a>
 </header>
 
-<section>
-  <div class="head"><h2>Pairs</h2><p>Both our robots on one alliance. Each runs its half.</p></div>
-  <div class="grid" id="pairs"></div>
-</section>
+<section id="pair"><h2>Pairs</h2><p class="lead">Both our robots on one alliance.</p><div class="grid"></div></section>
+<section id="solo"><h2>Solo Autos</h2><p class="lead">One of ours beside any partner.</p><div class="grid"></div></section>
+<section id="trial"><h2>Utility trials</h2><p class="lead">On the Utility menu, until they have run on the robot.</p><div class="grid"></div></section>
 
 <section>
-  <div class="head"><h2>Solo Autos</h2><p>One of ours beside any partner. On the Driver Station's Autonomous menu.</p></div>
-  <div class="grid" id="solos"></div>
-</section>
-
-<section>
-  <div class="head"><h2>Utility trials</h2><p>On the Driver Station's Utility menu. Not for a match until they have run on the robot.</p></div>
-  <div class="grid" id="trials"></div>
-</section>
-
-<section>
-  <div class="head"><h2>Drafts</h2><p>Every file in <code>TeamCode/autos/drafts/</code>, listed live from GitHub.</p></div>
+  <h2>Drafts</h2>
+  <p class="lead">Every file in <code>TeamCode/autos/drafts/</code>, listed live from GitHub.</p>
   <div class="list" id="drafts"><span class="note">Loading…</span></div>
 </section>
 
 <section>
-  <div class="head"><h2>Partner stand-ins</h2><p>Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, to open beside one of ours.</p></div>
+  <h2>Partner stand-ins</h2>
+  <p class="lead">Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, to open beside one of ours.</p>
   <div class="list" id="partners"><span class="note">Loading…</span></div>
 </section>
 
-<p class="note">The cards are written in <code>public/autos.html</code> of the Visualizer repo, and their animations come from <code>scripts/make-auto-gifs.mjs</code>. Add an Auto to both when it reaches the Driver Station.</p>
+<p class="note" id="foot">Animations: the Visualizer's preview, played from <code>scripts/make-auto-gifs.mjs</code>. A TIP that misses is its first volley missing; a fix can still TIP it.</p>
 </div>
 
 <script>
 const T = p => "./#team=master/" + p;
-/* Keep the gif ids in step with GIFS in scripts/make-auto-gifs.mjs. */
-const PAIRS = [
-  {gif:"lane", name:"Lane pair", files:["r-outside-lane.pp","l-under-hive.pp"], halves:["R-OutsideLane","L-UnderHive"],
-   start:"R on the near start, L on the far start.",
-   does:"R shoots its preloads at RIGHT, then twice takes the outside lane to pick a FLOWER and shoots again. L waits for TIP 1, shoots LEFT, gathers the GARDEN, then parks facing the HIVE and shoots LEFT from the park. If TIP 1 never comes, L crosses and fixes it.",
-   use:"Both our robots are on one alliance."},
-  {gif:"clockwise", name:"Clockwise pair", files:["r-clockwise.pp","l-clockwise.pp"], halves:["R-Clockwise","L-Clockwise"],
-   start:"R on the near start, L on the far start.",
-   does:"Both robots drive one loop, the same way round, so they never meet. Every stop has a fixed fallback if its TIP does not come.",
-   use:"Both our robots are on one alliance. Run 20245 as R."},
-  {gif:"nocross", name:"NoCross pair", files:["r-no-cross.pp","l-no-cross.pp"], halves:["R-NoCross","L-NoCross"],
-   start:"R on the near start, L on the far start.",
-   does:"Each robot scores at its own end and crosses only to fix a TIP that did not come.",
-   use:"The simplest plan for our two robots together."}
-];
-const SOLOS = [
-  {gif:"r-solo", name:"R-Solo", file:"r-solo.pp", tag:"Default",
-   start:"The near start.",
-   does:"Shoots its preloads at RIGHT, picks a FLOWER, shoots LEFT, picks another FLOWER, shoots LEFT again, then parks.",
-   use:"Our default. The partner starts in the far corner (or is off the far start by 10 s) and parks at the far end of the LOADING ZONE."},
-  {gif:"r-no-cross", name:"R-NoCross", file:"r-no-cross.pp", tag:"Fallback",
-   start:"The near start.",
-   does:"Scores at its own end and waits for the partner's TIP 2. In INIT, pick: wait for the partner, or cross and fix it.",
-   use:"The partner sits on the far start."},
-  {gif:"l-no-cross", name:"L-NoCross", file:"l-no-cross.pp", tag:"Fallback",
-   start:"The far start.",
-   does:"Waits for TIP 1, shoots LEFT and picks the SCORING FLOWER. In INIT, pick: cross and fix it, or wait for the partner's fix.",
-   use:"The partner insists on the near start."}
-];
-const TRIALS = [
-  {gif:"l-assist", name:"L-Assist", file:"drafts/l-assist.pp", tag:"Trial",
-   start:"The far start.",
-   does:"Waits for TIP 1, shoots its preloads at LEFT and parks at once.",
-   use:"A partner that runs its whole route from the near start."}
-];
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const ROBOT = f => f.replace(/^.*\//, "").replace(/\.pp$/, "").replace(/(^|-)([a-z])/g, (_, d, c) => d + c.toUpperCase());
+const preloaded = new Set();
+function preload(src) { if (!preloaded.has(src)) { preloaded.add(src); const i = new Image(); i.src = src; } }
 
-const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
-function card(e, links) {
-  const tag = e.tag ? `<span class="tag${e.tag === "Trial" ? " trial" : ""}">${e.tag}</span>` : "";
-  return `<article class="card">
-    <a class="shot" href="${links[0][0]}" aria-label="Open ${esc(e.name)}"><img src="autos/${e.gif}.gif" alt="${esc(e.name)}, best case, on the field" loading="lazy" decoding="async" width="480" height="480"></a>
-    <div class="body">
-      <div class="title"><h3>${esc(e.name)}</h3>${tag}</div>
-      <dl><dt>Start</dt><dd>${esc(e.start)}</dd><dt>Does</dt><dd>${esc(e.does)}</dd><dt>Use when</dt><dd>${esc(e.use)}</dd></dl>
-      <div class="actions">${links.map(([href, label], i) =>
-        `<a class="btn${i === 0 ? " primary" : ""}" href="${href}">${esc(label)}</a>`).join("")}</div>
-    </div></article>`;
+/** A caption: "Best case" or the drawing's own words in bold, then the result. */
+function captionHtml(text) {
+  const m = text.match(/^(Best case) · (.*)$/) || text.match(/^(.*?)\. (\d+ TIPs?.*)$/);
+  return m ? `<b>${esc(m[1])}.</b> ${esc(m[2])}` : esc(text);
 }
-document.getElementById("pairs").innerHTML = PAIRS.map(p => card(p,
-  [[T(p.files.join(",")), "Open the pair"], [T(p.files[0]), p.halves[0]], [T(p.files[1]), p.halves[1]]])).join("");
-document.getElementById("solos").innerHTML = SOLOS.map(s => card(s, [[T(s.file), "Open"]])).join("");
-document.getElementById("trials").innerHTML = TRIALS.map(t => card(t, [[T(t.file), "Open"]])).join("");
+
+function renderCard(card) {
+  const el = document.createElement("article");
+  el.className = "card";
+  const tagClass = card.tag === "Trial" ? " trial" : card.tag === "Fallback" ? " fallback" : "";
+  const halves = card.files.length > 1
+    ? card.files.map((f, i) => `<a class="btn" href="${T(f)}">${esc(card.halves?.[i] ?? ROBOT(f))}</a>`).join("") : "";
+  el.innerHTML = `
+    <div class="top"><h3>${esc(card.name)}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}
+      ${card.use ? `<p class="use">${esc(card.use)}</p>` : ""}</div>
+    <a class="shot" href="${T(card.files.join(","))}" aria-label="Open ${esc(card.name)} in the Visualizer">
+      <img alt="" width="480" height="480" loading="lazy" decoding="async"></a>
+    <p class="caption" aria-live="polite"></p>
+    <div class="switches">${card.switches.map((s, i) => `
+      <div class="sw" role="group" aria-label="${esc(s.label)}"><span>${esc(s.label)}</span>
+        <div class="seg">${s.options.map((o, j) =>
+          `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}</button>`).join("")}</div>
+      </div>`).join("")}</div>
+    <div class="actions"><a class="btn primary" href="${T(card.files.join(","))}">${card.files.length > 1 ? "Open the pair" : "Open"}</a>${halves}</div>`;
+  const img = el.querySelector("img");
+  const cap = el.querySelector(".caption");
+  const state = card.switches.map(() => 0);
+  const keyOf = st => st.join("") || "0";
+  const show = () => {
+    const sc = card.scenarios[keyOf(state)];
+    img.src = "autos/" + sc.gif;
+    img.alt = `${card.name}: ${sc.caption}`;
+    cap.innerHTML = captionHtml(sc.caption);
+    el.querySelectorAll(".seg button").forEach(b =>
+      b.setAttribute("aria-pressed", String(state[+b.dataset.i] === +b.dataset.j)));
+    // The one-flip neighbours, so the next switch swaps at once.
+    state.forEach((_, i) => {
+      const next = state.slice(); next[i] = 1 - next[i];
+      const n = card.scenarios[keyOf(next)];
+      if (n) preload("autos/" + n.gif);
+    });
+  };
+  el.querySelector(".switches").addEventListener("click", e => {
+    const b = e.target.closest("button[data-i]");
+    if (!b) return;
+    state[+b.dataset.i] = +b.dataset.j;
+    show();
+  });
+  show();
+  return el;
+}
+
+fetch("autos/manifest.json").then(r => r.json()).then(m => {
+  for (const card of m.cards) document.querySelector(`#${card.group} .grid`)?.appendChild(renderCard(card));
+  document.getElementById("foot").insertAdjacentText("beforeend", ` Made ${m.generated} from ${m.branch}.`);
+}).catch(e => {
+  document.querySelector("#pair .grid").innerHTML = `<p class="note">Could not load the animations (${esc(e.message)}).</p>`;
+});
 
 async function list(dir, el) {
   const box = document.getElementById(el);
