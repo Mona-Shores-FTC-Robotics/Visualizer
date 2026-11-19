@@ -91,7 +91,7 @@ const arg = (name, fallback) => {
 const BASE = arg("base", "http://localhost:5179/");
 const FPS = Number(arg("fps", "10"));
 const SPEED = Number(arg("speed", "3"));
-const WIDTH = Number(arg("width", "480"));
+const WIDTH = Number(arg("width", "720"));
 // --keep-gifs: rewrite the manifest, and capture only GIFs that are not there yet.
 const KEEP_GIFS = process.argv.includes("--keep-gifs");
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
@@ -117,22 +117,35 @@ function pageChoices() {
   const autos = v.overlays.active
     ? v.overlays.items.map((o) => o.doc.auto)
     : [v.auto.auto];
+  // A choice two Autos both have (Clockwise's Pickup) is one option, set on both: each owner keeps
+  // its own legs, in its own order (R's first leg is the WALL FLOWER, L's the GARDEN).
   const out = [];
-  const walk = (cards) => {
+  const walk = (cards, robot) => {
     for (const c of cards ?? []) {
       if (c.kind !== "firstOf") continue;
-      if (c.choice && !out.some((o) => o.option === c.choice)) {
+      if (c.choice) {
         const yes = c.rows.findIndex((r) => "when" in r);
-        out.push({
-          option: c.choice,
-          condition: c.rows[yes].when[0],
-          legs: [c.rows[yes].label ?? "yes", c.rows[1 - yes].label ?? "no"],
-        });
+        const legs = [
+          c.rows[yes].label ?? "yes",
+          c.rows[1 - yes].label ?? "no",
+        ];
+        let choice = out.find((o) => o.option === c.choice);
+        if (!choice) {
+          choice = {
+            option: c.choice,
+            condition: c.rows[yes].when[0],
+            legs,
+            owners: [],
+          };
+          out.push(choice);
+        }
+        if (!choice.owners.some((o) => o.robot === robot))
+          choice.owners.push({ robot, legs });
       }
-      for (const r of c.rows) walk(r.cards);
+      for (const r of c.rows) walk(r.cards, robot);
     }
   };
-  autos.forEach((a) => walk(a?.cards));
+  autos.forEach((a, robot) => walk(a?.cards, robot));
   return out;
 }
 
@@ -168,7 +181,10 @@ async function pageLook(look) {
   const previews = (raw instanceof Map ? [...raw.values()] : [...raw]).filter(
     Boolean,
   );
-  const tips = together.tips.filter((t) => t.settled <= 30 + 1e-6);
+  // The TIPs that count as AUTO (the team's rule): the last ball out by 30 s, settled by 38 s.
+  const tips = together.tips.filter(
+    (t) => (t.lastBall ?? t.start) <= 30 + 1e-6 && t.settled <= 38 + 1e-6,
+  );
   // Which TIP each branching wait reached is for, by the CELL it asks about: RIGHT is up at the
   // start and after TIPs 2, 4…; LEFT after TIPs 1, 3…. CellUp is the CELL at the robot's end (the
   // end of its last drive: y above the centre is LEFT). With k TIPs settled when it is asked, it
@@ -305,7 +321,7 @@ async function pageLook(look) {
 // ---- Scenarios ---------------------------------------------------------------------------------
 
 /** The card's switches and every combination's look, previewed. */
-async function scenarios(page, card) {
+async function scenarios(page, card, letters) {
   const choices = await page.evaluate(pageChoices);
   const pair = card.files.length > 1;
   const base = { choices: {}, tips: {}, waitTips: {} };
@@ -343,6 +359,10 @@ async function scenarios(page, card) {
       label: pretty(c.option),
       condition: c.condition,
       options: c.legs.map(pretty),
+      owners: c.owners.map((o) => ({
+        robot: o.robot,
+        options: o.legs.map(pretty),
+      })),
     });
     const n = Number(c.option.match(/TIP (\d+)/i)?.[1]);
     if (tipNumbers.includes(n) && !used.has(n)) {
@@ -380,7 +400,11 @@ async function scenarios(page, card) {
     const picked = shown
       .map((sw, i) =>
         sw.kind === "choice" && (bits >> i) & 1
-          ? `${sw.label}: ${sw.options[1]}`
+          ? sw.owners
+              .map((o) =>
+                `${letters[o.robot] ?? ""} ${sw.label}: ${o.options[1]}`.trim(),
+              )
+              .join(", ")
           : null,
       )
       .filter(Boolean);
@@ -419,10 +443,19 @@ async function scenarios(page, card) {
     });
   }
   return {
-    switches: shown.map(({ kind, label, options }) => ({
+    // A choice says whose Auto it is in (r or l, by the overlay's file), with that Auto's legs.
+    switches: shown.map(({ kind, label, options, owners }) => ({
       kind,
       label,
       options,
+      ...(owners
+        ? {
+            owners: owners.map((o) => ({
+              robot: (letters[o.robot] || "r").toLowerCase(),
+              options: o.options,
+            })),
+          }
+        : {}),
     })),
     looks,
   };
@@ -450,12 +483,18 @@ async function capture(page, card, look, hide, targets) {
   }, hide);
   const box = await page.evaluate(() => window.__gifBox);
   const dir = mkdtempSync(join(tmpdir(), `gif-${card.id}-`));
-  const frames = Math.round((AUTO_S * FPS) / SPEED);
-  const step = (AUTO_S * 10) / frames;
+  // The 30 s Auto, and on until the last TIP that counts has settled (the preview's clock runs
+  // that long), a whole number of frames.
+  const step = (10 * SPEED) / FPS;
   if (!Number.isInteger(step))
     throw new Error(`the clock needs whole tenths per frame (${step})`);
+  const length = await page.evaluate(
+    (s) => Math.max(s, window.__visualizer.playback.duration),
+    AUTO_S,
+  );
+  const frames = Math.ceil((length * 10) / step - 1e-6);
   for (let i = 0; i <= frames; i++) {
-    const t = (i / frames) * AUTO_S;
+    const t = (i * step) / 10;
     await page.evaluate(async (s) => {
       const p = window.__visualizer.playback;
       if (p.playing) p.toggle();
@@ -483,7 +522,7 @@ async function capture(page, card, look, hide, targets) {
       "-vf",
       `${turn}${clockFilter(step, box.width)},tpad=stop_mode=clone:stop_duration=1.2,` +
         `scale=${WIDTH}:-1:flags=lanczos,split[a][b];` +
-        "[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
+        "[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
       "-loop",
       "0",
       target,
@@ -559,12 +598,23 @@ const manifest = {
 };
 for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
   const page = await open(browser, card);
-  const { switches, looks } = await scenarios(page, card);
-  if (process.env.DRY) console.log(card.id, JSON.stringify(switches));
   const pair = card.files.length > 1;
   const index = pair ? await overlayIndexes(page, card) : [0];
   if (pair && index.some((i) => i < 0))
     throw new Error(`${card.id}: an overlay is missing (${index})`);
+  // Overlay index → "R" / "L" (the card's files are R's, then L's), and each robot's path colour.
+  const letters = pair ? { [index[0]]: "R", [index[1]]: "L" } : { 0: "" };
+  const colors = pair
+    ? await page.evaluate(
+        (ix) => ({
+          r: window.__visualizer.overlays.items[ix[0]].color,
+          l: window.__visualizer.overlays.items[ix[1]].color,
+        }),
+        index,
+      )
+    : null;
+  const { switches, looks } = await scenarios(page, card, letters);
+  if (process.env.DRY) console.log(card.id, JSON.stringify(switches));
   // Views: both robots; for a pair, also R alone and L alone (the other not drawn). A view shares a
   // GIF with every look whose drawn robots drive the same.
   const views = pair
@@ -606,7 +656,13 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
     }
   }
   const { files, ...rest } = card;
-  manifest.cards.push({ ...rest, files, switches, scenarios: scenarios_ });
+  manifest.cards.push({
+    ...rest,
+    files,
+    ...(colors ? { colors } : {}),
+    switches,
+    scenarios: scenarios_,
+  });
   await page.close();
 }
 await browser.close();
