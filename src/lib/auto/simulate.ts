@@ -457,6 +457,12 @@ export function simulateAuto(
   };
 
   /** Drive the path, or only its first `until` seconds when cut short. */
+  /**
+   * Fork: the park path the robot last drove to its end, while it has not driven since: it stands
+   * on that park, so a guard whose park is the same path has nothing left to do (biobuzz
+   * AutoRegistry.parkedVolley: the guard adds no park after a parked volley).
+   */
+  let parkedOn: string | null = null;
   const drive = (card: PathCard, path: PathInfo, until = Infinity) => {
     const t0 = t;
     const stop = Math.min(path.seconds, until);
@@ -481,6 +487,7 @@ export function simulateAuto(
       pos = { ...path.end };
       heading = path.endHeadingDeg;
     }
+    parkedOn = card.park && stop >= path.seconds - 1e-9 ? path.id : null;
   };
 
   /**
@@ -532,11 +539,18 @@ export function simulateAuto(
     guard.deadline = AUTO_LENGTH_S - guardSeconds(guard.path);
   };
 
+  /**
+   * Fork: the robot stands on this guard's park (it drove that park path to its end, in this
+   * block or one inside it, and has not driven since), so the guard has nothing left to do.
+   */
+  const standsOn = (guard: Guard) =>
+    parkedOn !== null && guard.path.id === parkedOn;
+
   const pendingDeadline = (guards: Guard[]): Guard | null => {
     if (goingFor) return null;
     let soonest: Guard | null = null;
     for (const guard of guards) {
-      if (guard.parked) continue;
+      if (guard.parked || standsOn(guard)) continue;
       if (!soonest || guard.deadline < soonest.deadline) soonest = guard;
     }
     return soonest;
@@ -547,7 +561,8 @@ export function simulateAuto(
     if (goingFor) return null;
     for (let i = guards.length - 1; i >= 0; i--) {
       const guard = guards[i];
-      if (!guard.parked && t >= guard.deadline - 1e-9) return guard;
+      if (!guard.parked && !standsOn(guard) && t >= guard.deadline - 1e-9)
+        return guard;
     }
     return null;
   };

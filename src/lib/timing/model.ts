@@ -144,6 +144,12 @@ export const ROBOT_FACTS: readonly string[] = [
 
 /** The command whose run is a volley. */
 export const VOLLEY_COMMAND = "LaunchAll";
+/**
+ * The volley fired from a park spot with the turret aimed (biobuzz LaunchAllAimed, AimedVolley,
+ * after the park card, behind a CELL check): the same feed as a LaunchAll, so the same weight in the
+ * CELL and the same time.
+ */
+export const AIMED_VOLLEY_COMMAND = "LaunchAllAimed";
 /** The FLOWER pick and the GARDEN gather, timed by `pickFlowerS` and `gardenGatherS`. */
 export const PICK_COMMAND = "PickFlower";
 /**
@@ -156,7 +162,7 @@ export const PICK_LAUNCH_COMMAND = "PickFlowerLaunch";
 export const PICK_LAUNCH_MOVES_S = 1.0;
 /** How many volleys' worth of pieces a command's run lands in the raised CELL; 0 for a command that launches nothing. */
 export function volleysIn(command: string): number {
-  if (command === VOLLEY_COMMAND) return 1;
+  if (command === VOLLEY_COMMAND || command === AIMED_VOLLEY_COMMAND) return 1;
   if (command === PICK_LAUNCH_COMMAND) return 2;
   return 0;
 }
@@ -447,7 +453,7 @@ export function previewTiming(
           Math.max(0, ready - t0) + PICK_LAUNCH_MOVES_S + 2 * values.volleyS
         );
       }
-      if (name === VOLLEY_COMMAND) {
+      if (name === VOLLEY_COMMAND || name === AIMED_VOLLEY_COMMAND) {
         // A launch waits for speed first: the rest of the spin-up from when it was asked, or all
         // of it from rest.
         const ready = (spunAt ?? t0) + values.spinUpS;
