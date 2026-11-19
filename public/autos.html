@@ -8,7 +8,7 @@
 <style>
 /* Every biobuzz Auto on master, as an animation with its switches: flip a TIP or an INIT choice
    and the animation shows that match. The cards, switches and GIFs come from
-   autos/manifest.json, written by scripts/make-auto-gifs.mjs; the drafts and partners lists are
+   autos/manifest.json, written by scripts/make-auto-gifs.mjs; the partners list is
    read live from GitHub. */
 :root{
   --bg:#f4f5f7; --panel:#ffffff; --ink:#15181d; --muted:#5d6470; --line:#dcdfe5;
@@ -30,7 +30,7 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
-.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 24px;justify-content:space-between}
 h1{margin:0;font-size:clamp(26px,4vw,34px);letter-spacing:-.01em}
 header p{margin:6px 0 0;color:var(--muted);max-width:60ch}
@@ -38,8 +38,15 @@ header p{margin:6px 0 0;color:var(--muted);max-width:60ch}
 .open-vis:hover{text-decoration:underline}
 section{display:grid;gap:14px}
 section > h2{margin:0;font-size:20px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+/* Wide: the GIF at up to 720 px beside its controls; narrow: one column, the GIF full width. */
+.card{container-type:inline-size}
+.body{display:grid;grid-template-columns:minmax(0,1fr)}
+@container (min-width:940px){
+  .body{grid-template-columns:minmax(0,720px) minmax(0,1fr);align-items:start}
+  .body .side{border-left:1px solid var(--line);min-height:100%}
+}
+.side{display:flex;flex-direction:column;min-width:0}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .top{display:flex;align-items:baseline;gap:8px 10px;flex-wrap:wrap;padding:14px 16px 10px}
 .top h3{margin:0;font-size:19px}
@@ -56,7 +63,7 @@ section > h2{margin:0;font-size:20px}
 .legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn-dot);vertical-align:1px}
 .seg button .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn-dot);margin-left:6px;vertical-align:1px}
 .seg button .dot[hidden]{display:none}
-.switches{display:grid;gap:8px;padding:12px 16px 4px}
+.switches{display:grid;gap:0;padding:2px 16px 4px}
 .sw{display:grid;grid-template-columns:7.5em 1fr;align-items:center;gap:10px}
 .sw > span{font-size:13px;font-weight:700;color:var(--muted)}
 .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--seg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;min-width:0}
@@ -83,7 +90,11 @@ section > h2{margin:0;font-size:20px}
 .alliance button[data-alliance="red"][aria-pressed="true"]{background:#c62828;color:#fff}
 .alliance button[data-alliance="blue"][aria-pressed="true"]{background:#1f5fd6;color:#fff}
 .seg.three{grid-template-columns:repeat(3,1fr)}
-.sw.view{padding-bottom:4px;border-bottom:1px dashed var(--line);margin-bottom:2px}
+.group{display:grid;gap:8px;padding:10px 0 4px}
+.group + .group{border-top:1px solid var(--line)}
+.group h4{margin:0;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.group h4 .key{display:inline-block;width:22px;height:4px;border-radius:2px}
+.group h4 small{font-weight:600;letter-spacing:0;text-transform:none}
 .ds{flex-basis:100%;margin:0;color:var(--muted);font-size:12px;font-style:italic}
 </style>
 </head>
@@ -101,12 +112,6 @@ section > h2{margin:0;font-size:20px}
 
 <section id="pair"><h2>Pairs</h2><div class="grid"></div></section>
 <section id="solo"><h2>Solo Autos</h2><p class="lead">One robot, beside any partner.</p><div class="grid"></div></section>
-
-<section>
-  <h2>Drafts</h2>
-  <p class="lead">Every file in <code>TeamCode/autos/drafts/</code>, listed live from GitHub.</p>
-  <div class="list" id="drafts"><span class="note">Loading…</span></div>
-</section>
 
 <section>
   <h2>Partner stand-ins</h2>
@@ -160,22 +165,45 @@ function renderCard(card) {
   const tagClass = card.tag === "Trial" ? " trial" : card.tag === "Fallback" ? " fallback" : "";
   const halves = card.files.length > 1
     ? card.files.map((f, i) => `<a class="btn" href="${T(f)}">${esc(card.halves?.[i] ?? ROBOT(f))}</a>`).join("") : "";
+  // A switch's buttons; `options` are its owner's own words for the two legs.
+  const seg = (s, i, options = s.options) => `
+        <div class="seg">${options.map((o, j) =>
+          `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}<span class="dot" hidden title="Touches the partner here"></span></button>`).join("")}</div>`;
+  const row = (label, inner, extra = "") =>
+    `<div class="sw${extra}" role="group" aria-label="${esc(label)}"><span>${esc(label)}</span>${inner}</div>`;
+  const tipNumber = (s) => Number(s.label.match(/\d+/)?.[0] ?? 0);
+  const tips = card.switches.map((s, i) => [s, i]).filter(([s]) => s.kind === "tip")
+    .sort(([a], [b]) => tipNumber(a) - tipNumber(b));
+  const choicesOf = (robot) => card.switches.map((s, i) => [s, i])
+    .filter(([s]) => s.kind === "choice" && (s.owners ?? [{ robot: "r" }]).some(o => o.robot === robot));
+  const optionsOf = (s, robot) => (s.owners ?? []).find(o => o.robot === robot)?.options ?? s.options;
+  // Pair: the match's TIPs, the view, then each robot's own INIT choices under its Auto's name and
+  // path colour (a robot with no choices has no group). Solo: one group.
+  const robotGroup = (robot, k, where) => {
+    const list = choicesOf(robot);
+    if (!list.length) return "";
+    const color = card.colors?.[robot];
+    return `<div class="group" role="group" aria-label="${esc(card.halves[k])} INIT choices">
+      <h4>${color ? `<span class="key" style="background:${esc(color)}" aria-hidden="true"></span>` : ""}${esc(card.halves[k]).replace(/-/g, "\u2011")} <small>(${where})</small></h4>
+      ${list.map(([s, i]) => row(s.label, seg(s, i, optionsOf(s, robot)))).join("")}</div>`;
+  };
+  const controls = pair
+    ? `<div class="group" role="group" aria-label="Match"><h4>Match</h4>${tips.map(([s, i]) => row(s.label, seg(s, i))).join("")}</div>
+      <div class="group">${row("Show", `<div class="seg three">${VIEWS.map(([v, label]) =>
+          `<button type="button" data-view="${v}" aria-pressed="${v === "both"}">${esc(label)}</button>`).join("")}</div>`, " view")}</div>
+      ${robotGroup("r", 0, "near start")}${robotGroup("l", 1, "far start")}`
+    : `<div class="group">${card.switches.map((s, i) => row(s.label, seg(s, i))).join("")}</div>`;
   el.innerHTML = `
-    <div class="top"><h3>${esc(card.name).replace(/-/g, "\u2011")}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}
-</div>
-    <a class="shot" href="${T(card.files.join(","))}" aria-label="Open ${esc(card.name)} in the Visualizer">
-      <img alt="" width="480" height="480" loading="lazy" decoding="async"></a>
-    <p class="caption" aria-live="polite"></p>
-    <div class="switches">${pair ? `
-      <div class="sw view" role="group" aria-label="Show"><span>Show</span>
-        <div class="seg three">${VIEWS.map(([v, label]) =>
-          `<button type="button" data-view="${v}" aria-pressed="${v === "both"}">${esc(label)}</button>`).join("")}</div>
-      </div>` : ""}${card.switches.map((s, i) => `
-      <div class="sw" role="group" aria-label="${esc(s.label)}"><span>${esc(s.label)}</span>
-        <div class="seg">${s.options.map((o, j) =>
-          `<button type="button" data-i="${i}" data-j="${j}" class="${j && s.kind === "tip" ? "off" : ""}" aria-pressed="${j === 0}">${esc(o)}<span class="dot" hidden title="Touches the partner here"></span></button>`).join("")}</div>
-      </div>`).join("")}</div>
-    <div class="actions"><a class="btn primary" href="${T(card.files.join(","))}">${card.files.length > 1 ? "Open the pair" : "Open"}</a>${halves}</div>`;
+    <div class="top"><h3>${esc(card.name).replace(/-/g, "\u2011")}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}</div>
+    <div class="body">
+      <a class="shot" href="${T(card.files.join(","))}" aria-label="Open ${esc(card.name)} in the Visualizer">
+        <img alt="" width="720" height="720" loading="lazy" decoding="async"></a>
+      <div class="side">
+        <p class="caption" aria-live="polite"></p>
+        <div class="switches">${controls}</div>
+        <div class="actions"><a class="btn primary" href="${T(card.files.join(","))}">${pair ? "Open the pair" : "Open"}</a>${halves}</div>
+      </div>
+    </div>`;
   const img = el.querySelector("img");
   const cap = el.querySelector(".caption");
   const state = card.switches.map(() => 0);
@@ -243,7 +271,6 @@ async function list(dir, el) {
     box.innerHTML = `<span class="note">Could not list them from GitHub (${esc(e.message)}). Try again in a minute.</span>`;
   }
 }
-list("drafts", "drafts");
 list("partners", "partners");
 </script>
 </body>
