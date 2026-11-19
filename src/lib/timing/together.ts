@@ -7,7 +7,6 @@ import type { Path, Settings, StartPose } from "../../types";
 import { buildPathCatalog } from "../auto/geometry";
 import type { AutoSection } from "../auto/types";
 import {
-  AUTO_LENGTH_S,
   simulateAuto,
   type PreviewResult,
   type PreviewTiming,
@@ -20,6 +19,7 @@ import {
   ROBOT_FACTS,
   TIP_CONDITIONS,
   volleysIn,
+  countsInAuto,
   type Tip,
   type TimingValues,
   type Volley,
@@ -114,7 +114,9 @@ export function volleysOf(
         t: l.t1,
         robot,
         load: loads[robot],
-        ...(volleysIn(l.command) === 1 ? {} : { volleys: volleysIn(l.command) }),
+        ...(volleysIn(l.command) === 1
+          ? {}
+          : { volleys: volleysIn(l.command) }),
       })),
   );
 }
@@ -185,7 +187,7 @@ export function previewTogether(
           ),
     );
     const next = hiveHistory(volleysOf(previews, loads), values).tips.map(
-      ({ start, settled }) => ({ start, settled }),
+      ({ start, settled, lastBall }) => ({ start, settled, lastBall }),
     );
     if (sameTips(next, tips)) break;
     tips = next;
@@ -208,9 +210,12 @@ export function previewTogether(
   return { previews, tips };
 }
 
-/** TIPs settled by the end of the Auto: what the alliance scores. */
+/**
+ * TIPs that count as AUTO, what the alliance scores: every ball for one left by 30 s and it settles
+ * by 38 s (model.ts countsInAuto, the team's rule).
+ */
 export function tipsInAuto(tips: Tip[]): number {
-  return tips.filter((tip) => tip.settled <= AUTO_LENGTH_S + 1e-9).length;
+  return tips.filter(countsInAuto).length;
 }
 
 /** Where changing one fact changes how many TIPs settle by 30 s. */
@@ -227,7 +232,7 @@ const SCAN_STEPS = 30;
 const NARROW_STEPS = 8;
 
 /**
- * For each fact, the nearest value above and below today's at which the TIPs by 30 s change,
+ * For each fact, the nearest value above and below today's at which the TIPs counted as AUTO change,
  * holding the other facts where they are.
  */
 export function breakpoints(

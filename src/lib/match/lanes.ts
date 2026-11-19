@@ -95,7 +95,7 @@ export interface HiveLane {
   tips: CausedTip[];
   volleys: (VolleyEffect & { name: string })[];
   cells: CellSpan[];
-  /** TIPs settled by 30 s: what the alliance scores. */
+  /** TIPs that count as AUTO (last ball out by 30 s, settled by 38 s): what the alliance scores. */
   tipsInAuto: number;
 }
 
@@ -327,7 +327,8 @@ export function robotOutcome(robot: RobotLane): string {
   if (robot.stalled) return "stuck in a wait";
   if (robot.unparked) return "not parked";
   if (robot.spareS < 0) return `over 30 s by ${(-robot.spareS).toFixed(1)} s`;
-  if (robot.guard) return `parked by the guard at ${robot.guard.t.toFixed(1)} s`;
+  if (robot.guard)
+    return `parked by the guard at ${robot.guard.t.toFixed(1)} s`;
   return `parked at ${robot.endTime.toFixed(1)} s`;
 }
 

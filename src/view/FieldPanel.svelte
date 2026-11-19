@@ -44,6 +44,7 @@
   import PathMarkers from "./scene/PathMarkers.svelte";
   import Obstacles from "./scene/Obstacles.svelte";
   import { polylinePath } from "./scene/svgPath";
+  import HiveCells from "../lib/match/HiveCells.svelte";
   import {
     COLLISION_COLOR,
     FIELD_POINT_COLOR,
@@ -661,6 +662,13 @@
           ondblclick={onDoubleClick}
         >
           <g transform={`matrix(1 0 0 -1 0 ${FIELD_SIZE})`}>
+            {#if auto.hive && /biobuzz/.test(fieldMapSrc)}
+              <HiveCells
+                history={auto.hive.history}
+                values={auto.hive.values}
+                seconds={playback.seconds}
+              />
+            {/if}
             {#if obstaclesOn}
               <Obstacles
                 shapes={doc.shapes}

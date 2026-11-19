@@ -8,6 +8,7 @@ import type { Overlays } from "./overlays.svelte";
 import { previewPose, type AutoState } from "./auto.svelte";
 import type { PreviewResult } from "../lib/auto/simulate";
 import type { TimePrediction } from "../types";
+import { countsInAuto } from "../lib/timing/model";
 import type { ProjectStore } from "./project.svelte";
 
 /**
@@ -49,12 +50,17 @@ export class Playback {
       );
     }),
   );
-  /** Seconds the clock runs for. */
-  duration = $derived.by(() =>
-    this.#overlays.active
+  /**
+   * Seconds the clock runs for: the robots' time, and (fork) on until the last TIP that counts as
+   * AUTO has settled, up to 38 s, so the field shows it swing (lib/match/hiveView.ts).
+   */
+  duration = $derived.by(() => {
+    const robots = this.#overlays.active
       ? Math.max(0, ...this.overlayPredictions.map((p) => p.totalTime))
-      : this.prediction.totalTime,
-  );
+      : this.prediction.totalTime;
+    const tips = (this.#auto?.hive?.history.tips ?? []).filter(countsInAuto);
+    return Math.max(robots, ...tips.map((tip) => tip.settled));
+  });
   seconds = $derived((this.percent / 100) * this.duration);
 
   robotPose: RobotPose = $derived.by(() => {
