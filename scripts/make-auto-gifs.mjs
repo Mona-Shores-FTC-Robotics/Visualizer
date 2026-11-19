@@ -314,9 +314,47 @@ async function pageLook(look) {
     .filter((s) => /^TIP \d+ comes on$/.test(s.textContent.trim()))
     .map((s) => Number(s.textContent.match(/\d+/)[0]));
   const contact = v.overlays.active ? (a.matchContactAt ?? null) : null;
+  // The result as data, for the page to lay out: each TIP that counts (when it settles; after 30 s
+  // still counts, by the team's rule), and each robot's end, by overlay index.
+  const ends = v.overlays.active
+    ? (a.matchLanes?.robots ?? []).map((r) => ({
+        still: r.still,
+        stalled: r.stalled,
+        unparked: r.unparked,
+        end: r.endTime,
+        guard: r.guard !== null,
+      }))
+    : [
+        {
+          still: false,
+          stalled: Boolean(previews[0].stalled),
+          unparked: Boolean(previews[0].unparked),
+          end: previews[0].endTime,
+          guard: Boolean(previews[0].guard),
+        },
+      ];
+  const round = (x) => Math.round(x * 10) / 10;
+  const outcome = {
+    tips: tips.map((t) => ({ settled: round(t.settled) })),
+    robots: ends.map((r) => {
+      const why = r.still
+        ? "no-show"
+        : r.stalled
+          ? "stuck in a wait"
+          : r.unparked
+            ? "not parked"
+            : r.end > 30 + 1e-6
+              ? "over 30 s"
+              : null;
+      return why
+        ? { parked: null, why }
+        : { parked: round(r.end), parkedBy: r.guard ? "guard" : null };
+    }),
+  };
   return {
     signature,
     robotSignatures,
+    outcome,
     result,
     did,
     contact,
@@ -396,7 +434,10 @@ async function scenarios(page, card, letters) {
   for (let bits = 0; bits < 1 << shown.length; bits++) {
     const key =
       shown.map((_, i) => ((bits >> i) & 1 ? "1" : "0")).join("") || "0";
-    const look = { choices: {}, tips: {}, waitTips };
+    // A TIP that misses answers no only the waits the best case reaches for it (alone, the preview
+    // takes a wait's TIP to come, the partner's included). A check inside the fallback reads the
+    // HIVE as the miss left it: R-Solo's fix at RIGHT sees RIGHT still up and fires.
+    const look = { choices: {}, tips: {}, waitTips: first.waits };
     shown.forEach((s, i) => {
       const flip = Boolean((bits >> i) & 1);
       if (s.kind === "choice") look.choices[s.condition] = !flip;
@@ -421,6 +462,9 @@ async function scenarios(page, card, letters) {
       bits,
       look,
       contact: seen.contact,
+      outcome: seen.outcome,
+      // What the drawing does instead, in its own words, only where it says more than the switches.
+      note: [...new Set(seen.did)].join("; ") || null,
       signature: seen.signature,
       robotSignatures: seen.robotSignatures,
       caption:
@@ -635,8 +679,16 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
   for (const l of looks)
     scenarios_[l.key] = {
       gif: {},
+      // The sentence, for the GIF's alt text; the page lays out the fields below.
       caption: l.caption,
+      best: l.bits === 0,
+      tips: l.outcome.tips,
+      // R first, then L (a solo card's one robot is r).
+      robots: l.outcome.robots
+        .map((r, i) => ({ robot: (letters[i] || "r").toLowerCase(), ...r }))
+        .sort((a, b) => a.robot.localeCompare(b.robot) * -1),
       contact: l.contact,
+      ...(l.note ? { note: l.note } : {}),
       ...(l.warn.length ? { warn: l.warn } : {}),
     };
   for (const view of views) {
