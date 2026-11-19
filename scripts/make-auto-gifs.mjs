@@ -51,8 +51,6 @@ export const CARDS = [
     name: "R-LeftUnderHive + L-LeftUnderHive",
     files: ["r-outside-lane.pp", "l-under-hive.pp"],
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
-    use: "L goes under the HIVE, R takes the outside lane",
-    note: "Driver Station: R-OutsideLane / L-UnderHive until the rename",
   },
   {
     id: "rightunder",
@@ -60,7 +58,6 @@ export const CARDS = [
     name: "R-RightUnderHive + L-RightUnderHive",
     files: ["drafts/r-right-under-hive.pp", "drafts/l-right-under-hive.pp"],
     halves: ["R-RightUnderHive", "L-RightUnderHive"],
-    use: "R goes under the HIVE and makes every fix; L takes the outside lane",
   },
   {
     id: "clockwise",
@@ -68,7 +65,6 @@ export const CARDS = [
     name: "R-Clockwise + L-Clockwise",
     files: ["r-clockwise.pp", "l-clockwise.pp"],
     halves: ["R-Clockwise", "L-Clockwise"],
-    use: "One loop, both robots the same way round",
   },
   {
     id: "nocross",
@@ -76,7 +72,6 @@ export const CARDS = [
     name: "R-NoCross + L-NoCross",
     files: ["r-no-cross.pp", "l-no-cross.pp"],
     halves: ["R-NoCross", "L-NoCross"],
-    use: "Each robot stays on its own end",
   },
   {
     id: "r-solo",
@@ -84,7 +79,6 @@ export const CARDS = [
     name: "R-Solo",
     files: ["r-solo.pp"],
     tag: "Default",
-    use: "Partner off the far start by 10 s, parks at the far end",
   },
 ];
 const MAX_SWITCHES = 4;
