@@ -196,11 +196,14 @@
             "r": "lane--010--r",
             "l": "lane--010--l"
           },
-          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 25.7 s \u00b7 no contact",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 2 TIPs \u00b7 R parked at 28.6 s \u00b7 L parked at 28.2 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
               "settled": 7.8
+            },
+            {
+              "settled": 32.4
             }
           ],
           "robots": [
@@ -211,8 +214,8 @@
             },
             {
               "robot": "l",
-              "parked": 29.5,
-              "parkedBy": "guard"
+              "parked": 28.2,
+              "parkedBy": null
             }
           ],
           "contact": null,
@@ -254,11 +257,14 @@
             "r": "lane--010--r",
             "l": "lane--010--l"
           },
-          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 25.7 s \u00b7 no contact",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 2 TIPs \u00b7 R parked at 28.6 s \u00b7 L parked at 28.2 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
               "settled": 7.8
+            },
+            {
+              "settled": 32.4
             }
           ],
           "robots": [
@@ -269,8 +275,8 @@
             },
             {
               "robot": "l",
-              "parked": 29.5,
-              "parkedBy": "guard"
+              "parked": 28.2,
+              "parkedBy": null
             }
           ],
           "contact": null,

@@ -134,6 +134,7 @@ function segmentKind(command: string): SegmentKind {
 const LABELS: Record<string, string> = {
   PickFlowerLaunch: "Pick flower and launch",
   LaunchAll: "Launch all",
+  LaunchAllAimed: "Launch all, aimed",
   PickFlower: "Pick flower",
   GardenGather: "Garden gather",
   SpinUp: "Spin up",
