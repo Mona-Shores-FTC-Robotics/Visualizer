@@ -872,11 +872,11 @@
         "Tip"
       ],
       "typicalS": {
-        "LaunchAll": 4,
+        "LaunchAll": 2.5,
         "LaunchOne": 0.5,
         "SpinUp": 0.1,
         "PickFlower": 4,
-        "GardenGather": 5
+        "GardenGather": 3
       }
     },
     "points": {
