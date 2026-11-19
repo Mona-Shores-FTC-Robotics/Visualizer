@@ -139,7 +139,7 @@ export class AutoState {
       // taken to come.
       return previewTogether(
         [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
-        this.#timingValues.current,
+        this.match.withTips(this.#timingValues.current),
         true,
         { tipsCome: true },
       );
@@ -320,7 +320,7 @@ export class AutoState {
       }
       const together = this.together;
       if (!together) return null;
-      const values = this.#timingValues.current;
+      const values = this.match.withTips(this.#timingValues.current);
       return {
         history: hiveHistory(volleysOf(together.previews), values),
         values,

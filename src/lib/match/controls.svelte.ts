@@ -107,6 +107,17 @@ export class MatchControls {
     return out;
   }
 
+  /**
+   * Fork: the team's facts with only the TIP what-ifs: what one Auto previewed alone uses, so a TIP
+   * that misses there misses on the HIVE too (its pieces do not land; a later volley TIPs it).
+   */
+  withTips(base: TimingValues): TimingValues {
+    const out = { ...base };
+    for (const [tip, misses] of Object.entries(this.tips))
+      out[tipMissesKey(Number(tip))] = misses;
+    return out;
+  }
+
   /** How many tries TIP `tip` misses in this look (0: the first one TIPs it). */
   tipMisses(tip: number): number {
     return this.tips[tip] ?? 0;

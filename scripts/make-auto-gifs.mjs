@@ -165,6 +165,10 @@ async function pageLook(look) {
     for (const [id, n] of Object.entries(look.waitTips))
       if (look.tips[n] === false) scenario[`wait:${id}`] = false;
     store.previewScenario.set(scenario);
+    // The TIP misses on the HIVE too (its volley's pieces do not land), as in a pair.
+    a.match.reset();
+    for (const [n, comes] of Object.entries(look.tips))
+      if (!comes) a.match.setTipMisses(Number(n), 1);
   }
   await new Promise((r) =>
     requestAnimationFrame(() => requestAnimationFrame(r)),

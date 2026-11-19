@@ -97,6 +97,42 @@ export function hiveAt(
   return view;
 }
 
+/** Seconds a volley that does not count is drawn: its pieces hit the CELL's edge and fall away. */
+export const MISS_S = 3;
+
+/** A volley whose pieces did not count, as the field draws it: at which CELL, how long ago. */
+export interface MissView {
+  cell: Cell;
+  /** 0 as it lands, 1 when it has gone (MISS_S later). */
+  age: number;
+  pieces: number;
+}
+
+/**
+ * The volleys at `t` whose pieces do not count: a try at a TIP that misses (the Match view's
+ * "Misses"), or one that lands while the HIVE swings. They are drawn at the CELL that was up when
+ * they landed, which neither gains them nor TIPs.
+ */
+export function missesAt(
+  history: HiveHistory,
+  values: TimingValues,
+  t: number,
+): MissView[] {
+  const out: MissView[] = [];
+  for (const v of history.volleys) {
+    if (v.counted) continue;
+    const age = (t - v.t) / MISS_S;
+    if (age < 0 || age > 1) continue;
+    const before = history.tips.filter((tip) => tip.start <= v.t + 1e-9).length;
+    out.push({
+      cell: upAfter(before),
+      age,
+      pieces: Math.max(1, Math.round(values.volleyLoad ?? 4)),
+    });
+  }
+  return out;
+}
+
 /**
  * The red HIVE's two CELLs on the field image, Pedro's frame, inches: the outlines the field draws
  * (measured on biobuzz-dark.webp). LEFT is the CELL at the scoring end, past the centre line.
