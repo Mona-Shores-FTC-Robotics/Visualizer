@@ -53,13 +53,6 @@ export const CARDS = [
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
   },
   {
-    id: "rightunder",
-    group: "pair",
-    name: "R-RightUnderHive + L-RightUnderHive",
-    files: ["r-right-under-hive.pp", "l-right-under-hive.pp"],
-    halves: ["R-RightUnderHive", "L-RightUnderHive"],
-  },
-  {
     id: "clockwise",
     group: "pair",
     name: "R-Clockwise + L-Clockwise",
