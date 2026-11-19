@@ -266,10 +266,20 @@ async function pageLook(look) {
   });
   // Each robot's drives (in the overlays' order): a view with one robot drawn changes only when
   // that robot's do.
-  const robotSignatures = previews.map((p) =>
-    JSON.stringify(
-      (p.drives ?? []).map((d) => `${d.pathId}@${d.t0.toFixed(1)}`),
+  // Every view draws the HIVE too: its TIPs and each volley that lands or misses, so two looks
+  // share a GIF only when the drawn robots drive the same and the HIVE does the same.
+  const hive = a.hive?.history;
+  const hiveSignature = JSON.stringify([
+    (hive?.tips ?? []).map((t) => t.start.toFixed(1)),
+    (hive?.volleys ?? []).map(
+      (x) => `${x.t.toFixed(1)}${x.counted ? "" : "x"}`,
     ),
+  ]);
+  const robotSignatures = previews.map((p) =>
+    JSON.stringify([
+      (p.drives ?? []).map((d) => `${d.pathId}@${d.t0.toFixed(1)}`),
+      hiveSignature,
+    ]),
   );
   const signature = JSON.stringify(robotSignatures);
   let result;
