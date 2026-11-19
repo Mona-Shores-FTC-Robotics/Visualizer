@@ -29,7 +29,14 @@ import {
   worstCase,
   type PreviewResult,
 } from "../lib/auto/simulate";
-import { previewTogether, type FieldEntry } from "../lib/timing/together";
+import {
+  previewTogether,
+  robotValues,
+  volleysOf,
+  type FieldEntry,
+} from "../lib/timing/together";
+import { hiveHistory, type TimingValues } from "../lib/timing/model";
+import type { HiveHistory } from "../lib/match/hiveView";
 import {
   aimMovedLaunchSpots,
   aimOwnLaunchSpots,
@@ -290,6 +297,36 @@ export class AutoState {
     }
     return null;
   });
+
+  /**
+   * Fork: the HIVE in what the field shows (the Autos shown together, else the open one alone):
+   * every volley that lands and the TIPs, for the field to draw (lib/match/hiveView.ts).
+   */
+  hive = $derived.by(
+    (): { history: HiveHistory; values: TimingValues } | null => {
+      if (this.#overlays.active) {
+        const { previews, entries, shown } = this.overlayTogether;
+        const list = shown.map((overlay) => previews.get(overlay));
+        if (!list.length || list.some((p) => !p)) return null;
+        const values = this.matchValues;
+        const loads = entries.map((e) => robotValues(e, values).volleyLoad);
+        return {
+          history: hiveHistory(
+            volleysOf(list as PreviewResult[], loads),
+            values,
+          ),
+          values,
+        };
+      }
+      const together = this.together;
+      if (!together) return null;
+      const values = this.#timingValues.current;
+      return {
+        history: hiveHistory(volleysOf(together.previews), values),
+        values,
+      };
+    },
+  );
 
   /** Fork: the Match view's answer in one line (lanes.ts matchResult); null outside it. */
   matchResultLine = $derived(

@@ -244,6 +244,27 @@ export function timingFileText(
 export interface Tip {
   start: number;
   settled: number;
+  /**
+   * When the volley that TIPs it ends, its last piece out (the counted feed ends just after the
+   * last ball). Unset for a TIP nothing on the field caused (an Auto alone, waiting on its partner).
+   */
+  lastBall?: number;
+}
+
+/**
+ * The team's rule for a TIP that counts as AUTO (mentor, 19 Nov 2026): every ball for it has left
+ * by 30 s, and it settles by 38 s (manual §10.5 B counts a TIP that completes in the transition as
+ * AUTO). A TIP that settles after 30 s is shown as AUTO, not dropped.
+ */
+export const AUTO_TIP_LAST_BALL_S = 30;
+export const AUTO_TIP_SETTLED_S = 38;
+
+/** Whether a TIP counts as AUTO under the team's rule. */
+export function countsInAuto(tip: Tip): boolean {
+  return (
+    (tip.lastBall ?? tip.start) <= AUTO_TIP_LAST_BALL_S + 1e-9 &&
+    tip.settled <= AUTO_TIP_SETTLED_S + 1e-9
+  );
 }
 
 /** A volley on the field's clock: when it ended, and which robot (its index in the entries) fired it. */
@@ -338,7 +359,12 @@ export function hiveHistory(
     const start = Math.max(0, volley.t + values.tipStartS);
     const settled = start + Math.max(0, values.tipSwingS);
     effect.tip = tips.length;
-    tips.push({ start, settled, cause: effects.length - 1 });
+    tips.push({
+      start,
+      settled,
+      lastBall: volley.t,
+      cause: effects.length - 1,
+    });
     settledAt = settled;
   }
   return { volleys: effects, tips };
@@ -352,7 +378,7 @@ export function tipsFrom(volleyEnds: number[], values: TimingValues): Tip[] {
   return hiveHistory(
     volleyEnds.map((t) => ({ t, robot: 0 })),
     values,
-  ).tips.map(({ start, settled }) => ({ start, settled }));
+  ).tips.map(({ start, settled, lastBall }) => ({ start, settled, lastBall }));
 }
 
 /**

@@ -218,7 +218,8 @@
 
   {#if tips.length}
     <p class="text-sm text-heading mb-1">
-      TIPs in this preview (settled), {tipsInAuto(tips)} by 30 s:
+      TIPs in this preview (settled), {tipsInAuto(tips)} count as AUTO (last ball
+      out by 30 s, settled by 38 s):
       {tips
         .map((tip, i) => `TIP ${i + 1} ${tip.settled.toFixed(1)} s`)
         .join(" · ")}
@@ -226,8 +227,8 @@
   {/if}
   <p class="text-xs text-body mb-3">
     Breakpoints: for each fact, the nearest values (others held where they are)
-    at which the TIPs by 30 s change for the Autos on screen. A fact with a
-    breakpoint close to its value is the one to measure first.
+    at which the TIPs counted as AUTO change for the Autos on screen. A fact
+    with a breakpoint close to its value is the one to measure first.
   </p>
 
   <div class="flex flex-wrap justify-end gap-2">

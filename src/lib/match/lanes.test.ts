@@ -45,7 +45,11 @@ test("hiveHistory gives tipsFrom's TIPs, and says which volley started each", ()
   ];
   const history = hiveHistory(volleys, v);
   assertEqual(
-    history.tips.map(({ start, settled }) => ({ start, settled })),
+    history.tips.map(({ start, settled, lastBall }) => ({
+      start,
+      settled,
+      lastBall,
+    })),
     tipsFrom(
       volleys.map((x) => x.t),
       v,
@@ -226,9 +230,19 @@ test("the result line: the TIPs by 30 s, how each robot ends, and contact", () =
   assert(line.startsWith(`${tips} TIP${tips === 1 ? "" : "s"} · LEFT `), line);
   assert(line.includes(`RIGHT ${robotOutcome(lanes.robots[1])}`), line);
   assert(line.endsWith("· no contact"), line);
-  assert(matchResult(lanes, 12.46).endsWith("· contact at 12.5 s"), "contact time");
+  assert(
+    matchResult(lanes, 12.46).endsWith("· contact at 12.5 s"),
+    "contact time",
+  );
   const still = { ...lanes.robots[0], still: true };
   assertEqual(robotOutcome(still), "no-show");
-  const guarded = { ...lanes.robots[0], still: false, stalled: false, unparked: false, spareS: 3, guard: { t: 27, label: "" } };
+  const guarded = {
+    ...lanes.robots[0],
+    still: false,
+    stalled: false,
+    unparked: false,
+    spareS: 3,
+    guard: { t: 27, label: "" },
+  };
   assertEqual(robotOutcome(guarded), "parked by the guard at 27.0 s");
 });
