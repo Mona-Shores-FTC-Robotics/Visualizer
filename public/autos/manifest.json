@@ -1,0 +1,460 @@
+{
+  "generated": "2026-11-19",
+  "branch": "master",
+  "cards": [
+    {
+      "id": "lane",
+      "group": "pair",
+      "name": "Lane pair",
+      "halves": [
+        "R-OutsideLane",
+        "L-UnderHive"
+      ],
+      "use": "Both our robots",
+      "files": [
+        "r-outside-lane.pp",
+        "l-under-hive.pp"
+      ],
+      "switches": [
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 2",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 3",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "100": {
+          "gif": "lane--100.gif",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact"
+        },
+        "101": {
+          "gif": "lane--100.gif",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact"
+        },
+        "110": {
+          "gif": "lane--100.gif",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact"
+        },
+        "111": {
+          "gif": "lane--100.gif",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact"
+        },
+        "000": {
+          "gif": "lane--000.gif",
+          "caption": "Best case · 3 TIPs · R parked at 27.4 s · L parked at 24.7 s · no contact"
+        },
+        "010": {
+          "gif": "lane--010.gif",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP · R parked at 28.6 s · L parked by the guard at 25.7 s · no contact"
+        },
+        "001": {
+          "gif": "lane--000.gif",
+          "caption": "2 TIPs · R parked at 27.4 s · L parked at 24.7 s · no contact"
+        },
+        "011": {
+          "gif": "lane--010.gif",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP · R parked at 28.6 s · L parked by the guard at 25.7 s · no contact"
+        }
+      }
+    },
+    {
+      "id": "clockwise",
+      "group": "pair",
+      "name": "Clockwise pair",
+      "halves": [
+        "R-Clockwise",
+        "L-Clockwise"
+      ],
+      "use": "Both our robots · 20245 as R",
+      "files": [
+        "r-clockwise.pp",
+        "l-clockwise.pp"
+      ],
+      "switches": [
+        {
+          "kind": "choice",
+          "label": "Pickup",
+          "options": [
+            "Wall flower",
+            "Garden"
+          ]
+        },
+        {
+          "kind": "choice",
+          "label": "Priority",
+          "options": [
+            "Three TIP",
+            "Park"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 2",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "1000": {
+          "gif": "clockwise--1000.gif",
+          "caption": "2 TIPs · R parked at 29.6 s · L parked by the guard at 22.8 s · contact at 11.0 s"
+        },
+        "1001": {
+          "gif": "clockwise--1100.gif",
+          "caption": "L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.5 s · contact at 11.0 s"
+        },
+        "1010": {
+          "gif": "clockwise--1010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "1011": {
+          "gif": "clockwise--1010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "1100": {
+          "gif": "clockwise--1100.gif",
+          "caption": "2 TIPs · R parked at 28.5 s · L parked by the guard at 22.8 s · contact at 11.0 s"
+        },
+        "1101": {
+          "gif": "clockwise--1100.gif",
+          "caption": "L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.5 s · contact at 11.0 s"
+        },
+        "1110": {
+          "gif": "clockwise--1010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "1111": {
+          "gif": "clockwise--1010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "0000": {
+          "gif": "clockwise--0000.gif",
+          "caption": "Best case · 2 TIPs · R parked at 29.8 s · L parked at 26.3 s · no contact"
+        },
+        "0100": {
+          "gif": "clockwise--0100.gif",
+          "caption": "2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact"
+        },
+        "0010": {
+          "gif": "clockwise--0010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "0110": {
+          "gif": "clockwise--0010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "0001": {
+          "gif": "clockwise--0100.gif",
+          "caption": "L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact"
+        },
+        "0101": {
+          "gif": "clockwise--0100.gif",
+          "caption": "L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact"
+        },
+        "0011": {
+          "gif": "clockwise--0010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        },
+        "0111": {
+          "gif": "clockwise--0010.gif",
+          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact"
+        }
+      }
+    },
+    {
+      "id": "nocross",
+      "group": "pair",
+      "name": "NoCross pair",
+      "halves": [
+        "R-NoCross",
+        "L-NoCross"
+      ],
+      "use": "Both our robots, simplest",
+      "files": [
+        "r-no-cross.pp",
+        "l-no-cross.pp"
+      ],
+      "switches": [
+        {
+          "kind": "choice",
+          "label": "If no TIP 2",
+          "options": [
+            "Wait for partner",
+            "Cross & fix"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 2",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        },
+        {
+          "kind": "choice",
+          "label": "If no TIP 1",
+          "options": [
+            "Cross & fix",
+            "Wait for partner fix"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "1000": {
+          "gif": "nocross--1000.gif",
+          "caption": "2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "1001": {
+          "gif": "nocross--0001.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s"
+        },
+        "1010": {
+          "gif": "nocross--1000.gif",
+          "caption": "2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "1011": {
+          "gif": "nocross--0011.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact"
+        },
+        "1100": {
+          "gif": "nocross--1100.gif",
+          "caption": "2 TIPs · R parked at 27.6 s · L parked at 20.9 s · no contact"
+        },
+        "1101": {
+          "gif": "nocross--0001.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s"
+        },
+        "1110": {
+          "gif": "nocross--1100.gif",
+          "caption": "2 TIPs · R parked at 27.6 s · L parked at 20.9 s · no contact"
+        },
+        "1111": {
+          "gif": "nocross--0011.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact"
+        },
+        "0000": {
+          "gif": "nocross--0000.gif",
+          "caption": "Best case · 2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "0100": {
+          "gif": "nocross--0000.gif",
+          "caption": "1 TIP · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "0010": {
+          "gif": "nocross--0000.gif",
+          "caption": "2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "0110": {
+          "gif": "nocross--0000.gif",
+          "caption": "1 TIP · R parked at 25.9 s · L parked at 20.9 s · no contact"
+        },
+        "0001": {
+          "gif": "nocross--0001.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s"
+        },
+        "0101": {
+          "gif": "nocross--0001.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s"
+        },
+        "0011": {
+          "gif": "nocross--0011.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact"
+        },
+        "0111": {
+          "gif": "nocross--0011.gif",
+          "caption": "1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact"
+        }
+      }
+    },
+    {
+      "id": "r-solo",
+      "group": "solo",
+      "name": "R-Solo",
+      "tag": "Default",
+      "use": "Partner off the far start by 10 s, parks at the far end",
+      "files": [
+        "r-solo.pp"
+      ],
+      "switches": [
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "0": {
+          "gif": "r-solo--0.gif",
+          "caption": "Best case · 2 TIPs by this robot · parked at 25.2 s"
+        },
+        "1": {
+          "gif": "r-solo--1.gif",
+          "caption": "1 TIP by this robot · parked at 19.7 s"
+        }
+      }
+    },
+    {
+      "id": "r-no-cross",
+      "group": "solo",
+      "name": "R-NoCross",
+      "tag": "Fallback",
+      "use": "Partner sits on the far start",
+      "files": [
+        "r-no-cross.pp"
+      ],
+      "switches": [
+        {
+          "kind": "choice",
+          "label": "If no TIP 2",
+          "options": [
+            "Wait for partner",
+            "Cross & fix"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 2",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "10": {
+          "gif": "r-no-cross--00.gif",
+          "caption": "1 TIP by this robot · parked by the guard at 17.7 s"
+        },
+        "11": {
+          "gif": "r-no-cross--11.gif",
+          "caption": "1 TIP by this robot · parked at 27.6 s"
+        },
+        "00": {
+          "gif": "r-no-cross--00.gif",
+          "caption": "Best case · 1 TIP by this robot · parked by the guard at 17.7 s"
+        },
+        "01": {
+          "gif": "r-no-cross--01.gif",
+          "caption": "1 TIP by this robot · parked at 25.9 s"
+        }
+      }
+    },
+    {
+      "id": "l-no-cross",
+      "group": "solo",
+      "name": "L-NoCross",
+      "tag": "Fallback",
+      "use": "Partner insists on the near start",
+      "files": [
+        "l-no-cross.pp"
+      ],
+      "switches": [
+        {
+          "kind": "choice",
+          "label": "If no TIP 1",
+          "options": [
+            "Cross & fix",
+            "Wait for partner fix"
+          ]
+        },
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "10": {
+          "gif": "l-no-cross--00.gif",
+          "caption": "1 TIP by this robot · parked at 22.5 s"
+        },
+        "11": {
+          "gif": "l-no-cross--11.gif",
+          "caption": "1 TIP by this robot · parked at 26.3 s"
+        },
+        "00": {
+          "gif": "l-no-cross--00.gif",
+          "caption": "Best case · 1 TIP by this robot · parked at 22.5 s"
+        },
+        "01": {
+          "gif": "l-no-cross--01.gif",
+          "caption": "0 TIPs by this robot · parked at 24.9 s"
+        }
+      }
+    },
+    {
+      "id": "l-assist",
+      "group": "trial",
+      "name": "L-Assist",
+      "tag": "Trial",
+      "use": "Partner runs its whole route from the near start",
+      "files": [
+        "drafts/l-assist.pp"
+      ],
+      "switches": [
+        {
+          "kind": "tip",
+          "label": "TIP 1",
+          "options": [
+            "Lands",
+            "Misses"
+          ]
+        }
+      ],
+      "scenarios": {
+        "0": {
+          "gif": "l-assist--0.gif",
+          "caption": "Best case · 1 TIP by this robot · parked at 9.7 s"
+        },
+        "1": {
+          "gif": "l-assist--1.gif",
+          "caption": "0 TIPs by this robot · parked at 10.9 s"
+        }
+      }
+    }
+  ]
+}

@@ -1,15 +1,32 @@
 #!/usr/bin/env node
-// Writes public/autos/<id>.gif, the animations on the Team Autos page (public/autos.html).
+// Writes the Team Autos page's animations (public/autos.html): public/autos/<id>--<key>.gif, one
+// per scenario that drives differently, and public/autos/manifest.json, which the page reads.
 //
-// Each GIF is the field from the Visualizer's own match view playing an Auto (or a pair) from
-// biobuzz master, at the preview's default answers: every wait's trigger comes (DEFAULT_ANSWER in
-// src/lib/auto/simulate.ts), so it is the drawn best case. A match clock is drawn on the field.
+// Each Auto (or pair) is opened from biobuzz master in the Visualizer's dev server, and its
+// switches are derived from the Autos themselves, not picked by hand:
+//   - an INIT route choice (a wait drawn as `choice`, e.g. Pickup, Priority, "if no TIP 1") is a
+//     switch between its two legs;
+//   - a TIP the Auto waits for is a switch: the volley at it lands, or misses. One Auto alone:
+//     every wait the drawing branches on, numbered by the TIP that answers it in the preview (the
+//     TIPs settled by the time it is answered), and "misses" answers every wait on that TIP no, so
+//     the drawn fallback (a fix) runs. A pair: the Match view's TIP rows (lib/match/tipToggles.ts),
+//     and "misses" is its first try missing: a later volley at it (a fix) can still TIP it.
+// Choices come first, each followed by the TIP it names, then the other TIPs; at most MAX_SWITCHES.
+// Every combination is previewed; combinations that drive the same way share one GIF.
 //
 // Run with the dev server up:   pnpm dev --port 5179 &   node scripts/make-auto-gifs.mjs
-// Needs Playwright (pre-installed or a dev dependency) and ffmpeg on the PATH.
-// Options: --base http://localhost:5179/  --only lane,r-solo  --fps 10  --speed 3  --width 480
+// It reads the app through window.__visualizer, which App.svelte sets on the dev server only.
+// Needs Playwright and ffmpeg. Options: --base URL  --only lane,r-solo  --fps 10  --speed 3  --width 480
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -17,16 +34,67 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-/** The Team Autos page's entries. Keep in step with ENTRIES in public/autos.html. */
-export const GIFS = [
-  { id: "lane", files: ["r-outside-lane.pp", "l-under-hive.pp"] },
-  { id: "clockwise", files: ["r-clockwise.pp", "l-clockwise.pp"] },
-  { id: "nocross", files: ["r-no-cross.pp", "l-no-cross.pp"] },
-  { id: "r-solo", files: ["r-solo.pp"] },
-  { id: "r-no-cross", files: ["r-no-cross.pp"] },
-  { id: "l-no-cross", files: ["l-no-cross.pp"] },
-  { id: "l-assist", files: ["drafts/l-assist.pp"] },
+/** The Team Autos page's cards. The page takes its names and order from the manifest. */
+export const CARDS = [
+  {
+    id: "lane",
+    group: "pair",
+    name: "Lane pair",
+    files: ["r-outside-lane.pp", "l-under-hive.pp"],
+    halves: ["R-OutsideLane", "L-UnderHive"],
+    use: "Both our robots",
+  },
+  {
+    id: "clockwise",
+    group: "pair",
+    name: "Clockwise pair",
+    files: ["r-clockwise.pp", "l-clockwise.pp"],
+    halves: ["R-Clockwise", "L-Clockwise"],
+    use: "Both our robots · 20245 as R",
+  },
+  {
+    id: "nocross",
+    group: "pair",
+    name: "NoCross pair",
+    files: ["r-no-cross.pp", "l-no-cross.pp"],
+    halves: ["R-NoCross", "L-NoCross"],
+    use: "Both our robots, simplest",
+  },
+  {
+    id: "r-solo",
+    group: "solo",
+    name: "R-Solo",
+    files: ["r-solo.pp"],
+    tag: "Default",
+    use: "Partner off the far start by 10 s, parks at the far end",
+  },
+  {
+    id: "r-no-cross",
+    group: "solo",
+    name: "R-NoCross",
+    files: ["r-no-cross.pp"],
+    tag: "Fallback",
+    use: "Partner sits on the far start",
+  },
+  {
+    id: "l-no-cross",
+    group: "solo",
+    name: "L-NoCross",
+    files: ["l-no-cross.pp"],
+    tag: "Fallback",
+    use: "Partner insists on the near start",
+  },
+  {
+    id: "l-assist",
+    group: "trial",
+    name: "L-Assist",
+    files: ["drafts/l-assist.pp"],
+    tag: "Trial",
+    use: "Partner runs its whole route from the near start",
+  },
 ];
+const MAX_SWITCHES = 4;
+const AUTO_S = 30;
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -37,127 +105,306 @@ const FPS = Number(arg("fps", "10"));
 const SPEED = Number(arg("speed", "3"));
 const WIDTH = Number(arg("width", "480"));
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
-const AUTO_S = 30;
 const OUT = new URL("../public/autos/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch();
-for (const gif of GIFS.filter((g) => !ONLY?.length || ONLY.includes(g.id))) {
-  const page = await browser.newPage({
-    viewport: { width: 1400, height: 1000 },
-    colorScheme: "dark",
-  });
-  await page.goto(`${BASE}#team=master/${gif.files.join(",")}`);
-  const pair = gif.files.length > 1;
-  // A pair opens in the match view, whose timeline is a slider over the 30 s; one Auto opens in
-  // the editor, whose playback bar is a range input over the preview's own length.
-  const timeline = page.locator(
-    'svg[role="slider"][aria-label^="Match timeline"]',
-  );
-  const range = page.locator(
-    'input[type="range"][aria-label="Playback position"]',
-  );
-  await (pair ? timeline : range).waitFor({ timeout: 30000 });
-  await page.waitForTimeout(2000);
-  if (!pair) {
-    // Nothing selected, and no editor chrome over the field.
-    await page.keyboard.press("Escape");
-  }
+/** "CROSS AND FIX IT" → "Cross & fix"; "WALL_FLOWER" → "Wall flower". */
+const pretty = (s) => {
+  const t = String(s)
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\band\b/g, "&")
+    .replace(/\s+it$/, "")
+    .trim();
+  return t.replace(/\btip\b/g, "TIP").replace(/^./, (c) => c.toUpperCase());
+};
 
-  // The field: the drawing layer's square box.
+// ---- In the page -------------------------------------------------------------------------------
+
+/** Runs in the page: the Auto's route choices, from the drawing. */
+function pageChoices() {
+  const v = window.__visualizer;
+  const autos = v.overlays.active
+    ? v.overlays.items.map((o) => o.doc.auto)
+    : [v.auto.auto];
+  const out = [];
+  const walk = (cards) => {
+    for (const c of cards ?? []) {
+      if (c.kind !== "firstOf") continue;
+      if (c.choice && !out.some((o) => o.option === c.choice)) {
+        const yes = c.rows.findIndex((r) => "when" in r);
+        out.push({
+          option: c.choice,
+          condition: c.rows[yes].when[0],
+          legs: [c.rows[yes].label ?? "yes", c.rows[1 - yes].label ?? "no"],
+        });
+      }
+      for (const r of c.rows) walk(r.cards);
+    }
+  };
+  autos.forEach((a) => walk(a?.cards));
+  return out;
+}
+
+/**
+ * Runs in the page: sets one look and reports it. `look` is { choices: {condition: bool},
+ * tips: {n: bool}, waitTips: {cardId: n} } (alone: which TIP each branching wait is for).
+ */
+async function pageLook(look) {
+  const v = window.__visualizer;
+  const a = v.auto;
+  if (v.overlays.active) {
+    a.match.reset();
+    for (const [n, comes] of Object.entries(look.tips))
+      if (!comes) a.match.setTipMisses(Number(n), 1);
+    for (const o of v.overlays.items) {
+      for (const [condition, yes] of Object.entries(look.choices))
+        if (!yes) a.match.setTrigger(o.filePath, o.doc.auto, condition, false);
+    }
+  } else {
+    const store = await import("/src/lib/auto/store.ts");
+    const scenario = {};
+    for (const [condition, yes] of Object.entries(look.choices))
+      if (!yes) scenario[condition] = false;
+    for (const [id, n] of Object.entries(look.waitTips))
+      if (look.tips[n] === false) scenario[`wait:${id}`] = false;
+    store.previewScenario.set(scenario);
+  }
+  await new Promise((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(r)),
+  );
+  const together = v.overlays.active ? a.overlayTogether : a.together;
+  const raw = together.previews ?? [];
+  const previews = (raw instanceof Map ? [...raw.values()] : [...raw]).filter(
+    Boolean,
+  );
+  const tips = together.tips.filter((t) => t.settled <= 30 + 1e-6);
+  // Which TIP each branching wait reached is for, by the CELL it asks about: RIGHT is up at the
+  // start and after TIPs 2, 4…; LEFT after TIPs 1, 3…. CellUp is the CELL at the robot's end (the
+  // end of its last drive: y above the centre is LEFT). With k TIPs settled when it is asked, it
+  // checks TIP k if that CELL is up, else waits for TIP k + 1. (Alone, the preview answers a wait
+  // for the partner's TIP at once, so its time cannot tell.)
+  const lines = v.overlays.active ? null : v.project.doc.lines;
+  const waits = {};
+  previews.forEach((p, pi) => {
+    const docLines = lines ?? v.overlays.items[pi]?.doc.lines ?? [];
+    for (const e of p.log ?? []) {
+      const m =
+        e.kind === "row" && e.cardId && e.text.match(/ \((\w+) true\)$/);
+      if (!m) continue;
+      let left;
+      if (/^Left/.test(m[1])) left = true;
+      else if (/^Right/.test(m[1])) left = false;
+      else {
+        const last = (p.drives ?? []).filter((d) => d.t1 <= e.t + 1e-6).pop();
+        const end = docLines.find((l) => l.id === last?.pathId)?.endPoint;
+        if (!end) continue;
+        left = end.y > 70.75;
+      }
+      const k = tips.filter((t) => t.settled <= e.t + 1e-6).length;
+      const upNow = (k % 2 === 1) === left;
+      waits[e.cardId] = upNow && k > 0 ? k : k + 1;
+    }
+  });
+  const branching = new Set();
+  const walk = (cards) => {
+    for (const c of cards ?? []) {
+      if (c.kind !== "firstOf") continue;
+      const plain = c.rows.every((r) => !r.cards?.length);
+      if (!c.choice && !plain && c.rows.some((r) => "when" in r))
+        branching.add(c.id);
+      for (const r of c.rows) walk(r.cards);
+    }
+  };
+  (v.overlays.active
+    ? v.overlays.items.map((o) => o.doc.auto)
+    : [a.auto]
+  ).forEach((x) => walk(x?.cards));
+  for (const id of Object.keys(waits)) if (!branching.has(id)) delete waits[id];
+  // What the robots did differently: each wait that timed out says what it does then, in the
+  // drawing's own words ("LEFT up before 9 s, otherwise cross under the HIVE, …").
+  const names = v.overlays.active
+    ? v.overlays.items.map((o) =>
+        /(^|\/)(biobuzz-)?r-/.test(o.filePath)
+          ? "R"
+          : /(^|\/)(biobuzz-)?l-/.test(o.filePath)
+            ? "L"
+            : "",
+      )
+    : [""];
+  const did = [];
+  previews.forEach((p, pi) => {
+    for (const e of p.log ?? []) {
+      if (e.kind !== "row" || / true\)$/.test(e.text)) continue;
+      const m = e.text.match(/otherwise (.+?) → /);
+      if (m)
+        did.push(
+          `${names[pi] ? names[pi] + " " : ""}${m[1]}`.replace(/^./, (c) =>
+            c.toUpperCase(),
+          ),
+        );
+    }
+  });
+  const signature = JSON.stringify(
+    previews.map((p) =>
+      (p.drives ?? []).map((d) => `${d.pathId}@${d.t0.toFixed(1)}`),
+    ),
+  );
+  let result;
+  if (v.overlays.active) {
+    result = a.matchResultLine;
+    v.overlays.items.forEach((o) => {
+      const name = o.filePath
+        .replace(/^.*\//, "")
+        .replace(/^biobuzz-/, "")
+        .replace(/\.pp$/, "");
+      result = result
+        .split(name)
+        .join(name.startsWith("r-") ? "R" : name.startsWith("l-") ? "L" : name);
+    });
+  } else {
+    const p = previews[0];
+    const end = p.stalled
+      ? "stuck in a wait"
+      : p.unparked
+        ? "not parked"
+        : p.endTime > 30
+          ? `over 30 s by ${(p.endTime - 30).toFixed(1)} s`
+          : p.guard
+            ? `parked by the guard at ${p.guard.t.toFixed(1)} s`
+            : `parked at ${p.endTime.toFixed(1)} s`;
+    result = `${tips.length} TIP${tips.length === 1 ? "" : "s"} by this robot · ${end}`;
+  }
+  // Pair: the Match view's TIP rows.
+  const tipRows = [...document.querySelectorAll("span")]
+    .filter((s) => /^TIP \d+ comes on$/.test(s.textContent.trim()))
+    .map((s) => Number(s.textContent.match(/\d+/)[0]));
+  return { signature, result, did, waits, tipRows: [...new Set(tipRows)] };
+}
+
+// ---- Scenarios ---------------------------------------------------------------------------------
+
+/** The card's switches and every combination's look, previewed. */
+async function scenarios(page, card) {
+  const choices = await page.evaluate(pageChoices);
+  const pair = card.files.length > 1;
+  const base = { choices: {}, tips: {}, waitTips: {} };
+  const first = await page.evaluate(pageLook, base);
+  // TIPs: a pair's Match rows; alone, the TIPs its branching waits are for, found by previewing
+  // until no new wait turns up (a wait inside a fallback is reached only when a TIP does not come).
+  const waitTips = { ...first.waits };
+  let tipNumbers = pair ? first.tipRows : [...new Set(Object.values(waitTips))];
+  if (!pair) {
+    for (let round = 0; round < 4; round++) {
+      let grew = false;
+      for (const n of [...tipNumbers].sort()) {
+        const seen = await page.evaluate(pageLook, {
+          choices: {},
+          tips: { [n]: false },
+          waitTips,
+        });
+        for (const [id, m] of Object.entries(seen.waits))
+          if (!(id in waitTips)) {
+            waitTips[id] = m;
+            grew = true;
+          }
+      }
+      tipNumbers = [...new Set(Object.values(waitTips))];
+      if (!grew) break;
+    }
+  }
+  tipNumbers.sort((x, y) => x - y);
+  // Order: each choice, then the TIP it names; then the other TIPs.
+  const switches = [];
+  const used = new Set();
+  for (const c of choices) {
+    switches.push({
+      kind: "choice",
+      label: pretty(c.option),
+      condition: c.condition,
+      options: c.legs.map(pretty),
+    });
+    const n = Number(c.option.match(/TIP (\d+)/i)?.[1]);
+    if (tipNumbers.includes(n) && !used.has(n)) {
+      used.add(n);
+      switches.push({
+        kind: "tip",
+        label: `TIP ${n}`,
+        tip: n,
+        options: ["Lands", "Misses"],
+      });
+    }
+  }
+  for (const n of tipNumbers)
+    if (!used.has(n))
+      switches.push({
+        kind: "tip",
+        label: `TIP ${n}`,
+        tip: n,
+        options: ["Lands", "Misses"],
+      });
+  const shown = switches.slice(0, MAX_SWITCHES);
+
+  const looks = [];
+  for (let bits = 0; bits < 1 << shown.length; bits++) {
+    const key =
+      shown.map((_, i) => ((bits >> i) & 1 ? "1" : "0")).join("") || "0";
+    const look = { choices: {}, tips: {}, waitTips };
+    shown.forEach((s, i) => {
+      const flip = Boolean((bits >> i) & 1);
+      if (s.kind === "choice") look.choices[s.condition] = !flip;
+      else look.tips[s.tip] = !flip;
+    });
+    const seen = await page.evaluate(pageLook, look);
+    const did = [...new Set(seen.did)].join("; ");
+    looks.push({
+      key,
+      look,
+      signature: seen.signature,
+      caption:
+        bits === 0
+          ? `Best case · ${seen.result}`
+          : did
+            ? `${did}. ${seen.result}`
+            : seen.result,
+    });
+  }
+  return {
+    switches: shown.map(({ kind, label, options }) => ({
+      kind,
+      label,
+      options,
+    })),
+    looks,
+  };
+}
+
+// ---- Capture -----------------------------------------------------------------------------------
+
+async function capture(page, card, look, target) {
+  await page.evaluate(pageLook, look);
   const field = page.locator("svg.absolute.inset-0.z-30").first();
   const box = await field.boundingBox();
-  if (!box) throw new Error(`${gif.id}: no field`);
-  // Hide the editor's tool rails and bars that float over the field's edges.
-  await field.evaluate((el, b) => {
-    const square = el.parentElement;
-    const points = [];
-    for (const fx of [0.02, 0.5, 0.98])
-      for (const fy of [0.02, 0.5, 0.98]) points.push([fx, fy]);
-    for (const [fx, fy] of points)
-      for (const hit of document.elementsFromPoint(
-        b.x + b.width * fx,
-        b.y + b.height * fy,
-      )) {
-        if (square.contains(hit) || hit.contains(square)) break;
-        hit.style.visibility = "hidden";
-      }
-  }, box);
-  // The match clock, drawn over the field's bottom-left corner.
-  await field.evaluate((el) => {
-    const clock = document.createElement("div");
-    clock.id = "gif-clock";
-    Object.assign(clock.style, {
-      position: "absolute",
-      left: "8px",
-      bottom: "8px",
-      zIndex: "60",
-      font: "600 22px ui-monospace, Menlo, monospace",
-      color: "#fff",
-      background: "rgba(0,0,0,.65)",
-      padding: "2px 10px",
-      borderRadius: "6px",
-    });
-    el.parentElement.appendChild(clock);
-  });
-
-  let seek;
-  if (pair) {
-    // The timeline maps x to seconds linearly: calibrate it from two clicks.
-    const tb = await timeline.boundingBox();
-    const y = tb.y + tb.height / 2;
-    const readAt = async (x) => {
-      await page.mouse.click(x, y);
-      await page.waitForTimeout(200);
-      return Number(await timeline.getAttribute("aria-valuenow"));
-    };
-    const xa = tb.x + tb.width * 0.3;
-    const xb = tb.x + tb.width * 0.9;
-    const ta = await readAt(xa);
-    const tbv = await readAt(xb);
-    const pxPerS = (xb - xa) / (tbv - ta);
-    if (!(pxPerS > 0 && isFinite(pxPerS)))
-      throw new Error(
-        `${gif.id}: the timeline did not seek (${ta} s, ${tbv} s)`,
-      );
-    seek = (t) =>
-      page.mouse.click(
-        Math.min(xa + (t - ta) * pxPerS, tb.x + tb.width - 2),
-        y,
-      );
-  } else {
-    // The readout says "<now> / <end> s of 30 s": the preview's length.
-    const readout = await range
-      .locator("xpath=../following-sibling::div")
-      .innerText();
-    const end = Number(readout.match(/\/\s*([\d.]+)\s*s/)?.[1]);
-    if (!(end > 0))
-      throw new Error(`${gif.id}: no preview length in "${readout}"`);
-    seek = (t) =>
-      range.evaluate(
-        (el, pct) => {
-          el.value = String(pct);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-        },
-        Math.min(100, (t / end) * 100),
-      );
-  }
-
-  const dir = mkdtempSync(join(tmpdir(), `gif-${gif.id}-`));
+  if (!box) throw new Error(`${card.id}: no field`);
+  const dir = mkdtempSync(join(tmpdir(), `gif-${card.id}-`));
   const frames = Math.round((AUTO_S * FPS) / SPEED);
   for (let i = 0; i <= frames; i++) {
     const t = (i / frames) * AUTO_S;
-    await seek(t);
-    await page.evaluate((s) => {
+    await page.evaluate(async (s) => {
+      const p = window.__visualizer.playback;
+      if (p.playing) p.toggle();
+      p.seek(p.duration > 0 ? Math.min(100, (s / p.duration) * 100) : 0);
       document.getElementById("gif-clock").textContent = `${s.toFixed(1)} s`;
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
     }, t);
     await page.screenshot({
       path: join(dir, `f${String(i).padStart(4, "0")}.png`),
       clip: box,
     });
   }
-  // Hold the last frame a second before the loop starts again.
-  const target = join(OUT, `${gif.id}.gif`);
+  // Hold the last frame before the loop starts again.
   execFileSync("ffmpeg", [
     "-y",
     "-loglevel",
@@ -174,7 +421,105 @@ for (const gif of GIFS.filter((g) => !ONLY?.length || ONLY.includes(g.id))) {
     target,
   ]);
   rmSync(dir, { recursive: true, force: true });
-  console.log(`${gif.id}: ${(statSync(target).size / 1024).toFixed(0)} KB`);
+}
+
+async function open(browser, card) {
+  const page = await browser.newPage({
+    viewport: { width: 1400, height: 1000 },
+    colorScheme: "dark",
+  });
+  page.on("pageerror", (e) => console.error(`${card.id}: ${e.message}`));
+  await page.goto(`${BASE}#team=master/${card.files.join(",")}`);
+  await page.waitForFunction(
+    (pair) => {
+      const v = window.__visualizer;
+      return (
+        v &&
+        (pair ? v.overlays.active && v.auto.matchResultLine : v.auto.together)
+      );
+    },
+    card.files.length > 1,
+    { timeout: 30000 },
+  );
+  await page.waitForTimeout(1500);
+  await page.keyboard.press("Escape");
+  const field = page.locator("svg.absolute.inset-0.z-30").first();
+  const box = await field.boundingBox();
+  // Hide the editor's tool rails and bars over the field's edges, and draw the match clock.
+  await field.evaluate((el, b) => {
+    const square = el.parentElement;
+    for (const fx of [0.02, 0.5, 0.98])
+      for (const fy of [0.02, 0.5, 0.98])
+        for (const hit of document.elementsFromPoint(
+          b.x + b.width * fx,
+          b.y + b.height * fy,
+        )) {
+          if (square.contains(hit) || hit.contains(square)) break;
+          hit.style.visibility = "hidden";
+        }
+    const clock = document.createElement("div");
+    clock.id = "gif-clock";
+    Object.assign(clock.style, {
+      position: "absolute",
+      left: "8px",
+      bottom: "8px",
+      zIndex: "60",
+      font: "600 22px ui-monospace, Menlo, monospace",
+      color: "#fff",
+      background: "rgba(0,0,0,.65)",
+      padding: "2px 10px",
+      borderRadius: "6px",
+    });
+    square.appendChild(clock);
+  }, box);
+  return page;
+}
+
+const browser = await chromium.launch();
+const manifest = {
+  generated: new Date().toISOString().slice(0, 10),
+  branch: "master",
+  cards: [],
+};
+for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
+  const page = await open(browser, card);
+  const { switches, looks } = await scenarios(page, card);
+  if (process.env.DRY) console.log(card.id, JSON.stringify(switches));
+  const gifs = {};
+  const bySignature = new Map();
+  for (const l of looks) {
+    let gif = bySignature.get(l.signature);
+    if (!gif) {
+      gif = `${card.id}--${l.key}.gif`;
+      bySignature.set(l.signature, gif);
+      if (!process.env.DRY) await capture(page, card, l.look, join(OUT, gif));
+      if (!process.env.DRY)
+        console.log(
+          `${gif}: ${(statSync(join(OUT, gif)).size / 1024).toFixed(0)} KB · ${l.caption}`,
+        );
+    }
+    gifs[l.key] = { gif, caption: l.caption };
+    if (process.env.DRY) console.log(card.id, l.key, gif, l.caption);
+  }
+  const { files, ...rest } = card;
+  manifest.cards.push({ ...rest, files, switches, scenarios: gifs });
   await page.close();
 }
 await browser.close();
+
+if (!ONLY?.length) {
+  // Drop GIFs no scenario names any more.
+  if (process.env.DRY) process.exit(0);
+  const keep = new Set(
+    manifest.cards.flatMap((c) => Object.values(c.scenarios).map((s) => s.gif)),
+  );
+  for (const f of readdirSync(OUT))
+    if (f.endsWith(".gif") && !keep.has(f)) unlinkSync(join(OUT, f));
+  if (process.env.DRY) process.exit(0);
+  writeFileSync(
+    join(OUT, "manifest.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+  );
+  const total = [...keep].reduce((s, f) => s + statSync(join(OUT, f)).size, 0);
+  console.log(`${keep.size} GIFs, ${(total / 1e6).toFixed(1)} MB`);
+}
