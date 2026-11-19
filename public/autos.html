@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Team Autos</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+/* One page that opens every biobuzz Auto on master in this Visualizer: pairs first, then
+   the solo Autos, the Utility trials, and (listed live from GitHub) every draft and partner. */
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --ink:#15181d; --muted:#5d6470; --line:#dcdfe5;
+  --accent:#2f6fde; --accent-ink:#ffffff; --chip:#eef1f6; --pair:#e8f0fd; --trial:#fdf3e4;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
+  --accent:#6ea0ff; --accent-ink:#0d1117; --chip:#232932; --pair:#1c2638; --trial:#2e2618; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111418; --panel:#1a1e24; --ink:#e8ebf0; --muted:#9aa2ae; --line:#2c323b;
+  --accent:#6ea0ff; --accent-ink:#0d1117; --chip:#232932; --pair:#1c2638; --trial:#2e2618; color-scheme:dark}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font)}
+.wrap{max-width:1100px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;justify-content:space-between}
+h1{margin:0;font-size:clamp(24px,3.5vw,32px)}
+header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.open{color:var(--accent);text-decoration:none;font-weight:600}
+h2{margin:0 0 4px;font-size:18px}
+section > p.lead{margin:0 0 12px;color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.pair{background:var(--pair)}
+.card.trial{background:var(--trial)}
+.card h3{margin:0;font-size:16px}
+.card p{margin:0;font-size:13px;color:var(--muted)}
+.links{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.btn{display:inline-block;padding:6px 10px;border-radius:7px;font-size:13px;font-weight:600;text-decoration:none;background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.list a{display:block;padding:7px 10px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-family:var(--mono);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list a:hover,.card:hover{border-color:var(--accent)}
+.note{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Team Autos</h1>
+    <p>Every Auto on biobuzz <code>master</code>, opened in the Visualizer. Pairs open both halves together. Links always show the latest.</p>
+  </div>
+  <a class="open" href="./">Open the Visualizer →</a>
+</header>
+
+<section>
+  <h2>Pairs: both our robots on one alliance</h2>
+  <p class="lead">Each robot runs its half. Open the pair to see both on the field and play the match.</p>
+  <div class="grid" id="pairs"></div>
+</section>
+
+<section>
+  <h2>Solo Autos: one of ours with any partner</h2>
+  <p class="lead">On the Driver Station's Autonomous menu.</p>
+  <div class="grid" id="solos"></div>
+</section>
+
+<section>
+  <h2>Utility trials</h2>
+  <p class="lead">On the Driver Station's Utility menu, not for matches until they have run on the robot.</p>
+  <div class="grid" id="trials"></div>
+</section>
+
+<section>
+  <h2>All drafts</h2>
+  <p class="lead">Every file in <code>TeamCode/autos/drafts/</code>, listed live from GitHub.</p>
+  <div class="list" id="drafts"><span class="note">Loading…</span></div>
+</section>
+
+<section>
+  <h2>Partner stand-ins</h2>
+  <p class="lead">Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, for opening beside one of ours.</p>
+  <div class="list" id="partners"><span class="note">Loading…</span></div>
+</section>
+
+<p class="note">The pairs, solo Autos and trials are listed in <code>public/autos.html</code> of the Visualizer repo; add an Auto there when it reaches the Driver Station.</p>
+</div>
+
+<script>
+const T = p => "./#team=master/" + p;
+const PAIRS = [
+  {name:"Lane pair", r:"r-outside-lane.pp", l:"l-under-hive.pp", rName:"R-OutsideLane", lName:"L-UnderHive",
+   about:"R keeps to the outside lane; L goes under the HIVE, parks angled at the HIVE and shoots LEFT from the park, and rescues a missing TIP 1."},
+  {name:"Clockwise pair", r:"r-clockwise.pp", l:"l-clockwise.pp", rName:"R-Clockwise", lName:"L-Clockwise",
+   about:"Both robots on a one-way loop with a fixed fallback at each stop. Keep 20245 as R."},
+  {name:"NoCross pair", r:"r-no-cross.pp", l:"l-no-cross.pp", rName:"R-NoCross", lName:"L-NoCross",
+   about:"Each robot stays on its own end and only crosses to fix a TIP. Usually run one half beside a partner."}
+];
+const SOLOS = [
+  {name:"R-Solo", f:"r-solo.pp", about:"From the near start: preloads at RIGHT, two FLOWER picks, LEFT volleys. Our default with a partner that can't score."},
+  {name:"R-NoCross", f:"r-no-cross.pp", about:"Stays at the near end; waits for the partner's TIP 2. Choice in INIT: wait, or cross and fix it."},
+  {name:"L-NoCross", f:"l-no-cross.pp", about:"From the far start: waits for TIP 1, fires at LEFT, SCORING FLOWER. Choice in INIT: cross and fix it, or wait."}
+];
+const TRIALS = [
+  {name:"L-Assist", f:"drafts/l-assist.pp",
+   about:"From the far start: waits for TIP 1, fires its preloads at LEFT, parks at once. For a partner that runs the whole route."}
+];
+const card = (cls, title, about, links) =>
+  `<div class="card ${cls}"><h3>${title}</h3><p>${about}</p><div class="links">${links.map(([href,label,primary]) =>
+    `<a class="btn${primary?" primary":""}" href="${href}">${label}</a>`).join("")}</div></div>`;
+document.getElementById("pairs").innerHTML = PAIRS.map(p => card("pair", p.name, p.about,
+  [[T(p.r+","+p.l),"Open the pair",true],[T(p.r),p.rName],[T(p.l),p.lName]])).join("");
+document.getElementById("solos").innerHTML = SOLOS.map(s => card("", s.name, s.about, [[T(s.f),"Open",true]])).join("");
+document.getElementById("trials").innerHTML = TRIALS.map(t => card("trial", t.name, t.about,
+  [[T(t.f),"Open",true]].concat(t.with ? [[T(t.with+","+t.f),"With its pair"]] : []))).join("");
+
+async function list(dir, el) {
+  const box = document.getElementById(el);
+  try {
+    const r = await fetch("https://api.github.com/repos/Mona-Shores-FTC-Robotics/biobuzz/contents/TeamCode/autos/" + dir + "?ref=master");
+    if (!r.ok) throw new Error("GitHub answered " + r.status);
+    const files = (await r.json()).filter(f => f.name.endsWith(".pp")).map(f => f.name).sort();
+    box.innerHTML = files.length ? files.map(n => `<a href="${T(dir + "/" + n)}" title="${dir}/${n}">${n.replace(/\.pp$/, "")}</a>`).join("")
+      : '<span class="note">None.</span>';
+  } catch (e) {
+    box.innerHTML = `<span class="note">Could not list them from GitHub (${e.message}). Try again in a minute.</span>`;
+  }
+}
+list("drafts", "drafts");
+list("partners", "partners");
+</script>
+</body>
+</html>
