@@ -76,11 +76,7 @@ section > h2{margin:0;font-size:20px}
 .note{color:var(--muted);font-size:13px}
 .lead{margin:-8px 0 0;color:var(--muted);font-size:14px}
 .brand{display:block}
-.brand .teams{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
-.brand .team{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:999px;color:#fff;font-weight:800;font-size:13px;letter-spacing:.12em}
-.brand .team b{font-size:15px;letter-spacing:.02em}
-.brand .ir{background:linear-gradient(90deg,#B0101E,#FF6A00)}
-.brand .uv{background:linear-gradient(90deg,#3A0CA3,#B14EFF)}
+.brand .logo{display:block;width:min(100%,420px);height:auto;background:#fff;border-radius:12px;padding:10px 16px;box-sizing:border-box;margin-bottom:12px}
 .brand h1{margin:0;font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
 .titlebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
 .alliance{grid-template-columns:auto 12em}
@@ -94,10 +90,7 @@ section > h2{margin:0;font-size:20px}
 <body>
 <div class="wrap">
 <header class="brand">
-  <div class="teams">
-    <span class="team ir"><b>19429</b> INFRARED</span>
-    <span class="team uv"><b>20245</b> ULTRAVIOLET</span>
-  </div>
+  <img class="logo" src="autos/mona-shores-logo.svg" alt="Mona Shores Ultraviolet 20245 and Infrared 19429" width="439" height="113">
   <div class="titlebar">
     <h1>Auto Strategy</h1>
     <div class="sw alliance" role="group" aria-label="Alliance"><span>Alliance</span>
@@ -168,8 +161,8 @@ function renderCard(card) {
   const halves = card.files.length > 1
     ? card.files.map((f, i) => `<a class="btn" href="${T(f)}">${esc(card.halves?.[i] ?? ROBOT(f))}</a>`).join("") : "";
   el.innerHTML = `
-    <div class="top"><h3>${esc(card.name)}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}
-      ${card.use ? `<p class="use">${esc(card.use)}</p>` : ""}${card.note ? `<p class="ds">${esc(card.note)}</p>` : ""}</div>
+    <div class="top"><h3>${esc(card.name).replace(/-/g, "\u2011")}</h3>${card.tag ? `<span class="tag${tagClass}">${esc(card.tag)}</span>` : ""}
+</div>
     <a class="shot" href="${T(card.files.join(","))}" aria-label="Open ${esc(card.name)} in the Visualizer">
       <img alt="" width="480" height="480" loading="lazy" decoding="async"></a>
     <p class="caption" aria-live="polite"></p>

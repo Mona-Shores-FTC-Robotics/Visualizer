@@ -10,8 +10,6 @@
         "R-LeftUnderHive",
         "L-LeftUnderHive"
       ],
-      "use": "L goes under the HIVE, R takes the outside lane",
-      "note": "Driver Station: R-OutsideLane / L-UnderHive until the rename",
       "files": [
         "r-outside-lane.pp",
         "l-under-hive.pp"
@@ -49,7 +47,7 @@
             "r": "lane--100--r",
             "l": "lane--100--l"
           },
-          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP \u00b7 R parked at 15.9 s \u00b7 L parked at 18.8 s \u00b7 no contact",
           "contact": null
         },
         "101": {
@@ -58,7 +56,7 @@
             "r": "lane--100--r",
             "l": "lane--100--l"
           },
-          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP \u00b7 R parked at 15.9 s \u00b7 L parked at 18.8 s \u00b7 no contact",
           "contact": null
         },
         "110": {
@@ -67,7 +65,7 @@
             "r": "lane--100--r",
             "l": "lane--100--l"
           },
-          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP \u00b7 R parked at 15.9 s \u00b7 L parked at 18.8 s \u00b7 no contact",
           "contact": null
         },
         "111": {
@@ -76,7 +74,7 @@
             "r": "lane--100--r",
             "l": "lane--100--l"
           },
-          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP · R parked at 15.9 s · L parked at 18.8 s · no contact",
+          "caption": "R park; L cross under the HIVE, fire at RIGHT, and park. 1 TIP \u00b7 R parked at 15.9 s \u00b7 L parked at 18.8 s \u00b7 no contact",
           "contact": null
         },
         "000": {
@@ -85,7 +83,7 @@
             "r": "lane--000--r",
             "l": "lane--000--l"
           },
-          "caption": "Best case · 3 TIPs · R parked at 27.4 s · L parked at 24.7 s · no contact",
+          "caption": "Best case \u00b7 3 TIPs \u00b7 R parked at 27.4 s \u00b7 L parked at 24.7 s \u00b7 no contact",
           "contact": null
         },
         "010": {
@@ -94,7 +92,7 @@
             "r": "lane--010--r",
             "l": "lane--010--l"
           },
-          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP · R parked at 28.6 s · L parked by the guard at 25.7 s · no contact",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 25.7 s \u00b7 no contact",
           "contact": null
         },
         "001": {
@@ -103,7 +101,7 @@
             "r": "lane--000--r",
             "l": "lane--000--l"
           },
-          "caption": "2 TIPs · R parked at 27.4 s · L parked at 24.7 s · no contact",
+          "caption": "2 TIPs \u00b7 R parked at 27.4 s \u00b7 L parked at 24.7 s \u00b7 no contact",
           "contact": null
         },
         "011": {
@@ -112,7 +110,7 @@
             "r": "lane--010--r",
             "l": "lane--010--l"
           },
-          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP · R parked at 28.6 s · L parked by the guard at 25.7 s · no contact",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 25.7 s \u00b7 no contact",
           "contact": null
         }
       }
@@ -125,7 +123,6 @@
         "R-RightUnderHive",
         "L-RightUnderHive"
       ],
-      "use": "R goes under the HIVE and makes every fix; L takes the outside lane",
       "files": [
         "drafts/r-right-under-hive.pp",
         "drafts/l-right-under-hive.pp"
@@ -155,7 +152,7 @@
             "r": "rightunder--10--r",
             "l": "rightunder--10--l"
           },
-          "caption": "1 TIP · R parked at 17.1 s · L parked at 29.3 s · contact at 28.6 s",
+          "caption": "1 TIP \u00b7 R parked at 17.1 s \u00b7 L parked at 29.3 s \u00b7 contact at 28.6 s",
           "contact": 28.6
         },
         "11": {
@@ -164,7 +161,7 @@
             "r": "rightunder--10--r",
             "l": "rightunder--10--l"
           },
-          "caption": "1 TIP · R parked at 17.1 s · L parked at 29.3 s · contact at 28.6 s",
+          "caption": "1 TIP \u00b7 R parked at 17.1 s \u00b7 L parked at 29.3 s \u00b7 contact at 28.6 s",
           "contact": 28.6
         },
         "00": {
@@ -173,7 +170,7 @@
             "r": "rightunder--00--r",
             "l": "rightunder--00--l"
           },
-          "caption": "Best case · 2 TIPs · R parked at 25.1 s · L parked at 26.9 s · no contact",
+          "caption": "Best case \u00b7 2 TIPs \u00b7 R parked at 25.1 s \u00b7 L parked at 26.9 s \u00b7 no contact",
           "contact": null
         },
         "01": {
@@ -182,7 +179,7 @@
             "r": "rightunder--01--r",
             "l": "rightunder--00--l"
           },
-          "caption": "R fix LEFT. 2 TIPs · R parked at 26.8 s · L parked at 26.9 s · no contact",
+          "caption": "R fix LEFT. 2 TIPs \u00b7 R parked at 26.8 s \u00b7 L parked at 26.9 s \u00b7 no contact",
           "contact": null
         }
       }
@@ -195,7 +192,6 @@
         "R-Clockwise",
         "L-Clockwise"
       ],
-      "use": "One loop, both robots the same way round",
       "files": [
         "r-clockwise.pp",
         "l-clockwise.pp"
@@ -241,7 +237,7 @@
             "r": "clockwise--1000--r",
             "l": "clockwise--1000--l"
           },
-          "caption": "Pickup: Garden. 2 TIPs · R parked at 29.6 s · L parked by the guard at 22.8 s · contact at 11.0 s",
+          "caption": "Pickup: Garden. 2 TIPs \u00b7 R parked at 29.6 s \u00b7 L parked by the guard at 22.8 s \u00b7 contact at 11.0 s",
           "contact": 11,
           "warn": [
             "0:1"
@@ -253,7 +249,7 @@
             "r": "clockwise--1100--r",
             "l": "clockwise--1000--l"
           },
-          "caption": "Pickup: Garden; L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.5 s · contact at 11.0 s",
+          "caption": "Pickup: Garden; L keep the load. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked at 26.5 s \u00b7 contact at 11.0 s",
           "contact": 11,
           "warn": [
             "0:1"
@@ -265,7 +261,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Pickup: Garden; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Pickup: Garden; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "1011": {
@@ -274,7 +270,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Pickup: Garden; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Pickup: Garden; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "1100": {
@@ -283,7 +279,7 @@
             "r": "clockwise--1100--r",
             "l": "clockwise--1000--l"
           },
-          "caption": "Pickup: Garden; Priority: Park. 2 TIPs · R parked at 28.5 s · L parked by the guard at 22.8 s · contact at 11.0 s",
+          "caption": "Pickup: Garden; Priority: Park. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked by the guard at 22.8 s \u00b7 contact at 11.0 s",
           "contact": 11,
           "warn": [
             "0:1"
@@ -295,7 +291,7 @@
             "r": "clockwise--1100--r",
             "l": "clockwise--1000--l"
           },
-          "caption": "Pickup: Garden; Priority: Park; L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.5 s · contact at 11.0 s",
+          "caption": "Pickup: Garden; Priority: Park; L keep the load. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked at 26.5 s \u00b7 contact at 11.0 s",
           "contact": 11,
           "warn": [
             "0:1"
@@ -307,7 +303,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Pickup: Garden; Priority: Park; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Pickup: Garden; Priority: Park; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "1111": {
@@ -316,7 +312,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Pickup: Garden; Priority: Park; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Pickup: Garden; Priority: Park; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "0000": {
@@ -325,7 +321,7 @@
             "r": "clockwise--0000--r",
             "l": "clockwise--0000--l"
           },
-          "caption": "Best case · 2 TIPs · R parked at 29.8 s · L parked at 26.3 s · no contact",
+          "caption": "Best case \u00b7 2 TIPs \u00b7 R parked at 29.8 s \u00b7 L parked at 26.3 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "0:1"
@@ -337,7 +333,7 @@
             "r": "clockwise--0100--r",
             "l": "clockwise--0000--l"
           },
-          "caption": "Priority: Park. 2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact",
+          "caption": "Priority: Park. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked at 26.3 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "0:1"
@@ -349,7 +345,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "0110": {
@@ -358,7 +354,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Priority: Park; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Priority: Park; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "0001": {
@@ -367,7 +363,7 @@
             "r": "clockwise--0100--r",
             "l": "clockwise--0000--l"
           },
-          "caption": "L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact",
+          "caption": "L keep the load. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked at 26.3 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "0:1"
@@ -379,7 +375,7 @@
             "r": "clockwise--0100--r",
             "l": "clockwise--0000--l"
           },
-          "caption": "Priority: Park; L keep the load. 2 TIPs · R parked at 28.5 s · L parked at 26.3 s · no contact",
+          "caption": "Priority: Park; L keep the load. 2 TIPs \u00b7 R parked at 28.5 s \u00b7 L parked at 26.3 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "0:1"
@@ -391,7 +387,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         },
         "0111": {
@@ -400,7 +396,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "Priority: Park; R park. 1 TIP · R parked at 17.6 s · L parked at 26.2 s · no contact",
+          "caption": "Priority: Park; R park. 1 TIP \u00b7 R parked at 17.6 s \u00b7 L parked at 26.2 s \u00b7 no contact",
           "contact": null
         }
       }
@@ -413,7 +409,6 @@
         "R-NoCross",
         "L-NoCross"
       ],
-      "use": "Each robot stays on its own end",
       "files": [
         "r-no-cross.pp",
         "l-no-cross.pp"
@@ -459,7 +454,7 @@
             "r": "nocross--1000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 2: Cross & fix. 2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 2: Cross & fix. 2 TIPs \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "1001": {
@@ -468,7 +463,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0001--l"
           },
-          "caption": "If no TIP 2: Cross & fix. 1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s",
+          "caption": "If no TIP 2: Cross & fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked at 27.0 s \u00b7 contact at 11.6 s",
           "contact": 11.6,
           "warn": [
             "2:0"
@@ -480,7 +475,7 @@
             "r": "nocross--1000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 2 TIPs \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "1011": {
@@ -489,7 +484,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0011--l"
           },
-          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact",
+          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked by the guard at 20.2 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "2:0"
@@ -501,7 +496,7 @@
             "r": "nocross--1100--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 2: Cross & fix. 2 TIPs · R parked at 27.6 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 2: Cross & fix. 2 TIPs \u00b7 R parked at 27.6 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "1101": {
@@ -510,7 +505,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0001--l"
           },
-          "caption": "If no TIP 2: Cross & fix. 1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s",
+          "caption": "If no TIP 2: Cross & fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked at 27.0 s \u00b7 contact at 11.6 s",
           "contact": 11.6,
           "warn": [
             "2:0"
@@ -522,7 +517,7 @@
             "r": "nocross--1100--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 2 TIPs · R parked at 27.6 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 2 TIPs \u00b7 R parked at 27.6 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "1111": {
@@ -531,7 +526,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0011--l"
           },
-          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact",
+          "caption": "If no TIP 2: Cross & fix; If no TIP 1: Wait for partner fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked by the guard at 20.2 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "2:0"
@@ -543,7 +538,7 @@
             "r": "nocross--0000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "Best case · 2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "Best case \u00b7 2 TIPs \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "0100": {
@@ -552,7 +547,7 @@
             "r": "nocross--0000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "1 TIP · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "1 TIP \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "0010": {
@@ -561,7 +556,7 @@
             "r": "nocross--0000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 1: Wait for partner fix. 2 TIPs · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 1: Wait for partner fix. 2 TIPs \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "0110": {
@@ -570,7 +565,7 @@
             "r": "nocross--0000--r",
             "l": "nocross--0000--l"
           },
-          "caption": "If no TIP 1: Wait for partner fix. 1 TIP · R parked at 25.9 s · L parked at 20.9 s · no contact",
+          "caption": "If no TIP 1: Wait for partner fix. 1 TIP \u00b7 R parked at 25.9 s \u00b7 L parked at 20.9 s \u00b7 no contact",
           "contact": null
         },
         "0001": {
@@ -579,7 +574,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0001--l"
           },
-          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s",
+          "caption": "1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked at 27.0 s \u00b7 contact at 11.6 s",
           "contact": 11.6,
           "warn": [
             "2:0"
@@ -591,7 +586,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0001--l"
           },
-          "caption": "1 TIP · R parked at 24.9 s · L parked at 27.0 s · contact at 11.6 s",
+          "caption": "1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked at 27.0 s \u00b7 contact at 11.6 s",
           "contact": 11.6,
           "warn": [
             "2:0"
@@ -603,7 +598,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0011--l"
           },
-          "caption": "If no TIP 1: Wait for partner fix. 1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact",
+          "caption": "If no TIP 1: Wait for partner fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked by the guard at 20.2 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "2:0"
@@ -615,7 +610,7 @@
             "r": "nocross--0001--r",
             "l": "nocross--0011--l"
           },
-          "caption": "If no TIP 1: Wait for partner fix. 1 TIP · R parked at 24.9 s · L parked by the guard at 20.2 s · no contact",
+          "caption": "If no TIP 1: Wait for partner fix. 1 TIP \u00b7 R parked at 24.9 s \u00b7 L parked by the guard at 20.2 s \u00b7 no contact",
           "contact": null,
           "warn": [
             "2:0"
@@ -628,7 +623,6 @@
       "group": "solo",
       "name": "R-Solo",
       "tag": "Default",
-      "use": "Partner off the far start by 10 s, parks at the far end",
       "files": [
         "r-solo.pp"
       ],
@@ -647,14 +641,14 @@
           "gif": {
             "both": "r-solo--0--both"
           },
-          "caption": "Best case · 2 TIPs by this robot · parked at 25.2 s",
+          "caption": "Best case \u00b7 2 TIPs by this robot \u00b7 parked at 25.2 s",
           "contact": null
         },
         "1": {
           "gif": {
             "both": "r-solo--1--both"
           },
-          "caption": "1 TIP by this robot · parked at 19.7 s",
+          "caption": "1 TIP by this robot \u00b7 parked at 19.7 s",
           "contact": null
         }
       }
