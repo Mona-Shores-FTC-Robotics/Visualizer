@@ -25,12 +25,14 @@
 // It reads the app through window.__visualizer, which App.svelte sets on the dev server only.
 // Needs Playwright and ffmpeg. Options: --base URL  --only lane,r-solo  --fps 30  --speed 3  --width 480
 // --keep-gifs (rewrite the manifest; capture only the GIFs that are missing)
+// --only clockwise: redo just that card (or a comma list of card ids); the manifest keeps the rest
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -764,8 +766,21 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
 }
 await browser.close();
 
-if (!ONLY?.length) {
-  // Drop GIFs and MP4s no scenario names any more.
+// --only: the cards it ran replace theirs in the manifest already written, and every other card
+// stays as it was (animations and results), so one changed Auto is a short run.
+if (ONLY?.length) {
+  const fresh = new Map(manifest.cards.map((c) => [c.id, c]));
+  const path = join(OUT, "manifest.json");
+  const before = existsSync(path)
+    ? JSON.parse(readFileSync(path, "utf8"))
+    : { cards: [] };
+  const old = new Map(before.cards.map((c) => [c.id, c]));
+  manifest.cards = CARDS.map((c) => fresh.get(c.id) ?? old.get(c.id)).filter(
+    Boolean,
+  );
+}
+{
+  // Drop GIFs and MP4s no scenario names any more (with --only, only those of the cards it ran).
   if (process.env.DRY) process.exit(0);
   const keep = new Set(
     manifest.cards.flatMap((c) =>
@@ -779,8 +794,11 @@ if (!ONLY?.length) {
       ),
     ),
   );
+  const ran = (f) =>
+    !ONLY?.length || ONLY.some((id) => f.startsWith(`${id}--`));
   for (const f of readdirSync(OUT))
-    if (/\.(gif|mp4)$/.test(f) && !keep.has(f)) unlinkSync(join(OUT, f));
+    if (/\.(gif|mp4)$/.test(f) && !keep.has(f) && ran(f))
+      unlinkSync(join(OUT, f));
   if (process.env.DRY) process.exit(0);
   writeFileSync(
     join(OUT, "manifest.json"),
@@ -790,5 +808,5 @@ if (!ONLY?.length) {
     ) + "\n",
   );
   const total = [...keep].reduce((s, f) => s + statSync(join(OUT, f)).size, 0);
-  console.log(`${keep.size} GIFs, ${(total / 1e6).toFixed(1)} MB`);
+  console.log(`${keep.size} GIFs and MP4s, ${(total / 1e6).toFixed(1)} MB`);
 }
