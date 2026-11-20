@@ -67,9 +67,7 @@ describe("a LaunchAll with a time limit", () => {
   it("ends at its limit, nothing launched, when the launcher is not at speed in time", () => {
     // 8 s to reach speed, 1 s limits: the launches before 7 s give up at their limit.
     const { preview, together } = run(2, 1, 8);
-    const launches = preview.actions.filter(
-      (a) => a.command === VOLLEY_COMMAND,
-    );
+    const launches = preview.actions.filter((a) => a.command === VOLLEY_COMMAND);
     const early = launches.filter((a) => a.t0 < 7 - 1e-6);
     const late = launches.filter((a) => a.t0 >= 7 - 1e-6);
     expect(early.length).toBeGreaterThan(0);
@@ -81,8 +79,6 @@ describe("a LaunchAll with a time limit", () => {
     for (const launch of late) expect(launch.unfired).toBeUndefined();
     // Only the launches that fed count as volleys for the HIVE.
     expect(volleysOf(together.previews)).toHaveLength(late.length);
-    expect(preview.log.some((e) => e.text.includes("nothing launched"))).toBe(
-      true,
-    );
+    expect(preview.log.some((e) => e.text.includes("nothing launched"))).toBe(true);
   });
 });

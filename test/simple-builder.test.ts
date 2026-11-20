@@ -303,10 +303,7 @@ describe("the simple builder", () => {
     // time in all (biobuzz AutoRegistration.PICK_FLOWER_TYPICAL_S), the rest split between the
     // push and the back-out.
     expect(dwell.t1 - dwell.t0).toBeCloseTo(2, 6);
-    expect(back.t1 - push.t0).toBeCloseTo(
-      teamRegistry().typicalS!.PickFlower,
-      6,
-    );
+    expect(back.t1 - push.t0).toBeCloseTo(teamRegistry().typicalS!.PickFlower, 6);
     expect(push.t1 - push.t0).toBeCloseTo(back.t1 - back.t0, 6);
   });
 
@@ -401,9 +398,7 @@ describe("the simple builder", () => {
     doc = add(doc, "gather");
     expect(stepsOf(doc)[0].problem).toBeNull();
     expect(stepsOf(doc)[1].garden).toBeNull();
-    expect(stepsOf(doc)[1].problem).toMatch(
-      /No GARDEN on our side of the centre line within 45 in/,
-    );
+    expect(stepsOf(doc)[1].problem).toMatch(/No GARDEN on our side of the centre line within 45 in/);
     // A spot whose robot reaches across x = 70.75 is marked.
     let over = fresh();
     over = addSpot(over, "OVER", 66, 70, 90); // 16 in wide: its right side is at 74
@@ -541,26 +536,17 @@ describe("an Auto's pick squares up where the drive stopped (FlowerPicker)", () 
     expect(after[after.length - 1].t1).toBeCloseTo(4.5, 6);
     // The time the pause took goes to the push and the back-out.
     const alone = pickMotions("p", from, lined, 0, 4.5);
-    expect(after[0].t1 - after[0].t0).toBeGreaterThan(
-      alone[1].t1 - alone[1].t0,
-    );
+    expect(after[0].t1 - after[0].t0).toBeGreaterThan(alone[1].t1 - alone[1].t0);
   });
 
   it("previews the stick coming down 24 in before the end of the drive to a pick", () => {
     const doc = settled(rQualsV2());
     const result = preview(doc);
-    const picks = doc.auto!.cards.filter(
-      (c) => c.kind === "action" && c.name === "PickFlower",
-    );
+    const picks = doc.auto!.cards.filter((c) => c.kind === "action" && c.name === "PickFlower");
     expect(picks.length).toBeGreaterThan(0);
     for (const pick of picks) {
-      const down = result.log.find(
-        (e) =>
-          e.cardId === pick.id && /Stick down on the drive in/.test(e.text),
-      );
-      const started = result.log.find(
-        (e) => e.cardId === pick.id && e.kind === "card",
-      );
+      const down = result.log.find((e) => e.cardId === pick.id && /Stick down on the drive in/.test(e.text));
+      const started = result.log.find((e) => e.cardId === pick.id && e.kind === "card");
       expect(down, pick.id).toBeDefined();
       expect(started, pick.id).toBeDefined();
       // On the drive before the card, and within the last two seconds of it.
@@ -808,11 +794,7 @@ describe("the Wait for TIP step", () => {
     let doc = fresh();
     doc = add(doc, "wait");
     const id = stepsOf(doc)[0].cardId;
-    doc = setWait(doc, id, {
-      waitFor: TIME_ONLY,
-      seconds: 12,
-      matchClock: true,
-    });
+    doc = setWait(doc, id, { waitFor: TIME_ONLY, seconds: 12, matchClock: true });
     expect(stepsOf(doc)[0]).toMatchObject({
       kind: "wait",
       label: "Wait until 12 s",
@@ -822,15 +804,11 @@ describe("the Wait for TIP step", () => {
       otherwise: [],
     });
     const card = doc.auto!.cards[0];
-    expect(card.kind === "firstOf" && card.rows).toEqual([
-      { afterMs: 12000, matchClock: true, cards: [] },
-    ]);
+    expect(card.kind === "firstOf" && card.rows).toEqual([{ afterMs: 12000, matchClock: true, cards: [] }]);
     expect(card.kind === "firstOf" && card.label).toBe("Wait until 12 s");
     expect(isSimple(doc)).toBe(true);
     // It has no Otherwise to add to.
-    expect(() =>
-      addStep(doc, "launch", 0, undefined, { waitCardId: id }),
-    ).toThrow();
+    expect(() => addStep(doc, "launch", 0, undefined, { waitCardId: id })).toThrow();
     const java = generateAutoJava({
       auto: doc.auto!,
       startPoint: doc.startPoint,
@@ -851,11 +829,7 @@ describe("the Wait for TIP step", () => {
     expect(preview.endTime).toBeCloseTo(12, 6);
     // Choosing a trigger again brings its row back.
     doc = setWait(doc, id, { waitFor: "CellUp" });
-    expect(stepsOf(doc)[0]).toMatchObject({
-      label: "Wait for TIP or CELL up",
-      waitFor: "CellUp",
-      waitS: 12,
-    });
+    expect(stepsOf(doc)[0]).toMatchObject({ label: "Wait for TIP or CELL up", waitFor: "CellUp", waitS: 12 });
     const back = doc.auto!.cards[0];
     expect(back.kind === "firstOf" && back.rows.length).toBe(2);
   });
@@ -960,9 +934,13 @@ describe("a Wait step's Otherwise list", () => {
     kind: Exclude<StepKind, "other" | "command">,
     spot?: string,
   ) =>
-    addStep(doc, kind, stepOf(doc, waitCardId).otherwise?.length ?? 0, spot, {
-      waitCardId,
-    });
+    addStep(
+      doc,
+      kind,
+      stepOf(doc, waitCardId).otherwise?.length ?? 0,
+      spot,
+      { waitCardId },
+    );
 
   /**
    * L-NoCross's no-TIP route in small: no TIP, so cross to RIGHT_FIRE; there, fire only if the
@@ -1001,10 +979,7 @@ describe("a Wait step's Otherwise list", () => {
       "Drive to LEFT_FIRE",
     ]);
     // Both go on: the launch after the inner wait runs whether or not its trigger came.
-    expect(stepOf(doc, inner)).toMatchObject({
-      rejoin: true,
-      insteadParks: false,
-    });
+    expect(stepOf(doc, inner)).toMatchObject({ rejoin: true, insteadParks: false });
   });
 
   it("inside an Otherwise that goes on, an Otherwise run instead skips the steps below, with no Park", () => {
@@ -1032,9 +1007,9 @@ describe("a Wait step's Otherwise list", () => {
     expect(otherwise.map((c) => c.kind)).toEqual(["path", "firstOf"]);
     const inner = otherwise[1];
     if (inner.kind !== "firstOf") throw new Error("not a wait");
-    expect(
-      inner.rows.find((r) => "when" in r)!.cards.map((c) => c.kind),
-    ).toEqual(["action", "path"]);
+    expect(inner.rows.find((r) => "when" in r)!.cards.map((c) => c.kind)).toEqual(
+      ["action", "path"],
+    );
     const java = generateAutoJava({
       auto: settled(doc).auto!,
       startPoint: settled(doc).startPoint,
@@ -1111,16 +1086,9 @@ describe("a Wait step's Otherwise list", () => {
     const made = addStep(doc, "choice", doc.auto!.cards.length);
     doc = made.doc;
     const choice = made.cardId;
-    const leg = (
-      n: 0 | 1,
-      kind: Exclude<StepKind, "other" | "command">,
-      spot?: string,
-    ) => {
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other" | "command">, spot?: string) => {
       const length = stepOf(doc, choice).legs![n].steps.length;
-      doc = addStep(doc, kind, length, spot, {
-        waitCardId: choice,
-        leg: n,
-      }).doc;
+      doc = addStep(doc, kind, length, spot, { waitCardId: choice, leg: n }).doc;
     };
     leg(0, "drive", "WALL_FLOWER_STAGING");
     leg(0, "pick");
@@ -1142,27 +1110,11 @@ describe("a Wait step's Otherwise list", () => {
       option: "First pickup",
       label: "First pickup: WALL_FLOWER or GARDEN",
     });
-    expect(step.legs!.map((leg) => leg.name)).toEqual([
-      "WALL_FLOWER",
-      "GARDEN",
-    ]);
-    expect(step.legs![0].steps.map((s) => s.kind)).toEqual([
-      "drive",
-      "pick",
-      "drive",
-    ]);
-    expect(step.legs![1].steps.map((s) => s.kind)).toEqual([
-      "drive",
-      "gather",
-      "drive",
-    ]);
+    expect(step.legs!.map((leg) => leg.name)).toEqual(["WALL_FLOWER", "GARDEN"]);
+    expect(step.legs![0].steps.map((s) => s.kind)).toEqual(["drive", "pick", "drive"]);
+    expect(step.legs![1].steps.map((s) => s.kind)).toEqual(["drive", "gather", "drive"]);
     // The launch below the choice is aimed from where both legs end.
-    expect(stepsOf(doc).map((s) => s.kind)).toEqual([
-      "launch",
-      "choice",
-      "launch",
-      "park",
-    ]);
+    expect(stepsOf(doc).map((s) => s.kind)).toEqual(["launch", "choice", "launch", "park"]);
     expect(stepsOf(doc)[2].atSpot).toBe("RIGHT_FIRE");
   });
 
@@ -1178,18 +1130,10 @@ describe("a Wait step's Otherwise list", () => {
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (!java.ok) return;
-    expect(java.source).toContain(
-      'AutoOption.choice("First pickup", "WALL_FLOWER", "GARDEN")',
-    );
-    expect(java.source.match(/kit\.route\("First pickup", 0,/g)?.length).toBe(
-      3,
-    );
-    expect(java.source.match(/kit\.route\("First pickup", 1,/g)?.length).toBe(
-      3,
-    );
-    expect(java.source).toContain(
-      'kit.route("First pickup", 1, () -> kit.command("GardenGather"',
-    );
+    expect(java.source).toContain('AutoOption.choice("First pickup", "WALL_FLOWER", "GARDEN")');
+    expect(java.source.match(/kit\.route\("First pickup", 0,/g)?.length).toBe(3);
+    expect(java.source.match(/kit\.route\("First pickup", 1,/g)?.length).toBe(3);
+    expect(java.source).toContain('kit.route("First pickup", 1, () -> kit.command("GardenGather"');
   });
 
   it("a choice and its legs can be renamed", () => {
@@ -1260,10 +1204,7 @@ describe("a Wait step's Otherwise list", () => {
     // The "partner's TIP" row is a wait's: a clock check cannot be it.
     expect(setWait(doc, made.cardId, { adjustable: true })).toEqual(doc);
     expect(newTimeName(doc)).toBe("Go on before");
-    doc = setWait(doc, made.cardId, {
-      option: newTimeName(doc),
-      seconds: 20.5,
-    });
+    doc = setWait(doc, made.cardId, { option: newTimeName(doc), seconds: 20.5 });
     expect(stepOf(doc, made.cardId)).toMatchObject({
       waitOption: "Go on before",
       waitAdjustable: false,
@@ -1271,9 +1212,7 @@ describe("a Wait step's Otherwise list", () => {
     expect(isSimple(doc)).toBe(true);
     expect(newTimeName(doc)).toBe("Go on before 2");
     // What the Driver Station's row reads, and what the export gives it.
-    expect(initRow("time", "Go on before", 20.5)).toBe(
-      "Go on before ◀▶: 20.5 s",
-    );
+    expect(initRow("time", "Go on before", 20.5)).toBe("Go on before ◀▶: 20.5 s");
     const laid = settled(doc);
     const java = generateAutoJava({
       auto: laid.auto!,
@@ -1286,15 +1225,10 @@ describe("a Wait step's Otherwise list", () => {
     expect(java.ok, JSON.stringify(java)).toBe(true);
     if (!java.ok) return;
     expect(java.source).toContain('AutoOption.time("Go on before", 20.5)');
-    expect(java.source).toContain(
-      'kit.atMatchSeconds(kit.seconds("Go on before", 20.5))',
-    );
+    expect(java.source).toContain('kit.atMatchSeconds(kit.seconds("Go on before", 20.5))');
     expect(java.source).not.toContain("AutoOption.matchSeconds");
     // Off the menu again.
-    expect(
-      stepOf(setWait(doc, made.cardId, { option: null }), made.cardId)
-        .waitOption,
-    ).toBeUndefined();
+    expect(stepOf(setWait(doc, made.cardId, { option: null }), made.cardId).waitOption).toBeUndefined();
   });
 
   it("a command's time limit is set, kept and taken off in the builder", () => {
@@ -1309,11 +1243,7 @@ describe("a Wait step's Otherwise list", () => {
     expect(pick.timeoutS).toBe(8);
     doc = setStepTimeout(doc, launch.cardId, 1);
     doc = setStepTimeout(doc, pick.cardId, 4.5);
-    expect(
-      stepsOf(doc)
-        .slice(0, 2)
-        .map((s) => s.timeoutS),
-    ).toEqual([1, 4.5]);
+    expect(stepsOf(doc).slice(0, 2).map((s) => s.timeoutS)).toEqual([1, 4.5]);
     const laid = settled(doc);
     const java = generateAutoJava({
       auto: laid.auto!,
@@ -1363,28 +1293,19 @@ describe("a Wait step's Otherwise list", () => {
       sourceFileName: "named.pp",
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
-    if (java.ok)
-      expect(java.source).toContain('kit.firstOf("RIGHT CELL still up?"');
+    if (java.ok) expect(java.source).toContain('kit.firstOf("RIGHT CELL still up?"');
     // Cleared, it follows its title again, here and on later edits.
     doc = setWaitName(doc, wait, "  ");
     expect(stepOf(doc, wait).name).toBeUndefined();
     doc = setWait(doc, wait, { waitFor: "CellUp" });
     const card = doc.auto!.cards.find((c) => c.id === wait)!;
-    expect(card.kind === "firstOf" && card.label).toBe(
-      "Wait for TIP or CELL up",
-    );
+    expect(card.kind === "firstOf" && card.label).toBe("Wait for TIP or CELL up");
   });
 
   it("the Driver Station rows read as biobuzz InitOptions writes them", () => {
-    expect(initRow("choice", "Pickup", "WALL_FLOWER")).toBe(
-      "Pickup ◀▶: WALL_FLOWER",
-    );
-    expect(initRow("partnerWait", "", 9)).toBe(
-      "waiting for partner's TIP ◀▶ until 9 s",
-    );
-    expect(initRow("partnerWait", "", 23.2, 2)).toBe(
-      "waiting for TIP 2 ◀▶ until 23.2 s",
-    );
+    expect(initRow("choice", "Pickup", "WALL_FLOWER")).toBe("Pickup ◀▶: WALL_FLOWER");
+    expect(initRow("partnerWait", "", 9)).toBe("waiting for partner's TIP ◀▶ until 9 s");
+    expect(initRow("partnerWait", "", 23.2, 2)).toBe("waiting for TIP 2 ◀▶ until 23.2 s");
   });
 
   it("a wait set in INIT says which TIP it waits for", () => {
@@ -1397,10 +1318,7 @@ describe("a Wait step's Otherwise list", () => {
     doc = setWait(doc, wait, { matchClock: true, seconds: 9 });
     // Turned on, it is for TIP 1 until the drawing says otherwise.
     doc = setWait(doc, wait, { adjustable: true });
-    expect(stepOf(doc, wait)).toMatchObject({
-      waitAdjustable: true,
-      waitTip: 1,
-    });
+    expect(stepOf(doc, wait)).toMatchObject({ waitAdjustable: true, waitTip: 1 });
     doc = setWait(doc, wait, { tip: 2 });
     expect(stepOf(doc, wait).waitTip).toBe(2);
     // It survives a save and a load, and the export hands it to the Driver Station.
@@ -1422,9 +1340,7 @@ describe("a Wait step's Otherwise list", () => {
         'AutoOption.matchSeconds("Wait for TIP or CELL up", 9, 2)',
       );
     // Off the menu, the TIP goes with it.
-    expect(
-      stepOf(setWait(doc, wait, { adjustable: false }), wait).waitTip,
-    ).toBeUndefined();
+    expect(stepOf(setWait(doc, wait, { adjustable: false }), wait).waitTip).toBeUndefined();
   });
 
   it("a choice that ends the route lets each leg park by its own road", () => {
@@ -1438,16 +1354,9 @@ describe("a Wait step's Otherwise list", () => {
     doc = setChoice(made.doc, made.cardId, { option: "Priority" });
     doc = setChoice(doc, made.cardId, { leg: 0, name: "THREE_TIP" });
     doc = setChoice(doc, made.cardId, { leg: 1, name: "PARK" });
-    const leg = (
-      n: 0 | 1,
-      kind: Exclude<StepKind, "other" | "command">,
-      spot?: string,
-    ) => {
+    const leg = (n: 0 | 1, kind: Exclude<StepKind, "other" | "command">, spot?: string) => {
       const length = stepOf(doc, made.cardId).legs![n].steps.length;
-      doc = addStep(doc, kind, length, spot, {
-        waitCardId: made.cardId,
-        leg: n,
-      }).doc;
+      doc = addStep(doc, kind, length, spot, { waitCardId: made.cardId, leg: n }).doc;
     };
     expect(stepOf(doc, made.cardId).legsMayPark).toBe(true);
     leg(0, "drive", "RIGHT_FIRE");
@@ -1456,9 +1365,7 @@ describe("a Wait step's Otherwise list", () => {
     leg(1, "wait");
     leg(1, "park", "RIGHT_PARK");
     expect(isSimple(doc)).toBe(true);
-    expect(
-      stepOf(doc, made.cardId).legs!.map((l) => l.steps.map((s) => s.kind)),
-    ).toEqual([
+    expect(stepOf(doc, made.cardId).legs!.map((l) => l.steps.map((s) => s.kind))).toEqual([
       ["drive", "launch", "park"],
       ["wait", "park"],
     ]);
@@ -1508,24 +1415,17 @@ describe("a Wait step's Otherwise list", () => {
   it("a leg holds drives, commands and holds only, and a choice stays in the main list", () => {
     const { doc, choice } = pickupChoice();
     // A wait in a leg is a hold for its time only, and stays one.
-    const held = addStep(doc, "wait", 1, undefined, {
-      waitCardId: choice,
-      leg: 1,
-    });
+    const held = addStep(doc, "wait", 1, undefined, { waitCardId: choice, leg: 1 });
     const hold = stepOf(held.doc, held.cardId);
     expect(hold).toMatchObject({ kind: "wait", waitFor: TIME_ONLY });
-    expect(setWait(held.doc, held.cardId, { waitFor: "CellUp" })).toEqual(
-      held.doc,
-    );
+    expect(setWait(held.doc, held.cardId, { waitFor: "CellUp" })).toEqual(held.doc);
     expect(isSimple(held.doc)).toBe(true);
     const withWait = add(doc, "wait");
     const wait = stepsOf(withWait).find((s) => s.kind === "wait")!.cardId;
     expect(() =>
       addStep(withWait, "choice", 0, undefined, { waitCardId: wait }),
     ).toThrow();
-    expect(moveStep(withWait, choice, 0, { waitCardId: wait })).toEqual(
-      withWait,
-    );
+    expect(moveStep(withWait, choice, 0, { waitCardId: wait })).toEqual(withWait);
   });
 
   it("lays an Otherwise drive's heading from the heading at the wait", () => {
@@ -1963,10 +1863,7 @@ describe("steps the builder has no control of its own for", () => {
   /** A new Auto with `cards` put in by hand, as an older file or another tool would. */
   const withCards = (cards: AutoCard[]): ProjectDoc => {
     const doc = add(fresh(), "launch");
-    return {
-      ...doc,
-      auto: { ...doc.auto!, cards: [...doc.auto!.cards, ...cards] },
-    };
+    return { ...doc, auto: { ...doc.auto!, cards: [...doc.auto!.cards, ...cards] } };
   };
 
   it("shows a command it does not know by its name, with its time limit", () => {
@@ -2020,9 +1917,9 @@ describe("steps the builder has no control of its own for", () => {
     const moved = moveStep(doc, "old", 0);
     expect(stepsOf(moved)[0].kind).toBe("other");
     expect(moved.auto!.cards[0]).toEqual(doc.auto!.cards.at(-1));
-    expect(
-      stepsOf(removeStep(doc, "old")).some((s) => s.kind === "other"),
-    ).toBe(false);
+    expect(stepsOf(removeStep(doc, "old")).some((s) => s.kind === "other")).toBe(
+      false,
+    );
   });
 });
 
@@ -2076,8 +1973,7 @@ describe("Pick flower and launch", () => {
       sourceFileName: "eight-shot.pp",
     });
     expect(java.ok, JSON.stringify(java)).toBe(true);
-    if (java.ok)
-      expect(java.source).toContain('kit.command("PickFlowerLaunch", 8)');
+    if (java.ok) expect(java.source).toContain('kit.command("PickFlowerLaunch", 8)');
 
     const result = preview(doc);
     const run = result.actions.find((a) => a.command === "PickFlowerLaunch")!;
