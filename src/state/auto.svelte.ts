@@ -5,7 +5,6 @@ import type { ProjectDoc } from "../io";
 import { FIELD_SIZE } from "../config";
 import type { Command } from "../model/commands";
 import type { RobotPose } from "../sim/pose";
-import { robotPoseAt } from "../sim/pose";
 import { atomicSegments } from "../utils/pathTraversal";
 import { createSegment } from "../utils/normalize";
 import {
@@ -24,11 +23,8 @@ import { linkSegmentIds } from "../lib/auto/links";
 import { settleDoc } from "../lib/auto/settle";
 import { buildPathCatalog } from "../lib/auto/geometry";
 import { validateAuto } from "../lib/auto/validate";
-import {
-  motionPoseAt,
-  worstCase,
-  type PreviewResult,
-} from "../lib/auto/simulate";
+import { worstCase, type PreviewResult } from "../lib/auto/simulate";
+import { previewPose } from "../lib/auto/previewPose";
 import {
   previewTogether,
   robotValues,
@@ -566,26 +562,7 @@ function idSet(ids: string[]): ReadonlySet<string> {
 }
 
 const NONE = idSet([]);
-/** Where a robot is in a preview: on its project paths, or on a routine's own drive. */
-export function previewPose(
-  preview: PreviewResult,
-  seconds: number,
-  doc: Pick<ProjectDoc, "startPoint" | "lines">,
-  settings: Settings,
-): RobotPose {
-  // Routine patterns and straight drives are not project paths; the
-  // preview places the robot on them itself.
-  const motion = motionPoseAt(preview, seconds);
-  if (motion)
-    return { x: motion.x, y: motion.y, heading: motion.headingDeg, t: null };
-  return robotPoseAt(
-    seconds,
-    preview.timeline,
-    doc.startPoint,
-    doc.lines,
-    settings,
-  );
-}
+export { previewPose };
 
 const CONTEXT_KEY = Symbol("auto");
 
