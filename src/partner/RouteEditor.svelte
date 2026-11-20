@@ -91,7 +91,7 @@
           : kind === "wait"
             ? { kind: "wait", until: 10 }
             : kind === "shoot"
-              ? { kind: "shoot", at: null }
+              ? { kind: "shoot", at: "up" }
               : { kind };
       // New steps go before the park, which stays last.
       const park = steps.findIndex((s) => s.kind === "drive" && s.park);
@@ -238,12 +238,13 @@
           >
         </span>
         {#if step.kind === "drive" || step.kind === "shoot" || step.kind === "wait"}
-          {@const value =
+          {@const raw =
             step.kind === "drive"
               ? step.by
               : step.kind === "shoot"
                 ? step.at
                 : step.until}
+          {@const value = typeof raw === "number" ? raw : null}
           {@const preview =
             step.kind === "drive"
               ? arrivals[i]
@@ -280,15 +281,17 @@
                 type="button"
                 class="value"
                 onclick={() => {
-                  const v =
-                    value === null ? clampS(Math.ceil(preview ?? 10)) : null;
-                  set(
-                    i,
-                    step.kind === "drive"
-                      ? { ...step, by: v }
-                      : { ...step, at: v },
-                  );
-                }}>{value === null ? "any time" : fmt(value)}</button
+                  // A drive: any time ↔ a time. A shot: when its CELL is up ↔ a time.
+                  const time = clampS(Math.ceil(preview ?? 10));
+                  if (step.kind === "drive")
+                    set(i, { ...step, by: value === null ? time : null });
+                  else set(i, { ...step, at: raw === "up" ? time : "up" });
+                }}
+                >{raw === "up"
+                  ? "CELL up"
+                  : value === null
+                    ? "any time"
+                    : fmt(value)}</button
               >
             {/if}
             <button
@@ -313,7 +316,9 @@
             </p>
           {:else if step.kind === "shoot" && shots[i]}
             <p class="out">
-              Last ball {fmt(shots[i].t1)} · {shots[i].settled === null
+              Shoots {fmt(shots[i].t0)} · last ball {fmt(shots[i].t1)} · {shots[
+                i
+              ].settled === null
                 ? "no TIP"
                 : `CELL settled ${fmt(shots[i].settled!)}`}
             </p>
