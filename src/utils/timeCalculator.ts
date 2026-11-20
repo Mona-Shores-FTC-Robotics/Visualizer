@@ -8,6 +8,7 @@ import type {
   SequenceItem,
 } from "../types";
 import {
+  cruiseSpeed,
   motionProfile,
   timeAtDistance,
   turnLimitedTimes,
@@ -160,7 +161,8 @@ export function calculatePathTime(
           length > 0 ? Math.min(1, Math.max(0, (d - starts[k]) / length)) : 1;
         return segmentHeadingAt(pathSegments, step.segments[k].index, s);
       },
-      settings.aVelocity,
+      settings.turnShareRadPerS ?? settings.aVelocity,
+      settings.turnShareRadPerS ? cruiseSpeed(settings) : 0,
     );
     const timeAt = (d: number) =>
       turn ? timeInTable(turn, d) : timeAtDistance(profile, d);

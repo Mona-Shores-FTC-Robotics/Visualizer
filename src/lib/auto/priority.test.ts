@@ -5,10 +5,11 @@ import { DEFAULT_SETTINGS } from "../../config";
 import { fallbackValues, type TimingValues } from "../timing/model";
 import { previewTogether, type FieldEntry } from "../timing/together";
 import { tipBeforePark, type Scenario } from "./simulate";
-// biobuzz TeamCode/autos as of 15 Nov 2026: R-Clockwise has the INIT row Priority (THREE_TIP drawn,
-// or PARK), L-Clockwise is its partner.
-import rText from "../match/fixtures/r-clockwise.pp?raw";
-import lText from "../match/fixtures/l-clockwise.pp?raw";
+// biobuzz TeamCode/autos as of 20 Nov 2026 (#673, both loaded lanes backward): R-Clockwise has the
+// INIT row Priority (THREE_TIP drawn, or PARK), L-Clockwise is its partner. (The 15 Nov copies, timed
+// with the simulator's turning, have the guard park before the third volley: the drawing has moved on.)
+import rText from "../match/fixtures/r-clockwise-673.pp?raw";
+import lText from "../match/fixtures/l-clockwise-673.pp?raw";
 
 function entry(text: string, scenario: Scenario = {}): FieldEntry {
   const d = JSON.parse(text);
@@ -21,10 +22,16 @@ function entry(text: string, scenario: Scenario = {}): FieldEntry {
   };
 }
 
+// The team's timing.json as of 20 Nov 2026.
 const values: TimingValues = {
   ...fallbackValues(),
   volleyS: 2.5,
   spinUpS: 1.1,
+  tipStartS: 2.6,
+  tipSwingS: 1.6,
+  intakeFullS: 1.9,
+  pickFlowerS: 3.6,
+  gardenGatherS: 2.5,
 };
 const rPreview = (scenario: Scenario) =>
   previewTogether([entry(rText, scenario), entry(lText)], values).previews[0];

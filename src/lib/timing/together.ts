@@ -5,6 +5,7 @@
  */
 import type { Path, Settings, StartPose } from "../../types";
 import { buildPathCatalog } from "../auto/geometry";
+import { simTurning } from "./simDrive";
 import type { AutoSection } from "../auto/types";
 import {
   simulateAuto,
@@ -151,19 +152,30 @@ export function previewTogether(
   entries: FieldEntry[],
   values: TimingValues,
   withLog = true,
-  options: { tipsCome?: boolean } = {},
+  options: {
+    tipsCome?: boolean;
+    /**
+     * "sim" (the default): paths turn as biobuzz's Java simulator turns the competition robot
+     * (simDrive.ts). "drawn": at the drawing's own turn rate, as the preview did before, for a
+     * robot the simulator does not describe (the 25 Oct light chassis).
+     */
+    turning?: "sim" | "drawn";
+  } = {},
 ): TogetherResult {
   const own = entries.map((e) => robotValues(e, values));
   const loads = own.map((v) => v.volleyLoad);
   const catalogs = entries.map((e, i) => {
     const speed = own[i].driveSpeed ?? 1;
+    // Fork: the preview drives and turns as the Java simulator does (simDrive.ts).
     const catalog = buildPathCatalog(
       e.startPoint,
       e.lines,
-      atSpeed(e.settings, speed),
+      options.turning === "drawn"
+        ? atSpeed(e.settings, speed)
+        : simTurning(atSpeed(e.settings, speed), speed),
     );
-    if (catalog.paths.length && atSpeed(e.settings, speed) !== e.settings) {
-      // The robot's endgame guard reserves the export's time, at the drawing's speed.
+    if (catalog.paths.length) {
+      // The robot's endgame guard reserves the export's time, at the drawing's speed and turning.
       const drawn = buildPathCatalog(e.startPoint, e.lines, e.settings);
       for (const path of catalog.paths)
         path.drawnSeconds = drawn.byId.get(path.id)?.seconds;

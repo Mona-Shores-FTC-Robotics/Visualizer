@@ -464,6 +464,26 @@ export function simulateAuto(
    */
   let parkedOn: string | null = null;
   const drive = (card: PathCard, path: PathInfo, until = Infinity) => {
+    // Fork: the preview turns the robot in place first, from where the last path left its heading
+    // to where this one starts, at the simulator's rate (timing/simDrive.ts; preview only).
+    const turnRate = catalog.settings.maxTurnRadPerS;
+    const jump = Math.abs(
+      ((((path.startHeadingDeg - heading) % 360) + 540) % 360) - 180,
+    );
+    if (turnRate && jump > 0.5) {
+      const turnS = (jump * Math.PI) / 180 / turnRate;
+      timeline.push({
+        type: "wait",
+        duration: turnS,
+        startTime: t,
+        endTime: t + turnS,
+        startHeading: heading,
+        targetHeading: path.startHeadingDeg,
+        atPoint: { ...pos },
+      });
+      t += turnS;
+      heading = path.startHeadingDeg;
+    }
     const t0 = t;
     const stop = Math.min(path.seconds, until);
     for (const event of path.travel) {

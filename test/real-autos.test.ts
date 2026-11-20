@@ -22,7 +22,11 @@ import { previewTogether } from "../src/lib/timing/together";
 
 const DIR = "test/fixtures/biobuzz";
 
-function load(path: string, values: TimingValues = fallbackValues()) {
+function load(
+  path: string,
+  values: TimingValues = fallbackValues(),
+  turning: "sim" | "drawn" = "sim",
+) {
   const loaded = parseProject(
     readFileSync(path, "utf8"),
     robotConfigOf(DEFAULT_SETTINGS),
@@ -52,7 +56,7 @@ function load(path: string, values: TimingValues = fallbackValues()) {
       ],
       values,
       true,
-      { tipsCome: true },
+      { tipsCome: true, turning },
     ).previews[0];
   return { doc, settings, catalog, waits, preview };
 }
@@ -75,12 +79,14 @@ describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
     );
 
     it("ends its good path parked, by 30 s", () => {
+      // The endgame guard may park it. These are the October Autos, and the 15 Oct simulator run
+      // they were checked against (sim/*.json) predates the simulator's wheel-sharing fit (Belding,
+      // 7 Nov), which the preview now turns with (simDrive.ts): their curves take longer, and the
+      // guard can be what parks them. Parked by 30 s stays strict.
       const good = preview({});
       expect(good.endTime).toBeLessThanOrEqual(AUTO_LENGTH_S);
-      expect(
-        good.guard,
-        "the endgame guard should not be needed when every tip comes",
-      ).toBeNull();
+      expect(good.unparked, "parked").toBeFalsy();
+      expect(good.stalled, "not stuck in a wait").toBeFalsy();
     });
 
     it("parks by 30 s whatever tip is missed, at the robot's measured speed", () => {
@@ -90,7 +96,10 @@ describe.each(readdirSync(`${DIR}/autos`).filter((f) => f.endsWith(".pp")))(
       const measured = load(`${DIR}/autos/${file}`, MEASURED).preview;
       for (const { card } of waits) {
         const miss = measured({ [switchKey(card.id)]: false });
-        expect(miss.endTime, `${card.label ?? card.id} missed`).toBeLessThanOrEqual(AUTO_LENGTH_S + 1e-6);
+        expect(
+          miss.endTime,
+          `${card.label ?? card.id} missed`,
+        ).toBeLessThanOrEqual(AUTO_LENGTH_S + 1e-6);
       }
     });
 
@@ -202,8 +211,12 @@ describe("the robot's first match logs (25 Oct 2026)", () => {
   >;
 
   /** The preview of `auto` with no condition ever coming, as on the night. */
-  function asRan(auto: string) {
-    const { doc, catalog, preview } = load(`${DIR}/real/${auto}.pp`, values);
+  function asRan(auto: string, turning: "sim" | "drawn" = "sim") {
+    const { doc, catalog, preview } = load(
+      `${DIR}/real/${auto}.pp`,
+      values,
+      turning,
+    );
     const never: Scenario = {};
     for (const card of allCards(doc.auto!.cards))
       if (card.kind === "firstOf")
@@ -254,10 +267,15 @@ describe("the robot's first match logs (25 Oct 2026)", () => {
 
   it("r-quals: times the drive that turns 180° within 15% of the robot", () => {
     // FAR_FLOWER to N_FIRE turns half a circle in 15.5 in: turning, not driving, sets its time.
-    const { drives } = asRan("r-quals");
+    // This validates the preview's light-chassis mode (the drawing's own turn rate, turning:
+    // "drawn") against the robot that ran on 25 Oct, the light chassis; not the competition
+    // robot, whose turning the preview takes from the simulator (simDrive.ts).
+    const { drives } = asRan("r-quals", "drawn");
     const drive = drives.get("FAR_FLOWER to N_FIRE")!;
     const measured = real["r-quals"].drives["FAR_FLOWER to N_FIRE"].seconds;
-    expect(Math.abs(drive.t1 - drive.t0 - measured) / measured).toBeLessThan(0.15);
+    expect(Math.abs(drive.t1 - drive.t0 - measured) / measured).toBeLessThan(
+      0.15,
+    );
   });
 
   it("r-quals: the endgame guard parks when the robot's did, and the park ends by 30 s", () => {
