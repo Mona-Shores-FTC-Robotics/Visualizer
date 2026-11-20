@@ -91,6 +91,9 @@ const WIDTH = Number(arg("width", "720"));
 // --keep-gifs: rewrite the manifest, and capture only GIFs that are not there yet.
 const KEEP_GIFS = process.argv.includes("--keep-gifs");
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
+// --mp4 DIR: also write each animation as an H.264 MP4 into DIR (same frames and clock).
+const MP4_DIR = arg("mp4", "");
+if (MP4_DIR) mkdirSync(MP4_DIR, { recursive: true });
 const OUT = new URL("../public/autos/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
@@ -527,8 +530,8 @@ function clockFilter(step, size, alliance) {
   const fontfile = existsSync(font) ? `fontfile=${font}:` : "";
   const tenths = `n*${step}`;
   return (
-    `drawtext=${fontfile}text='%{eif\\:floor(${tenths}/10)\\:d}.%{eif\\:mod(${tenths}\\,10)\\:d} s':` +
-    `fontsize=${Math.round(size * 0.048)}:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:` +
+    `drawtext=${fontfile}text='%{eif\\:floor(${tenths}/10)\\:d}.%{eif\\:mod(${tenths}\\,10)\\:d}s':` +
+    `fontsize=${Math.round(size * 0.06)}:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:` +
     `x=w*${alliance === "blue" ? CLOCK_X : 1 - CLOCK_X}-tw/2:y=h*${alliance === "blue" ? CLOCK_Y : 1 - CLOCK_Y}-th/2`
   );
 }
@@ -585,6 +588,30 @@ async function capture(page, card, look, hide, targets) {
       "0",
       target,
     ]);
+    if (MP4_DIR) {
+      execFileSync("ffmpeg", [
+        "-y",
+        "-loglevel",
+        "error",
+        "-framerate",
+        String(FPS),
+        "-i",
+        join(dir, "f%04d.png"),
+        "-vf",
+        `${turn}${clockFilter(step, box.width, alliance)},tpad=stop_mode=clone:stop_duration=1.2,` +
+          `scale=${WIDTH}:-2:flags=lanczos,format=yuv420p`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "slow",
+        "-crf",
+        "26",
+        "-movflags",
+        "+faststart",
+        "-an",
+        join(MP4_DIR, target.replace(/^.*\//, "").replace(/\.gif$/, ".mp4")),
+      ]);
+    }
   }
   rmSync(dir, { recursive: true, force: true });
 }
