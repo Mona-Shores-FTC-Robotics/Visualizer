@@ -113,8 +113,9 @@ section > h2{margin:0;font-size:20px}
 .brand{display:block}
 .brand .logo{display:block;width:min(100%,420px);height:auto;background:#fff;border-radius:12px;padding:10px 16px;box-sizing:border-box;margin-bottom:12px}
 .brand h1{margin:0;font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
-.titlebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
-.alliance{grid-template-columns:auto 12em}
+.titlebar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.titlebar h1{min-width:0;white-space:nowrap;font-size:clamp(24px,7vw,40px)}
+.alliance{display:block;flex:none;width:min(10em,42%);padding:0}
 .alliance button[data-alliance="red"][aria-pressed="true"]{background:#c62828;color:#fff}
 .alliance button[data-alliance="blue"][aria-pressed="true"]{background:#1f5fd6;color:#fff}
 .seg.three{grid-template-columns:repeat(3,1fr)}
@@ -132,7 +133,7 @@ section > h2{margin:0;font-size:20px}
   <img class="logo" src="autos/mona-shores-logo.svg" alt="Mona Shores Ultraviolet 20245 and Infrared 19429" width="439" height="113">
   <div class="titlebar">
     <h1>Auto Strategy</h1>
-    <div class="sw alliance" role="group" aria-label="Alliance"><span>Alliance</span>
+    <div class="sw alliance" role="group" aria-label="Alliance">
       <div class="seg"><button type="button" data-alliance="red" aria-pressed="true">Red</button><button type="button" data-alliance="blue" aria-pressed="false">Blue</button></div>
     </div>
   </div>
