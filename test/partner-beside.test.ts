@@ -4,6 +4,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fallbackValues } from "../src/lib/timing/model";
+import { getDefaultShapes } from "../src/config/defaults";
+import { robotFootprints } from "../src/model/collision";
+import { polygonsOverlap } from "../src/utils/geometry";
 import {
   contactOnly,
   initWait,
@@ -411,5 +414,32 @@ describe("the left stand-ins' paths and times", () => {
       if (Math.abs(p.x - 47.4) < 8) nearest = Math.min(nearest, 126.6 - p.y);
     }
     expect(nearest).toBeGreaterThan(4);
+  });
+});
+
+describe("the stand-ins keep clear of the field", () => {
+  it("never drive through the HIVE's frame or a FLOWER (a pick touches its own, as it must)", () => {
+    const shapes = getDefaultShapes("biobuzz.webp");
+    for (const p of PRESETS) {
+      const robot = partner(p);
+      const r = runBeside(load("r-solo.pp"), robot, plain, values, false);
+      const preview = r.previews[1];
+      const picking = preview.actions.filter((a) =>
+        ["PickFlower", "PickFlowerLaunch", "GardenGather"].includes(a.command),
+      );
+      for (let t = 0; t <= preview.endTime; t += 0.05) {
+        if (picking.some((a) => t >= a.t0 - 1e-9 && t <= a.t1 + 1e-9)) continue;
+        const frames = robotFootprints(poseOf(robot, preview, t), {
+          ...robot.settings,
+          safetyMargin: 0,
+        });
+        for (const shape of shapes)
+          for (const frame of frames)
+            expect(
+              polygonsOverlap(frame, shape.vertices),
+              `${p.name} hits ${shape.name} at ${t.toFixed(2)} s`,
+            ).toBe(false);
+      }
+    }
   });
 });

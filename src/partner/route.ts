@@ -133,6 +133,8 @@ const SCORING_FLOWER_STAGING = spot(47.2, 119.3, 90);
 const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
 /** The middle of the right start's tile (58.75, 10.75: a tile is 24 in, the edge tiles 1.25 in under the walls), to a tenth. */
 const RIGHT_START_TILE = spot(58.8, 10.8, 90);
+/** Out of the top of the HIVE on the lane under it, on the way from under it to LEFT_PARK. */
+const OUT_OF_THE_HIVE: BasePoint = { x: 58, y: 110 };
 /** Below the SCORING FLOWER on the way from the left start to LEFT_PARK. */
 const PAST_SCORING_FLOWER: BasePoint = { x: 45, y: 112 };
 /** Under the HIVE's left half, on the lane L-LeftUnderHive drives under it. */
@@ -155,11 +157,13 @@ export const PRESETS: PartnerRoute[] = [
   ]),
   // Out of the way after its preloads: onto the lane our L-LeftUnderHive crosses under the HIVE
   // by (LEFT_AUTO_HIVE to RIGHT_AUTO_FIX_TIP, x about 59), just inside the HIVE's left half.
-  // It stays there until it must leave to be parked with about 4.5 s left.
+  // It stays there until it must leave to be parked with about 4.5 s left, and leaves the way it
+  // came in: back out the top of the HIVE along the lane, then over to LEFT_PARK, never through the
+  // HIVE's side.
   route("L: shoot, hide under the HIVE", LEFT_START, [
     shoot,
     drive(UNDER_HIVE_LEFT),
-    drive(LEFT_PARK, true, null, 25.5),
+    drive(LEFT_PARK, true, OUT_OF_THE_HIVE, 25.5),
   ]),
   route("L: SUPER FLOWER (turret)", LEFT_START, [
     drive(SCORING_FLOWER_STAGING),
