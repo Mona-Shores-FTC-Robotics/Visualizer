@@ -46,20 +46,20 @@ test("their Auto first, then ours on top: contact, parks, TIPs", async ({
   await page.goto("/partner.html");
   // A first visit: nothing of ours yet, so no answer tiles; their Autos as pictures.
   const cards = page.getByRole("group", { name: "Their Autos" });
-  await expect(cards.getByRole("button")).toHaveCount(8);
+  await expect(cards.getByRole("button")).toHaveCount(7);
   await expect(page.locator(".tile")).toHaveCount(0);
   await expect(cards.getByRole("button", { name: /broken|wall/i })).toHaveCount(
     0,
   );
 
-  await cards
-    .getByRole("button", { name: "L: shoot, FLOWER, shoot, park" })
-    .click();
+  await cards.getByRole("button", { name: "L: SUPER FLOWER (turret)" }).click();
   await expect(
-    cards.getByRole("button", { name: "L: shoot, FLOWER, shoot, park" }),
+    cards.getByRole("button", { name: "L: SUPER FLOWER (turret)" }),
   ).toHaveAttribute("aria-pressed", "true");
-  // Each shot says when its last ball is out and when the CELL settles.
-  await expect(page.getByText(/^Last ball \d+\.\d s/).first()).toBeVisible();
+  // The SUPER FLOWER says when it fires its eight (once TIP 1 is in), its last ball and the CELL.
+  await expect(
+    page.getByText(/^Shoots \d+\.\d s · last ball \d+\.\d s · CELL settled/),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: /^R-Solo/ }).click();
   await expect(page.locator(".tile").first()).toContainText(
@@ -136,9 +136,7 @@ test("options: a second one to compare, marked as the one we go with", async ({
   await serveBiobuzz(page);
   await page.goto("/partner.html#ours=r-solo.pp");
   const cards = page.getByRole("group", { name: "Their Autos" });
-  await cards
-    .getByRole("button", { name: "L: shoot, FLOWER, shoot, park" })
-    .click();
+  await cards.getByRole("button", { name: "L: SUPER FLOWER (turret)" }).click();
   const tabs = page.getByRole("group", { name: "Options" });
   await tabs.getByRole("button", { name: "Another option" }).click();
   await expect(tabs.getByRole("button", { name: /^B/ })).toHaveAttribute(
@@ -152,7 +150,7 @@ test("options: a second one to compare, marked as the one we go with", async ({
   await expect(tabs.getByRole("button", { name: /^B ★/ })).toBeVisible();
   await tabs.getByRole("button", { name: "A", exact: true }).click();
   await expect(
-    cards.getByRole("button", { name: "L: shoot, FLOWER, shoot, park" }),
+    cards.getByRole("button", { name: "L: SUPER FLOWER (turret)" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".tile").first()).toContainText(/Contact\s*\d/);
   // Where no delay helps, the page says so.

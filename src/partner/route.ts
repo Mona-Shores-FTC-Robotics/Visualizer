@@ -39,6 +39,11 @@ export type RouteStep =
   | { kind: "shoot"; at: number | null }
   /** Picks up a FLOWER where it is. */
   | { kind: "pick" }
+  /**
+   * The SUPER FLOWER (a robot with a turret): it waits at the FLOWER with its preloads, and when its
+   * CELL comes up (TIP 1, for a left start) takes the FLOWER's four and fires all eight in one go.
+   */
+  | { kind: "superFlower" }
   /** Gathers at the GARDEN where it is. */
   | { kind: "gather" }
   /**
@@ -87,10 +92,14 @@ export function clampPoint(p: BasePoint): BasePoint {
 // ---- The page's stand-ins -------------------------------------------------------------------
 
 const spot = (x: number, y: number, h: number): Spot => ({ x, y, h });
-const drive = (to: Spot, park = false): RouteStep => ({
+const drive = (
+  to: Spot,
+  park = false,
+  bend: BasePoint | null = null,
+): RouteStep => ({
   kind: "drive",
   to,
-  bend: null,
+  bend,
   by: null,
   park,
 });
@@ -113,7 +122,6 @@ const LEFT_START = spot(62.3, 133.8, 270);
 const RIGHT_START = spot(55.6, 7.7, 90);
 const LEFT_PARK = spot(14.5, 117.4, 0);
 const RIGHT_PARK = spot(14.5, 98.7, 0);
-const LEFT_AUTO_HIVE = spot(61.4, 120.5, 269);
 const RIGHT_AUTO_HIVE = spot(59.2, 20.9, 96);
 const SCORING_FLOWER_STAGING = spot(47.2, 119.3, 90);
 const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
@@ -123,9 +131,10 @@ const UNDER_HIVE_LEFT = spot(59, 85, 270);
 /**
  * The page's stand-ins: a starting point to change to what the partner says, by picture. A
  * left-start one parks on the left (LEFT_PARK), a right-start one on the right (RIGHT_PARK).
- * L-NoCross and R-NoCross are our own Autos' main route (each CELL comes up when it asks), as
- * steps, without their fallbacks (and R-NoCross without its GARDEN trip, which only fits with our
- * endgame guard): a partner may run one like them. The simulator's stand-ins are not these.
+ * "R: shoot, FLOWER, shoot, park" is our R-NoCross's main route (without its GARDEN trip, which only
+ * fits with our endgame guard). The SUPER FLOWER is for a partner with a turret: staged at the
+ * SCORING FLOWER, it fires eight in a row as soon as TIP 1 brings its CELL up. The simulator's
+ * stand-ins are not these.
  */
 export const PRESETS: PartnerRoute[] = [
   route("L: shoot, park", LEFT_START, [shoot, drive(LEFT_PARK, true)]),
@@ -135,26 +144,17 @@ export const PRESETS: PartnerRoute[] = [
     shoot,
     drive(UNDER_HIVE_LEFT),
   ]),
-  route("L: shoot, FLOWER, shoot, park", LEFT_START, [
-    drive(spot(57.5, 123.5, 273)),
-    shoot,
+  route("L: SUPER FLOWER (turret)", LEFT_START, [
     drive(SCORING_FLOWER_STAGING),
-    pick,
-    drive(spot(57.5, 123.5, 273)),
-    shoot,
+    { kind: "superFlower" },
     drive(LEFT_PARK, true),
   ]),
-  route("L-NoCross", LEFT_START, [
-    drive(LEFT_AUTO_HIVE),
+  // Up the field in an arc toward the left wall, not straight across the middle; drag the bend.
+  route("R: shoot, park", RIGHT_START, [
     shoot,
-    drive(SCORING_FLOWER_STAGING),
-    pick,
-    drive(LEFT_AUTO_HIVE),
-    shoot,
-    drive(LEFT_PARK, true),
+    drive(RIGHT_PARK, true, { x: 26, y: 55 }),
   ]),
-  route("R: shoot, park", RIGHT_START, [shoot, drive(RIGHT_PARK, true)]),
-  route("R-NoCross", RIGHT_START, [
+  route("R: shoot, FLOWER, shoot, park", RIGHT_START, [
     drive(RIGHT_AUTO_HIVE),
     shoot,
     drive(WALL_FLOWER_STAGING),
@@ -213,6 +213,19 @@ export function routeDoc(
           ),
         );
       cards.push({ id: cardId(i), kind: "action", name: "LaunchAll" });
+    } else if (step.kind === "superFlower") {
+      cards.push(
+        {
+          id: `${cardId(i)}-up`,
+          kind: "firstOf",
+          label: "Waits at the FLOWER for its CELL up",
+          rows: [
+            { when: ["CellUp"], cards: [] },
+            { afterMs: 30000, matchClock: true, cards: [] },
+          ],
+        },
+        { id: cardId(i), kind: "action", name: "PickFlowerLaunch" },
+      );
     } else if (step.kind === "pick" || step.kind === "gather") {
       cards.push({
         id: cardId(i),
@@ -347,7 +360,7 @@ export function launches(
   const out: Record<number, { t0: number; t1: number }> = {};
   for (const a of preview?.actions ?? []) {
     const m = /^c-r(\d+)$/.exec(a.cardId ?? "");
-    if (m && a.command === "LaunchAll")
+    if (m && (a.command === "LaunchAll" || a.command === "PickFlowerLaunch"))
       out[Number(m[1])] = { t0: a.t0, t1: a.t1 };
   }
   return out;
@@ -432,7 +445,11 @@ export function cleanRoute(raw: unknown): PartnerRoute | null {
       steps.push({ kind: "shoot", at: time(s.at) });
       if (shotVolley === null && num(s.volleyS))
         shotVolley = s.volleyS as number;
-    } else if (s?.kind === "pick" || s?.kind === "gather")
+    } else if (
+      s?.kind === "pick" ||
+      s?.kind === "gather" ||
+      s?.kind === "superFlower"
+    )
       steps.push({ kind: s.kind });
     else if (s?.kind === "wait" && num(s.until))
       steps.push({ kind: "wait", until: time(s.until)! });
