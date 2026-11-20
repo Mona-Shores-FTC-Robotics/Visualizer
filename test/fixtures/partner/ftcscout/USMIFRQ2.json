@@ -1,0 +1,76 @@
+{
+  "data": {
+    "eventByCode": {
+      "code": "USMIFRQ2",
+      "name": "Fruitport Qualifier",
+      "start": "2026-11-20",
+      "end": "2026-11-21",
+      "teams": [
+        { "teamNumber": 5290, "team": { "name": "Steel Eagles" } },
+        {
+          "teamNumber": 5383,
+          "team": { "name": "Neutrinos Breaking the Laws of Physics" }
+        },
+        {
+          "teamNumber": 5384,
+          "team": { "name": "Emergency Situation Evacuate Now" }
+        },
+        { "teamNumber": 6482, "team": { "name": "Red Storm Robotics-Red" } },
+        { "teamNumber": 8513, "team": { "name": "Joe Bots - Maize" } },
+        { "teamNumber": 8733, "team": { "name": "RoboVikings" } },
+        { "teamNumber": 8932, "team": { "name": "NBC Robocats" } },
+        { "teamNumber": 10031, "team": { "name": "Red Storm Robotics-Blue" } },
+        { "teamNumber": 10255, "team": { "name": "RoboDux" } },
+        { "teamNumber": 11228, "team": { "name": "OverClucked Bots" } },
+        { "teamNumber": 11266, "team": { "name": "River Rat Robotics" } },
+        {
+          "teamNumber": 11531,
+          "team": { "name": "Techno Trojans - Green - Sponsored by MSI" }
+        },
+        {
+          "teamNumber": 11846,
+          "team": { "name": "Wayland Wildcat Cat-a-Tech-Nics" }
+        },
+        { "teamNumber": 11855, "team": { "name": "Joe Bots - Blue" } },
+        {
+          "teamNumber": 11940,
+          "team": { "name": "Cyber Coyotes: ACME Fabrications" }
+        },
+        { "teamNumber": 13702, "team": { "name": "Joe Bots - White" } },
+        { "teamNumber": 13885, "team": { "name": "OJ Cyborioles" } },
+        { "teamNumber": 14933, "team": { "name": "Rogue Rat Robotics" } },
+        { "teamNumber": 15510, "team": { "name": "Pioneer Robotics" } },
+        { "teamNumber": 16204, "team": { "name": "GOATageddon" } },
+        {
+          "teamNumber": 16220,
+          "team": { "name": "Mechanical Mustangs--16220" }
+        },
+        { "teamNumber": 16646, "team": { "name": "ZooBOTix Linden Grove" } },
+        {
+          "teamNumber": 18092,
+          "team": { "name": "Techno Trojans - Blue - Sponsored by Studica" }
+        },
+        { "teamNumber": 19429, "team": { "name": "Infrared" } },
+        { "teamNumber": 20245, "team": { "name": "Ultraviolet" } },
+        {
+          "teamNumber": 20862,
+          "team": { "name": "Eagle Robotics G.I.R.L.S." }
+        },
+        { "teamNumber": 20863, "team": { "name": "BIG Eagle Robotics" } },
+        {
+          "teamNumber": 22091,
+          "team": { "name": "Cyber Coyotes: ACME Innovations" }
+        },
+        { "teamNumber": 22313, "team": { "name": "CybOrioles Orange" } },
+        { "teamNumber": 22368, "team": { "name": "Powerful Pumas" } },
+        { "teamNumber": 24370, "team": { "name": "hyphenated-modifiers" } },
+        { "teamNumber": 24371, "team": { "name": "Proto Pioneers" } },
+        { "teamNumber": 27689, "team": { "name": "AnchorBits" } },
+        { "teamNumber": 28481, "team": { "name": "Soaring Circuits" } },
+        { "teamNumber": 31969, "team": { "name": "Techno Trojans - Gray" } },
+        { "teamNumber": 38293, "team": { "name": "AnchorBytes" } }
+      ],
+      "matches": []
+    }
+  }
+}

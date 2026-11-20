@@ -21,6 +21,8 @@
     type Robot,
   } from "./beside";
   import { drawField, routesOf, toField } from "./field";
+  import ScoutPanel from "./ScoutPanel.svelte";
+  import { drawnPlan, type PartnerPlan, type PlanRecord } from "./scouting";
   import {
     displayName,
     loadFile,
@@ -48,6 +50,11 @@
   let alliance = $state<"red" | "blue">(initial.alliance);
   let off = $state.raw<string[]>(initial.off);
   let miss = $state.raw<number[]>(initial.miss);
+  let event = $state<string | null>(initial.event);
+  let team = $state<number | null>(initial.team);
+  let match = $state<string | null>(initial.match);
+  /** The link held a look of its own: a saved plan loading first does not replace it. */
+  const linkHasLook = initial.drawn !== null || initial.partner !== null;
 
   // ---- What is loaded ----
   let lists = $state.raw<Lists | null>(null);
@@ -90,6 +97,46 @@
     return partner ? (robots[partner] ?? null) : null;
   });
   const choices = $derived(oursRobot ? routeChoices(oursRobot.doc.auto!) : []);
+  /** What the field shows, as a saved plan keeps it. */
+  const current = $derived.by(() => {
+    let plan: PartnerPlan | null = null;
+    if (partnerMode === "draw") {
+      if (drawn?.length) plan = drawnPlan(drawn, at, shoots);
+    } else if (partner) plan = { kind: "standin", file: partner };
+    return { ours, off, partner: plan };
+  });
+
+  /** A saved plan onto the field; none saved: a fresh drawing for this partner. */
+  function applyPlan(
+    record: PlanRecord | null,
+    matchAlliance: "red" | "blue" | null,
+  ) {
+    if (matchAlliance) alliance = matchAlliance;
+    playing = false;
+    arming = false;
+    stroke = null;
+    miss = [];
+    if (!record || !record.partner) {
+      partnerMode = "draw";
+      drawn = null;
+      at = 0;
+      shoots = false;
+      if (record?.ours) ours = record.ours;
+      off = record?.off ?? [];
+      return;
+    }
+    if (record.ours) ours = record.ours;
+    off = record.off;
+    if (record.partner.kind === "standin") {
+      partnerMode = "standin";
+      partner = record.partner.file;
+    } else {
+      partnerMode = "draw";
+      drawn = record.partner.points.map(([x, y]) => ({ x, y }));
+      at = record.partner.startS;
+      shoots = record.partner.shoots;
+    }
+  }
 
   const look = $derived({
     choices: Object.fromEntries(off.map((c) => [c, false])),
@@ -149,11 +196,13 @@
   );
   const startsTouching = $derived(result?.contact?.t === 0);
   const partnerName = $derived(
-    partnerMode === "draw"
-      ? "Drawn partner"
-      : partner
-        ? displayName(partner)
-        : "Partner",
+    team
+      ? `${team}`
+      : partnerMode === "draw"
+        ? "Drawn partner"
+        : partner
+          ? displayName(partner)
+          : "Partner",
   );
 
   // ---- Loading ----
@@ -255,6 +304,9 @@
       alliance,
       off,
       miss,
+      event,
+      team,
+      match,
     };
     const hash = stateHash(state);
     if (hash !== location.hash)
@@ -551,6 +603,17 @@
     </div>
 
     <div class="controls">
+      <ScoutPanel
+        bind:event
+        bind:team
+        bind:match
+        {current}
+        keepLinkLook={linkHasLook}
+        onApply={applyPlan}
+        autoName={nameOf}
+        onDraw={startDrawing}
+      />
+
       {#if result}
         <section class="details">
           <h2>What happens</h2>
@@ -681,7 +744,7 @@
 
       <section>
         <h2>Partner</h2>
-        <div class="seg two" role="group" aria-label="Partner">
+        <div class="seg two" role="group" aria-label="Stand-in or drawn">
           <button
             type="button"
             aria-pressed={partnerMode === "standin"}

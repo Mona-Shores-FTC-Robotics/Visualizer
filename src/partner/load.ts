@@ -129,6 +129,10 @@ export interface PageState {
   off: string[];
   /** TIPs whose first try misses. */
   miss: number[];
+  /** The scouting menu: an FTCScout event code, a partner team, and one of our matches. */
+  event: string | null;
+  team: number | null;
+  match: string | null;
 }
 
 export const EMPTY_STATE: PageState = {
@@ -140,6 +144,9 @@ export const EMPTY_STATE: PageState = {
   alliance: "red",
   off: [],
   miss: [],
+  event: null,
+  team: null,
+  match: null,
 };
 
 const FILE = /^(partners\/)?[A-Za-z0-9._-]+\.pp$/;
@@ -169,6 +176,9 @@ export function parseState(hash: string): PageState {
       drawn = points.map(([x, y]) => ({ x, y }));
   }
   const at = Number(params.get("at") ?? 0);
+  const event = params.get("event") ?? "";
+  const team = Number(params.get("team") ?? NaN);
+  const match = params.get("match") ?? "";
   const list = (key: string) =>
     (params.get(key) ?? "").split(",").filter(Boolean);
   return {
@@ -186,6 +196,9 @@ export function parseState(hash: string): PageState {
     miss: list("miss")
       .map(Number)
       .filter((n) => Number.isInteger(n) && n > 0 && n < 10),
+    event: /^[A-Z0-9]{3,16}$/.test(event) ? event : null,
+    team: Number.isInteger(team) && team > 0 && team < 100000 ? team : null,
+    match: /^(Q\d{1,3}|P\d{1,3}(-\d)?)$/.test(match) ? match : null,
   };
 }
 
@@ -194,6 +207,9 @@ const round = (n: number) => Math.round(n * 10) / 10;
 /** The link's fragment for a look (the reverse of `parseState`). */
 export function stateHash(state: PageState): string {
   const parts: string[] = [];
+  if (state.event) parts.push(`event=${state.event}`);
+  if (state.team) parts.push(`team=${state.team}`);
+  if (state.match) parts.push(`match=${state.match}`);
   if (state.ours) parts.push(`ours=${state.ours}`);
   if (state.drawn?.length) {
     parts.push(

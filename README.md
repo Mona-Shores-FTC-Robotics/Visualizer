@@ -69,6 +69,12 @@ What the fork adds:
   It runs the two together with the preview and the Match view's contact check (`src/partner/`)
   and answers in four tiles: contact (and when), where each robot parks, and the TIPs. The link
   holds the whole look, a drawn partner included. A quick look, not the Java simulator.
+  Its **Match** menu lists our events and matches from FTCScout (both teams, this season; before
+  the schedule is out, the event's team list), and keeps the team's plan for each partner: their
+  Auto (a stand-in or a drawing), ours beside it and notes, for the team at that event or for one
+  match. Plans are one JSON file per event on biobuzz's `scouting` branch
+  (`scouting/<season>/<event>.json`): anyone can read them, and saving takes the GitHub token Save
+  to GitHub uses.
 - **Drafts in Team Autos.** `TeamCode/autos/drafts/` (Autos of ours the robot does not run yet) is
   listed too, and a link may name one: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`.
   A draft opens and saves like any Auto: Save to GitHub suggests its own `drafts/` path, and Save to
