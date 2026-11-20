@@ -99,6 +99,8 @@ section > h2{margin:0;font-size:20px}
 @media (max-width:480px){.sw:not(.alliance){grid-template-columns:6.2em 1fr;gap:8px}.sw > span{font-size:12.5px;line-height:1.2}.seg button{white-space:normal;line-height:1.2}}
 /* A finger, not a mouse: every button at least 40 px tall. */
 @media (pointer:coarse){.seg button{min-height:40px;font-size:14px}.btn{min-height:44px}}
+/* Pairs, then solo Autos, spaced as one list of cards. */
+#solo{margin-top:-16px}
 .jump{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .jump a{padding:7px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap}
 .jump a:hover{border-color:var(--accent)}
@@ -142,8 +144,8 @@ section > h2{margin:0;font-size:20px}
   <nav class="jump" id="jump" aria-label="Jump to an Auto"></nav>
 </header>
 
-<section id="pair"><h2>Pairs</h2><div class="grid"></div></section>
-<section id="solo"><h2>Solo Autos</h2><p class="lead">One robot, beside any partner.</p><div class="grid"></div></section>
+<section id="pair" aria-label="Pairs"><div class="grid"></div></section>
+<section id="solo" aria-label="Solo Autos"><div class="grid"></div></section>
 
 <section id="partners-section">
   <h2>Partner stand-ins</h2>
