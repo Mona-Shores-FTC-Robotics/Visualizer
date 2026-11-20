@@ -106,11 +106,6 @@
   let failed = $state.raw<Record<string, string>>({});
   /** Every team's known Autos this season, loaded by the match panel. */
   let library = $state.raw<PartnerLibrary | null>(null);
-  /**
-   * Our Autos drawn to run beside one other, from the Auto Strategy page's manifest: each half's
-   * file and Auto name → the other half's Auto name.
-   */
-  let pairs = $state.raw<Record<string, string>>({});
   let listError = $state<string | null>(null);
 
   // ---- Playback ----
@@ -400,11 +395,6 @@
     return robots[file]?.doc.auto?.exportName || displayName(file);
   }
 
-  /** The other half's Auto name, when `file` is half of a pair; null for a solo Auto. */
-  function pairOf(file: string): string | null {
-    return pairs[nameOf(file)] ?? pairs[file] ?? null;
-  }
-
   onMount(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const theme = () => {
@@ -427,28 +417,6 @@
         listError =
           "GitHub would not list our Autos (too many visits from this Wi-Fi, or no internet): these are the ones from 20 Nov.";
       await Promise.all(l.autos.map(loadRobot));
-    })();
-    void (async () => {
-      try {
-        const res = await fetch("autos/manifest.json", { cache: "no-cache" });
-        if (!res.ok) return;
-        const manifest = await res.json();
-        const out: Record<string, string> = {};
-        for (const card of manifest.cards ?? []) {
-          if (card.group !== "pair" || card.files?.length !== 2) continue;
-          const names: string[] = card.halves ?? card.files.map(displayName);
-          for (const [i, j] of [
-            [0, 1],
-            [1, 0],
-          ]) {
-            out[card.files[i]] = names[j];
-            out[names[i]] = names[j];
-          }
-        }
-        pairs = out;
-      } catch {
-        // No pair tags.
-      }
     })();
     return () => media.removeEventListener("change", theme);
   });
@@ -879,9 +847,6 @@
               disabled={!!failed[file]}
             >
               {nameOf(file)}
-              {#if pairOf(file)}<small>pair</small>{:else}<small class="solo"
-                  >solo</small
-                >{/if}
             </button>
           {/each}
         </div>
@@ -1380,20 +1345,6 @@
     align-items: center;
     gap: 6px;
     max-width: 100%;
-  }
-  .pick small {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 999px;
-    background: var(--trial);
-    color: var(--trial-ink);
-  }
-  .pick small.solo {
-    background: var(--tag);
-    color: var(--tag-ink);
   }
   .pick[aria-pressed="true"] {
     background: var(--accent);

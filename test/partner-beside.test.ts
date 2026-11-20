@@ -104,6 +104,7 @@ describe("the page's stand-ins", () => {
   it("are the ones the team asked for, and none broken down or idle by a wall", () => {
     expect(PRESETS.map((p) => p.name)).toEqual([
       "L: shoot, park",
+      "L: shoot, hide under the HIVE",
       "L: shoot, FLOWER, shoot, park",
       "L-NoCross",
       "R: shoot, park",

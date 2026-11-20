@@ -117,6 +117,8 @@ const LEFT_AUTO_HIVE = spot(61.4, 120.5, 269);
 const RIGHT_AUTO_HIVE = spot(59.2, 20.9, 96);
 const SCORING_FLOWER_STAGING = spot(47.2, 119.3, 90);
 const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
+/** Under the HIVE's left half, on the lane L-LeftUnderHive drives under it. */
+const UNDER_HIVE_LEFT = spot(59, 85, 270);
 
 /**
  * The page's stand-ins: a starting point to change to what the partner says, by picture. A
@@ -127,6 +129,12 @@ const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
  */
 export const PRESETS: PartnerRoute[] = [
   route("L: shoot, park", LEFT_START, [shoot, drive(LEFT_PARK, true)]),
+  // Out of the way after its preloads: onto the lane our L-LeftUnderHive crosses under the HIVE
+  // by (LEFT_AUTO_HIVE to RIGHT_AUTO_FIX_TIP, x about 59), just inside the HIVE's left half.
+  route("L: shoot, hide under the HIVE", LEFT_START, [
+    shoot,
+    drive(UNDER_HIVE_LEFT),
+  ]),
   route("L: shoot, FLOWER, shoot, park", LEFT_START, [
     drive(spot(57.5, 123.5, 273)),
     shoot,

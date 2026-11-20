@@ -46,7 +46,7 @@ test("their Auto first, then ours on top: contact, parks, TIPs", async ({
   await page.goto("/partner.html");
   // A first visit: nothing of ours yet, so no answer tiles; their Autos as pictures.
   const cards = page.getByRole("group", { name: "Their Autos" });
-  await expect(cards.getByRole("button")).toHaveCount(7);
+  await expect(cards.getByRole("button")).toHaveCount(8);
   await expect(page.locator(".tile")).toHaveCount(0);
   await expect(cards.getByRole("button", { name: /broken|wall/i })).toHaveCount(
     0,
