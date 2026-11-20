@@ -560,11 +560,14 @@ export function simulateAuto(
   };
 
   /**
-   * Fork: the robot stands on this guard's park (it drove that park path to its end, in this
-   * block or one inside it, and has not driven since), so the guard has nothing left to do.
+   * Fork: the robot stands on a park (it drove a park path to its end and has not driven since),
+   * so no guard has anything left to do: not this block's, and not an outer one whose own park is
+   * drawn from somewhere else (biobuzz AutoRegistry.parkedVolley: the guard adds no park after a
+   * parked volley). Before 20 Nov 2026 only a guard whose park was that same path stood down, so
+   * L-Clockwise's Auto-wide guard drove its catch park from LEFT_AUTO_HIVE after L had parked on
+   * LEFT_AIMED_PARK: L jumped back across the field and its park shot was cut.
    */
-  const standsOn = (guard: Guard) =>
-    parkedOn !== null && guard.path.id === parkedOn;
+  const standsOn = (_guard: Guard) => parkedOn !== null;
 
   const pendingDeadline = (guards: Guard[]): Guard | null => {
     if (goingFor) return null;
