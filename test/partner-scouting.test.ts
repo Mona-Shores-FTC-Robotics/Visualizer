@@ -4,8 +4,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { currentEvent, ourMatches, seasonOf } from "../src/partner/ftcscout";
 import {
-  drawnPlan,
   emptyPlans,
+  knownAutos,
+  parseLibrary,
   parsePlans,
   planFor,
   planKey,
@@ -92,7 +93,14 @@ const plan = (t: number, match: string | null, notes = ""): PlanRecord => ({
   match,
   ours: "r-solo.pp",
   off: [],
-  partner: drawnPlan([{ x: 62.33, y: 133.8 }], 4, true),
+  partner: {
+    name: "X",
+    start: { x: 62.3, y: 133.8, h: 270 },
+    steps: [
+      { kind: "shoot" },
+      { kind: "drive", to: { x: 9.8, y: 117.4, h: 0 }, by: 15, park: true },
+    ],
+  },
   notes,
   savedBy: "someone",
   savedAt: "2026-11-20T15:00:00.000Z",
@@ -109,12 +117,7 @@ describe("the team's plans", () => {
     );
     const back = parsePlans(text, 2026, "USMIFRQ2");
     expect(back).toEqual(plans);
-    expect(back.plans["11228"].partner).toEqual({
-      kind: "drawn",
-      points: [[62.3, 133.8]],
-      startS: 4,
-      shoots: true,
-    });
+    expect(back.plans["11228"].partner).toEqual(plan(11228, null).partner);
   });
 
   it("a match's own plan wins in that match; the team's holds elsewhere", () => {
@@ -134,15 +137,16 @@ describe("saving a plan to GitHub", () => {
     localStorage.clear();
   });
 
-  /** A fake biobuzz: the scouting branch, its file, and someone else saving once mid-save. */
+  /** A fake biobuzz: the scouting branch, its files, and someone else saving once mid-save. */
   function fakeGitHub(options: { otherSaveFirst: boolean }) {
     let head = "c1";
     let file: string | null = serializePlans({
       ...emptyPlans(2026, "E"),
       plans: { "5290": plan(5290, null, "theirs") },
     });
+    let library: string | null = null;
     let interfere = options.otherSaveFirst;
-    const commits: string[] = [];
+    const commits: Record<string, string>[] = [];
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const path = new URL(url).pathname;
       const method = init?.method ?? "GET";
@@ -153,11 +157,22 @@ describe("saving a plan to GitHub", () => {
         return ok({ object: { sha: head } });
       if (path.includes("/contents/scouting/2026/E.json"))
         return file === null ? new Response("", { status: 404 }) : ok(file);
+      if (path.includes("/contents/scouting/2026/partners.json"))
+        return library === null
+          ? new Response("", { status: 404 })
+          : ok(library);
       if (path.includes("/git/commits/") && method === "GET")
         return ok({ tree: { sha: "t" } });
       if (path.endsWith("/git/trees")) {
         const body = JSON.parse(String(init!.body));
-        commits.push(body.tree[0].content);
+        commits.push(
+          Object.fromEntries(
+            body.tree.map((e: { path: string; content: string }) => [
+              e.path,
+              e.content,
+            ]),
+          ),
+        );
         return ok({ sha: "t2" });
       }
       if (path.endsWith("/git/commits")) return ok({ sha: "c2" });
@@ -173,14 +188,16 @@ describe("saving a plan to GitHub", () => {
             status: 422,
           });
         }
-        file = commits[commits.length - 1];
+        const last = commits[commits.length - 1];
+        file = last["scouting/2026/E.json"] ?? file;
+        library = last["scouting/2026/partners.json"] ?? library;
         head = "c2";
         return ok({});
       }
       return new Response("", { status: 500 });
     });
     vi.stubGlobal("fetch", fetchMock);
-    return { file: () => file, fetchMock };
+    return { file: () => file, library: () => library, fetchMock };
   }
 
   const mine = {
@@ -188,7 +205,7 @@ describe("saving a plan to GitHub", () => {
     match: null,
     ours: "r-solo.pp",
     off: [],
-    partner: drawnPlan([{ x: 62, y: 134 }], 0, false),
+    partner: plan(11228, null).partner,
     notes: "ours",
   };
 
@@ -196,16 +213,26 @@ describe("saving a plan to GitHub", () => {
     localStorage.setItem("githubToken", "t");
     const gh = fakeGitHub({ otherSaveFirst: false });
     const saved = await savePlan(2026, "E", "11228", mine, "Event");
-    expect(Object.keys(saved.plans).sort()).toEqual(["11228", "5290"]);
-    expect(saved.plans["11228"].savedBy).toBe("scout");
-    expect(parsePlans(gh.file()!, 2026, "E")).toEqual(saved);
+    expect(Object.keys(saved.plans.plans).sort()).toEqual(["11228", "5290"]);
+    expect(saved.plans.plans["11228"].savedBy).toBe("scout");
+    expect(parsePlans(gh.file()!, 2026, "E")).toEqual(saved.plans);
+    // Its Auto, named X, is now one of 11228's known Autos, for the next event too.
+    const known = parseLibrary(gh.library()!, 2026);
+    expect(known).toEqual(saved.library);
+    expect(knownAutos(known, 11228).map((k) => k.route)).toEqual([
+      mine.partner,
+    ]);
   });
 
   it("someone saving at the same moment loses nothing: it reads again and retries", async () => {
     localStorage.setItem("githubToken", "t");
     const gh = fakeGitHub({ otherSaveFirst: true });
     const saved = await savePlan(2026, "E", "11228", mine, "Event");
-    expect(Object.keys(saved.plans).sort()).toEqual(["11228", "11855", "5290"]);
+    expect(Object.keys(saved.plans.plans).sort()).toEqual([
+      "11228",
+      "11855",
+      "5290",
+    ]);
     expect(Object.keys(parsePlans(gh.file()!, 2026, "E").plans).sort()).toEqual(
       ["11228", "11855", "5290"],
     );

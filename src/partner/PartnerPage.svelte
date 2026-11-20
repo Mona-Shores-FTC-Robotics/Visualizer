@@ -1,16 +1,14 @@
 <script lang="ts">
   /**
-   * "Our Auto beside a partner" (partner.html): pick one of our Autos on biobuzz master and a
-   * partner (a stand-in, or one drawn with a finger), watch them run together, and read whether
-   * they touch, where each parks, and the TIPs. The answer is the Visualizer's preview
-   * (beside.ts), not biobuzz's Java simulator.
+   * "Our Auto beside a partner" (partner.html): pick one of our Autos on biobuzz master and the
+   * partner's Auto (one of the page's stand-ins, or a team's saved one, edited as steps on the
+   * field), watch them run together, and read whether they touch, where each parks, and the TIPs.
+   * The answer is the Visualizer's preview (beside.ts), not biobuzz's Java simulator.
    */
   import { onMount } from "svelte";
   import { publicAsset } from "../utils/publicAsset";
-  import type { BasePoint } from "../types";
   import type { TimingValues } from "../lib/timing/model";
   import {
-    drawnPartner,
     OUR_COLOR,
     previewAlone,
     PARTNER_COLOR,
@@ -20,9 +18,18 @@
     type BesideResult,
     type Robot,
   } from "./beside";
-  import { drawField, routesOf, toField } from "./field";
+  import { drawField, markerAt, routesOf, toField, type Marker } from "./field";
+  import RouteEditor from "./RouteEditor.svelte";
   import ScoutPanel from "./ScoutPanel.svelte";
-  import { drawnPlan, type PartnerPlan, type PlanRecord } from "./scouting";
+  import type { PlanRecord } from "./scouting";
+  import {
+    arrivals as arrivalsOf,
+    clampSpot,
+    PRESETS,
+    routeRobot,
+    STILL_PRESET,
+    type PartnerRoute,
+  } from "./route";
   import {
     displayName,
     loadFile,
@@ -40,21 +47,21 @@
   // ---- What is picked (the link carries it) ----
   const initial = parseState(location.hash);
   let ours = $state<string | null>(initial.ours);
-  let partnerMode = $state<"standin" | "draw">(
-    initial.drawn ? "draw" : "standin",
+  let partner = $state.raw<PartnerRoute>(
+    initial.partner ?? { ...STILL_PRESET, name: "" },
   );
-  let partner = $state<string | null>(initial.partner);
-  let drawn = $state.raw<BasePoint[] | null>(initial.drawn);
-  let at = $state(initial.at);
-  let shoots = $state(initial.shoots);
   let alliance = $state<"red" | "blue">(initial.alliance);
   let off = $state.raw<string[]>(initial.off);
   let miss = $state.raw<number[]>(initial.miss);
   let event = $state<string | null>(initial.event);
   let team = $state<number | null>(initial.team);
   let match = $state<string | null>(initial.match);
-  /** The link held a look of its own: a saved plan loading first does not replace it. */
-  const linkHasLook = initial.drawn !== null || initial.partner !== null;
+  /** The stand-in the partner's Auto was started from, for its button; null for a team's own. */
+  let preset = $state<string | null>(
+    initial.partner ? null : STILL_PRESET.name,
+  );
+  /** The link held a partner of its own: a saved plan loading first does not replace it. */
+  const linkHasLook = initial.partner !== null;
 
   // ---- What is loaded ----
   let lists = $state.raw<Lists | null>(null);
@@ -73,9 +80,10 @@
   let t = $state(0);
   let playing = $state(false);
   let speed = $state(2);
-  /** The finger is drawing a partner: the canvas takes touches instead of scrolling. */
-  let arming = $state(false);
-  let stroke = $state.raw<BasePoint[] | null>(null);
+  /** The partner's spots are being moved: the field's markers take touches, not the page. */
+  let moving = $state(false);
+  /** The marker under the finger, while one is dragged. */
+  let dragging = $state<number | null>(null);
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let size = $state(360);
@@ -85,66 +93,52 @@
 
   const oursRobot = $derived(ours ? (robots[ours] ?? null) : null);
   const partnerRobot = $derived.by((): Robot | null => {
-    if (partnerMode === "draw") {
-      if (!drawn?.length) return null;
-      return drawnPartner({
-        start: drawn[0],
-        stroke: drawn.slice(1),
-        startS: at,
-        shoots,
-      });
+    if (!values) return null;
+    try {
+      return routeRobot(partner, values);
+    } catch (error) {
+      console.error("Could not build the partner's Auto:", error);
+      return null;
     }
-    return partner ? (robots[partner] ?? null) : null;
   });
   const choices = $derived(oursRobot ? routeChoices(oursRobot.doc.auto!) : []);
   /** What the field shows, as a saved plan keeps it. */
-  const current = $derived.by(() => {
-    let plan: PartnerPlan | null = null;
-    if (partnerMode === "draw") {
-      if (drawn?.length) plan = drawnPlan(drawn, at, shoots);
-    } else if (partner) plan = { kind: "standin", file: partner };
-    return { ours, off, partner: plan };
-  });
+  const current = $derived({ ours, off, partner });
 
-  /** A saved plan onto the field; none saved: a fresh drawing for this partner. */
+  /** A saved plan onto the field; none saved: the partner as a blank Auto to fill in. */
   function applyPlan(
     record: PlanRecord | null,
     matchAlliance: "red" | "blue" | null,
   ) {
     if (matchAlliance) alliance = matchAlliance;
     playing = false;
-    arming = false;
-    stroke = null;
     miss = [];
-    if (!record || !record.partner) {
-      partnerMode = "draw";
-      drawn = null;
-      at = 0;
-      shoots = false;
-      if (record?.ours) ours = record.ours;
-      off = record?.off ?? [];
-      return;
-    }
-    if (record.ours) ours = record.ours;
-    off = record.off;
-    if (record.partner.kind === "standin") {
-      partnerMode = "standin";
-      partner = record.partner.file;
-    } else {
-      partnerMode = "draw";
-      drawn = record.partner.points.map(([x, y]) => ({ x, y }));
-      at = record.partner.startS;
-      shoots = record.partner.shoots;
-    }
+    if (record?.ours) ours = record.ours;
+    off = record?.off ?? [];
+    partner = record?.partner ?? { ...STILL_PRESET, name: "" };
+    preset = record?.partner ? null : STILL_PRESET.name;
+  }
+
+  /** A stand-in to start from: its steps, with no name until the partner gives theirs. */
+  function pickPreset(route: PartnerRoute) {
+    pickRoute({ ...route, name: "" });
+    preset = route.name;
+  }
+
+  function pickRoute(route: PartnerRoute) {
+    preset = null;
+    partner = route;
+    playing = false;
+    miss = [];
   }
 
   const look = $derived({
     choices: Object.fromEntries(off.map((c) => [c, false])),
     tips: Object.fromEntries(miss.map((n) => [n, false])),
   });
-  /** Ours alone, for the field while there is no pair to run (a partner being drawn). */
+  /** Ours alone, for the field while there is no pair to run. */
   const alone = $derived.by(() => {
-    if (!oursRobot || !values || (result && !arming)) return null;
+    if (!oursRobot || !values || result) return null;
     try {
       const preview = previewAlone(oursRobot, look, values);
       return {
@@ -175,6 +169,25 @@
     result ? routesOf(shown, result.previews, result.span) : [],
   );
   const span = $derived(result?.span ?? 30);
+  /** When each of the partner's drives gets there, by step index. */
+  const partnerArrivals = $derived(arrivalsOf(result?.previews[1]));
+  /** The partner's spots on the field while they are being moved: the start, then each drive. */
+  const markerSteps = $derived.by((): (number | "start")[] => [
+    "start",
+    ...partner.steps.flatMap((s, i) => (s.kind === "drive" ? [i] : [])),
+  ]);
+  const markers = $derived.by((): Marker[] | null =>
+    moving
+      ? markerSteps.map((k, n) => {
+          const step = k === "start" ? null : partner.steps[k];
+          return {
+            at: step?.kind === "drive" ? step.to : partner.start,
+            label: k === "start" ? "S" : String(n),
+            active: dragging === n,
+          };
+        })
+      : null,
+  );
   /** The TIP rows: each the volleys try for in this look, and each set to miss. */
   const tipRows = $derived.by(() => {
     const rows: { tip: number; robot: number | null }[] = (
@@ -196,13 +209,8 @@
   );
   const startsTouching = $derived(result?.contact?.t === 0);
   const partnerName = $derived(
-    team
-      ? `${team}`
-      : partnerMode === "draw"
-        ? "Drawn partner"
-        : partner
-          ? displayName(partner)
-          : "Partner",
+    [team ? String(team) : "", partner.name].filter(Boolean).join(" ") ||
+      "Partner",
   );
 
   // ---- Loading ----
@@ -220,10 +228,7 @@
   }
 
   function nameOf(file: string): string {
-    const auto = robots[file]?.doc.auto;
-    return (
-      (!file.startsWith("partners/") && auto?.exportName) || displayName(file)
-    );
+    return robots[file]?.doc.auto?.exportName || displayName(file);
   }
 
   /** The other half's Auto name, when `file` is half of a pair; null for a solo Auto. */
@@ -251,13 +256,6 @@
       if (l.stale)
         listError =
           "GitHub would not list the folders (too many visits from this Wi-Fi, or no internet), so these are the files that were there on 20 Nov. A new one may be missing.";
-      // A first visit starts beside the stand-in that stays out of the way.
-      if (
-        partnerMode === "standin" &&
-        (!partner || !l.partners.includes(partner))
-      )
-        partner =
-          l.partners.find((f) => f.endsWith("/partner-still.pp")) ?? null;
       if (!ours || !l.autos.includes(ours))
         ours = l.autos.includes("r-solo.pp")
           ? "r-solo.pp"
@@ -289,18 +287,11 @@
     return () => media.removeEventListener("change", theme);
   });
 
-  $effect(() => {
-    if (partnerMode === "standin" && partner) void loadRobot(partner);
-  });
-
   // The link follows what is picked.
   $effect(() => {
     const state: PageState = {
       ours,
-      partner: partnerMode === "standin" ? partner : null,
-      drawn: partnerMode === "draw" ? drawn : null,
-      at,
-      shoots,
+      partner,
       alliance,
       off,
       miss,
@@ -317,10 +308,10 @@
       );
   });
 
-  // A new pick starts from the top.
+  // A new pick starts from the top (not while a spot is being dragged: the field stays put).
   $effect(() => {
     void result;
-    t = 0;
+    if (dragging === null) t = 0;
   });
 
   // ---- Playback ----
@@ -345,6 +336,7 @@
       return;
     }
     if (t >= span - 1e-6) t = 0;
+    moving = false;
     playing = true;
   }
 
@@ -367,67 +359,73 @@
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    // Drawing, or no pair yet: ours alone, at its start.
-    const solo = arming || stroke !== null || !result;
+    // No pair yet: ours alone, at its start.
+    const solo = !result;
     drawField(ctx, size, {
       robots: solo ? (oursRobot && alone ? [oursRobot] : []) : shown,
       previews: solo ? (alone ? [alone.preview] : []) : result!.previews,
       colors: COLORS,
       routes: solo ? (alone ? [alone.route] : []) : routes,
-      t: solo ? 0 : t,
+      // Moving spots: the robots stand at their starts, under the markers.
+      t: solo || moving ? 0 : t,
       contact: solo ? null : result!.contact,
       blue: alliance === "blue",
       image,
-      stroke,
+      markers,
     });
   });
 
-  function fieldPoint(event: PointerEvent): BasePoint {
+  function canvasXY(event: PointerEvent) {
     const rect = canvas!.getBoundingClientRect();
-    return toField(
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-      rect.width,
-      alliance === "blue",
-    );
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      w: rect.width,
+    };
   }
 
   function down(event: PointerEvent) {
-    if (!arming || !canvas) return;
+    if (!moving || !canvas || !markers) return;
+    const { x, y, w } = canvasXY(event);
+    const hit = markerAt(markers, x, y, w, alliance === "blue");
+    if (hit < 0) return;
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
     playing = false;
-    stroke = [fieldPoint(event)];
+    dragging = hit;
   }
   function move(event: PointerEvent) {
-    if (!stroke) return;
+    if (dragging === null) return;
     event.preventDefault();
-    stroke = [...stroke, fieldPoint(event)];
+    const { x, y, w } = canvasXY(event);
+    const p = toField(x, y, w, alliance === "blue");
+    const k = markerSteps[dragging];
+    if (k === "start") {
+      partner = {
+        ...partner,
+        start: clampSpot({ ...partner.start, x: p.x, y: p.y }),
+      };
+    } else {
+      const step = partner.steps[k];
+      if (step.kind !== "drive") return;
+      partner = {
+        ...partner,
+        steps: partner.steps.map((s, i) =>
+          i === k
+            ? { ...step, to: clampSpot({ ...step.to, x: p.x, y: p.y }) }
+            : s,
+        ),
+      };
+    }
   }
   function up() {
-    if (!stroke) return;
-    drawn = stroke;
-    stroke = null;
-    arming = false;
-    t = 0;
+    dragging = null;
   }
 
   // ---- Picks ----
   function pickOurs(file: string) {
     ours = file;
     off = [];
-    miss = [];
-  }
-  function pickPartner(file: string) {
-    partnerMode = "standin";
-    partner = file;
-    arming = false;
-    miss = [];
-  }
-  function startDrawing() {
-    partnerMode = "draw";
-    arming = true;
-    playing = false;
     miss = [];
   }
   function setChoice(condition: string, yes: boolean) {
@@ -439,9 +437,6 @@
     miss = lands
       ? miss.filter((n) => n !== tip)
       : [...new Set([...miss, tip])].sort((a, b) => a - b);
-  }
-  function nudgeAt(delta: number) {
-    at = Math.min(25, Math.max(0, Math.round((at + delta) * 2) / 2));
   }
 
   const fmt = (s: number) => `${s.toFixed(1)} s`;
@@ -489,7 +484,7 @@
       <div class="fieldbox">
         <canvas
           bind:this={canvas}
-          class:arming
+          class:moving
           style:height="{size}px"
           aria-label="The field: our robot in red, the partner in teal"
           onpointerdown={down}
@@ -503,7 +498,7 @@
           type="button"
           class="play"
           onclick={play}
-          disabled={!result || arming}
+          disabled={!result}
           aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button
         >
         <div class="scrub">
@@ -513,7 +508,7 @@
             max={span}
             step="0.1"
             bind:value={t}
-            disabled={!result || arming}
+            disabled={!result}
             aria-label="Time after PLAY"
           />
           <div class="ticks" aria-hidden="true">
@@ -544,17 +539,15 @@
       </div>
 
       <div class="verdict" aria-live="polite">
-        {#if arming}
+        {#if moving}
           <p class="drawhint">
-            Put a finger on the partner's <b>start</b> and drag along its
-            <b>path</b>. Lift to finish.
+            Drag a numbered spot to move it (<b>S</b> is the start). Press
+            <b>Done moving spots</b> to play.
           </p>
         {:else if !result}
           <p class="quiet">
             {#if !values || !lists}Loading from biobuzz master…
             {:else if !oursRobot}Pick our Auto.
-            {:else if partnerMode === "draw" && !drawn}Draw the partner on the
-              field.
             {:else if !partnerRobot}Pick a partner.
             {:else}Could not preview these two together.{/if}
           </p>
@@ -611,7 +604,7 @@
         keepLinkLook={linkHasLook}
         onApply={applyPlan}
         autoName={nameOf}
-        onDraw={startDrawing}
+        onPickRoute={pickRoute}
       />
 
       {#if result}
@@ -744,93 +737,26 @@
 
       <section>
         <h2>Partner</h2>
-        <div class="seg two" role="group" aria-label="Stand-in or drawn">
-          <button
-            type="button"
-            aria-pressed={partnerMode === "standin"}
-            onclick={() => {
-              partnerMode = "standin";
-              arming = false;
-              miss = [];
-            }}>Stand-in</button
-          >
-          <button
-            type="button"
-            aria-pressed={partnerMode === "draw"}
-            onclick={() =>
-              drawn ? ((partnerMode = "draw"), (miss = [])) : startDrawing()}
-            >Draw it</button
-          >
-        </div>
-
-        {#if partnerMode === "standin"}
-          <div class="picks">
-            {#each lists?.partners ?? [] as file (file)}
-              <button
-                type="button"
-                class="pick"
-                aria-pressed={partner === file}
-                onclick={() => pickPartner(file)}>{displayName(file)}</button
-              >
-            {/each}
-          </div>
-          {#if partner && failed[partner]}<p class="note warn">
-              {failed[partner]}
-            </p>{/if}
-          <p class="note">
-            The stand-ins in biobuzz <code>TeamCode/autos/partners/</code>.
-          </p>
-        {:else}
-          <div class="drawn">
+        <p class="note">
+          Start from a stand-in, then move its spots and set its times to what
+          the partner tells you.
+        </p>
+        <div class="picks" role="group" aria-label="Stand-ins">
+          {#each PRESETS as stand (stand.name)}
             <button
               type="button"
-              class="btn primary"
-              onclick={startDrawing}
-              disabled={arming}
+              class="pick"
+              aria-pressed={preset === stand.name}
+              onclick={() => pickPreset(stand)}>{stand.name}</button
             >
-              {drawn ? "Redraw on the field" : "Draw on the field"}
-            </button>
-            <div class="sw">
-              <span>Starts driving</span>
-              <div class="stepper">
-                <button
-                  type="button"
-                  onclick={() => nudgeAt(-0.5)}
-                  aria-label="Earlier">−</button
-                >
-                <output>{at === 0 ? "at PLAY" : `at ${at.toFixed(1)} s`}</output
-                >
-                <button
-                  type="button"
-                  onclick={() => nudgeAt(0.5)}
-                  aria-label="Later">+</button
-                >
-              </div>
-            </div>
-            <div class="sw">
-              <span>Shoots preloads first</span>
-              <div class="seg">
-                <button
-                  type="button"
-                  aria-pressed={!shoots}
-                  onclick={() => (shoots = false)}>No</button
-                >
-                <button
-                  type="button"
-                  aria-pressed={shoots}
-                  onclick={() => (shoots = true)}>Yes</button
-                >
-              </div>
-            </div>
-            <p class="note">
-              It faces away from the wall it starts nearest, drives one smooth
-              path through the drawing at our robot's speed, and stops at its
-              end. If it shoots, it fires one volley at the CELL at its end
-              before it drives. Send the link (it holds the drawing) to the
-              team.
-            </p>
-          </div>
-        {/if}
+          {/each}
+        </div>
+        <RouteEditor
+          route={partner}
+          arrivals={partnerArrivals}
+          bind:moving
+          onChange={(route) => (partner = route)}
+        />
       </section>
 
       <p class="note foot">
@@ -995,7 +921,7 @@
     width: 100%;
     touch-action: pan-y;
   }
-  canvas.arming {
+  canvas.moving {
     touch-action: none;
     cursor: crosshair;
     outline: 3px solid var(--accent);
@@ -1305,50 +1231,6 @@
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
-  .drawn {
-    display: grid;
-    gap: 8px;
-  }
-  .btn {
-    font: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    min-height: 46px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: var(--seg);
-    color: var(--ink);
-    cursor: pointer;
-  }
-  .btn.primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-ink);
-  }
-  .btn:disabled {
-    opacity: 0.55;
-  }
-  .stepper {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    align-items: center;
-    gap: 6px;
-  }
-  .stepper button {
-    font: inherit;
-    font-size: 20px;
-    font-weight: 700;
-    height: 44px;
-    border-radius: 9px;
-    border: 1px solid var(--line);
-    background: var(--seg);
-    color: var(--ink);
-    cursor: pointer;
-  }
-  .stepper output {
-    text-align: center;
-    font-weight: 700;
-  }
   .note {
     margin: 0;
     color: var(--muted);
@@ -1359,9 +1241,5 @@
   }
   .foot {
     padding: 0 4px;
-  }
-  code {
-    font-family: var(--mono);
-    font-size: 12.5px;
   }
 </style>

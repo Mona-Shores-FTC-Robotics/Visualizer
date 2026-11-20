@@ -20,8 +20,42 @@ export interface FieldScene {
   contact: Contact | null;
   blue: boolean;
   image: HTMLImageElement | null;
-  /** A partner being drawn: its start and stroke, in field inches. */
-  stroke: BasePoint[] | null;
+  /** The partner's spots, numbered, to drag while its Auto is edited; null when not editing. */
+  markers: Marker[] | null;
+}
+
+export interface Marker {
+  at: BasePoint;
+  /** "S" for the start, else the step's number. */
+  label: string;
+  /** The one being dragged or picked in the list. */
+  active: boolean;
+}
+
+/** A marker's radius on screen, CSS pixels: big enough for a fingertip. */
+export const MARKER_PX = 13;
+
+/** Which marker a touch at (px, py) grabs: the nearest within a fingertip, else -1. */
+export function markerAt(
+  markers: Marker[],
+  px: number,
+  py: number,
+  size: number,
+  blue: boolean,
+): number {
+  const at = mapper(size, blue);
+  let best = -1;
+  let bestD = MARKER_PX * 2.2;
+  // Later markers are drawn on top, so they win a tie.
+  markers.forEach((m, i) => {
+    const q = at(m.at);
+    const d = Math.hypot(q.x - px, q.y - py);
+    if (d <= bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 /** Each robot's route: where its preview has it every 0.1 s through `span`. */
@@ -107,16 +141,6 @@ export function drawField(
     line(route, scene.colors[i], Math.max(2, scale * 0.9));
   });
 
-  if (scene.stroke) {
-    line(scene.stroke, "rgba(0,0,0,.55)", Math.max(4, scale * 1.8));
-    line(scene.stroke, scene.colors[1] ?? "#4ECDC4", Math.max(3, scale * 1.1));
-    const s = at(scene.stroke[0]);
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, Math.max(6, scale * 3), 0, Math.PI * 2);
-    ctx.fillStyle = scene.colors[1] ?? "#4ECDC4";
-    ctx.fill();
-  }
-
   // The robots at `t`: frame, and a stripe on the front.
   const touching = scene.contact !== null && scene.t >= scene.contact.t - 1e-9;
   scene.robots.forEach((robot, i) => {
@@ -154,6 +178,23 @@ export function drawField(
     ctx.lineWidth = Math.max(2, scale * 0.8);
     ctx.stroke();
   });
+
+  // The partner's spots, while its Auto is edited: a numbered disc on each.
+  for (const m of scene.markers ?? []) {
+    const q = at(m.at);
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, MARKER_PX, 0, Math.PI * 2);
+    ctx.fillStyle = m.active ? "#ffffff" : (scene.colors[1] ?? "#4ECDC4");
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = m.active ? (scene.colors[1] ?? "#4ECDC4") : "#111";
+    ctx.stroke();
+    ctx.fillStyle = "#111";
+    ctx.font = "800 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(m.label, q.x, q.y + 0.5);
+  }
 
   // Where they first touch: a ring, from the moment they do.
   if (scene.contact) {
