@@ -22,6 +22,10 @@ export interface FieldScene {
   image: HTMLImageElement | null;
   /** The partner's spots, numbered, to drag while its Auto is edited; null when not editing. */
   markers: Marker[] | null;
+  /** Markers' radius, CSS pixels (a thumbnail's are small); MARKER_PX when unset. */
+  markerPx?: number;
+  /** Routes' widths are scaled by this (a thumbnail's are thicker, to read small). */
+  lineScale?: number;
 }
 
 export interface Marker {
@@ -136,9 +140,10 @@ export function drawField(
   };
 
   // Routes: a dark casing under each so they read on the light and dark field alike.
+  const k = scene.lineScale ?? 1;
   scene.routes.forEach((route, i) => {
-    line(route, "rgba(0,0,0,.55)", Math.max(3, scale * 1.6));
-    line(route, scene.colors[i], Math.max(2, scale * 0.9));
+    line(route, "rgba(0,0,0,.55)", Math.max(3, scale * 1.6) * k);
+    line(route, scene.colors[i], Math.max(2, scale * 0.9) * k);
   });
 
   // The robots at `t`: frame, and a stripe on the front.
@@ -180,13 +185,14 @@ export function drawField(
   });
 
   // The partner's spots, while its Auto is edited: a numbered disc on each.
+  const r = scene.markerPx ?? MARKER_PX;
   for (const m of scene.markers ?? []) {
     const q = at(m.at);
     ctx.beginPath();
-    ctx.arc(q.x, q.y, MARKER_PX, 0, Math.PI * 2);
+    ctx.arc(q.x, q.y, r, 0, Math.PI * 2);
     ctx.fillStyle = m.active ? "#ffffff" : (scene.colors[1] ?? "#4ECDC4");
     ctx.fill();
-    ctx.lineWidth = 3;
+    ctx.lineWidth = Math.max(1.5, r / 4.5);
     ctx.strokeStyle = m.active ? (scene.colors[1] ?? "#4ECDC4") : "#111";
     ctx.stroke();
     ctx.fillStyle = "#111";

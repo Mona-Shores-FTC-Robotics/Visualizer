@@ -189,8 +189,8 @@ test("before the schedule: pick a team, set their Auto from a stand-in, name it,
   );
   await page.goto("/partner.html#event=USMIFRQ2");
   await expect(
-    page.getByText("No match schedule on FTCScout yet"),
-  ).toBeVisible();
+    page.getByRole("option", { name: "Pick a team (no schedule yet)" }),
+  ).toBeAttached();
   await page.getByLabel("Partner team").selectOption("11228");
   await expect(page.getByText("No plan yet")).toBeVisible();
 

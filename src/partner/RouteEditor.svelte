@@ -137,12 +137,6 @@
     onclick={() => (moving = !moving)}
     >{moving ? "Done moving spots" : "Move spots on the field"}</button
   >
-  {#if moving}
-    <p class="note">
-      Drag a numbered spot on the field: <b>S</b> is the start. The page scrolls again
-      when you press Done.
-    </p>
-  {/if}
 
   <ol class="steps">
     <li class="step">
@@ -237,11 +231,6 @@
       >{parked ? "+ Park (move it)" : "+ Park"}</button
     >
   </div>
-  <p class="note">
-    A time is when the partner says it is there ("parked by 15"): the page holds
-    it at its last spot until it must leave. "Any time" goes as soon as the step
-    before is done.
-  </p>
 </div>
 
 <style>
@@ -393,11 +382,6 @@
     background: transparent;
     color: var(--accent);
     cursor: pointer;
-  }
-  .note {
-    margin: 0;
-    color: var(--muted);
-    font-size: 13px;
   }
   button:focus-visible,
   input:focus-visible {

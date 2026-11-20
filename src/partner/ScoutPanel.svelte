@@ -307,11 +307,6 @@
           </button>
         {/each}
       </div>
-    {:else if !loading}
-      <p class="note">
-        No match schedule on FTCScout yet. Pick the partner team you are talking
-        to:
-      </p>
     {/if}
     <label class="field">
       <span>Partner</span>
@@ -323,7 +318,11 @@
           pickTeam(v > 0 ? v : null);
         }}
       >
-        <option value="">Pick a team…</option>
+        <option value=""
+          >{info.matches.length
+            ? "Pick a team…"
+            : "Pick a team (no schedule yet)"}</option
+        >
         {#each info.teams.filter((t) => t.number !== 19429 && t.number !== 20245) as t (t.number)}
           <option value={t.number}
             >{t.number} {t.name}{hasPlan(t.number, null) ? " ✓" : ""}</option
@@ -370,10 +369,6 @@
           {/each}
         </div>
       {/if}
-      <p class="note">
-        Name their Auto under Partner (what they call it: X, Y…) and it is kept
-        for {team}, for this event and the next.
-      </p>
       <label class="field notes">
         <span>Notes</span>
         <textarea
@@ -410,9 +405,8 @@
             >{match} has its own plan: remove it and use {team}'s</button
           >
         {/if}
-        <p class="note">
-          Saving as {login ?? "…"} to biobuzz's <code>scouting</code> branch:
-          the whole team sees it.
+        <p class="who">
+          Signed in as {login ?? "…"} ·
           <button
             type="button"
             class="linkbtn"
@@ -433,16 +427,11 @@
       {/if}
       {#if showConnect && !token}
         <div class="connect">
-          <p class="note">
-            Paste the team's GitHub token once on this phone (the one Save to
-            GitHub uses: Contents read and write on biobuzz). It stays in this
-            browser only.
-          </p>
           <input
             type="password"
             autocomplete="off"
             bind:value={tokenInput}
-            placeholder="github_pat_…"
+            placeholder="Paste the team's GitHub token"
             aria-label="GitHub token"
           />
           <button type="button" class="btn" onclick={connect}>Connect</button>
@@ -668,8 +657,10 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
-  .connect .note {
-    grid-column: 1 / -1;
+  .who {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
   }
   .note {
     margin: 0;
@@ -682,10 +673,6 @@
   .note.ok {
     color: var(--good-ink);
     font-weight: 700;
-  }
-  code {
-    font-family: var(--mono);
-    font-size: 12.5px;
   }
   button:focus-visible,
   select:focus-visible,

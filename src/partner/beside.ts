@@ -1,5 +1,5 @@
 /**
- * The "Our Auto beside a partner" page (partner.html): one of our Autos and one partner, run
+ * The Auto Match Planning page (partner.html): one of our Autos and one partner, run
  * together by the Visualizer's own preview, as the Match view runs Autos shown together
  * (state/auto.svelte.ts overlayTogether, matchLanes, matchContactAt). Nothing here is new physics:
  * it is that code without the editor around it, so the page and the app give the same answer.

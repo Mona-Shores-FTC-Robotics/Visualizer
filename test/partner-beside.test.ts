@@ -1,4 +1,4 @@
-// The "Our Auto beside a partner" page's core (src/partner/beside.ts, route.ts): one of our Autos
+// The Auto Match Planning page's core (src/partner/beside.ts, route.ts): one of our Autos
 // and a partner's Auto as steps, run together by the preview; the contact check, each robot's park,
 // the TIPs, and the partner's times ("parked by 15").
 import { readFileSync } from "node:fs";
