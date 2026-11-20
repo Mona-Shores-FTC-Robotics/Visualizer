@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Writes the Auto Strategy page's animations (public/autos.html):
-// public/autos/<id>--<key>--<show>--<red|blue>.gif, one per scenario that drives differently, per
+// public/autos/<id>--<key>--<show>--<red|blue>.gif and .mp4, one per scenario that drives differently, per
 // view (both robots, or one with the other not drawn), per alliance; and
 // public/autos/manifest.json, which the page reads.
 //
@@ -91,9 +91,10 @@ const WIDTH = Number(arg("width", "720"));
 // --keep-gifs: rewrite the manifest, and capture only GIFs that are not there yet.
 const KEEP_GIFS = process.argv.includes("--keep-gifs");
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
-// --mp4 DIR: also write each animation as an H.264 MP4 into DIR (same frames and clock).
-const MP4_DIR = arg("mp4", "");
-if (MP4_DIR) mkdirSync(MP4_DIR, { recursive: true });
+// Each animation is also an H.264 MP4 beside its GIF (same frames and clock): the page plays the
+// MP4, which pauses, seeks and slows, and falls back to the GIF. --mp4 DIR writes them elsewhere.
+const MP4_DIR = arg("mp4", OUT);
+mkdirSync(MP4_DIR, { recursive: true });
 const OUT = new URL("../public/autos/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
 
@@ -761,7 +762,7 @@ for (const card of CARDS.filter((c) => !ONLY?.length || ONLY.includes(c.id))) {
 await browser.close();
 
 if (!ONLY?.length) {
-  // Drop GIFs no scenario names any more.
+  // Drop GIFs and MP4s no scenario names any more.
   if (process.env.DRY) process.exit(0);
   const keep = new Set(
     manifest.cards.flatMap((c) =>
@@ -769,12 +770,14 @@ if (!ONLY?.length) {
         Object.values(s.gif).flatMap((b) => [
           `${b}--red.gif`,
           `${b}--blue.gif`,
+          `${b}--red.mp4`,
+          `${b}--blue.mp4`,
         ]),
       ),
     ),
   );
   for (const f of readdirSync(OUT))
-    if (f.endsWith(".gif") && !keep.has(f)) unlinkSync(join(OUT, f));
+    if (/\.(gif|mp4)$/.test(f) && !keep.has(f)) unlinkSync(join(OUT, f));
   if (process.env.DRY) process.exit(0);
   writeFileSync(
     join(OUT, "manifest.json"),

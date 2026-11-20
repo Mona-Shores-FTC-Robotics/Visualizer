@@ -105,6 +105,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   // Only this site's own GET requests; anything else goes to the network untouched.
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
+  // Video is fetched in byte ranges, which the saved copy cannot answer (Safari then will not
+  // play it): the Auto Strategy page's MP4s go to the network and the browser's own cache.
+  if (/\.(mp4|webm)$/.test(url.pathname)) return;
 
   if (event.request.mode === "navigate") {
     // A single page app: every page is index.html, saved as "./".
