@@ -49,7 +49,7 @@ export const CARDS = [
     id: "lane",
     group: "pair",
     name: "R-LeftUnderHive + L-LeftUnderHive",
-    files: ["r-outside-lane.pp", "l-under-hive.pp"],
+    files: ["r-left-under-hive.pp", "l-left-under-hive.pp"],
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
   },
   {
