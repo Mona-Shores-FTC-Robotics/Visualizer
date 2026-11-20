@@ -49,7 +49,7 @@ export const CARDS = [
     id: "lane",
     group: "pair",
     name: "R-LeftUnderHive + L-LeftUnderHive",
-    files: ["r-outside-lane.pp", "l-under-hive.pp"],
+    files: ["r-left-under-hive.pp", "l-left-under-hive.pp"],
     halves: ["R-LeftUnderHive", "L-LeftUnderHive"],
   },
   {
@@ -75,6 +75,9 @@ export const CARDS = [
   },
 ];
 const MAX_SWITCHES = 4;
+/** The clock's centre on a blue frame, as fractions of the frame (red: 1 − each): the far CELLs. */
+const CLOCK_X = 0.385;
+const CLOCK_Y = 0.48;
 const AUTO_S = 30;
 
 const arg = (name, fallback) => {
@@ -514,15 +517,19 @@ async function scenarios(page, card, letters) {
 
 // ---- Capture -----------------------------------------------------------------------------------
 
-/** The ffmpeg filter that draws the clock on frame n (n × STEP tenths of a second). */
-function clockFilter(step, size) {
+/**
+ * The ffmpeg filter that draws the clock on frame n (n × STEP tenths of a second), centred over
+ * the HIVE's other alliance's CELLs, which our robots never use: right of centre on a red frame,
+ * and left of it on a blue one (the red frame turned half a turn, clock drawn after).
+ */
+function clockFilter(step, size, alliance) {
   const font = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf";
   const fontfile = existsSync(font) ? `fontfile=${font}:` : "";
   const tenths = `n*${step}`;
   return (
     `drawtext=${fontfile}text='%{eif\\:floor(${tenths}/10)\\:d}.%{eif\\:mod(${tenths}\\,10)\\:d} s':` +
-    `fontsize=${Math.round(size * 0.042)}:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:` +
-    `x=${Math.round(size * 0.02)}:y=h-th-${Math.round(size * 0.025)}`
+    `fontsize=${Math.round(size * 0.048)}:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:` +
+    `x=w*${alliance === "blue" ? CLOCK_X : 1 - CLOCK_X}-tw/2:y=h*${alliance === "blue" ? CLOCK_Y : 1 - CLOCK_Y}-th/2`
   );
 }
 
@@ -571,7 +578,7 @@ async function capture(page, card, look, hide, targets) {
       "-i",
       join(dir, "f%04d.png"),
       "-vf",
-      `${turn}${clockFilter(step, box.width)},tpad=stop_mode=clone:stop_duration=1.2,` +
+      `${turn}${clockFilter(step, box.width, alliance)},tpad=stop_mode=clone:stop_duration=1.2,` +
         `scale=${WIDTH}:-1:flags=lanczos,split[a][b];` +
         "[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
       "-loop",
