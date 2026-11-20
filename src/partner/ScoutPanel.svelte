@@ -17,14 +17,17 @@
     type ScoutEvent,
   } from "./ftcscout";
   import {
+    knownAutos,
+    loadLibrary,
     loadPlans,
     planFor,
     planKey,
     savePlan,
     type EventPlans,
-    type PartnerPlan,
+    type PartnerLibrary,
     type PlanRecord,
   } from "./scouting";
+  import type { PartnerRoute } from "./route";
 
   interface Props {
     event: string | null;
@@ -34,7 +37,7 @@
     current: {
       ours: string | null;
       off: string[];
-      partner: PartnerPlan | null;
+      partner: PartnerRoute;
     };
     /** The link already held a look: the first plan loaded does not replace it. */
     keepLinkLook: boolean;
@@ -44,8 +47,8 @@
       alliance: "red" | "blue" | null,
     ) => void;
     autoName: (file: string) => string;
-    /** Start drawing the partner on the field. */
-    onDraw: () => void;
+    /** Put one of the team's known Autos on the field. */
+    onPickRoute: (route: PartnerRoute) => void;
   }
   let {
     event = $bindable(),
@@ -55,13 +58,15 @@
     keepLinkLook,
     onApply,
     autoName,
-    onDraw,
+    onPickRoute,
   }: Props = $props();
 
   const season = seasonOf(new Date());
   let events = $state.raw<ScoutEvent[]>([]);
   let info = $state.raw<EventInfo | null>(null);
   let plans = $state.raw<EventPlans | null>(null);
+  /** Every team's known Autos this season (scouting.ts). */
+  let library = $state.raw<PartnerLibrary | null>(null);
   let error = $state<string | null>(null);
   let loading = $state(false);
   let notes = $state("");
@@ -106,6 +111,9 @@
         error = e instanceof Error ? e.message : String(e);
       }
     })();
+    loadLibrary(season)
+      .then((l) => (library = l))
+      .catch(() => (library = null));
     if (token)
       whoAmI(token)
         .then((l) => (login = l))
@@ -184,7 +192,7 @@
     saveMessage = null;
     const key = planKey(team, forMatch ? match : null);
     try {
-      plans = await savePlan(
+      ({ plans, library } = await savePlan(
         season,
         event,
         key,
@@ -197,7 +205,7 @@
           notes: notes.trim(),
         },
         info.event.name,
-      );
+      ));
       saveMessage = {
         ok: true,
         text: `Saved for the team${forMatch ? ` in ${match} only` : ` at ${info.event.name}`}.`,
@@ -205,7 +213,7 @@
     } catch (e) {
       saveMessage = {
         ok: false,
-        text: `Not saved: ${e instanceof Error ? e.message : String(e)} Your drawing is still here; try again.`,
+        text: `Not saved: ${e instanceof Error ? e.message : String(e)} Your changes are still here; try again.`,
       };
     } finally {
       saving = false;
@@ -216,13 +224,13 @@
     if (!event || !team || !match || !info) return;
     saving = true;
     try {
-      plans = await savePlan(
+      ({ plans, library } = await savePlan(
         season,
         event,
         planKey(team, match),
         null,
         info.event.name,
-      );
+      ));
       const r = planFor(plans, team, match);
       notes = r?.notes ?? "";
       onApply(r, null);
@@ -344,18 +352,28 @@
             ? `. We run ${autoName(record.ours)}`
             : ""}.
         {:else}
-          No plan yet. Draw what they told you (or pick a stand-in), then save.
+          No plan yet. Set their Auto under Partner below (start from a
+          stand-in, move its spots, set its times), then save.
         {/if}
         {#if dirty}<span class="unsaved">Not saved</span>{/if}
       </p>
-      <button type="button" class="btn draw" onclick={onDraw}>
-        {current.partner?.kind === "drawn"
-          ? `Redraw ${team} on the field`
-          : `Draw ${team} on the field`}
-      </button>
-      {#if !current.partner}
-        <p class="note">Or pick a stand-in under Partner, below.</p>
+      {#if knownAutos(library, team).length}
+        <div class="known" role="group" aria-label="Their known Autos">
+          <span>Their Autos</span>
+          {#each knownAutos(library, team) as known (known.route.name)}
+            <button
+              type="button"
+              aria-pressed={current.partner.name === known.route.name}
+              onclick={() => onPickRoute(known.route)}
+              >{known.route.name}</button
+            >
+          {/each}
+        </div>
       {/if}
+      <p class="note">
+        Name their Auto under Partner (what they call it: X, Y…) and it is kept
+        for {team}, for this event and the next.
+      </p>
       <label class="field notes">
         <span>Notes</span>
         <textarea
@@ -596,10 +614,35 @@
     color: var(--ink);
     cursor: pointer;
   }
-  .btn.draw {
+  .known {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .known > span {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+  .known button {
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 44px;
+    min-width: 3em;
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--seg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .known button[aria-pressed="true"] {
+    background: var(--accent);
     border-color: var(--accent);
-    color: var(--accent);
-    background: transparent;
+    color: var(--accent-ink);
   }
   .btn.primary {
     background: var(--accent);

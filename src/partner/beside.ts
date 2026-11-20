@@ -4,14 +4,12 @@
  * (state/auto.svelte.ts overlayTogether, matchLanes, matchContactAt). Nothing here is new physics:
  * it is that code without the editor around it, so the page and the app give the same answer.
  *
- * The partner is a stand-in from biobuzz `TeamCode/autos/partners/`, or one drawn with a finger
- * (`drawnPartner`): a start, a rough path, a time to start driving, and whether it shoots its
- * preloads first.
+ * The partner is a route (route.ts): where it starts and a few timed steps, from one of the
+ * page's stand-ins or a team's saved Auto.
  */
 import { DEFAULT_SETTINGS } from "../config/defaults";
 import { parseProject, robotConfigOf, type ProjectDoc } from "../io";
 import { layOutDoc } from "../lib/auto/links";
-import { TEAM_ROBOT, teamRegistry } from "../lib/auto/teamRobot";
 import {
   setTrigger,
   type PreviewResult,
@@ -27,7 +25,6 @@ import { previewPose } from "../lib/auto/previewPose";
 import type { RobotPose } from "../sim/pose";
 import type { BasePoint, Settings } from "../types";
 import { polygonsOverlap } from "../utils/geometry";
-import { FIELD_SIZE } from "../config/defaults";
 
 /** Our robot's colour and the partner's, as the Match view draws the first two Autos. */
 export const OUR_COLOR = "#FF6B6B";
@@ -275,163 +272,6 @@ export function runBeside(
     contact: firstContact(robots, previews, span),
     span,
   };
-}
-
-// ---- A partner drawn with a finger --------------------------------------------------------------
-
-/** What the page knows of a drawn partner. Field inches, red's frame. */
-export interface DrawnPartner {
-  start: BasePoint;
-  /** The finger's path after the start, in order (may be empty: it stays where it starts). */
-  stroke: BasePoint[];
-  /** Seconds after PLAY it starts to drive. */
-  startS: number;
-  /** It shoots its preloads before it drives (a LaunchAll at its start). */
-  shoots: boolean;
-}
-
-/** At most this many interior points: Pedro's `Paths.through()` curve the preview draws. */
-export const MAX_THROUGH = 4;
-/** Half the robot: a drawn start or point is kept this far inside the walls. */
-const INSET = 8;
-
-function clampToField(p: BasePoint): BasePoint {
-  const c = (v: number) => Math.min(FIELD_SIZE - INSET, Math.max(INSET, v));
-  return { x: Math.round(c(p.x) * 10) / 10, y: Math.round(c(p.y) * 10) / 10 };
-}
-
-/** Distance from `p` to the segment a-b. */
-function toSegment(p: BasePoint, a: BasePoint, b: BasePoint): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const len2 = dx * dx + dy * dy;
-  const u =
-    len2 > 0
-      ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
-      : 0;
-  return Math.hypot(p.x - (a.x + u * dx), p.y - (a.y + u * dy));
-}
-
-/** Ramer–Douglas–Peucker: the points of `line` that keep it within `tolerance`. */
-function simplify(line: BasePoint[], tolerance: number): BasePoint[] {
-  if (line.length <= 2) return line;
-  let worst = 0;
-  let at = 0;
-  for (let i = 1; i < line.length - 1; i++) {
-    const d = toSegment(line[i], line[0], line[line.length - 1]);
-    if (d > worst) {
-      worst = d;
-      at = i;
-    }
-  }
-  if (worst <= tolerance) return [line[0], line[line.length - 1]];
-  const left = simplify(line.slice(0, at + 1), tolerance);
-  const right = simplify(line.slice(at), tolerance);
-  return [...left.slice(0, -1), ...right];
-}
-
-/**
- * A finger's stroke as a start and a few points: the corners that matter, at most
- * {@link MAX_THROUGH} between the start and the end, each inside the field.
- */
-export function strokeWaypoints(
-  start: BasePoint,
-  stroke: BasePoint[],
-): BasePoint[] {
-  const line = [start, ...stroke].map(clampToField);
-  // Drop jitter: points closer than 2 in to the last one kept.
-  const kept: BasePoint[] = [line[0]];
-  for (const p of line.slice(1)) {
-    const last = kept[kept.length - 1];
-    if (Math.hypot(p.x - last.x, p.y - last.y) >= 2) kept.push(p);
-  }
-  if (kept.length < 2) return [];
-  let tolerance = 2;
-  let points = simplify(kept, tolerance);
-  while (points.length - 2 > MAX_THROUGH) {
-    tolerance *= 1.5;
-    points = simplify(kept, tolerance);
-  }
-  return points.slice(1);
-}
-
-/** The heading a drawn start faces: away from the nearest wall, square to it. */
-export function startHeading(start: BasePoint): number {
-  const walls: [number, number][] = [
-    [start.x, 0], // left wall (x = 0): face +x
-    [FIELD_SIZE - start.x, 180],
-    [start.y, 90], // bottom wall (y = 0): face +y
-    [FIELD_SIZE - start.y, 270],
-  ];
-  walls.sort((a, b) => a[0] - b[0]);
-  return walls[0][1];
-}
-
-/** A drawn partner as a project the preview runs: its start, one path through the stroke, a park. */
-export function drawnPartner(drawn: DrawnPartner): Robot {
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
-  const start = clampToField(drawn.start);
-  const heading = startHeading(start);
-  const points = strokeWaypoints(start, drawn.stroke);
-  const lineId = "line-drawn-partner";
-  const lines: ProjectDoc["lines"] = points.length
-    ? [
-        {
-          kind: "atomic",
-          id: lineId,
-          name: "Drawn path",
-          endPoint: points[points.length - 1],
-          controlPoints: [],
-          throughPoints: points.slice(0, -1),
-          heading: { type: "constant", degrees: heading },
-          color: PARTNER_COLOR,
-          locked: false,
-          waitBeforeMs: 0,
-          waitAfterMs: 0,
-          waitBeforeName: "",
-          waitAfterName: "",
-        },
-      ]
-    : [];
-  const cards: AutoCard[] = [];
-  if (drawn.shoots)
-    cards.push({ id: "c-drawn-shoot", kind: "action", name: "LaunchAll" });
-  const startMs = Math.max(0, Math.round(drawn.startS * 1000));
-  if (lines.length && startMs > 0) {
-    cards.push({
-      id: "c-drawn-wait",
-      kind: "firstOf",
-      label: `Starts driving at ${drawn.startS} s`,
-      rows: [{ afterMs: startMs, matchClock: true, cards: [] }],
-    });
-  }
-  if (lines.length)
-    cards.push({ id: "c-drawn-path", kind: "path", lineId, park: true });
-  const auto: AutoSection = {
-    version: 1,
-    drawnFor: "RED",
-    registry: teamRegistry(),
-    points: {},
-    pathEnds: {},
-    cards,
-    exportName: "Drawn-Partner",
-  };
-  const doc: ProjectDoc = {
-    startPoint: { x: start.x, y: start.y, headingDeg: heading, locked: false },
-    lines,
-    shapes: [],
-    sequence: lines.map((l) => ({ kind: "path" as const, lineId: l.id })),
-    fieldPoints: [],
-    robot: robotConfigOf(settings),
-    activePaths: [],
-    auto,
-  };
-  return { name: "Drawn partner", doc, settings };
-}
-
-/** Red's field turned half a turn about the centre: blue's (the field is rotationally symmetric). */
-export function turnHalf(p: BasePoint): BasePoint {
-  return { x: FIELD_SIZE - p.x, y: FIELD_SIZE - p.y };
 }
 
 /**

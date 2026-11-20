@@ -1,14 +1,19 @@
 /**
- * The team's partner plans from the pits: for each partner team at an event, what their Auto does
- * (a stand-in or a drawing) and which of our Autos we run beside it, with notes. A plan is for the
- * team at that event, and a match may have its own, which wins in that match.
+ * The team's partner plans from the pits, kept on biobuzz's `scouting` branch so everyone sees
+ * everyone's and git keeps the history:
  *
- * Each event's plans are one JSON file on biobuzz's `scouting` branch, `scouting/<season>/<event>.json`,
- * so everyone sees everyone's plans and git keeps the history. Reading needs no login (the raw
- * file, which GitHub's cache may serve up to 5 minutes old; with a token, the API, which is fresh).
- * Saving needs the GitHub token the Visualizer's Save to GitHub uses: a save reads the file as it
- * is now, puts its own plan in, and commits; if someone else saved in between, it reads again and
- * retries, so nobody's plan is lost. The branch is made from master the first time.
+ * - `scouting/<season>/<event>.json`, an event's plans: for each partner team, what their Auto does
+ *   (a route: route.ts) and which of ours runs beside it, with notes. A plan is for the team at that
+ *   event, and a match may have its own, which wins in that match.
+ * - `scouting/<season>/partners.json`, every team's known Autos by name, across events ("X" and
+ *   "Y" for a team with two): a plan's route is kept there too when it has a name, so at the next
+ *   event it is one tap.
+ *
+ * Reading needs no login (the raw files, which GitHub's cache may serve up to 5 minutes old; with a
+ * token, the API, which is fresh). Saving needs the GitHub token the Visualizer's Save to GitHub
+ * uses: a save reads the files as they are now, puts its own plan in, and commits both at once; if
+ * someone else saved in between, it reads again and retries, so nobody's plan is lost. The branch
+ * is made from master the first time.
  */
 import {
   branchHeadOrNull,
@@ -21,20 +26,10 @@ import {
   whoAmI,
 } from "../lib/github/api";
 import { GIT_REPO } from "../utils/gitLink";
-import type { BasePoint } from "../types";
+import { cleanRoute, type PartnerRoute } from "./route";
 
 export const SCOUTING_BRANCH = "scouting";
 const BASE_BRANCH = "master";
-
-/** What the partner does, as the page draws it. Field inches, red's frame. */
-export type PartnerPlan =
-  | { kind: "standin"; file: string }
-  | {
-      kind: "drawn";
-      points: [number, number][];
-      startS: number;
-      shoots: boolean;
-    };
 
 export interface PlanRecord {
   team: number;
@@ -44,7 +39,8 @@ export interface PlanRecord {
   ours: string | null;
   /** Our route choices set to their other leg, by condition. */
   off: string[];
-  partner: PartnerPlan | null;
+  /** What the partner does. */
+  partner: PartnerRoute | null;
   notes: string;
   savedBy: string;
   /** ISO time. */
@@ -59,6 +55,19 @@ export interface EventPlans {
   plans: Record<string, PlanRecord>;
 }
 
+export interface KnownAuto {
+  route: PartnerRoute;
+  savedBy: string;
+  savedAt: string;
+}
+
+/** Every team's known Autos this season, by team number, then by the Auto's name. */
+export interface PartnerLibrary {
+  version: 1;
+  season: number;
+  teams: Record<string, Record<string, KnownAuto>>;
+}
+
 export function planKey(team: number, match: string | null): string {
   return match ? `${team}@${match}` : String(team);
 }
@@ -67,51 +76,24 @@ export function plansPath(season: number, event: string): string {
   return `scouting/${season}/${event}.json`;
 }
 
+export function libraryPath(season: number): string {
+  return `scouting/${season}/partners.json`;
+}
+
 export function emptyPlans(season: number, event: string): EventPlans {
   return { version: 1, season, event, plans: {} };
 }
 
-const round = (n: number) => Math.round(n * 10) / 10;
-
-/** A drawing as a plan keeps it: start first, a tenth of an inch. */
-export function drawnPlan(
-  points: BasePoint[],
-  startS: number,
-  shoots: boolean,
-): PartnerPlan {
-  return {
-    kind: "drawn",
-    points: points.map((p) => [round(p.x), round(p.y)]),
-    startS: round(startS),
-    shoots,
-  };
+export function emptyLibrary(season: number): PartnerLibrary {
+  return { version: 1, season, teams: {} };
 }
+
+const text = (v: unknown) => (typeof v === "string" ? v : "");
 
 function cleanRecord(raw: unknown): PlanRecord | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   if (!Number.isInteger(r.team)) return null;
-  let partner: PartnerPlan | null = null;
-  const p = r.partner as Record<string, unknown> | null;
-  if (p?.kind === "standin" && typeof p.file === "string")
-    partner = { kind: "standin", file: p.file };
-  else if (
-    p?.kind === "drawn" &&
-    Array.isArray(p.points) &&
-    p.points.length > 0 &&
-    p.points.every(
-      (q) =>
-        Array.isArray(q) &&
-        q.length === 2 &&
-        q.every((n) => typeof n === "number" && Number.isFinite(n)),
-    )
-  )
-    partner = {
-      kind: "drawn",
-      points: p.points as [number, number][],
-      startS: typeof p.startS === "number" ? p.startS : 0,
-      shoots: p.shoots === true,
-    };
   return {
     team: r.team as number,
     match: typeof r.match === "string" && r.match ? r.match : null,
@@ -119,22 +101,22 @@ function cleanRecord(raw: unknown): PlanRecord | null {
     off: Array.isArray(r.off)
       ? r.off.filter((s): s is string => typeof s === "string")
       : [],
-    partner,
-    notes: typeof r.notes === "string" ? r.notes : "",
-    savedBy: typeof r.savedBy === "string" ? r.savedBy : "",
-    savedAt: typeof r.savedAt === "string" ? r.savedAt : "",
+    partner: cleanRoute(r.partner),
+    notes: text(r.notes),
+    savedBy: text(r.savedBy),
+    savedAt: text(r.savedAt),
   };
 }
 
 /** Reads an event's file; anything unreadable in it is dropped, never fatal. */
 export function parsePlans(
-  text: string,
+  json: string,
   season: number,
   event: string,
 ): EventPlans {
   const out = emptyPlans(season, event);
   try {
-    const data = JSON.parse(text);
+    const data = JSON.parse(json);
     for (const raw of Object.values(data?.plans ?? {})) {
       const record = cleanRecord(raw);
       if (record) out.plans[planKey(record.team, record.match)] = record;
@@ -145,13 +127,49 @@ export function parsePlans(
   return out;
 }
 
-export function serializePlans(plans: EventPlans): string {
-  const sorted = Object.fromEntries(
-    Object.entries(plans.plans).sort(([a], [b]) =>
+/** Reads the known Autos; anything unreadable in it is dropped, never fatal. */
+export function parseLibrary(json: string, season: number): PartnerLibrary {
+  const out = emptyLibrary(season);
+  try {
+    const data = JSON.parse(json);
+    for (const [team, autos] of Object.entries(data?.teams ?? {})) {
+      if (!/^\d+$/.test(team) || !autos || typeof autos !== "object") continue;
+      for (const [name, raw] of Object.entries(autos as object)) {
+        const known = raw as Record<string, unknown>;
+        const route = cleanRoute(known?.route);
+        if (!route) continue;
+        (out.teams[team] ??= {})[name] = {
+          route: { ...route, name },
+          savedBy: text(known.savedBy),
+          savedAt: text(known.savedAt),
+        };
+      }
+    }
+  } catch {
+    // An unreadable file reads as no known Autos.
+  }
+  return out;
+}
+
+const sortedKeys = <T>(o: Record<string, T>) =>
+  Object.fromEntries(
+    Object.entries(o).sort(([a], [b]) =>
       a.localeCompare(b, "en", { numeric: true }),
     ),
   );
-  return `${JSON.stringify({ ...plans, plans: sorted }, null, 2)}\n`;
+
+export function serializePlans(plans: EventPlans): string {
+  return `${JSON.stringify({ ...plans, plans: sortedKeys(plans.plans) }, null, 2)}\n`;
+}
+
+export function serializeLibrary(library: PartnerLibrary): string {
+  const teams = Object.fromEntries(
+    Object.entries(sortedKeys(library.teams)).map(([t, autos]) => [
+      t,
+      sortedKeys(autos),
+    ]),
+  );
+  return `${JSON.stringify({ ...library, teams }, null, 2)}\n`;
 }
 
 /** The plan that holds for `team` in `match`: the match's own, else the team's. */
@@ -168,38 +186,60 @@ export function planFor(
   );
 }
 
-/** An event's plans, freshest available; none yet if the branch or file does not exist. */
+/** A team's known Autos, by name. */
+export function knownAutos(
+  library: PartnerLibrary | null,
+  team: number,
+): KnownAuto[] {
+  return Object.values(library?.teams[String(team)] ?? {});
+}
+
+/** A file on the scouting branch, freshest available; null if it (or the branch) is not there. */
+async function loadText(path: string): Promise<string | null> {
+  const token = savedToken();
+  if (token) {
+    return readText(token, path, SCOUTING_BRANCH).catch((error) => {
+      if (error instanceof GitHubError && error.status === 404) return null;
+      throw error;
+    });
+  }
+  const url = `https://raw.githubusercontent.com/${GIT_REPO}/${SCOUTING_BRANCH}/${path}`;
+  const response = await fetch(url, { cache: "no-cache" }).catch((error) => {
+    throw new Error("Could not reach GitHub. Is this phone online?", {
+      cause: error,
+    });
+  });
+  if (response.ok) return response.text();
+  if (response.status === 404) return null;
+  throw new Error(`GitHub answered ${response.status}`);
+}
+
+/** An event's plans; none yet if the branch or file does not exist. */
 export async function loadPlans(
   season: number,
   event: string,
 ): Promise<EventPlans> {
-  const path = plansPath(season, event);
-  const token = savedToken();
-  let text: string | null = null;
-  if (token) {
-    text = await readText(token, path, SCOUTING_BRANCH).catch((error) => {
-      if (error instanceof GitHubError && error.status === 404) return null;
-      throw error;
-    });
-  } else {
-    const url = `https://raw.githubusercontent.com/${GIT_REPO}/${SCOUTING_BRANCH}/${path}`;
-    const response = await fetch(url, { cache: "no-cache" }).catch((error) => {
-      throw new Error("Could not reach GitHub. Is this phone online?", {
-        cause: error,
-      });
-    });
-    if (response.ok) text = await response.text();
-    else if (response.status !== 404)
-      throw new Error(`GitHub answered ${response.status}`);
-  }
-  return text === null
+  const json = await loadText(plansPath(season, event));
+  return json === null
     ? emptyPlans(season, event)
-    : parsePlans(text, season, event);
+    : parsePlans(json, season, event);
+}
+
+/** Every team's known Autos this season; none yet if the branch or file does not exist. */
+export async function loadLibrary(season: number): Promise<PartnerLibrary> {
+  const json = await loadText(libraryPath(season));
+  return json === null ? emptyLibrary(season) : parseLibrary(json, season);
+}
+
+export interface Saved {
+  plans: EventPlans;
+  library: PartnerLibrary;
 }
 
 /**
  * Saves one plan (or removes it, with `record` null) into the event's file on the scouting branch,
- * on top of whatever is there now. Returns the file as saved.
+ * on top of whatever is there now; a plan's partner Auto with a name goes into the team's known
+ * Autos too, in the same commit. Returns both files as saved.
  */
 export async function savePlan(
   season: number,
@@ -207,11 +247,12 @@ export async function savePlan(
   key: string,
   record: Omit<PlanRecord, "savedBy" | "savedAt"> | null,
   eventName: string,
-): Promise<EventPlans> {
+): Promise<Saved> {
   const token = savedToken();
   if (!token) throw new Error("Connect GitHub first: paste the team's token.");
   const login = await whoAmI(token);
   const path = plansPath(season, event);
+  const libPath = libraryPath(season);
   for (let attempt = 0; attempt < 4; attempt++) {
     let head = await branchHeadOrNull(token, SCOUTING_BRANCH);
     if (!head) {
@@ -228,17 +269,31 @@ export async function savePlan(
       }
       head = await branchHead(token, SCOUTING_BRANCH);
     }
-    const text = await readText(token, path, head);
-    const plans = text
-      ? parsePlans(text, season, event)
+    const [plansText, libText] = await Promise.all([
+      readText(token, path, head),
+      readText(token, libPath, head),
+    ]);
+    const plans = plansText
+      ? parsePlans(plansText, season, event)
       : emptyPlans(season, event);
-    if (record)
-      plans.plans[key] = {
-        ...record,
-        savedBy: login,
-        savedAt: new Date().toISOString(),
-      };
-    else delete plans.plans[key];
+    const library = libText
+      ? parseLibrary(libText, season)
+      : emptyLibrary(season);
+    const savedAt = new Date().toISOString();
+    const files: Record<string, string> = {};
+    if (record) {
+      plans.plans[key] = { ...record, savedBy: login, savedAt };
+      const name = record.partner?.name.trim();
+      if (record.partner && name) {
+        (library.teams[String(record.team)] ??= {})[name] = {
+          route: { ...record.partner, name },
+          savedBy: login,
+          savedAt,
+        };
+        files[libPath] = serializeLibrary(library);
+      }
+    } else delete plans.plans[key];
+    files[path] = serializePlans(plans);
     const what = record
       ? `${record.team}${record.match ? ` in ${record.match}` : ""}`
       : key;
@@ -247,10 +302,10 @@ export async function savePlan(
         token,
         SCOUTING_BRANCH,
         head,
-        { [path]: serializePlans(plans) },
+        files,
         `Scouting ${eventName}: ${record ? "plan for" : "remove plan for"} ${what}`,
       );
-      return plans;
+      return { plans, library };
     } catch (error) {
       // The branch moved (someone else saved): read it again and retry.
       if (error instanceof GitHubError && error.status === 422) continue;

@@ -7,13 +7,41 @@ import { expect, test, type Page } from "@playwright/test";
 
 const FIXTURES = `${import.meta.dirname}/../test/fixtures/partner`;
 const AUTOS = ["r-solo.pp"];
-const PARTNERS = [
-  "partner-still.pp",
-  "partner-l-tip-park.pp",
-  "partner-park-1.pp",
-];
 
-/** Belding's saved plans: Q1's partner, 18975, drawn from the left wall. */
+/** RoboSquires' (18975) two Autos, as they told us at Belding. */
+const ROUTE_X = {
+  name: "X",
+  start: { x: 62.3, y: 133.8, h: 270 },
+  steps: [
+    { kind: "shoot" },
+    { kind: "drive", to: { x: 12, y: 104, h: 0 }, by: 14, park: true },
+  ],
+};
+const ROUTE_Y = {
+  name: "Y",
+  start: { x: 38.3, y: 133.8, h: 270 },
+  steps: [{ kind: "drive", to: { x: 9.8, y: 99.4, h: 0 }, by: 20, park: true }],
+};
+const LIBRARY = {
+  version: 1,
+  season: 2026,
+  teams: {
+    "18975": {
+      X: {
+        route: ROUTE_X,
+        savedBy: "pit-scout",
+        savedAt: "2026-11-07T15:00:00.000Z",
+      },
+      Y: {
+        route: ROUTE_Y,
+        savedBy: "pit-scout",
+        savedAt: "2026-11-07T15:05:00.000Z",
+      },
+    },
+  },
+};
+
+/** Belding's saved plans: Q1's partner, 18975, runs its X. */
 const BELDING_PLANS = {
   version: 1,
   season: 2026,
@@ -24,16 +52,7 @@ const BELDING_PLANS = {
       match: null,
       ours: "r-solo.pp",
       off: [],
-      partner: {
-        kind: "drawn",
-        points: [
-          [62, 133],
-          [40, 115],
-          [12, 104],
-        ],
-        startS: 3,
-        shoots: true,
-      },
+      partner: ROUTE_X,
       notes: "Shoots preloads, then parks in the corner",
       savedBy: "pit-scout",
       savedAt: "2026-11-07T15:00:00.000Z",
@@ -42,14 +61,15 @@ const BELDING_PLANS = {
 };
 
 interface Fake {
-  /** Every file content a commit wrote, in order. */
-  commits: string[];
+  /** Every commit's files (path → content), in order. */
+  commits: Record<string, string>[];
 }
 
 async function serve(page: Page): Promise<Fake> {
   const fake: Fake = { commits: [] };
   const scoutingFiles: Record<string, string> = {
     "scouting/2026/USMIBEQ.json": JSON.stringify(BELDING_PLANS),
+    "scouting/2026/partners.json": JSON.stringify(LIBRARY),
   };
   await page.route("https://api.ftcscout.org/graphql", (route) => {
     const body = route.request().postDataJSON();
@@ -71,8 +91,7 @@ async function serve(page: Page): Promise<Fake> {
         : route.fulfill({ status: 404, body: "" });
     }
     const name = path.split("/").pop()!;
-    if (![...AUTOS, ...PARTNERS].includes(name))
-      return route.fulfill({ status: 404, body: "" });
+    if (!AUTOS.includes(name)) return route.fulfill({ status: 404, body: "" });
     return route.fulfill({ body: readFileSync(`${FIXTURES}/${name}`, "utf8") });
   });
   await page.route("https://api.github.com/**", (route) => {
@@ -87,8 +106,7 @@ async function serve(page: Page): Promise<Fake> {
     if (path === "/user") return json({ login: "pit-scout" });
     if (path.endsWith("/contents/TeamCode/autos"))
       return json(AUTOS.map((name) => ({ name, type: "file" })));
-    if (path.endsWith("/contents/TeamCode/autos/partners"))
-      return json(PARTNERS.map((name) => ({ name, type: "file" })));
+    if (path.endsWith("/contents/TeamCode/autos/partners")) return json([]);
     const contents = path.match(/\/contents\/(scouting\/.+)$/);
     if (contents) {
       const text = scoutingFiles[decodeURIComponent(contents[1])];
@@ -101,9 +119,12 @@ async function serve(page: Page): Promise<Fake> {
     if (path.includes("/git/commits/") && method === "GET")
       return json({ tree: { sha: "t1" } });
     if (path.endsWith("/git/trees")) {
-      const tree = route.request().postDataJSON().tree[0];
-      fake.commits.push(tree.content);
-      scoutingFiles[tree.path] = tree.content;
+      const files: Record<string, string> = {};
+      for (const entry of route.request().postDataJSON().tree) {
+        files[entry.path] = entry.content;
+        scoutingFiles[entry.path] = entry.content;
+      }
+      fake.commits.push(files);
       return json({ sha: "t2" });
     }
     if (path.endsWith("/git/commits")) return json({ sha: "c2" });
@@ -136,8 +157,18 @@ test("a match from FTCScout opens its partner's saved plan", async ({
     "aria-pressed",
     "true",
   );
-  await expect(page.locator(".tile").nth(2)).toContainText(/\d+\.\d s/);
+  // Its X parks by 14 s, as saved.
+  await expect(page.locator(".tile").nth(2)).toContainText("14.0 s");
   await expect(page).toHaveURL(/event=USMIBEQ&team=18975&match=Q1/);
+  // Both of their known Autos are one tap: Y parks by 20 s.
+  const theirs = page.getByRole("group", { name: "Their known Autos" });
+  await expect(theirs.getByRole("button", { name: "X" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await theirs.getByRole("button", { name: "Y" }).click();
+  await expect(page.locator(".tile").nth(2)).toContainText("20.0 s");
+  await expect(page.getByText("Not saved")).toBeVisible();
   // Without a token, saving asks for one.
   await expect(
     page.getByRole("button", { name: "Connect GitHub to save" }),
@@ -149,7 +180,7 @@ test("a match from FTCScout opens its partner's saved plan", async ({
   expect(errors).toEqual([]);
 });
 
-test("before the schedule: pick a team, draw them, add notes, save for the team", async ({
+test("before the schedule: pick a team, set their Auto from a stand-in, name it, save", async ({
   page,
 }) => {
   const fake = await serve(page);
@@ -163,19 +194,8 @@ test("before the schedule: pick a team, draw them, add notes, save for the team"
   await page.getByLabel("Partner team").selectOption("11228");
   await expect(page.getByText("No plan yet")).toBeVisible();
 
-  await page.getByRole("button", { name: "Draw 11228 on the field" }).click();
-  const canvas = page.locator("canvas");
-  await canvas.scrollIntoViewIfNeeded();
-  const box = (await canvas.boundingBox())!;
-  const at = (x: number, y: number) => ({
-    clientX: box.x + (x / 141.5) * box.width,
-    clientY: box.y + ((141.5 - y) / 141.5) * box.height,
-  });
-  const touch = { pointerId: 1, pointerType: "touch", isPrimary: true };
-  await canvas.dispatchEvent("pointerdown", { ...touch, ...at(62, 133) });
-  await canvas.dispatchEvent("pointermove", { ...touch, ...at(30, 110) });
-  await canvas.dispatchEvent("pointerup", { ...touch, ...at(30, 110) });
-
+  await page.getByRole("button", { name: "L: shoot, park" }).click();
+  await page.getByLabel("Name").fill("X");
   await page.getByLabel("Notes").fill("Starts left, parks by the wall");
   await expect(page.getByText("Not saved")).toBeVisible();
   await page.getByRole("button", { name: "Save for 11228" }).click();
@@ -184,14 +204,25 @@ test("before the schedule: pick a team, draw them, add notes, save for the team"
   ).toBeVisible();
   await expect(page.getByText("Not saved")).toHaveCount(0);
 
-  const saved = JSON.parse(fake.commits.at(-1)!);
+  const commit = fake.commits.at(-1)!;
+  const saved = JSON.parse(commit["scouting/2026/USMIFRQ2.json"]);
   expect(saved.plans["11228"]).toMatchObject({
     team: 11228,
     match: null,
     ours: "r-solo.pp",
     notes: "Starts left, parks by the wall",
     savedBy: "pit-scout",
-    partner: { kind: "drawn" },
+    partner: { name: "X", start: { x: 62.3, y: 133.8, h: 270 } },
   });
-  expect(saved.plans["11228"].partner.points).toHaveLength(2);
+  // In the same commit, X joins 11228's known Autos, beside 18975's.
+  const library = JSON.parse(commit["scouting/2026/partners.json"]);
+  expect(Object.keys(library.teams)).toEqual(["11228", "18975"]);
+  expect(library.teams["11228"].X.route.steps).toEqual(
+    saved.plans["11228"].partner.steps,
+  );
+  await expect(
+    page
+      .getByRole("group", { name: "Their known Autos" })
+      .getByRole("button", { name: "X" }),
+  ).toBeVisible();
 });
