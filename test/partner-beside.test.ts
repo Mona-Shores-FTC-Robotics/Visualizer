@@ -7,6 +7,7 @@ import { fallbackValues } from "../src/lib/timing/model";
 import {
   contactOnly,
   initWait,
+  poseOf,
   robotFromText,
   routeChoices,
   runBeside,
@@ -386,5 +387,29 @@ describe("their Auto on its own", () => {
     const fired = launches(alone.previews[1])[1];
     expect(fired.t0).toBeLessThan(10);
     expect(alone.ends[1].parkedAt!).toBeLessThan(30);
+  });
+});
+
+describe("the left stand-ins' paths and times", () => {
+  it("hides under the HIVE, then is parked with about 4.5 s of AUTO left", () => {
+    const hide = preset("L: shoot, hide under the HIVE");
+    const r = runBeside(load("r-solo.pp"), partner(hide), plain, values, false);
+    expect(arrivals(r.previews[1])[2]).toBeCloseTo(25.5, 1);
+    expect(r.ends[1].parkedAt!).toBeCloseTo(25.5, 1);
+  });
+
+  it("L: shoot, park keeps clear of the SCORING FLOWER on its way to LEFT_PARK", () => {
+    // The FLOWER stands out from the scoring-table wall at x about 47; the robot (16 in across)
+    // passes it with its near side at least 4 in below where a robot pressed against it would be.
+    const shootPark = preset("L: shoot, park");
+    const robot = partner(shootPark);
+    const r = runBeside(load("r-solo.pp"), robot, plain, values, false);
+    const drive = r.previews[1].drives[0];
+    let nearest = Infinity;
+    for (let t = drive.t0; t <= drive.t1; t += 0.05) {
+      const p = poseOf(robot, r.previews[1], t);
+      if (Math.abs(p.x - 47.4) < 8) nearest = Math.min(nearest, 126.6 - p.y);
+    }
+    expect(nearest).toBeGreaterThan(4);
   });
 });

@@ -36,7 +36,11 @@ export interface Spot {
 
 export type RouteStep =
   /** Shoots: its launch starts at `at` (null: as soon as the step before is done). */
-  | { kind: "shoot"; at: number | null }
+  /**
+   * Shoots. `at`: a time its launch starts ("we shoot at 5"); "up": as soon as its CELL is up (at
+   * the latest at UP_SHOT_BY_S, so it still parks); null: as soon as the step before is done.
+   */
+  | { kind: "shoot"; at: number | "up" | null }
   /** Picks up a FLOWER where it is. */
   | { kind: "pick" }
   /**
@@ -71,6 +75,8 @@ export interface PartnerRoute {
   delayS: number;
 }
 
+/** A shot waiting for its CELL up fires at this time on the match clock at the latest. */
+export const UP_SHOT_BY_S = 25;
 /** A volley's length when the partner does not say: launch starts to last ball leaves. */
 export const DEFAULT_VOLLEY_S = 3.5;
 /** A spot is kept this far inside the walls: half the robot's 15.44 in, as a start on the wall is. */
@@ -96,14 +102,15 @@ const drive = (
   to: Spot,
   park = false,
   bend: BasePoint | null = null,
+  by: number | null = null,
 ): RouteStep => ({
   kind: "drive",
   to,
   bend,
-  by: null,
+  by,
   park,
 });
-const shoot: RouteStep = { kind: "shoot", at: null };
+const shoot: RouteStep = { kind: "shoot", at: "up" };
 const pick: RouteStep = { kind: "pick" };
 const route = (
   name: string,
@@ -122,9 +129,12 @@ const LEFT_START = spot(62.3, 133.8, 270);
 const RIGHT_START = spot(55.6, 7.7, 90);
 const LEFT_PARK = spot(14.5, 117.4, 0);
 const RIGHT_PARK = spot(14.5, 98.7, 0);
-const RIGHT_AUTO_HIVE = spot(59.2, 20.9, 96);
 const SCORING_FLOWER_STAGING = spot(47.2, 119.3, 90);
 const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
+/** The middle of the right start's tile (58.75, 10.75: a tile is 24 in, the edge tiles 1.25 in under the walls), to a tenth. */
+const RIGHT_START_TILE = spot(58.8, 10.8, 90);
+/** Below the SCORING FLOWER on the way from the left start to LEFT_PARK. */
+const PAST_SCORING_FLOWER: BasePoint = { x: 45, y: 112 };
 /** Under the HIVE's left half, on the lane L-LeftUnderHive drives under it. */
 const UNDER_HIVE_LEFT = spot(59, 85, 270);
 
@@ -137,12 +147,19 @@ const UNDER_HIVE_LEFT = spot(59, 85, 270);
  * stand-ins are not these.
  */
 export const PRESETS: PartnerRoute[] = [
-  route("L: shoot, park", LEFT_START, [shoot, drive(LEFT_PARK, true)]),
+  // Off the wall first and past the SCORING FLOWER below it (the FLOWER stands out from the wall
+  // at x about 47), not in a straight line through it.
+  route("L: shoot, park", LEFT_START, [
+    shoot,
+    drive(LEFT_PARK, true, PAST_SCORING_FLOWER),
+  ]),
   // Out of the way after its preloads: onto the lane our L-LeftUnderHive crosses under the HIVE
   // by (LEFT_AUTO_HIVE to RIGHT_AUTO_FIX_TIP, x about 59), just inside the HIVE's left half.
+  // It stays there until it must leave to be parked with about 4.5 s left.
   route("L: shoot, hide under the HIVE", LEFT_START, [
     shoot,
     drive(UNDER_HIVE_LEFT),
+    drive(LEFT_PARK, true, null, 25.5),
   ]),
   route("L: SUPER FLOWER (turret)", LEFT_START, [
     drive(SCORING_FLOWER_STAGING),
@@ -154,14 +171,16 @@ export const PRESETS: PartnerRoute[] = [
     shoot,
     drive(RIGHT_PARK, true, { x: 26, y: 55 }),
   ]),
+  // Shoots from its start (no move up to the HIVE, as ours does), the WALL FLOWER, back to the
+  // middle of its start tile to shoot again when its CELL is back up (TIP 2), then up the field in
+  // an arc to its park.
   route("R: shoot, FLOWER, shoot, park", RIGHT_START, [
-    drive(RIGHT_AUTO_HIVE),
     shoot,
     drive(WALL_FLOWER_STAGING),
     pick,
-    drive(RIGHT_AUTO_HIVE),
+    drive(RIGHT_START_TILE),
     shoot,
-    drive(RIGHT_PARK, true),
+    drive(RIGHT_PARK, true, { x: 26, y: 55 }),
   ]),
   route("Corner and park", spot(15, 133.8, 270), [drive(LEFT_PARK, true)]),
   route("Still: out of the way", spot(15, 133.8, 270), []),
@@ -204,7 +223,21 @@ export function routeDoc(
     cards.push(holdUntil("c-delay", `They wait ${delay} s`, delay));
   r.steps.forEach((step, i) => {
     if (step.kind === "shoot") {
-      if (step.at !== null)
+      if (step.at === "up")
+        cards.push({
+          id: `${cardId(i)}-at`,
+          kind: "firstOf",
+          label: "Shoots when its CELL is up",
+          rows: [
+            { when: ["CellUp"], cards: [] },
+            {
+              afterMs: Math.round((UP_SHOT_BY_S + delay) * 1000),
+              matchClock: true,
+              cards: [],
+            },
+          ],
+        });
+      else if (step.at !== null)
         cards.push(
           holdUntil(
             `${cardId(i)}-at`,
@@ -442,7 +475,7 @@ export function cleanRoute(raw: unknown): PartnerRoute | null {
   for (const raw of r.steps) {
     const s = raw as Record<string, unknown>;
     if (s?.kind === "shoot") {
-      steps.push({ kind: "shoot", at: time(s.at) });
+      steps.push({ kind: "shoot", at: s.at === "up" ? "up" : time(s.at) });
       if (shotVolley === null && num(s.volleyS))
         shotVolley = s.volleyS as number;
     } else if (

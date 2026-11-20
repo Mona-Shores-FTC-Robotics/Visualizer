@@ -86,7 +86,8 @@ test("their Auto edited: a shot time, a park time, a spot dragged; the link keep
   /** Steps the `n`th time stepper to `target` seconds. */
   async function setTime(n: number, target: number) {
     const value = page.locator(".time .value").nth(n);
-    if ((await value.textContent())?.trim() === "any time") await value.click();
+    // "any time" (a drive) or "CELL up" (a shot): tap for a time first.
+    if (!/\d/.test((await value.textContent()) ?? "")) await value.click();
     for (let i = 0; i < 60; i++) {
       const v = Number.parseFloat((await value.textContent()) ?? "0");
       if (Math.abs(v - target) < 0.01) return;
@@ -99,7 +100,9 @@ test("their Auto edited: a shot time, a park time, a spot dragged; the link keep
   }
   // They shoot at 4 s: last ball out a 3.5 s volley later.
   await setTime(0, 4);
-  await expect(page.getByText(/^Last ball 7\.5 s/)).toBeVisible();
+  await expect(
+    page.getByText(/^Shoots 4\.0 s · last ball 7\.5 s/),
+  ).toBeVisible();
   // Parked by 20 s: it leaves just in time.
   await setTime(1, 20);
   await expect(page.getByText("There 20.0 s")).toBeVisible();
