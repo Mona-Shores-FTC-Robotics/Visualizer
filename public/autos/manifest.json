@@ -163,28 +163,28 @@
             "r": "lane--000--r",
             "l": "lane--000--l"
           },
-          "caption": "Best case \u00b7 3 TIPs \u00b7 R parked at 27.4 s \u00b7 L parked at 24.7 s \u00b7 no contact",
+          "caption": "Best case \u00b7 3 TIPs \u00b7 R parked at 27.0 s \u00b7 L parked at 24.6 s \u00b7 no contact",
           "best": true,
           "tips": [
             {
               "settled": 7.8
             },
             {
-              "settled": 18.5
+              "settled": 18.3
             },
             {
-              "settled": 28.9
+              "settled": 28.5
             }
           ],
           "robots": [
             {
               "robot": "r",
-              "parked": 27.4,
+              "parked": 27,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 24.7,
+              "parked": 24.6,
               "parkedBy": null
             }
           ],
@@ -227,25 +227,25 @@
             "r": "lane--001--r",
             "l": "lane--001--l"
           },
-          "caption": "2 TIPs \u00b7 R parked at 27.4 s \u00b7 L parked at 24.7 s \u00b7 no contact",
+          "caption": "2 TIPs \u00b7 R parked at 27.0 s \u00b7 L parked at 24.6 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
               "settled": 7.8
             },
             {
-              "settled": 18.5
+              "settled": 18.3
             }
           ],
           "robots": [
             {
               "robot": "r",
-              "parked": 27.4,
+              "parked": 27,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 24.7,
+              "parked": 24.6,
               "parkedBy": null
             }
           ],
