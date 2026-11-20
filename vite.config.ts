@@ -42,6 +42,13 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    // Fork: partner.html is a page of its own (src/partner), beside the app.
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, "index.html"),
+        partner: resolve(import.meta.dirname, "partner.html"),
+      },
+    },
     // Increase chunk size warning limit to 1.2 MB to avoid noisy warnings
     chunkSizeWarningLimit: 1200,
   },

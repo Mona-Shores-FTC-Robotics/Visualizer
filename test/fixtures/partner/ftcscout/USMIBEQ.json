@@ -1,0 +1,581 @@
+{
+  "data": {
+    "eventByCode": {
+      "code": "USMIBEQ",
+      "name": "Belding Qualifier",
+      "start": "2026-11-06",
+      "end": "2026-11-07",
+      "teams": [
+        { "teamNumber": 5292, "team": { "name": "Red Storm Robotics-White" } },
+        { "teamNumber": 5980, "team": { "name": "Titanium Tech Vikes" } },
+        {
+          "teamNumber": 7911,
+          "team": { "name": "Scrap Cat Robotics Team Jaguarundi" }
+        },
+        { "teamNumber": 8733, "team": { "name": "RoboVikings" } },
+        { "teamNumber": 9133, "team": { "name": "Robo Dawgs" } },
+        { "teamNumber": 9476, "team": { "name": "Advanced Skilltronics" } },
+        { "teamNumber": 10104, "team": { "name": "That OTHER Team" } },
+        {
+          "teamNumber": 11531,
+          "team": { "name": "Techno Trojans - Green - Sponsored by MSI" }
+        },
+        { "teamNumber": 15397, "team": { "name": "Apex Pollen-Raiders" } },
+        { "teamNumber": 15547, "team": { "name": "Bio Birds" } },
+        { "teamNumber": 16464, "team": { "name": "This OTHER Team" } },
+        { "teamNumber": 17283, "team": { "name": "Red Storm Robotics-Gray" } },
+        {
+          "teamNumber": 18092,
+          "team": { "name": "Techno Trojans - Blue - Sponsored by Studica" }
+        },
+        { "teamNumber": 18975, "team": { "name": "RoboSquires" } },
+        { "teamNumber": 19429, "team": { "name": "Infrared" } },
+        { "teamNumber": 20245, "team": { "name": "Ultraviolet" } },
+        {
+          "teamNumber": 20862,
+          "team": { "name": "Eagle Robotics G.I.R.L.S." }
+        },
+        { "teamNumber": 20863, "team": { "name": "BIG Eagle Robotics" } },
+        { "teamNumber": 22368, "team": { "name": "Powerful Pumas" } },
+        { "teamNumber": 23410, "team": { "name": "TC Titans - Apollo" } },
+        { "teamNumber": 23411, "team": { "name": "TC Titans - Artemis" } },
+        { "teamNumber": 26153, "team": { "name": "Mini Mobots" } },
+        { "teamNumber": 31969, "team": { "name": "Techno Trojans - Gray" } },
+        { "teamNumber": 32190, "team": { "name": "More Mini Mobots" } },
+        { "teamNumber": 32975, "team": { "name": "The WOBITS" } },
+        { "teamNumber": 37377, "team": { "name": "The OTHER Team" } },
+        { "teamNumber": 37680, "team": { "name": "TC Titans - Orion" } }
+      ],
+      "matches": [
+        {
+          "matchNum": 1,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:00:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 16464 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 32190 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 20245 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 18975 }
+          ]
+        },
+        {
+          "matchNum": 2,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:07:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 32975 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 15547 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 5980 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 37377 }
+          ]
+        },
+        {
+          "matchNum": 3,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:14:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 23411 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 20863 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 15397 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 31969 }
+          ]
+        },
+        {
+          "matchNum": 4,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:21:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 19429 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 7911 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 23410 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 26153 }
+          ]
+        },
+        {
+          "matchNum": 5,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:28:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 37680 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 20862 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 10104 }
+          ]
+        },
+        {
+          "matchNum": 6,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:35:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 11531 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 9133 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 8733 }
+          ]
+        },
+        {
+          "matchNum": 7,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:42:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 20245 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18092 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 17283 }
+          ]
+        },
+        {
+          "matchNum": 8,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:49:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 31969 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 23410 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 15547 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 37680 }
+          ]
+        },
+        {
+          "matchNum": 9,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T16:56:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 26153 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 20862 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 20863 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 5980 }
+          ]
+        },
+        {
+          "matchNum": 10,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T17:03:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 37377 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 32190 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 23411 }
+          ]
+        },
+        {
+          "matchNum": 11,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T17:10:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 18092 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 7911 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 11531 }
+          ]
+        },
+        {
+          "matchNum": 12,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T17:17:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 16464 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 15397 }
+          ]
+        },
+        {
+          "matchNum": 13,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:00:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 8733 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 18975 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 19429 }
+          ]
+        },
+        {
+          "matchNum": 14,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:06:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 32975 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 31969 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 9133 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 20245 }
+          ]
+        },
+        {
+          "matchNum": 15,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:13:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 16464 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 5980 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 23410 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 18092 }
+          ]
+        },
+        {
+          "matchNum": 16,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:19:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 15397 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 20862 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 8733 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 32190 }
+          ]
+        },
+        {
+          "matchNum": 17,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:26:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 7911 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 37377 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 5292 }
+          ]
+        },
+        {
+          "matchNum": 18,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:32:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 23411 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 32975 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 26153 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 10104 }
+          ]
+        },
+        {
+          "matchNum": 19,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:39:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 9133 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 15547 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 19429 }
+          ]
+        },
+        {
+          "matchNum": 20,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:45:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18975 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 20863 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 11531 }
+          ]
+        },
+        {
+          "matchNum": 21,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:52:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 37680 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 5980 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 7911 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 23411 }
+          ]
+        },
+        {
+          "matchNum": 22,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T18:58:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 26153 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 5292 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 18092 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 9133 }
+          ]
+        },
+        {
+          "matchNum": 23,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:05:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 18975 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 15397 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 17283 }
+          ]
+        },
+        {
+          "matchNum": 24,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:11:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 11531 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 16464 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 37680 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 37377 }
+          ]
+        },
+        {
+          "matchNum": 25,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:18:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 32190 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 9476 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 32975 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 23410 }
+          ]
+        },
+        {
+          "matchNum": 26,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:24:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 19429 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 20862 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 31969 }
+          ]
+        },
+        {
+          "matchNum": 27,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:31:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 15547 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 20245 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 8733 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 20863 }
+          ]
+        },
+        {
+          "matchNum": 28,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:37:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 16464 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 7911 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 32975 }
+          ]
+        },
+        {
+          "matchNum": 29,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:44:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 37377 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 9133 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 9476 }
+          ]
+        },
+        {
+          "matchNum": 30,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:50:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 18975 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18092 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 20862 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 15547 }
+          ]
+        },
+        {
+          "matchNum": 31,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T19:57:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 23410 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 23411 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 20245 }
+          ]
+        },
+        {
+          "matchNum": 32,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T20:03:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 5980 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 11531 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 19429 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 15397 }
+          ]
+        },
+        {
+          "matchNum": 33,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T20:10:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 20863 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 32190 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 37680 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 22368 }
+          ]
+        },
+        {
+          "matchNum": 34,
+          "series": 0,
+          "tournamentLevel": "Quals",
+          "scheduledStartTime": "2026-11-07T20:16:30.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 8733 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 26153 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 31969 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 16464 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 1,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:00:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 31969 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 18975 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 2,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:06:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18092 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 8733 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 5980 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 3,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:12:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 20245 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 31969 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 4,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:18:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 19429 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 18092 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 5,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:24:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 31969 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 8733 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 5980 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 6,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:30:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 9476 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18092 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 18975 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 7,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:36:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 20245 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 19429 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 8,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T21:42:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 17283 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 18975 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 31969 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 9,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T22:00:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 19429 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 22368 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 31969 }
+          ]
+        },
+        {
+          "matchNum": 1,
+          "series": 10,
+          "tournamentLevel": "DoubleElim",
+          "scheduledStartTime": "2026-11-07T22:18:00.000Z",
+          "teams": [
+            { "alliance": "Red", "station": "One", "teamNumber": 20245 },
+            { "alliance": "Red", "station": "Two", "teamNumber": 10104 },
+            { "alliance": "Blue", "station": "One", "teamNumber": 5292 },
+            { "alliance": "Blue", "station": "Two", "teamNumber": 19429 }
+          ]
+        }
+      ]
+    }
+  }
+}

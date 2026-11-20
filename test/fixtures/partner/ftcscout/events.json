@@ -1,0 +1,60 @@
+{
+  "data": {
+    "t19429": {
+      "events": [
+        {
+          "event": {
+            "code": "USMIFRQ2",
+            "name": "Fruitport Qualifier",
+            "start": "2026-11-20",
+            "end": "2026-11-21"
+          }
+        },
+        {
+          "event": {
+            "code": "USMIBEQ",
+            "name": "Belding Qualifier",
+            "start": "2026-11-06",
+            "end": "2026-11-07"
+          }
+        },
+        {
+          "event": {
+            "code": "USMINWCMP",
+            "name": "Michigan - FiM Championship NW",
+            "start": "2026-12-10",
+            "end": "2026-12-12"
+          }
+        }
+      ]
+    },
+    "t20245": {
+      "events": [
+        {
+          "event": {
+            "code": "USMIFRQ2",
+            "name": "Fruitport Qualifier",
+            "start": "2026-11-20",
+            "end": "2026-11-21"
+          }
+        },
+        {
+          "event": {
+            "code": "USMIBEQ",
+            "name": "Belding Qualifier",
+            "start": "2026-11-06",
+            "end": "2026-11-07"
+          }
+        },
+        {
+          "event": {
+            "code": "USMINWCMP",
+            "name": "Michigan - FiM Championship NW",
+            "start": "2026-12-10",
+            "end": "2026-12-12"
+          }
+        }
+      ]
+    }
+  }
+}
