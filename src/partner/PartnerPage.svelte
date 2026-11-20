@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * "Our Auto beside a partner" (partner.html): pick one of our Autos on biobuzz master and the
+   * Auto Match Planning (partner.html): pick one of our Autos on biobuzz master and the
    * partner's Auto (one of the page's stand-ins, or a team's saved one, edited as steps on the
    * field), watch them run together, and read whether they touch, where each parks, and the TIPs.
    * The answer is the Visualizer's preview (beside.ts), not biobuzz's Java simulator.
@@ -19,6 +19,7 @@
     type Robot,
   } from "./beside";
   import { drawField, markerAt, routesOf, toField, type Marker } from "./field";
+  import PresetCards from "./PresetCards.svelte";
   import RouteEditor from "./RouteEditor.svelte";
   import ScoutPanel from "./ScoutPanel.svelte";
   import type { PlanRecord } from "./scouting";
@@ -87,7 +88,7 @@
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let size = $state(360);
-  let image: HTMLImageElement | null = null;
+  let image = $state.raw<HTMLImageElement | null>(null);
   let imageTick = $state(0);
   let dark = $state(false);
 
@@ -198,20 +199,6 @@
         rows.push({ tip: n, robot: null });
     return rows.sort((a, b) => a.tip - b.tip);
   });
-  /** Who TIPped each TIP that counts: 0 us, 1 the partner. */
-  const tipBy = $derived(
-    (result?.tipsInAuto ?? []).map((tip) => {
-      const index = result!.tips.indexOf(tip);
-      return (
-        result!.lanes?.hive.volleys.find((v) => v.tip === index)?.robot ?? null
-      );
-    }),
-  );
-  const startsTouching = $derived(result?.contact?.t === 0);
-  const partnerName = $derived(
-    [team ? String(team) : "", partner.name].filter(Boolean).join(" ") ||
-      "Partner",
-  );
 
   // ---- Loading ----
   async function loadRobot(file: string) {
@@ -457,7 +444,7 @@
       <a href="./">Visualizer</a>
     </nav>
     <div class="titlebar">
-      <h1>Beside a partner</h1>
+      <h1>Auto Match Planning</h1>
       <div class="seg alliance" role="group" aria-label="Alliance">
         <button
           type="button"
@@ -473,10 +460,6 @@
         >
       </div>
     </div>
-    <p class="lead">
-      Our Auto and a partner's, run together: do they touch, does each park, how
-      many TIPs.
-    </p>
   </header>
 
   <div class="layout">
@@ -539,12 +522,7 @@
       </div>
 
       <div class="verdict" aria-live="polite">
-        {#if moving}
-          <p class="drawhint">
-            Drag a numbered spot to move it (<b>S</b> is the start). Press
-            <b>Done moving spots</b> to play.
-          </p>
-        {:else if !result}
+        {#if !result}
           <p class="quiet">
             {#if !values || !lists}Loading from biobuzz master…
             {:else if !oursRobot}Pick our Auto.
@@ -607,56 +585,6 @@
         onPickRoute={pickRoute}
       />
 
-      {#if result}
-        <section class="details">
-          <h2>What happens</h2>
-          <ul>
-            <li class:bad={result.contact}>
-              {#if !result.contact}
-                <b>No contact</b> in the whole Auto.
-              {:else if startsTouching}
-                <b>They touch at the start:</b> both start on the same spot. A partner
-                from the other side of the field fits beside this Auto.
-              {:else}
-                <b>They touch at {fmt(result.contact.t)}</b>, at the red ring on
-                the field.
-              {/if}
-            </li>
-            {#each result.ends as end, i (i)}
-              <li
-                class:bad={end.parkedAt === null &&
-                  end.why !== "stays on its start"}
-              >
-                <span class="key" style:background={COLORS[i]}></span>
-                <b>{i === 0 ? nameOf(ours ?? "") : partnerName}</b>:
-                {#if end.parkedAt !== null}
-                  parked at {fmt(end.parkedAt)}{#if end.byGuard}, by the endgame
-                    guard{/if}.
-                {:else if end.why === "stays on its start"}
-                  never drives; it stays on its start.
-                {:else}
-                  not parked ({end.why}).
-                {/if}
-              </li>
-            {/each}
-            <li>
-              <b
-                >{result.tipsInAuto.length} TIP{result.tipsInAuto.length === 1
-                  ? ""
-                  : "s"}</b
-              >{#if result.tipsInAuto.length}:{/if}
-              {#each result.tipsInAuto as tip, i (i)}
-                <span class="chip" class:late={tip.settled > 30}
-                  >TIP {i + 1} settled {fmt(tip.settled)}{#if who(tipBy[i])}, {who(
-                      tipBy[i],
-                    )}{/if}{#if tip.settled > 30}, after AUTO: counts{/if}</span
-                >
-              {/each}
-            </li>
-          </ul>
-        </section>
-      {/if}
-
       <section>
         <h2>Our Auto</h2>
         {#if listError}<p class="note warn">{listError}</p>{/if}
@@ -676,12 +604,6 @@
             </button>
           {/each}
         </div>
-        {#if ours && pairOf(ours)}
-          <p class="note">
-            {nameOf(ours)} is drawn to run beside our {pairOf(ours)}. Beside
-            anyone else, check this carefully.
-          </p>
-        {/if}
         {#if ours && failed[ours]}<p class="note warn">{failed[ours]}</p>{/if}
 
         {#if choices.length || tipRows.length}
@@ -728,29 +650,20 @@
               </div>
             {/each}
           </div>
-          <p class="note">
-            A TIP that misses is its first try missing; a later volley at that
-            CELL can still TIP it.
-          </p>
         {/if}
       </section>
 
       <section>
         <h2>Partner</h2>
-        <p class="note">
-          Start from a stand-in, then move its spots and set its times to what
-          the partner tells you.
-        </p>
-        <div class="picks" role="group" aria-label="Stand-ins">
-          {#each PRESETS as stand (stand.name)}
-            <button
-              type="button"
-              class="pick"
-              aria-pressed={preset === stand.name}
-              onclick={() => pickPreset(stand)}>{stand.name}</button
-            >
-          {/each}
-        </div>
+        <PresetCards
+          presets={PRESETS}
+          selected={preset}
+          ours={result ? (routes[0] ?? null) : (alone?.route ?? null)}
+          blue={alliance === "blue"}
+          {image}
+          {imageTick}
+          onPick={pickPreset}
+        />
         <RouteEditor
           route={partner}
           arrivals={partnerArrivals}
@@ -758,13 +671,6 @@
           onChange={(route) => (partner = route)}
         />
       </section>
-
-      <p class="note foot">
-        From the Visualizer's own preview and collision check: each robot's
-        frame, every tenth of a second, with the team's timing facts on biobuzz
-        master. It is a quick look, not the Java simulator, which stays the
-        answer.
-      </p>
     </div>
   </div>
 </div>
@@ -866,12 +772,6 @@
     font-size: clamp(24px, 6vw, 36px);
     letter-spacing: -0.01em;
   }
-  .lead {
-    margin: 6px 0 0;
-    color: var(--muted);
-    font-size: 14px;
-    max-width: 60ch;
-  }
   .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -926,15 +826,6 @@
     cursor: crosshair;
     outline: 3px solid var(--accent);
     outline-offset: -3px;
-  }
-  .drawhint {
-    margin: 0;
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: var(--tag);
-    color: var(--tag-ink);
-    font-size: 15px;
-    line-height: 1.35;
   }
   .playbar {
     display: grid;
@@ -1062,35 +953,6 @@
     .tile small {
       font-size: 10.5px;
     }
-  }
-  .details ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 6px;
-  }
-  .details li.bad b {
-    color: var(--warn-ink);
-  }
-  .details .key {
-    margin-right: 4px;
-    vertical-align: 2px;
-  }
-  .chip {
-    display: inline-block;
-    margin: 2px 4px 0 0;
-    font-size: 12.5px;
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: var(--seg);
-    border: 1px solid var(--line);
-    white-space: nowrap;
-  }
-  .chip.late {
-    background: var(--trial);
-    color: var(--trial-ink);
-    border-color: transparent;
   }
   .quiet {
     color: var(--muted);
@@ -1238,8 +1100,5 @@
   }
   .note.warn {
     color: var(--warn-ink);
-  }
-  .foot {
-    padding: 0 4px;
   }
 </style>

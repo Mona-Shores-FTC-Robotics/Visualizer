@@ -62,7 +62,7 @@ What the fork adds:
 - **Partner stand-ins in Team Autos.** Under the Autos, `TeamCode/autos/partners/` is listed on
   its own; tick a stand-in beside an Auto to draw it as an overlay. It is never the project
   that opens.
-- **Beside a partner** (`partner.html`, linked from the Auto Strategy page). A phone page for
+- **Auto Match Planning** (`partner.html`, linked from the Auto Strategy page). A phone page for
   the pits: pick one of our Autos on biobuzz master, with its INIT route choices and each TIP
   landing or missing, and the partner's Auto, as steps on the field (`src/partner/route.ts`):
   where it starts, then shoot, pick a FLOWER, drive to a spot, wait until a time, park. A drive's

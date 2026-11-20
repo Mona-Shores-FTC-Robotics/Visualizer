@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
-// Fork: the "Beside a partner" page (partner.html), on a phone, with biobuzz master's files served
+// Fork: the Auto Match Planning page (partner.html), on a phone, with biobuzz master's files served
 // from test/fixtures/partner instead of GitHub, and FTCScout's answers recorded there too. The
 // partner is one of the page's stand-ins, edited as steps.
 
@@ -55,7 +55,6 @@ test("runs our Auto beside a stand-in and says whether they touch", async ({
   await expect(page.locator(".tile").first()).toContainText(
     /Contact\s*\d+\.\d s/,
   );
-  await expect(page.getByText("What happens")).toBeVisible();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
@@ -89,7 +88,7 @@ test("a stand-in edited: a spot dragged, a park time set, and the link keeps it"
 
   // Move the park spot: drag marker 1 down the wall.
   await page.getByRole("button", { name: "Move spots on the field" }).click();
-  const canvas = page.locator("canvas");
+  const canvas = page.getByLabel(/^The field/);
   await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   const at = (x: number, y: number) => ({
