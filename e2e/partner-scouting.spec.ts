@@ -160,13 +160,12 @@ test("a match from FTCScout opens its partner's saved plan", async ({
   // Its X parks by 14 s, as saved.
   await expect(page.locator(".tile").nth(2)).toContainText("14.0 s");
   await expect(page).toHaveURL(/event=USMIBEQ&team=18975&match=Q1/);
-  // Both of their known Autos are one tap: Y parks by 20 s.
-  const theirs = page.getByRole("group", { name: "Their known Autos" });
-  await expect(theirs.getByRole("button", { name: "X" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await theirs.getByRole("button", { name: "Y" }).click();
+  // Both of their known Autos lead their picture cards: Y parks by 20 s.
+  const theirs = page.getByRole("group", { name: "Their Autos" });
+  await expect(
+    theirs.getByRole("button", { name: "18975 · X" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await theirs.getByRole("button", { name: "18975 · Y" }).click();
   await expect(page.locator(".tile").nth(2)).toContainText("20.0 s");
   await expect(page.getByText("Not saved")).toBeVisible();
   // Without a token, saving asks for one.
@@ -194,8 +193,10 @@ test("before the schedule: pick a team, set their Auto from a stand-in, name it,
   await page.getByLabel("Partner team").selectOption("11228");
   await expect(page.getByText("No plan yet")).toBeVisible();
 
+  // Their Auto first: the picture that looks like theirs, named what they call it; then ours.
   await page.getByRole("button", { name: "L: shoot, park" }).click();
   await page.getByLabel("Name").fill("X");
+  await page.getByRole("button", { name: /^R-Solo/ }).click();
   await page.getByLabel("Notes").fill("Starts left, parks by the wall");
   await expect(page.getByText("Not saved")).toBeVisible();
   await page.getByRole("button", { name: "Save for 11228" }).click();
@@ -209,20 +210,25 @@ test("before the schedule: pick a team, set their Auto from a stand-in, name it,
   expect(saved.plans["11228"]).toMatchObject({
     team: 11228,
     match: null,
-    ours: "r-solo.pp",
+    chosen: 0,
     notes: "Starts left, parks by the wall",
     savedBy: "pit-scout",
-    partner: { name: "X", start: { x: 62.3, y: 133.8, h: 270 } },
+    options: [
+      {
+        ours: "r-solo.pp",
+        partner: { name: "X", start: { x: 62.3, y: 133.8, h: 270 } },
+      },
+    ],
   });
-  // In the same commit, X joins 11228's known Autos, beside 18975's.
+  // In the same commit, X joins 11228's known Autos, beside 18975's, and leads its cards.
   const library = JSON.parse(commit["scouting/2026/partners.json"]);
   expect(Object.keys(library.teams)).toEqual(["11228", "18975"]);
   expect(library.teams["11228"].X.route.steps).toEqual(
-    saved.plans["11228"].partner.steps,
+    saved.plans["11228"].options[0].partner.steps,
   );
   await expect(
     page
-      .getByRole("group", { name: "Their known Autos" })
-      .getByRole("button", { name: "X" }),
-  ).toBeVisible();
+      .getByRole("group", { name: "Their Autos" })
+      .getByRole("button", { name: "11228 · X" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });

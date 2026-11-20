@@ -14,6 +14,7 @@ import {
   serializePlans,
   type PlanRecord,
 } from "../src/partner/scouting";
+import type { PartnerRoute } from "../src/partner/route";
 
 const team = (alliance: string, station: string, teamNumber: number) => ({
   alliance,
@@ -88,19 +89,32 @@ describe("our matches from FTCScout", () => {
   });
 });
 
+const routeX: PartnerRoute = {
+  name: "X",
+  start: { x: 62.3, y: 133.8, h: 270 },
+  steps: [
+    { kind: "shoot", at: 5 },
+    {
+      kind: "drive",
+      to: { x: 14.5, y: 117.4, h: 0 },
+      bend: null,
+      by: 15,
+      park: true,
+    },
+  ],
+  volleyS: 3.5,
+  delayS: 0,
+};
+const routeY: PartnerRoute = { ...routeX, name: "Y", delayS: 2 };
+
 const plan = (t: number, match: string | null, notes = ""): PlanRecord => ({
   team: t,
   match,
-  ours: "r-solo.pp",
-  off: [],
-  partner: {
-    name: "X",
-    start: { x: 62.3, y: 133.8, h: 270 },
-    steps: [
-      { kind: "shoot" },
-      { kind: "drive", to: { x: 9.8, y: 117.4, h: 0 }, by: 15, park: true },
-    ],
-  },
+  options: [
+    { partner: routeX, ours: "r-solo.pp", off: [], ourWaitS: null },
+    { partner: routeY, ours: "r-no-cross.pp", off: [], ourWaitS: 11 },
+  ],
+  chosen: 1,
   notes,
   savedBy: "someone",
   savedAt: "2026-11-20T15:00:00.000Z",
@@ -117,7 +131,32 @@ describe("the team's plans", () => {
     );
     const back = parsePlans(text, 2026, "USMIFRQ2");
     expect(back).toEqual(plans);
-    expect(back.plans["11228"].partner).toEqual(plan(11228, null).partner);
+    expect(back.plans["11228"].options[1]).toEqual(
+      plan(11228, null).options[1],
+    );
+    expect(back.plans["11228"].chosen).toBe(1);
+  });
+
+  it("reads a plan saved before options as its one option", () => {
+    const old = {
+      plans: {
+        "11228": {
+          team: 11228,
+          match: null,
+          ours: "r-solo.pp",
+          off: ["Pickup"],
+          partner: routeX,
+          notes: "old",
+          savedBy: "s",
+          savedAt: "t",
+        },
+      },
+    };
+    const back = parsePlans(JSON.stringify(old), 2026, "E").plans["11228"];
+    expect(back.options).toEqual([
+      { partner: routeX, ours: "r-solo.pp", off: ["Pickup"], ourWaitS: null },
+    ]);
+    expect(back.chosen).toBe(0);
   });
 
   it("a match's own plan wins in that match; the team's holds elsewhere", () => {
@@ -203,9 +242,8 @@ describe("saving a plan to GitHub", () => {
   const mine = {
     team: 11228,
     match: null,
-    ours: "r-solo.pp",
-    off: [],
-    partner: plan(11228, null).partner,
+    options: plan(11228, null).options,
+    chosen: 0,
     notes: "ours",
   };
 
@@ -216,11 +254,12 @@ describe("saving a plan to GitHub", () => {
     expect(Object.keys(saved.plans.plans).sort()).toEqual(["11228", "5290"]);
     expect(saved.plans.plans["11228"].savedBy).toBe("scout");
     expect(parsePlans(gh.file()!, 2026, "E")).toEqual(saved.plans);
-    // Its Auto, named X, is now one of 11228's known Autos, for the next event too.
+    // Both options' Autos, X and Y, are now 11228's known Autos, for the next event too.
     const known = parseLibrary(gh.library()!, 2026);
     expect(known).toEqual(saved.library);
     expect(knownAutos(known, 11228).map((k) => k.route)).toEqual([
-      mine.partner,
+      routeX,
+      routeY,
     ]);
   });
 

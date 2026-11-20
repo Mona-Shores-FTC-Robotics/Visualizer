@@ -1,13 +1,19 @@
 /**
  * A partner's Auto as the drive team describes it in the pits: where it starts, then a few steps
- * (shoot its preloads, pick a FLOWER, drive to a spot, wait until a time, park), with the time it
- * says it is somewhere: "we're parked by 15". Each spot is dragged on the field; nothing is drawn by
- * hand. A route is turned into a small project the preview runs like any stand-in (`routeRobot`).
+ * (shoot, pick a FLOWER, gather at the GARDEN, drive to a spot, wait until a time), with the times
+ * they give: "we shoot at 5", "we're parked by 20". Each spot is dragged on the field, and a drive
+ * may bend through one point (Pedro curves through it). A route is turned into a small project the
+ * preview runs like any stand-in (`routeRobot`).
  *
- * A drive's `by` is when the partner says it gets there. The page times the drive alone first (the
- * preview, as the Match view drives it), then holds the robot at its last spot until the moment it
- * must leave to arrive by then (a wait on the match clock). Where the steps before it run late, it
- * leaves at once and arrives late, and the editor says so (`arrivals`).
+ * Times, in the team's words (biobuzz TeamCode/autos/timing-terms.md):
+ * - A shot's `at` is when its launch starts; the robot's volley, `volleyS` (3.5 s unless they say
+ *   otherwise), runs from there to its last ball leaving. The page then shows when their CELL
+ *   settles, from the HIVE model.
+ * - A drive's `by` is when they say they are there. The page times the drive alone first, then
+ *   holds the robot at its last spot until the moment it must leave (a wait on the match clock).
+ *   Where the steps before it run late, it leaves at once and arrives late, and the page says so.
+ * - `delayS` is a "they wait": every time in the route moves that much later, as when a partner
+ *   agrees to start a second later to let us by.
  *
  * Field inches, red's frame (blue is turned half a turn by the page, never stored).
  */
@@ -18,7 +24,7 @@ import { TEAM_ROBOT, teamRegistry } from "../lib/auto/teamRobot";
 import type { AutoCard, AutoSection } from "../lib/auto/types";
 import type { TimingValues } from "../lib/timing/model";
 import { previewTogether } from "../lib/timing/together";
-import type { Settings } from "../types";
+import type { BasePoint, Settings } from "../types";
 import type { Robot } from "./beside";
 
 /** A spot: x, y (inches) and the heading the robot faces there (degrees). */
@@ -29,12 +35,23 @@ export interface Spot {
 }
 
 export type RouteStep =
-  /** Shoots its preloads (or what it picked up) when its CELL is up, as the stand-ins do. */
-  | { kind: "shoot" }
+  /** Shoots: its launch starts at `at` (null: as soon as the step before is done). */
+  | { kind: "shoot"; at: number | null }
   /** Picks up a FLOWER where it is. */
   | { kind: "pick" }
-  /** Drives to a spot; with `by`, gets there by that time; `park`: it is the park. */
-  | { kind: "drive"; to: Spot; by: number | null; park: boolean }
+  /** Gathers at the GARDEN where it is. */
+  | { kind: "gather" }
+  /**
+   * Drives to a spot, curving through `bend` if set; with `by`, gets there by that time; `park`:
+   * it is the park.
+   */
+  | {
+      kind: "drive";
+      to: Spot;
+      bend: BasePoint | null;
+      by: number | null;
+      park: boolean;
+    }
   /** Stays where it is until this time on the match clock. */
   | { kind: "wait"; until: number };
 
@@ -43,10 +60,14 @@ export interface PartnerRoute {
   name: string;
   start: Spot;
   steps: RouteStep[];
+  /** Seconds from a shot's launch starting to its last ball leaving. */
+  volleyS: number;
+  /** "They wait": every time in the route this much later, seconds. */
+  delayS: number;
 }
 
-/** How long a shoot waits for its CELL to come up before it fires anyway, seconds. */
-export const SHOOT_WAIT_S = 12;
+/** A volley's length when the partner does not say: launch starts to last ball leaves. */
+export const DEFAULT_VOLLEY_S = 3.5;
 /** A spot is kept this far inside the walls: half the robot's 15.44 in, as a start on the wall is. */
 const INSET = 7.7;
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -57,152 +78,162 @@ export function clampSpot(s: Spot): Spot {
   return { x: c(s.x), y: c(s.y), h: ((Math.round(s.h) % 360) + 360) % 360 };
 }
 
+export function clampPoint(p: BasePoint): BasePoint {
+  const c = (v: number) =>
+    round(Math.min(FIELD_SIZE - INSET, Math.max(INSET, v)));
+  return { x: c(p.x), y: c(p.y) };
+}
+
+// ---- The page's stand-ins -------------------------------------------------------------------
+
 const spot = (x: number, y: number, h: number): Spot => ({ x, y, h });
-const drive = (
-  to: Spot,
-  by: number | null = null,
-  park = false,
-): RouteStep => ({
+const drive = (to: Spot, park = false): RouteStep => ({
   kind: "drive",
   to,
-  by,
+  bend: null,
+  by: null,
   park,
 });
+const shoot: RouteStep = { kind: "shoot", at: null };
+const pick: RouteStep = { kind: "pick" };
+const route = (
+  name: string,
+  start: Spot,
+  steps: RouteStep[],
+): PartnerRoute => ({
+  name,
+  start,
+  steps,
+  volleyS: DEFAULT_VOLLEY_S,
+  delayS: 0,
+});
+
+/** The team's spots (biobuzz TeamCode/autos/spots.json), red's. */
+const LEFT_START = spot(62.3, 133.8, 270);
+const RIGHT_START = spot(55.6, 7.7, 90);
+const LEFT_PARK = spot(14.5, 117.4, 0);
+const RIGHT_PARK = spot(14.5, 98.7, 0);
+const LEFT_AUTO_HIVE = spot(61.4, 120.5, 269);
+const RIGHT_AUTO_HIVE = spot(59.2, 20.9, 96);
+const SCORING_FLOWER_STAGING = spot(47.2, 119.3, 90);
+const WALL_FLOWER_STAGING = spot(23.1, 47.2, 180);
 
 /**
- * The page's stand-ins: the partner Autos in biobuzz `TeamCode/autos/partners/` (20 Nov 2026), as
- * steps, without the broken-down ones. A starting point to change: pick one, then move its spots
- * and set its times to what the partner says. The simulator's own stand-ins are not changed.
+ * The page's stand-ins: a starting point to change to what the partner says, by picture. A
+ * left-start one parks on the left (LEFT_PARK), a right-start one on the right (RIGHT_PARK).
+ * L-NoCross and R-NoCross are our own Autos' main route (each CELL comes up when it asks), as
+ * steps, without their fallbacks (and R-NoCross without its GARDEN trip, which only fits with our
+ * endgame guard): a partner may run one like them. The simulator's stand-ins are not these.
  */
 export const PRESETS: PartnerRoute[] = [
-  {
-    name: "L: shoot, park",
-    start: spot(62.3, 133.8, 270),
-    steps: [{ kind: "shoot" }, drive(spot(9.8, 117.4, 0), null, true)],
-  },
-  {
-    name: "L: shoot, FLOWER, shoot, park",
-    start: spot(62.3, 133.8, 270),
-    steps: [
-      drive(spot(57.5, 123.5, 273)),
-      { kind: "shoot" },
-      drive(spot(47.2, 119.3, 90)),
-      { kind: "pick" },
-      drive(spot(57.5, 123.5, 273)),
-      { kind: "shoot" },
-      drive(spot(9.8, 117.4, 0), null, true),
-    ],
-  },
-  {
-    name: "L: park at 15 s",
-    start: spot(62.3, 133.8, 270),
-    steps: [
-      { kind: "wait", until: 15 },
-      drive(spot(9.8, 117.4, 0), null, true),
-    ],
-  },
-  {
-    name: "L wall: park at 15 s",
-    start: spot(38.3, 133.8, 270),
-    steps: [{ kind: "wait", until: 15 }, drive(spot(9.8, 99.4, 0), null, true)],
-  },
-  {
-    name: "L: leave POLLEN, park",
-    start: spot(34.8, 133.4, 270),
-    steps: [
-      { kind: "wait", until: 2 },
-      drive(spot(14.5, 133.4, 270)),
-      drive(spot(9.8, 117.4, 0), null, true),
-    ],
-  },
-  {
-    name: "R: shoot, park",
-    start: spot(55.6, 7.7, 90),
-    steps: [{ kind: "shoot" }, drive(spot(9.6, 95.7, 0), null, true)],
-  },
-  {
-    name: "Sits by the left wall",
-    start: spot(10.3, 82, 70),
-    steps: [],
-  },
-  {
-    name: "Still: out of the way",
-    start: spot(15, 133.8, 270),
-    steps: [],
-  },
+  route("L: shoot, park", LEFT_START, [shoot, drive(LEFT_PARK, true)]),
+  route("L: shoot, FLOWER, shoot, park", LEFT_START, [
+    drive(spot(57.5, 123.5, 273)),
+    shoot,
+    drive(SCORING_FLOWER_STAGING),
+    pick,
+    drive(spot(57.5, 123.5, 273)),
+    shoot,
+    drive(LEFT_PARK, true),
+  ]),
+  route("L-NoCross", LEFT_START, [
+    drive(LEFT_AUTO_HIVE),
+    shoot,
+    drive(SCORING_FLOWER_STAGING),
+    pick,
+    drive(LEFT_AUTO_HIVE),
+    shoot,
+    drive(LEFT_PARK, true),
+  ]),
+  route("R: shoot, park", RIGHT_START, [shoot, drive(RIGHT_PARK, true)]),
+  route("R-NoCross", RIGHT_START, [
+    drive(RIGHT_AUTO_HIVE),
+    shoot,
+    drive(WALL_FLOWER_STAGING),
+    pick,
+    drive(RIGHT_AUTO_HIVE),
+    shoot,
+    drive(RIGHT_PARK, true),
+  ]),
+  route("Corner and park", spot(15, 133.8, 270), [drive(LEFT_PARK, true)]),
+  route("Still: out of the way", spot(15, 133.8, 270), []),
 ];
 
 export const STILL_PRESET = PRESETS[PRESETS.length - 1];
 
+// ---- Running it ------------------------------------------------------------------------------
+
 const cardId = (i: number) => `c-r${i}`;
 const lineId = (i: number) => `line-r${i}`;
+const SETTINGS: Settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
+
+/** The partner robot's own timing: its volley as they say it, from launch start (no spin-up). */
+export function routeFacts(r: PartnerRoute): Partial<TimingValues> {
+  return { volleyS: r.volleyS, spinUpS: 0 };
+}
+
+const holdUntil = (id: string, label: string, s: number): AutoCard => ({
+  id,
+  kind: "firstOf",
+  label,
+  rows: [{ afterMs: Math.round(s * 1000), matchClock: true, cards: [] }],
+});
 
 /**
  * The route as a project. `leaveAt[i]`, when given, holds drive `i` until that time on the match
- * clock (the page's arrive-by); without it every step goes as soon as the one before ends.
+ * clock (the page's arrive-by, already with the delay); every other time gets `delayS` added.
  */
 export function routeDoc(
-  route: PartnerRoute,
+  r: PartnerRoute,
   leaveAt: Record<number, number> = {},
 ): ProjectDoc {
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
-  const start = clampSpot(route.start);
+  const start = clampSpot(r.start);
   const lines: ProjectDoc["lines"] = [];
   const cards: AutoCard[] = [];
+  const delay = Math.max(0, r.delayS);
   let heading = start.h;
-  route.steps.forEach((step, i) => {
+  if (delay > 0)
+    cards.push(holdUntil("c-delay", `They wait ${delay} s`, delay));
+  r.steps.forEach((step, i) => {
     if (step.kind === "shoot") {
-      cards.push(
-        {
-          id: `${cardId(i)}-up`,
-          kind: "firstOf",
-          label: "Waits for its CELL up",
-          rows: [
-            { when: ["CellUp"], cards: [] },
-            { afterMs: SHOOT_WAIT_S * 1000, cards: [] },
-          ],
-        },
-        { id: cardId(i), kind: "action", name: "LaunchAll" },
-      );
-    } else if (step.kind === "pick") {
+      if (step.at !== null)
+        cards.push(
+          holdUntil(
+            `${cardId(i)}-at`,
+            `Shoots at ${step.at + delay} s`,
+            step.at + delay,
+          ),
+        );
+      cards.push({ id: cardId(i), kind: "action", name: "LaunchAll" });
+    } else if (step.kind === "pick" || step.kind === "gather") {
       cards.push({
         id: cardId(i),
         kind: "action",
-        name: "PickFlower",
+        name: step.kind === "pick" ? "PickFlower" : "GardenGather",
         timeoutS: 8,
       });
     } else if (step.kind === "wait") {
-      cards.push({
-        id: cardId(i),
-        kind: "firstOf",
-        label: `Waits until ${step.until} s`,
-        rows: [
-          {
-            afterMs: Math.round(step.until * 1000),
-            matchClock: true,
-            cards: [],
-          },
-        ],
-      });
+      cards.push(
+        holdUntil(
+          cardId(i),
+          `Waits until ${step.until + delay} s`,
+          step.until + delay,
+        ),
+      );
     } else {
       const to = clampSpot(step.to);
       const leave = leaveAt[i];
-      if (leave !== undefined && leave > 0) {
-        cards.push({
-          id: `${cardId(i)}-leave`,
-          kind: "firstOf",
-          label: `Leaves at ${round(leave)} s`,
-          rows: [
-            { afterMs: Math.round(leave * 1000), matchClock: true, cards: [] },
-          ],
-        });
-      }
+      if (leave !== undefined && leave > 0)
+        cards.push(
+          holdUntil(`${cardId(i)}-leave`, `Leaves at ${round(leave)} s`, leave),
+        );
       lines.push({
         kind: "atomic",
         id: lineId(i),
         name: step.park ? "Park" : `Drive ${i + 1}`,
         endPoint: { x: to.x, y: to.y },
         controlPoints: [],
+        ...(step.bend ? { throughPoints: [clampPoint(step.bend)] } : {}),
         heading: { type: "linear", startDeg: heading, endDeg: to.h },
         color: "#4ECDC4",
         locked: false,
@@ -230,7 +261,7 @@ export function routeDoc(
     points: {},
     pathEnds: {},
     cards,
-    exportName: route.name || "Partner",
+    exportName: r.name || "Partner",
   };
   return {
     startPoint: { x: start.x, y: start.y, headingDeg: start.h, locked: false },
@@ -238,7 +269,7 @@ export function routeDoc(
     shapes: [],
     sequence: lines.map((l) => ({ kind: "path" as const, lineId: l.id })),
     fieldPoints: [],
-    robot: robotConfigOf(settings),
+    robot: robotConfigOf(SETTINGS),
     activePaths: [],
     auto,
   };
@@ -246,19 +277,19 @@ export function routeDoc(
 
 /** Each drive's seconds, by step index, from the route previewed alone with no times held. */
 export function driveSeconds(
-  route: PartnerRoute,
+  r: PartnerRoute,
   values: TimingValues,
 ): Record<number, number> {
-  const doc = routeDoc(route);
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
+  const doc = routeDoc(r);
   const { previews } = previewTogether(
     [
       {
         auto: doc.auto!,
         startPoint: doc.startPoint,
         lines: doc.lines,
-        settings,
+        settings: SETTINGS,
         scenario: {},
+        own: routeFacts(r),
       },
     ],
     values,
@@ -274,16 +305,19 @@ export function driveSeconds(
 }
 
 /** The route as a robot to run: each drive with a `by` leaves in time to arrive then. */
-export function routeRobot(route: PartnerRoute, values: TimingValues): Robot {
-  const seconds = driveSeconds(route, values);
+export function routeRobot(r: PartnerRoute, values: TimingValues): Robot {
+  const seconds = driveSeconds(r, values);
   const leaveAt: Record<number, number> = {};
-  route.steps.forEach((step, i) => {
+  r.steps.forEach((step, i) => {
     if (step.kind === "drive" && step.by !== null && seconds[i] !== undefined)
-      leaveAt[i] = Math.max(0, step.by - seconds[i]);
+      leaveAt[i] = Math.max(0, step.by + Math.max(0, r.delayS) - seconds[i]);
   });
-  const doc = routeDoc(route, leaveAt);
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...TEAM_ROBOT };
-  return { name: route.name || "Partner", doc, settings };
+  return {
+    name: r.name || "Partner",
+    doc: routeDoc(r, leaveAt),
+    settings: SETTINGS,
+    own: routeFacts(r),
+  };
 }
 
 /** When each drive of the route got there in a preview, by step index. */
@@ -298,16 +332,36 @@ export function arrivals(
   return out;
 }
 
+/** Each shot's launch, start to last ball leaving, by step index, in a preview. */
+export function launches(
+  preview: PreviewResult | undefined,
+): Record<number, { t0: number; t1: number }> {
+  const out: Record<number, { t0: number; t1: number }> = {};
+  for (const a of preview?.actions ?? []) {
+    const m = /^c-r(\d+)$/.exec(a.cardId ?? "");
+    if (m && a.command === "LaunchAll")
+      out[Number(m[1])] = { t0: a.t0, t1: a.t1 };
+  }
+  return out;
+}
+
+/** The route's path on the field: its start, then each spot it drives to, through its bends. */
+export function routePath(r: PartnerRoute): BasePoint[] {
+  return [
+    r.start,
+    ...r.steps.flatMap((s) =>
+      s.kind === "drive" ? (s.bend ? [s.bend, s.to] : [s.to]) : [],
+    ),
+  ];
+}
+
 // ---- Editing --------------------------------------------------------------------------------
 
-/** A copy with one step changed, added or removed; at most one park, and only the last drive. */
-export function withSteps(
-  route: PartnerRoute,
-  steps: RouteStep[],
-): PartnerRoute {
+/** A copy with its steps changed; at most one park, and only the last drive. */
+export function withSteps(r: PartnerRoute, steps: RouteStep[]): PartnerRoute {
   const lastDrive = steps.map((s) => s.kind).lastIndexOf("drive");
   return {
-    ...route,
+    ...r,
     steps: steps.map((s, i) =>
       s.kind === "drive" ? { ...s, park: s.park && i === lastDrive } : s,
     ),
@@ -315,59 +369,96 @@ export function withSteps(
 }
 
 /** Where a new drive goes: a little way on from the robot's last spot, toward the field's middle. */
-export function nextSpot(route: PartnerRoute): Spot {
-  const drives = route.steps.filter((s) => s.kind === "drive");
-  const from = drives.length ? drives[drives.length - 1].to : route.start;
+export function nextSpot(r: PartnerRoute): Spot {
+  const drives = r.steps.flatMap((s) => (s.kind === "drive" ? [s] : []));
+  const from = drives.length ? drives[drives.length - 1].to : r.start;
   const toward = (v: number) => v + Math.sign(FIELD_SIZE / 2 - v) * 18;
   return clampSpot({ x: toward(from.x), y: toward(from.y), h: from.h });
 }
 
+/** Where drive `i` starts: the spot before it. */
+export function driveFrom(r: PartnerRoute, i: number): Spot {
+  for (let k = i - 1; k >= 0; k--) {
+    const s = r.steps[k];
+    if (s.kind === "drive") return s.to;
+  }
+  return r.start;
+}
+
 // ---- Keeping -------------------------------------------------------------------------------
+
+const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+const time = (v: unknown) =>
+  num(v) ? Math.min(30, Math.max(0, v as number)) : null;
 
 function cleanSpot(raw: unknown): Spot | null {
   if (!raw || typeof raw !== "object") return null;
   const s = raw as Record<string, unknown>;
-  const ok = (v: unknown) => typeof v === "number" && Number.isFinite(v);
-  return ok(s.x) && ok(s.y) && ok(s.h)
+  return num(s.x) && num(s.y) && num(s.h)
     ? clampSpot({ x: s.x as number, y: s.y as number, h: s.h as number })
     : null;
 }
 
-/** A route read from a saved plan or a link; anything unreadable makes it null. */
+function cleanPoint(raw: unknown): BasePoint | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  return num(s.x) && num(s.y)
+    ? clampPoint({ x: s.x as number, y: s.y as number })
+    : null;
+}
+
+/**
+ * A route read from a saved plan, the team library or a link; anything unreadable makes it null.
+ * A shot's own `volleyS` (as the library format allows) sets the route's when the route has none.
+ */
 export function cleanRoute(raw: unknown): PartnerRoute | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const start = cleanSpot(r.start);
   if (!start || !Array.isArray(r.steps) || r.steps.length > 30) return null;
   const steps: RouteStep[] = [];
+  let shotVolley: number | null = null;
   for (const raw of r.steps) {
     const s = raw as Record<string, unknown>;
-    if (s?.kind === "shoot" || s?.kind === "pick") steps.push({ kind: s.kind });
-    else if (s?.kind === "wait" && typeof s.until === "number")
-      steps.push({ kind: "wait", until: Math.min(30, Math.max(0, s.until)) });
+    if (s?.kind === "shoot") {
+      steps.push({ kind: "shoot", at: time(s.at) });
+      if (shotVolley === null && num(s.volleyS))
+        shotVolley = s.volleyS as number;
+    } else if (s?.kind === "pick" || s?.kind === "gather")
+      steps.push({ kind: s.kind });
+    else if (s?.kind === "wait" && num(s.until))
+      steps.push({ kind: "wait", until: time(s.until)! });
     else if (s?.kind === "drive") {
       const to = cleanSpot(s.to);
       if (!to) return null;
-      const by =
-        typeof s.by === "number" && Number.isFinite(s.by)
-          ? Math.min(30, Math.max(0, s.by))
-          : null;
-      steps.push({ kind: "drive", to, by, park: s.park === true });
+      steps.push({
+        kind: "drive",
+        to,
+        bend: cleanPoint(s.bend),
+        by: time(s.by),
+        park: s.park === true,
+      });
     } else return null;
   }
+  const volley = num(r.volleyS) ? (r.volleyS as number) : shotVolley;
   return withSteps(
     {
       name: typeof r.name === "string" ? r.name.slice(0, 40) : "",
       start,
       steps,
+      volleyS:
+        volley !== null
+          ? Math.min(10, Math.max(0.5, volley))
+          : DEFAULT_VOLLEY_S,
+      delayS: num(r.delayS) ? Math.min(15, Math.max(0, r.delayS as number)) : 0,
     },
     steps,
   );
 }
 
 /** A route for a link: compact JSON, base64url. */
-export function encodeRoute(route: PartnerRoute): string {
-  const bytes = new TextEncoder().encode(JSON.stringify(route));
+export function encodeRoute(r: PartnerRoute): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(r));
   let text = "";
   for (const b of bytes) text += String.fromCharCode(b);
   return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
