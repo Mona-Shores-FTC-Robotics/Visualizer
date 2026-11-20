@@ -65,3 +65,35 @@ test("LaunchAllAimed is a volley: L's shot from the park completes TIP 2 after R
   );
   assert(shot.t1 <= 30, "its last ball is out by 30 s");
 });
+
+// biobuzz master's Clockwise pair, 20 Nov 2026 (c9d1455): L-Clockwise's "RIGHT up by 22 s, otherwise
+// park, then fire at LEFT from the park if it is up" parks on LEFT_AIMED_PARK along its outside lane,
+// while the Auto-wide guard's own park is the catch park from LEFT_AUTO_HIVE. That outer guard used to
+// drive its catch park after L had parked: L jumped back to LEFT_AUTO_HIVE at 27.3 s and its park shot
+// was cut, so TIP 2 never came on THREE_TIP.
+import rClockwise from "../match/fixtures/r-clockwise-park-shot.pp?raw";
+import lClockwise from "../match/fixtures/l-clockwise-park-shot.pp?raw";
+
+for (const priority of ["THREE_TIP", "PARK"] as const)
+  test(`Clockwise, TIP 2 missing, Priority ${priority}: no guard parks L again once it stands on a park`, () => {
+    const r = entry(rClockwise);
+    if (priority === "PARK") r.scenario = { Priority: false };
+    const { previews, tips } = previewTogether([r, entry(lClockwise)], values);
+    const left = previews[1];
+    assert(
+      !left.log.some((e) => e.kind === "guard"),
+      `no guard parks L: ${left.log
+        .filter((e) => e.kind === "guard")
+        .map((e) => e.text)
+        .join("; ")}`,
+    );
+    assertEqual(
+      left.drives.filter((d) => d.pathId.includes("park")).map((d) => d.pathId),
+      ["l-park"],
+      "L drives one park, the outside lane",
+    );
+    const shot = left.actions.find((a) => a.command === "LaunchAllAimed");
+    assert(shot, "L fires from the park");
+    assert(shot.t1 <= 30, `its last ball is out by 30 s (${shot.t1})`);
+    assertEqual(tips.length, 2, "TIP 1, then TIP 2");
+  });
