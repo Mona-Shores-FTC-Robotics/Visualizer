@@ -366,7 +366,7 @@
             "r": "clockwise--1000--r",
             "l": "clockwise--1000--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower. 2 TIPs \u00b7 R not parked \u00b7 L parked by the guard at 24.0 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower. 3 TIPs \u00b7 R not parked \u00b7 L parked at 29.3 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -374,6 +374,9 @@
             },
             {
               "settled": 20
+            },
+            {
+              "settled": 31.1
             }
           ],
           "robots": [
@@ -384,11 +387,14 @@
             },
             {
               "robot": "l",
-              "parked": 28.1,
-              "parkedBy": "guard"
+              "parked": 29.3,
+              "parkedBy": null
             }
           ],
-          "contact": null
+          "contact": null,
+          "warn": [
+            "1:1"
+          ]
         },
         "1001": {
           "gif": {
@@ -396,30 +402,30 @@
             "r": "clockwise--1001--r",
             "l": "clockwise--1001--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; L keep the load. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked at 28.1 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 27.0 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
               "settled": 7.8
-            },
-            {
-              "settled": 29.9
             }
           ],
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 28.6,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 28.1,
-              "parkedBy": null
+              "parked": 29.5,
+              "parkedBy": "guard"
             }
           ],
           "contact": null,
-          "note": "L keep the load"
+          "note": "R park; L park, then fire at LEFT from the park if it is up",
+          "warn": [
+            "1:1"
+          ]
         },
         "1010": {
           "gif": {
@@ -427,7 +433,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -437,12 +443,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -455,7 +461,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -465,12 +471,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -483,7 +489,7 @@
             "r": "clockwise--1100--r",
             "l": "clockwise--1100--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked by the guard at 24.0 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park. 2 TIPs \u00b7 R parked at 29.4 s \u00b7 L parked at 29.3 s \u00b7 contact at 27.7 s",
           "best": false,
           "tips": [
             {
@@ -496,24 +502,28 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 28.1,
-              "parkedBy": "guard"
+              "parked": 29.3,
+              "parkedBy": null
             }
           ],
-          "contact": null
+          "contact": 27.7,
+          "warn": [
+            "0:1",
+            "1:1"
+          ]
         },
         "1101": {
           "gif": {
-            "both": "clockwise--1001--both",
-            "r": "clockwise--1001--r",
-            "l": "clockwise--1001--l"
+            "both": "clockwise--1101--both",
+            "r": "clockwise--1101--r",
+            "l": "clockwise--1101--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; L keep the load. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked at 28.1 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; L park, then fire at LEFT from the park if it is up. 2 TIPs \u00b7 R parked at 29.4 s \u00b7 L parked by the guard at 27.0 s \u00b7 contact at 27.3 s",
           "best": false,
           "tips": [
             {
@@ -526,17 +536,20 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 28.1,
-              "parkedBy": null
+              "parked": 29.5,
+              "parkedBy": "guard"
             }
           ],
-          "contact": null,
-          "note": "L keep the load"
+          "contact": 27.3,
+          "note": "L park, then fire at LEFT from the park if it is up",
+          "warn": [
+            "1:1"
+          ]
         },
         "1110": {
           "gif": {
@@ -544,7 +557,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -554,12 +567,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -572,7 +585,7 @@
             "r": "clockwise--1010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Pickup: Garden, L Pickup: Wall flower; R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -582,12 +595,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -600,7 +613,7 @@
             "r": "clockwise--0000--r",
             "l": "clockwise--0000--l"
           },
-          "caption": "Best case \u00b7 3 TIPs \u00b7 R not parked \u00b7 L parked at 26.8 s \u00b7 no contact",
+          "caption": "Best case \u00b7 3 TIPs \u00b7 R parked at 29.8 s \u00b7 L parked at 27.0 s \u00b7 no contact",
           "best": true,
           "tips": [
             {
@@ -610,18 +623,18 @@
               "settled": 19.6
             },
             {
-              "settled": 33.9
+              "settled": 30.8
             }
           ],
           "robots": [
             {
               "robot": "r",
-              "parked": null,
-              "why": "not parked"
+              "parked": 29.8,
+              "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.8,
+              "parked": 27,
               "parkedBy": null
             }
           ],
@@ -633,7 +646,7 @@
             "r": "clockwise--0100--r",
             "l": "clockwise--0100--l"
           },
-          "caption": "R Priority: Park. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked at 26.8 s \u00b7 no contact",
+          "caption": "R Priority: Park. 2 TIPs \u00b7 R parked at 29.4 s \u00b7 L parked at 27.0 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -646,16 +659,19 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.8,
+              "parked": 27,
               "parkedBy": null
             }
           ],
-          "contact": null
+          "contact": null,
+          "warn": [
+            "0:1"
+          ]
         },
         "0010": {
           "gif": {
@@ -663,7 +679,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -673,12 +689,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -691,7 +707,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -701,12 +717,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -719,38 +735,38 @@
             "r": "clockwise--0001--r",
             "l": "clockwise--0001--l"
           },
-          "caption": "L keep the load. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked at 26.8 s \u00b7 no contact",
+          "caption": "R park; L park, then fire at LEFT from the park if it is up. 1 TIP \u00b7 R parked at 28.6 s \u00b7 L parked by the guard at 27.0 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
               "settled": 7.8
-            },
-            {
-              "settled": 29.9
             }
           ],
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 28.6,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.8,
-              "parkedBy": null
+              "parked": 29.5,
+              "parkedBy": "guard"
             }
           ],
           "contact": null,
-          "note": "L keep the load"
+          "note": "R park; L park, then fire at LEFT from the park if it is up",
+          "warn": [
+            "1:1"
+          ]
         },
         "0101": {
           "gif": {
-            "both": "clockwise--0001--both",
-            "r": "clockwise--0001--r",
-            "l": "clockwise--0001--l"
+            "both": "clockwise--0101--both",
+            "r": "clockwise--0101--r",
+            "l": "clockwise--0101--l"
           },
-          "caption": "R Priority: Park; L keep the load. 2 TIPs \u00b7 R parked at 29.0 s \u00b7 L parked at 26.8 s \u00b7 no contact",
+          "caption": "R Priority: Park; L park, then fire at LEFT from the park if it is up. 2 TIPs \u00b7 R parked at 29.4 s \u00b7 L parked by the guard at 27.0 s \u00b7 contact at 27.3 s",
           "best": false,
           "tips": [
             {
@@ -763,17 +779,20 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.8,
-              "parkedBy": null
+              "parked": 29.5,
+              "parkedBy": "guard"
             }
           ],
-          "contact": null,
-          "note": "L keep the load"
+          "contact": 27.3,
+          "note": "L park, then fire at LEFT from the park if it is up",
+          "warn": [
+            "1:1"
+          ]
         },
         "0011": {
           "gif": {
@@ -781,7 +800,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -791,12 +810,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
@@ -809,7 +828,7 @@
             "r": "clockwise--0010--r",
             "l": "clockwise--0010--l"
           },
-          "caption": "R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.0 s \u00b7 L parked at 26.6 s \u00b7 no contact",
+          "caption": "R Priority: Park; R park. 1 TIP \u00b7 R parked at 29.4 s \u00b7 L parked at 26.8 s \u00b7 no contact",
           "best": false,
           "tips": [
             {
@@ -819,12 +838,12 @@
           "robots": [
             {
               "robot": "r",
-              "parked": 29,
+              "parked": 29.4,
               "parkedBy": null
             },
             {
               "robot": "l",
-              "parked": 26.6,
+              "parked": 26.8,
               "parkedBy": null
             }
           ],
