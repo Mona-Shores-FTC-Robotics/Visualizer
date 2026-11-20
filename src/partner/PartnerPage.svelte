@@ -165,7 +165,7 @@
     const left = oursRobot ?? nobody;
     if (!left || !partnerRobot || !values) return null;
     try {
-      return runBeside(left, partnerRobot, look, values, paired);
+      return runBeside(left, partnerRobot, look, values, paired, !paired);
     } catch (error) {
       console.error("Could not preview these two together:", error);
       return null;

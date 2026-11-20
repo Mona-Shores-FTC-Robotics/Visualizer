@@ -70,7 +70,7 @@ describe("our Auto beside a partner", () => {
 
   it("offers a TIP switch, and a miss changes the TIPs", () => {
     const ours = load("r-solo.pp");
-    const them = partner(preset("L: shoot, FLOWER, shoot, park"));
+    const them = partner(preset("L: SUPER FLOWER (turret)"));
     const r = runBeside(ours, them, plain, values);
     expect(r.toggles.length).toBeGreaterThan(0);
     const first = r.toggles[0].tip;
@@ -105,10 +105,9 @@ describe("the page's stand-ins", () => {
     expect(PRESETS.map((p) => p.name)).toEqual([
       "L: shoot, park",
       "L: shoot, hide under the HIVE",
-      "L: shoot, FLOWER, shoot, park",
-      "L-NoCross",
+      "L: SUPER FLOWER (turret)",
       "R: shoot, park",
-      "R-NoCross",
+      "R: shoot, FLOWER, shoot, park",
       "Corner and park",
       "Still: out of the way",
     ]);
@@ -132,12 +131,36 @@ describe("the page's stand-ins", () => {
     for (const p of PRESETS) {
       const r = runBeside(ours, partner(p), plain, values, false);
       const drives = p.steps.filter((s) => s.kind === "drive").length;
-      const shots = p.steps.filter((s) => s.kind === "shoot").length;
+      const shots = p.steps.filter(
+        (s) => s.kind === "shoot" || s.kind === "superFlower",
+      ).length;
       expect(r.previews[1].drives, p.name).toHaveLength(drives);
       expect(Object.keys(launches(r.previews[1])), p.name).toHaveLength(shots);
       if (drives) expect(r.ends[1].parkedAt, p.name).not.toBeNull();
       expect(r.previews[1].guard, p.name).toBeNull();
     }
+  });
+});
+
+describe("the SUPER FLOWER", () => {
+  it("waits at the FLOWER until TIP 1 brings its CELL up, then fires eight in one go", () => {
+    const superFlower = preset("L: SUPER FLOWER (turret)");
+    const r = runBeside(
+      load("r-solo.pp"),
+      partner(superFlower),
+      plain,
+      values,
+      false,
+    );
+    const fired = launches(r.previews[1])[1];
+    // R-Solo's preloads TIP 1, which brings the LEFT CELL up: the SUPER FLOWER goes then.
+    const tip1 = r.tips[0];
+    expect(fired.t0).toBeCloseTo(tip1.settled, 1);
+    // Eight: 1 s of moves and two volleys.
+    expect(fired.t1 - fired.t0).toBeCloseTo(1 + 2 * superFlower.volleyS, 1);
+    // Both volleys land on the HIVE as one robot's two.
+    const theirs = r.lanes!.hive.volleys.filter((v) => v.robot === 1);
+    expect(theirs).toHaveLength(1);
   });
 });
 
@@ -270,7 +293,7 @@ describe("editing and keeping a route", () => {
 
   it("goes through a link and a saved file unchanged; junk reads as nothing", () => {
     const route = {
-      ...preset("L: shoot, FLOWER, shoot, park"),
+      ...preset("R: shoot, FLOWER, shoot, park"),
       volleyS: 2,
       delayS: 1.5,
     };
@@ -342,5 +365,26 @@ describe("the page's link", () => {
   it("names our Autos as the drive team says them", () => {
     expect(displayName("r-solo.pp")).toBe("R-Solo");
     expect(displayName("l-left-under-hive.pp")).toBe("L-Left-Under-Hive");
+  });
+});
+
+describe("their Auto on its own", () => {
+  it("a SUPER FLOWER shown alone fires as soon as TIP 1 could come, not at the end of AUTO", () => {
+    const superFlower = preset("L: SUPER FLOWER (turret)");
+    const nobody = partner({
+      ...STILL_PRESET,
+      start: { x: 120, y: 70, h: 180 },
+    });
+    const alone = runBeside(
+      nobody,
+      partner(superFlower),
+      plain,
+      values,
+      false,
+      true,
+    );
+    const fired = launches(alone.previews[1])[1];
+    expect(fired.t0).toBeLessThan(10);
+    expect(alone.ends[1].parkedAt!).toBeLessThan(30);
   });
 });

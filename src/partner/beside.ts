@@ -248,6 +248,11 @@ export function runBeside(
   values: TimingValues,
   /** Also find the TIP switches (each a few more previews): off for a summary. */
   withToggles = true,
+  /**
+   * A wait for a TIP or a CELL ends as soon as a TIP could bring it, as the app previews an Auto
+   * alone: for the partner shown before ours is picked, when nothing on the field TIPs the HIVE.
+   */
+  tipsCome = false,
 ): BesideResult {
   const robots = [ours, partner];
   const entries = [
@@ -255,7 +260,9 @@ export function runBeside(
     entryOf(partner, {}),
   ];
   const shared = lookValues(values, look);
-  const { previews, tips } = previewTogether(entries, shared);
+  const { previews, tips } = previewTogether(entries, shared, true, {
+    tipsCome,
+  });
   const lanes = matchLanes(
     entries,
     previews,

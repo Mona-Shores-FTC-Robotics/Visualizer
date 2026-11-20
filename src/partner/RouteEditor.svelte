@@ -130,11 +130,13 @@
         ? "Picks a FLOWER"
         : s.kind === "gather"
           ? "Gathers at the GARDEN"
-          : s.kind === "wait"
-            ? "Waits until"
-            : s.park
-              ? `Parks at ${n}`
-              : `Drives to ${n}`;
+          : s.kind === "superFlower"
+            ? "SUPER FLOWER: shoots 8 when its CELL is up"
+            : s.kind === "wait"
+              ? "Waits until"
+              : s.park
+                ? `Parks at ${n}`
+                : `Drives to ${n}`;
 </script>
 
 <div class="editor">
@@ -316,6 +318,13 @@
                 : `CELL settled ${fmt(shots[i].settled!)}`}
             </p>
           {/if}
+        {:else if step.kind === "superFlower" && shots[i]}
+          <p class="out">
+            Shoots {fmt(shots[i].t0)} · last ball {fmt(shots[i].t1)} · {shots[i]
+              .settled === null
+              ? "no TIP"
+              : `CELL settled ${fmt(shots[i].settled!)}`}
+          </p>
         {/if}
       </li>
     {/each}
@@ -326,6 +335,9 @@
     <button type="button" onclick={() => add("drive")}>+ Drive</button>
     <button type="button" onclick={() => add("pick")}>+ FLOWER</button>
     <button type="button" onclick={() => add("gather")}>+ GARDEN</button>
+    <button type="button" onclick={() => add("superFlower")}
+      >+ SUPER FLOWER</button
+    >
     <button type="button" onclick={() => add("wait")}>+ Wait</button>
     <button type="button" onclick={() => add("park")}
       >{parked ? "+ Park (move it)" : "+ Park"}</button
