@@ -11,8 +11,8 @@
         "L-LeftUnderHive"
       ],
       "files": [
-        "r-outside-lane.pp",
-        "l-under-hive.pp"
+        "r-left-under-hive.pp",
+        "l-left-under-hive.pp"
       ],
       "colors": {
         "r": "#FF6B6B",
@@ -55,7 +55,7 @@
           "best": false,
           "tips": [
             {
-              "settled": 19.9
+              "settled": 20.9
             }
           ],
           "robots": [
@@ -83,7 +83,7 @@
           "best": false,
           "tips": [
             {
-              "settled": 19.9
+              "settled": 20.9
             }
           ],
           "robots": [
@@ -111,7 +111,7 @@
           "best": false,
           "tips": [
             {
-              "settled": 19.9
+              "settled": 20.9
             }
           ],
           "robots": [
@@ -139,7 +139,7 @@
           "best": false,
           "tips": [
             {
-              "settled": 19.9
+              "settled": 20.9
             }
           ],
           "robots": [
