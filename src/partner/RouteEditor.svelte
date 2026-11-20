@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * The partner's Auto as steps (route.ts): its name, where it starts, then shoot, pick a FLOWER,
-   * drive to a spot by a time, wait until a time, and park. Spots are moved by dragging their
-   * numbered markers on the field ("Move spots"); times with − and + buttons. Each drive shows when
-   * the preview gets it there, and says so when that is later than the partner said.
+   * The partner's Auto as steps (route.ts): when they shoot (and how long their volley is), where
+   * they drive and by when, waits, a FLOWER or the GARDEN, the park; and "they wait", to try them
+   * a little later. Spots and bends are dragged on the field ("Move spots"); times are − / +.
+   * Shots show their last ball out and when the CELL settles; drives when they get there.
    */
   import {
     nextSpot,
@@ -12,20 +12,36 @@
     type RouteStep,
   } from "./route";
 
+  export interface ShotTimes {
+    /** Launch starts, last ball leaves, seconds after PLAY. */
+    t0: number;
+    t1: number;
+    /** When the CELL it TIPs settles; null: it TIPs nothing. */
+    settled: number | null;
+  }
+
   interface Props {
     route: PartnerRoute;
-    /** When each drive gets there in the run with our Auto, by step index. */
+    /** When each drive gets there, by step index. */
     arrivals: Record<number, number>;
+    /** Each shot's times, by step index. */
+    shots: Record<number, ShotTimes>;
     /** The field's markers take touches: spots are being moved. */
     moving: boolean;
     onChange: (route: PartnerRoute) => void;
   }
-  let { route, arrivals, moving = $bindable(), onChange }: Props = $props();
+  let {
+    route,
+    arrivals,
+    shots,
+    moving = $bindable(),
+    onChange,
+  }: Props = $props();
 
   const STEP_S = 0.5;
   const LATE_S = 0.25;
-  const clampS = (s: number) =>
-    Math.min(30, Math.max(0, Math.round(s / STEP_S) * STEP_S));
+  const clampS = (s: number, max = 30) =>
+    Math.min(max, Math.max(0, Math.round(s / STEP_S) * STEP_S));
   const fmt = (s: number) => `${s.toFixed(1)} s`;
 
   /** Each drive's number on the field: 1, 2, … in order. */
@@ -55,19 +71,28 @@
   }
   function add(kind: RouteStep["kind"] | "park") {
     let steps = [...route.steps];
+    const driveTo = (park: boolean): RouteStep => ({
+      kind: "drive",
+      to: nextSpot(route),
+      bend: null,
+      by: null,
+      park,
+    });
     if (kind === "park") {
       // One park, and last: an earlier one becomes a plain drive.
       steps = steps.map((s) =>
         s.kind === "drive" ? { ...s, park: false } : s,
       );
-      steps.push({ kind: "drive", to: nextSpot(route), by: null, park: true });
+      steps.push(driveTo(true));
     } else {
       const step: RouteStep =
         kind === "drive"
-          ? { kind: "drive", to: nextSpot(route), by: null, park: false }
+          ? driveTo(false)
           : kind === "wait"
             ? { kind: "wait", until: 10 }
-            : { kind };
+            : kind === "shoot"
+              ? { kind: "shoot", at: null }
+              : { kind };
       // New steps go before the park, which stays last.
       const park = steps.findIndex((s) => s.kind === "drive" && s.park);
       if (park >= 0) steps.splice(park, 0, step);
@@ -76,47 +101,40 @@
     onChange(withSteps(route, steps));
     if (kind === "drive" || kind === "park") moving = true;
   }
-  function turn(i: number | "start", by: number) {
+  function turn(i: number | "start") {
     if (i === "start") {
       onChange({
         ...route,
-        start: { ...route.start, h: (route.start.h + by + 360) % 360 },
+        start: { ...route.start, h: (route.start.h + 315) % 360 },
       });
       return;
     }
     const s = route.steps[i];
     if (s.kind === "drive")
-      set(i, { ...s, to: { ...s.to, h: (s.to.h + by + 360) % 360 } });
+      set(i, { ...s, to: { ...s.to, h: (s.to.h + 315) % 360 } });
   }
-  function nudgeBy(i: number, delta: number) {
-    const s = route.steps[i];
-    if (s.kind !== "drive") return;
-    const base = s.by ?? Math.ceil(arrivals[i] ?? 10);
-    set(i, { ...s, by: clampS(s.by === null ? base : base + delta) });
+  /** A time stepper's next value: from "any time" it starts where the preview has it. */
+  function nudge(value: number | null, fallback: number, delta: number) {
+    return clampS(value === null ? Math.ceil(fallback) : value + delta);
   }
-  function nudgeUntil(i: number, delta: number) {
-    const s = route.steps[i];
-    if (s.kind === "wait") set(i, { ...s, until: clampS(s.until + delta) });
-  }
-
-  /** What is wrong with an arrival: later than the partner said, or after AUTO ends; else "". */
   function lateText(by: number | null, at: number): string {
-    if (by !== null && at > by + LATE_S)
-      return `: ${fmt(at - by)} later than they said`;
-    if (at > 30 + 1e-6) return ": after AUTO ends";
+    if (by !== null && at > by + LATE_S) return ` · ${fmt(at - by)} late`;
+    if (at > 30 + 1e-6) return " · after AUTO";
     return "";
   }
 
   const label = (s: RouteStep, n: number) =>
     s.kind === "shoot"
-      ? "Shoots (when its CELL is up)"
+      ? "Shoots"
       : s.kind === "pick"
         ? "Picks a FLOWER"
-        : s.kind === "wait"
-          ? "Waits until"
-          : s.park
-            ? `Parks at ${n}`
-            : `Drives to ${n}`;
+        : s.kind === "gather"
+          ? "Gathers at the GARDEN"
+          : s.kind === "wait"
+            ? "Waits until"
+            : s.park
+              ? `Parks at ${n}`
+              : `Drives to ${n}`;
 </script>
 
 <div class="editor">
@@ -130,6 +148,47 @@
     />
   </label>
 
+  <div class="knobs">
+    <div class="knob">
+      <span>Volley</span>
+      <button
+        type="button"
+        aria-label="Shorter volley"
+        onclick={() =>
+          onChange({
+            ...route,
+            volleyS: Math.max(0.5, clampS(route.volleyS - STEP_S, 10)),
+          })}>−</button
+      >
+      <b>{fmt(route.volleyS)}</b>
+      <button
+        type="button"
+        aria-label="Longer volley"
+        onclick={() =>
+          onChange({ ...route, volleyS: clampS(route.volleyS + STEP_S, 10) })}
+        >+</button
+      >
+    </div>
+    <div class="knob">
+      <span>They wait</span>
+      <button
+        type="button"
+        aria-label="They wait less"
+        onclick={() =>
+          onChange({ ...route, delayS: clampS(route.delayS - STEP_S, 15) })}
+        >−</button
+      >
+      <b>+{fmt(route.delayS)}</b>
+      <button
+        type="button"
+        aria-label="They wait more"
+        onclick={() =>
+          onChange({ ...route, delayS: clampS(route.delayS + STEP_S, 15) })}
+        >+</button
+      >
+    </div>
+  </div>
+
   <button
     type="button"
     class="btn move"
@@ -140,28 +199,33 @@
 
   <ol class="steps">
     <li class="step">
-      <span class="num start">S</span>
+      <span class="num">S</span>
       <span class="what">Starts here</span>
       <span class="acts">
         <button
           type="button"
           aria-label="Turn the start 45 degrees"
-          title="Turn 45°"
-          onclick={() => turn("start", -45)}>⟳</button
+          onclick={() => turn("start")}>⟳</button
         >
       </span>
     </li>
     {#each route.steps as step, i (i)}
       <li class="step">
-        <span class="num" class:start={false}>{numbers[i] || ""}</span>
+        <span class="num">{numbers[i] || ""}</span>
         <span class="what">{label(step, numbers[i])}</span>
         <span class="acts">
           {#if step.kind === "drive"}
+            {#if step.bend}
+              <button
+                type="button"
+                aria-label="Straighten this drive"
+                onclick={() => set(i, { ...step, bend: null })}>⟋</button
+              >
+            {/if}
             <button
               type="button"
               aria-label="Turn 45 degrees at this spot"
-              title="Turn 45°"
-              onclick={() => turn(i, -45)}>⟳</button
+              onclick={() => turn(i)}>⟳</button
             >
           {/if}
           <button
@@ -171,52 +235,87 @@
             onclick={() => remove(i)}>✕</button
           >
         </span>
-        {#if step.kind === "drive"}
+        {#if step.kind === "drive" || step.kind === "shoot" || step.kind === "wait"}
+          {@const value =
+            step.kind === "drive"
+              ? step.by
+              : step.kind === "shoot"
+                ? step.at
+                : step.until}
+          {@const preview =
+            step.kind === "drive"
+              ? arrivals[i]
+              : step.kind === "shoot"
+                ? shots[i]?.t0
+                : undefined}
           <div class="time">
-            <span class="by">by</span>
+            <span class="by"
+              >{step.kind === "drive"
+                ? "by"
+                : step.kind === "shoot"
+                  ? "at"
+                  : ""}</span
+            >
             <button
               type="button"
               aria-label="Earlier"
-              onclick={() => nudgeBy(i, -STEP_S)}>−</button
+              onclick={() => {
+                const v = nudge(value, preview ?? 10, -STEP_S);
+                set(
+                  i,
+                  step.kind === "drive"
+                    ? { ...step, by: v }
+                    : step.kind === "shoot"
+                      ? { ...step, at: v }
+                      : { ...step, until: v },
+                );
+              }}>−</button
             >
-            <button
-              type="button"
-              class="value"
-              onclick={() =>
-                set(i, {
-                  ...step,
-                  by:
-                    step.by === null
-                      ? clampS(Math.ceil(arrivals[i] ?? 10))
-                      : null,
-                })}>{step.by === null ? "any time" : fmt(step.by)}</button
-            >
+            {#if step.kind === "wait"}
+              <span class="value">{fmt(step.until)}</span>
+            {:else}
+              <button
+                type="button"
+                class="value"
+                onclick={() => {
+                  const v =
+                    value === null ? clampS(Math.ceil(preview ?? 10)) : null;
+                  set(
+                    i,
+                    step.kind === "drive"
+                      ? { ...step, by: v }
+                      : { ...step, at: v },
+                  );
+                }}>{value === null ? "any time" : fmt(value)}</button
+              >
+            {/if}
             <button
               type="button"
               aria-label="Later"
-              onclick={() => nudgeBy(i, STEP_S)}>+</button
+              onclick={() => {
+                const v = nudge(value, preview ?? 10, STEP_S);
+                set(
+                  i,
+                  step.kind === "drive"
+                    ? { ...step, by: v }
+                    : step.kind === "shoot"
+                      ? { ...step, at: v }
+                      : { ...step, until: v },
+                );
+              }}>+</button
             >
           </div>
-          {#if arrivals[i] !== undefined}
-            <p class="arrive" class:late={lateText(step.by, arrivals[i])}>
-              Gets there at {fmt(arrivals[i])}{lateText(step.by, arrivals[i])}
+          {#if step.kind === "drive" && arrivals[i] !== undefined}
+            <p class="out" class:late={lateText(step.by, arrivals[i]) !== ""}>
+              There {fmt(arrivals[i])}{lateText(step.by, arrivals[i])}
+            </p>
+          {:else if step.kind === "shoot" && shots[i]}
+            <p class="out">
+              Last ball {fmt(shots[i].t1)} · {shots[i].settled === null
+                ? "no TIP"
+                : `CELL settled ${fmt(shots[i].settled!)}`}
             </p>
           {/if}
-        {:else if step.kind === "wait"}
-          <div class="time">
-            <span class="by">until</span>
-            <button
-              type="button"
-              aria-label="Earlier"
-              onclick={() => nudgeUntil(i, -STEP_S)}>−</button
-            >
-            <span class="value">{fmt(step.until)}</span>
-            <button
-              type="button"
-              aria-label="Later"
-              onclick={() => nudgeUntil(i, STEP_S)}>+</button
-            >
-          </div>
         {/if}
       </li>
     {/each}
@@ -226,6 +325,7 @@
     <button type="button" onclick={() => add("shoot")}>+ Shoot</button>
     <button type="button" onclick={() => add("drive")}>+ Drive</button>
     <button type="button" onclick={() => add("pick")}>+ FLOWER</button>
+    <button type="button" onclick={() => add("gather")}>+ GARDEN</button>
     <button type="button" onclick={() => add("wait")}>+ Wait</button>
     <button type="button" onclick={() => add("park")}
       >{parked ? "+ Park (move it)" : "+ Park"}</button
@@ -244,7 +344,8 @@
     align-items: center;
     gap: 10px;
   }
-  .name > span {
+  .name > span,
+  .knob > span {
     font-size: 13px;
     font-weight: 700;
     color: var(--muted);
@@ -260,6 +361,21 @@
     min-height: 44px;
     width: 100%;
     min-width: 0;
+  }
+  .knobs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 6px 12px;
+  }
+  .knob {
+    display: grid;
+    grid-template-columns: 4.6em 40px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 6px;
+  }
+  .knob b {
+    text-align: center;
+    font-size: 15px;
   }
   .btn {
     font: inherit;
@@ -323,9 +439,11 @@
     font-size: 13px;
     color: var(--muted);
     font-weight: 700;
+    min-width: 1.2em;
   }
   .time button,
-  .acts button {
+  .acts button,
+  .knob button {
     font: inherit;
     font-size: 17px;
     font-weight: 700;
@@ -354,15 +472,14 @@
   }
   .del {
     color: var(--muted);
-    font-size: 14px;
   }
-  .arrive {
+  .out {
     grid-column: 2 / -1;
     margin: 0;
     font-size: 13px;
     color: var(--muted);
   }
-  .arrive.late {
+  .out.late {
     color: var(--warn-ink);
     font-weight: 700;
   }

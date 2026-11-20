@@ -34,6 +34,8 @@ export interface Marker {
   label: string;
   /** The one being dragged or picked in the list. */
   active: boolean;
+  /** A bend handle: drawn smaller and hollow. */
+  small?: boolean;
 }
 
 /** A marker's radius on screen, CSS pixels: big enough for a fingertip. */
@@ -189,8 +191,12 @@ export function drawField(
   for (const m of scene.markers ?? []) {
     const q = at(m.at);
     ctx.beginPath();
-    ctx.arc(q.x, q.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = m.active ? "#ffffff" : (scene.colors[1] ?? "#4ECDC4");
+    ctx.arc(q.x, q.y, m.small ? r * 0.62 : r, 0, Math.PI * 2);
+    ctx.fillStyle = m.active
+      ? "#ffffff"
+      : m.small
+        ? "rgba(255,255,255,.85)"
+        : (scene.colors[1] ?? "#4ECDC4");
     ctx.fill();
     ctx.lineWidth = Math.max(1.5, r / 4.5);
     ctx.strokeStyle = m.active ? (scene.colors[1] ?? "#4ECDC4") : "#111";

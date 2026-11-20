@@ -38,6 +38,8 @@ export interface Robot {
   name: string;
   doc: ProjectDoc;
   settings: Settings;
+  /** This robot's own timing over the team's (a partner's volley length). */
+  own?: Partial<TimingValues>;
 }
 
 /** The settings a file's robot is timed with: the app's defaults with the file's own robot. */
@@ -141,6 +143,7 @@ function entryOf(robot: Robot, scenario: Scenario): FieldEntry {
     lines: robot.doc.lines,
     settings: robot.settings,
     scenario,
+    own: robot.own,
   };
 }
 
@@ -243,6 +246,8 @@ export function runBeside(
   partner: Robot,
   look: Look,
   values: TimingValues,
+  /** Also find the TIP switches (each a few more previews): off for a summary. */
+  withToggles = true,
 ): BesideResult {
   const robots = [ours, partner];
   const entries = [
@@ -267,7 +272,7 @@ export function runBeside(
     lanes,
     tips,
     tipsInAuto,
-    toggles: tipToggles(entries, shared),
+    toggles: withToggles ? tipToggles(entries, shared) : [],
     ends: [endOf(lanes, previews[0], 0), endOf(lanes, previews[1], 1)],
     contact: firstContact(robots, previews, span),
     span,
@@ -279,14 +284,101 @@ export function runBeside(
  * app previews an Auto alone, a TIP it waits for from its partner is taken to come.
  */
 export function previewAlone(
-  ours: Robot,
+  robot: Robot,
   look: Look,
   values: TimingValues,
 ): PreviewResult {
   return previewTogether(
-    [entryOf(ours, ourScenario(ours.doc.auto!, look))],
+    [entryOf(robot, ourScenario(robot.doc.auto!, look))],
     lookValues(values, look),
     false,
     { tipsCome: true },
   ).previews[0];
+}
+
+// ---- Our INIT wait, and what avoids contact --------------------------------------------------
+
+/**
+ * Our Auto's one time the drive team may move in INIT (biobuzz InitOptions: "waiting for TIP 1
+ * until 9 s"): a wait's match-clock row marked `adjustable`. Null for an Auto without one.
+ */
+export interface InitWait {
+  cardId: string;
+  /** Seconds on the match clock, as drawn. */
+  s: number;
+  /** The TIP it waits for, when the drawing says. */
+  tip: number | null;
+}
+
+export function initWait(auto: AutoSection): InitWait | null {
+  let found: InitWait | null = null;
+  const walk = (cards: AutoCard[]) => {
+    for (const card of cards) {
+      if (card.kind !== "firstOf") continue;
+      for (const row of card.rows) {
+        if (!found && "afterMs" in row && row.adjustable)
+          found = {
+            cardId: card.id,
+            s: row.afterMs / 1000,
+            tip: row.tip ?? null,
+          };
+        walk(row.cards);
+      }
+    }
+  };
+  walk(auto.cards);
+  return found;
+}
+
+/** Our robot with its INIT wait set to `s` (null or no such wait: as drawn). */
+export function withInitWait(robot: Robot, s: number | null): Robot {
+  const wait = robot.doc.auto ? initWait(robot.doc.auto) : null;
+  if (s === null || !wait || Math.abs(wait.s - s) < 1e-9) return robot;
+  const set = (cards: AutoCard[]): AutoCard[] =>
+    cards.map((card) =>
+      card.kind !== "firstOf"
+        ? card
+        : {
+            ...card,
+            rows: card.rows.map((row) => ({
+              ...row,
+              ...(card.id === wait.cardId && "afterMs" in row && row.adjustable
+                ? { afterMs: Math.round(s * 1000) }
+                : {}),
+              cards: set(row.cards),
+            })),
+          },
+    );
+  const auto = robot.doc.auto!;
+  return {
+    ...robot,
+    doc: { ...robot.doc, auto: { ...auto, cards: set(auto.cards) } },
+  };
+}
+
+/** Only when the two first touch (no TIP switches, no lanes): for trying what-ifs quickly. */
+export function contactOnly(
+  ours: Robot,
+  partner: Robot,
+  look: Look,
+  values: TimingValues,
+): Contact | null {
+  const shared = lookValues(values, look);
+  const { previews } = previewTogether(
+    [entryOf(ours, ourScenario(ours.doc.auto!, look)), entryOf(partner, {})],
+    shared,
+    false,
+  );
+  const span = Math.max(AUTO_S, ...previews.map((p) => p.endTime));
+  return firstContact([ours, partner], previews, span);
+}
+
+/** The smallest change, in half seconds, that makes `touches` false; null if none up to `max`. */
+export function smallestFix(
+  touches: (extra: number) => boolean,
+  max: number,
+): number | null {
+  for (let extra = 0.5; extra <= max + 1e-9; extra += 0.5)
+    if (!touches(extra)) return extra;
+  return null;
 }

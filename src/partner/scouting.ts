@@ -2,12 +2,13 @@
  * The team's partner plans from the pits, kept on biobuzz's `scouting` branch so everyone sees
  * everyone's and git keeps the history:
  *
- * - `scouting/<season>/<event>.json`, an event's plans: for each partner team, what their Auto does
- *   (a route: route.ts) and which of ours runs beside it, with notes. A plan is for the team at that
- *   event, and a match may have its own, which wins in that match.
+ * - `scouting/<season>/<event>.json`, an event's plans: for each partner team, the ways the match
+ *   could go (options: their Auto, a route.ts route, beside one of ours as set in INIT), the one the
+ *   team is going with, and notes. A plan is for the team at that event, and a match may have its
+ *   own, which wins in that match.
  * - `scouting/<season>/partners.json`, every team's known Autos by name, across events ("X" and
- *   "Y" for a team with two): a plan's route is kept there too when it has a name, so at the next
- *   event it is one tap.
+ *   "Y" for a team with two): each option's partner Auto is kept there too when it has a name, so
+ *   at the next event it is one tap. An entry may carry a `note` (where it was seen).
  *
  * Reading needs no login (the raw files, which GitHub's cache may serve up to 5 minutes old; with a
  * token, the API, which is fresh). Saving needs the GitHub token the Visualizer's Save to GitHub
@@ -31,16 +32,26 @@ import { cleanRoute, type PartnerRoute } from "./route";
 export const SCOUTING_BRANCH = "scouting";
 const BASE_BRANCH = "master";
 
+/** One way the match could go: their Auto beside one of ours, as set in INIT. */
+export interface PlanOption {
+  /** What the partner does. */
+  partner: PartnerRoute;
+  /** Our Auto beside them (its .pp in TeamCode/autos), or null while not picked. */
+  ours: string | null;
+  /** Our route choices set to their other leg, by condition. */
+  off: string[];
+  /** Our INIT wait (InitWait), seconds on the match clock; null: as drawn. */
+  ourWaitS: number | null;
+}
+
 export interface PlanRecord {
   team: number;
   /** "Q12" for a plan for that match only; null for the team's plan at this event. */
   match: string | null;
-  /** Our Auto beside them (its .pp in TeamCode/autos). */
-  ours: string | null;
-  /** Our route choices set to their other leg, by condition. */
-  off: string[];
-  /** What the partner does. */
-  partner: PartnerRoute | null;
+  /** The ways the match could go, to flip between (at least one). */
+  options: PlanOption[];
+  /** The option the team is going with (an index into `options`). */
+  chosen: number;
   notes: string;
   savedBy: string;
   /** ISO time. */
@@ -57,6 +68,8 @@ export interface EventPlans {
 
 export interface KnownAuto {
   route: PartnerRoute;
+  /** Where it was seen, or what it is based on. */
+  note?: string;
   savedBy: string;
   savedAt: string;
 }
@@ -90,18 +103,40 @@ export function emptyLibrary(season: number): PartnerLibrary {
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 
+export function cleanOption(raw: unknown): PlanOption | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const partner = cleanRoute(o.partner);
+  if (!partner) return null;
+  return {
+    partner,
+    ours: typeof o.ours === "string" ? o.ours : null,
+    off: Array.isArray(o.off)
+      ? o.off.filter((s): s is string => typeof s === "string")
+      : [],
+    ourWaitS:
+      typeof o.ourWaitS === "number" && Number.isFinite(o.ourWaitS)
+        ? Math.min(30, Math.max(0, o.ourWaitS))
+        : null,
+  };
+}
+
 function cleanRecord(raw: unknown): PlanRecord | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   if (!Number.isInteger(r.team)) return null;
+  // A plan saved before options (one partner, one Auto of ours) reads as one option.
+  const options = (Array.isArray(r.options) ? r.options : [r])
+    .map(cleanOption)
+    .filter((o): o is PlanOption => o !== null)
+    .slice(0, 6);
+  if (!options.length) return null;
+  const chosen = Number.isInteger(r.chosen) ? (r.chosen as number) : 0;
   return {
     team: r.team as number,
     match: typeof r.match === "string" && r.match ? r.match : null,
-    ours: typeof r.ours === "string" ? r.ours : null,
-    off: Array.isArray(r.off)
-      ? r.off.filter((s): s is string => typeof s === "string")
-      : [],
-    partner: cleanRoute(r.partner),
+    options,
+    chosen: chosen >= 0 && chosen < options.length ? chosen : 0,
     notes: text(r.notes),
     savedBy: text(r.savedBy),
     savedAt: text(r.savedAt),
@@ -140,6 +175,9 @@ export function parseLibrary(json: string, season: number): PartnerLibrary {
         if (!route) continue;
         (out.teams[team] ??= {})[name] = {
           route: { ...route, name },
+          ...(typeof known.note === "string" && known.note
+            ? { note: known.note }
+            : {}),
           savedBy: text(known.savedBy),
           savedAt: text(known.savedAt),
         };
@@ -283,10 +321,15 @@ export async function savePlan(
     const files: Record<string, string> = {};
     if (record) {
       plans.plans[key] = { ...record, savedBy: login, savedAt };
-      const name = record.partner?.name.trim();
-      if (record.partner && name) {
-        (library.teams[String(record.team)] ??= {})[name] = {
-          route: { ...record.partner, name },
+      // Each option's partner Auto with a name is one of that team's known Autos.
+      for (const option of record.options) {
+        const name = option.partner.name.trim();
+        if (!name) continue;
+        const autos = (library.teams[String(record.team)] ??= {});
+        autos[name] = {
+          route: { ...option.partner, name },
+          // Where it was seen stays with it.
+          ...(autos[name]?.note ? { note: autos[name].note } : {}),
           savedBy: login,
           savedAt,
         };

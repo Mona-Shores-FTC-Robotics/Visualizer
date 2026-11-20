@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { encodeRoute } from "../src/partner/route";
 
 // Fork: the Auto Match Planning page (partner.html), on a phone, with biobuzz master's files served
 // from test/fixtures/partner instead of GitHub, and FTCScout's answers recorded there too. The
@@ -36,25 +37,35 @@ async function serveBiobuzz(page: Page) {
 
 test.use({ viewport: { width: 390, height: 800 }, hasTouch: true });
 
-test("runs our Auto beside a stand-in and says whether they touch", async ({
+test("their Auto first, then ours on top: contact, parks, TIPs", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await serveBiobuzz(page);
   await page.goto("/partner.html");
-  // A first visit: R-Solo beside the stand-in that stays out of the way, and no broken-down one.
-  await expect(page.locator(".tile").first()).toContainText("None");
-  // The link names them (after the event the match menu opened on, whichever it is today).
-  await expect(page).toHaveURL(/[#&]ours=r-solo\.pp&partner=[\w-]+/);
+  // A first visit: nothing of ours yet, so no answer tiles; their Autos as pictures.
+  const cards = page.getByRole("group", { name: "Their Autos" });
+  await expect(cards.getByRole("button")).toHaveCount(8);
+  await expect(page.locator(".tile")).toHaveCount(0);
+  await expect(cards.getByRole("button", { name: /broken|wall/i })).toHaveCount(
+    0,
+  );
 
-  await expect(page.getByRole("button", { name: /broken/i })).toHaveCount(0);
-  await page
+  await cards
     .getByRole("button", { name: "L: shoot, FLOWER, shoot, park" })
     .click();
+  await expect(
+    cards.getByRole("button", { name: "L: shoot, FLOWER, shoot, park" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  // Each shot says when its last ball is out and when the CELL settles.
+  await expect(page.getByText(/^Last ball \d+\.\d s/).first()).toBeVisible();
+
+  await page.getByRole("button", { name: /^R-Solo/ }).click();
   await expect(page.locator(".tile").first()).toContainText(
     /Contact\s*\d+\.\d s/,
   );
+  await expect(page).toHaveURL(/[#&]ours=r-solo\.pp&partner=[\w-]+/);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
@@ -63,30 +74,38 @@ test("runs our Auto beside a stand-in and says whether they touch", async ({
   expect(errors).toEqual([]);
 });
 
-test("a stand-in edited: a spot dragged, a park time set, and the link keeps it", async ({
+test("their Auto edited: a shot time, a park time, a spot dragged; the link keeps it", async ({
   page,
 }) => {
   await serveBiobuzz(page);
   await page.goto("/partner.html#ours=r-solo.pp");
-  await expect(page.locator(".tile").first()).toBeVisible();
-  await page.getByRole("button", { name: "L: shoot, park" }).click();
+  const cards = page.getByRole("group", { name: "Their Autos" });
+  await cards.getByRole("button", { name: "L: shoot, park" }).click();
   await expect(page.getByText("Parks at 1")).toBeVisible();
 
-  // Park by 20 s: it leaves just in time and gets there then.
-  await page.getByRole("button", { name: "any time" }).click();
-  for (let i = 0; i < 40; i++) {
-    const value = await page.locator(".time .value").first().textContent();
-    if (value?.trim() === "20.0 s") break;
-    const n = Number.parseFloat(value ?? "0");
-    await page
-      .getByRole("button", { name: n < 20 ? "Later" : "Earlier" })
-      .first()
-      .click();
+  /** Steps the `n`th time stepper to `target` seconds. */
+  async function setTime(n: number, target: number) {
+    const value = page.locator(".time .value").nth(n);
+    if ((await value.textContent())?.trim() === "any time") await value.click();
+    for (let i = 0; i < 60; i++) {
+      const v = Number.parseFloat((await value.textContent()) ?? "0");
+      if (Math.abs(v - target) < 0.01) return;
+      await page
+        .locator(".time")
+        .nth(n)
+        .getByRole("button", { name: v < target ? "Later" : "Earlier" })
+        .click();
+    }
   }
-  await expect(page.getByText("Gets there at 20.0 s")).toBeVisible();
+  // They shoot at 4 s: last ball out a 3.5 s volley later.
+  await setTime(0, 4);
+  await expect(page.getByText(/^Last ball 7\.5 s/)).toBeVisible();
+  // Parked by 20 s: it leaves just in time.
+  await setTime(1, 20);
+  await expect(page.getByText("There 20.0 s")).toBeVisible();
   await expect(page.locator(".tile").nth(2)).toContainText("20.0 s");
 
-  // Move the park spot: drag marker 1 down the wall.
+  // Move the park spot down the wall: drag marker 1.
   await page.getByRole("button", { name: "Move spots on the field" }).click();
   const canvas = page.getByLabel(/^The field/);
   await canvas.scrollIntoViewIfNeeded();
@@ -97,16 +116,71 @@ test("a stand-in edited: a spot dragged, a park time set, and the link keeps it"
   });
   const touch = { pointerId: 1, pointerType: "touch", isPrimary: true };
   const before = page.url();
-  await canvas.dispatchEvent("pointerdown", { ...touch, ...at(9.8, 117.4) });
-  await canvas.dispatchEvent("pointermove", { ...touch, ...at(12, 100) });
-  await canvas.dispatchEvent("pointerup", { ...touch, ...at(12, 100) });
+  await canvas.dispatchEvent("pointerdown", { ...touch, ...at(14.5, 117.4) });
+  await canvas.dispatchEvent("pointermove", { ...touch, ...at(14, 105) });
+  await canvas.dispatchEvent("pointerup", { ...touch, ...at(14, 105) });
   await expect.poll(() => page.url()).not.toBe(before);
   await page.getByRole("button", { name: "Done moving spots" }).click();
-  await expect(page.getByText("Gets there at 20.0 s")).toBeVisible();
+  await expect(page.getByText("There 20.0 s")).toBeVisible();
 
   // Reloading the link brings the edited partner back.
   const url = page.url();
   await page.reload();
   expect(page.url()).toBe(url);
-  await expect(page.getByText("Gets there at 20.0 s")).toBeVisible();
+  await expect(page.getByText("There 20.0 s")).toBeVisible();
+});
+
+test("options: a second one to compare, marked as the one we go with", async ({
+  page,
+}) => {
+  await serveBiobuzz(page);
+  await page.goto("/partner.html#ours=r-solo.pp");
+  const cards = page.getByRole("group", { name: "Their Autos" });
+  await cards
+    .getByRole("button", { name: "L: shoot, FLOWER, shoot, park" })
+    .click();
+  const tabs = page.getByRole("group", { name: "Options" });
+  await tabs.getByRole("button", { name: "Another option" }).click();
+  await expect(tabs.getByRole("button", { name: /^B/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  // B: they run something else; A keeps its own.
+  await cards.getByRole("button", { name: "Still: out of the way" }).click();
+  await expect(page.locator(".tile").first()).toContainText("None");
+  await tabs.getByRole("button", { name: "☆ Go with this" }).click();
+  await expect(tabs.getByRole("button", { name: /^B ★/ })).toBeVisible();
+  await tabs.getByRole("button", { name: "A", exact: true }).click();
+  await expect(
+    cards.getByRole("button", { name: "L: shoot, FLOWER, shoot, park" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".tile").first()).toContainText(/Contact\s*\d/);
+  // Where no delay helps, the page says so.
+  await expect(page.getByText("No delay up to 6 s avoids it")).toBeVisible();
+
+  // A partner crossing R-Solo's first drive: waiting 2 s clears it, and the page says so.
+  const crossing = {
+    name: "",
+    start: { x: 100, y: 22, h: 180 },
+    steps: [
+      {
+        kind: "drive" as const,
+        to: { x: 30, y: 22, h: 180 },
+        bend: null,
+        by: null,
+        park: true,
+      },
+    ],
+    volleyS: 3.5,
+    delayS: 0,
+  };
+  await page.goto(
+    `/partner.html#ours=r-solo.pp&partner=${encodeRoute(crossing)}`,
+  );
+  // Only the fragment changed: load it.
+  await page.reload();
+  const fix = page.getByRole("button", { name: /^No contact if they wait/ });
+  await expect(fix).toHaveText("No contact if they wait +2.0 s");
+  await fix.click();
+  await expect(page.locator(".tile").first()).toContainText("None");
 });

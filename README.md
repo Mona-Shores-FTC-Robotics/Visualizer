@@ -63,22 +63,21 @@ What the fork adds:
   its own; tick a stand-in beside an Auto to draw it as an overlay. It is never the project
   that opens.
 - **Auto Match Planning** (`partner.html`, linked from the Auto Strategy page). A phone page for
-  the pits: pick one of our Autos on biobuzz master, with its INIT route choices and each TIP
-  landing or missing, and the partner's Auto, as steps on the field (`src/partner/route.ts`):
-  where it starts, then shoot, pick a FLOWER, drive to a spot, wait until a time, park. A drive's
-  time is when the partner says it is there ("parked by 15"): the page holds it at its last spot
-  until it must leave. Start from one of the page's stand-ins (biobuzz's, without the broken-down
-  ones), drag its numbered spots, set its times. It runs the two together with the preview and the
-  Match view's contact check (`src/partner/`) and answers in four tiles: contact (and when), where
-  each robot parks, and the TIPs. The link holds the whole look. A quick look, not the Java
-  simulator.
-  Its **Match** menu lists our events and matches from FTCScout (both teams, this season; before
-  the schedule is out, the event's team list), and keeps the team's plan for each partner: their
-  Auto, ours beside it and notes, for the team at that event or for one match. A partner Auto with
-  a name (what they call it: X, Y) is also kept as one of that team's known Autos for the season,
-  one tap at the next event. Plans are on biobuzz's `scouting` branch
-  (`scouting/<season>/<event>.json`, and `scouting/<season>/partners.json` for the known Autos):
-  anyone can read them, and saving takes the GitHub token Save to GitHub uses.
+  the pits, in the order the conversation goes: the match (our events and matches from
+  FTCScout, or before the schedule the event's team list), then **their Auto**, then **ours** on
+  top of it.
+  - Their Auto is picked by picture: the team's saved Autos first, then the page's stand-ins
+    (`src/partner/route.ts`). Then it is adjusted: spots and one bend per drive dragged on the
+    field; shot times ("we shoot at 5"; the volley, 3.5 s unless they say, runs to the last ball
+    leaving, and the page shows when the CELL settles); "parked by" times; "they wait".
+  - Our Auto comes with its INIT choices and INIT wait. The two run together with the preview
+    and the Match view's contact check, answered in four tiles: contact, where each parks, TIPs.
+    When they touch, the page offers the smallest delay (theirs, or our INIT wait) that avoids it.
+  - A plan holds options (A, B, …: their Auto beside ours) to flip between, one starred as the
+    one the team goes with. Plans are on biobuzz's `scouting` branch
+    (`scouting/<season>/<event>.json`, and `scouting/<season>/partners.json` for each team's
+    known Autos, which a plan's named partner Autos join): anyone can read them; saving takes
+    the GitHub token Save to GitHub uses. A quick look, not the Java simulator.
 - **Drafts in Team Autos.** `TeamCode/autos/drafts/` (Autos of ours the robot does not run yet) is
   listed too, and a link may name one: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`.
   A draft opens and saves like any Auto: Save to GitHub suggests its own `drafts/` path, and Save to
