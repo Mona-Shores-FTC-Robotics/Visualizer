@@ -1,31 +1,45 @@
 <script lang="ts">
   /**
-   * Auto Match Planning (partner.html): pick one of our Autos on biobuzz master and the
-   * partner's Auto (one of the page's stand-ins, or a team's saved one, edited as steps on the
-   * field), watch them run together, and read whether they touch, where each parks, and the TIPs.
-   * The answer is the Visualizer's preview (beside.ts), not biobuzz's Java simulator.
+   * Auto Match Planning (partner.html), in the order the pits conversation goes: the match (or the
+   * team you are talking to), then their Auto (they point at the picture that looks like theirs,
+   * and you move its spots and set its times), then ours on top of it, with whether the two touch,
+   * where each parks and the TIPs. A plan holds a few options (their Auto beside one of ours) to
+   * flip between, and the one the team is going with. When the two touch, the page says the
+   * smallest delay, theirs or our INIT wait, that avoids it. The answer is the Visualizer's preview
+   * (beside.ts), not biobuzz's Java simulator.
    */
   import { onMount } from "svelte";
   import { publicAsset } from "../utils/publicAsset";
   import type { TimingValues } from "../lib/timing/model";
   import {
+    contactOnly,
+    initWait,
     OUR_COLOR,
-    previewAlone,
     PARTNER_COLOR,
     robotFromText,
     routeChoices,
     runBeside,
+    smallestFix,
+    withInitWait,
     type BesideResult,
     type Robot,
   } from "./beside";
   import { drawField, markerAt, routesOf, toField, type Marker } from "./field";
-  import PresetCards from "./PresetCards.svelte";
-  import RouteEditor from "./RouteEditor.svelte";
+  import PresetCards, { type Card } from "./PresetCards.svelte";
+  import RouteEditor, { type ShotTimes } from "./RouteEditor.svelte";
   import ScoutPanel from "./ScoutPanel.svelte";
-  import type { PlanRecord } from "./scouting";
+  import {
+    knownAutos,
+    type PartnerLibrary,
+    type PlanOption,
+    type PlanRecord,
+  } from "./scouting";
   import {
     arrivals as arrivalsOf,
+    clampPoint,
     clampSpot,
+    driveFrom,
+    launches as launchesOf,
     PRESETS,
     routeRobot,
     STILL_PRESET,
@@ -42,27 +56,47 @@
     type PageState,
   } from "./load";
 
-  const COLORS = [OUR_COLOR, PARTNER_COLOR];
   const SPEEDS = [1, 2, 4];
+  const LETTERS = "ABCDEF";
+  const MAX_OPTIONS = 4;
 
-  // ---- What is picked (the link carries it) ----
+  /** Before anyone has said what they do: nothing picked on either side. */
+  const blankOption = (): PlanOption => ({
+    partner: { ...STILL_PRESET, name: "" },
+    ours: null,
+    off: [],
+    ourWaitS: null,
+  });
+
+  // ---- What is picked (the link carries the option shown) ----
   const initial = parseState(location.hash);
-  let ours = $state<string | null>(initial.ours);
-  let partner = $state.raw<PartnerRoute>(
-    initial.partner ?? { ...STILL_PRESET, name: "" },
-  );
+  let options = $state.raw<PlanOption[]>([
+    {
+      ...blankOption(),
+      ...(initial.partner ? { partner: initial.partner } : {}),
+      ours: initial.ours,
+      off: initial.off,
+    },
+  ]);
+  let active = $state(0);
+  let chosen = $state(0);
   let alliance = $state<"red" | "blue">(initial.alliance);
-  let off = $state.raw<string[]>(initial.off);
   let miss = $state.raw<number[]>(initial.miss);
   let event = $state<string | null>(initial.event);
   let team = $state<number | null>(initial.team);
   let match = $state<string | null>(initial.match);
-  /** The stand-in the partner's Auto was started from, for its button; null for a team's own. */
-  let preset = $state<string | null>(
-    initial.partner ? null : STILL_PRESET.name,
-  );
   /** The link held a partner of its own: a saved plan loading first does not replace it. */
   const linkHasLook = initial.partner !== null;
+
+  const option = $derived(options[active] ?? options[0]);
+  const ours = $derived(option.ours);
+  const partner = $derived(option.partner);
+  const off = $derived(option.off);
+
+  /** Changes the option shown. */
+  function patch(change: Partial<PlanOption>) {
+    options = options.map((o, i) => (i === active ? { ...o, ...change } : o));
+  }
 
   // ---- What is loaded ----
   let lists = $state.raw<Lists | null>(null);
@@ -70,6 +104,8 @@
   /** Loaded robots, by file. */
   let robots = $state.raw<Record<string, Robot>>({});
   let failed = $state.raw<Record<string, string>>({});
+  /** Every team's known Autos this season, loaded by the match panel. */
+  let library = $state.raw<PartnerLibrary | null>(null);
   /**
    * Our Autos drawn to run beside one other, from the Auto Strategy page's manifest: each half's
    * file and Auto name → the other half's Auto name.
@@ -92,7 +128,19 @@
   let imageTick = $state(0);
   let dark = $state(false);
 
-  const oursRobot = $derived(ours ? (robots[ours] ?? null) : null);
+  // ---- The robots ----
+  const look = $derived({
+    choices: Object.fromEntries(off.map((c) => [c, false])),
+    tips: Object.fromEntries(miss.map((n) => [n, false])),
+  });
+  /** Our Auto as drawn (before its INIT wait is set). */
+  const oursBase = $derived(ours ? (robots[ours] ?? null) : null);
+  const oursWait = $derived(
+    oursBase?.doc.auto ? initWait(oursBase.doc.auto) : null,
+  );
+  const oursRobot = $derived(
+    oursBase ? withInitWait(oursBase, option.ourWaitS) : null,
+  );
   const partnerRobot = $derived.by((): Robot | null => {
     if (!values) return null;
     try {
@@ -102,103 +150,237 @@
       return null;
     }
   });
-  const choices = $derived(oursRobot ? routeChoices(oursRobot.doc.auto!) : []);
-  /** What the field shows, as a saved plan keeps it. */
-  const current = $derived({ ours, off, partner });
+  /**
+   * Stands in for our robot until ours is picked, so the partner's own TIPs are worked out: it
+   * never moves, and nothing about it is shown.
+   */
+  const nobody = $derived(
+    values
+      ? routeRobot(
+          { ...STILL_PRESET, start: { x: 120, y: 70, h: 180 } },
+          values,
+        )
+      : null,
+  );
+  const choices = $derived(oursBase ? routeChoices(oursBase.doc.auto!) : []);
+  /** Whether our Auto is on the field yet. */
+  const paired = $derived(oursRobot !== null);
 
-  /** A saved plan onto the field; none saved: the partner as a blank Auto to fill in. */
-  function applyPlan(
-    record: PlanRecord | null,
-    matchAlliance: "red" | "blue" | null,
-  ) {
-    if (matchAlliance) alliance = matchAlliance;
-    playing = false;
-    miss = [];
-    if (record?.ours) ours = record.ours;
-    off = record?.off ?? [];
-    partner = record?.partner ?? { ...STILL_PRESET, name: "" };
-    preset = record?.partner ? null : STILL_PRESET.name;
-  }
-
-  /** A stand-in to start from: its steps, with no name until the partner gives theirs. */
-  function pickPreset(route: PartnerRoute) {
-    pickRoute({ ...route, name: "" });
-    preset = route.name;
-  }
-
-  function pickRoute(route: PartnerRoute) {
-    preset = null;
-    partner = route;
-    playing = false;
-    miss = [];
-  }
-
-  const look = $derived({
-    choices: Object.fromEntries(off.map((c) => [c, false])),
-    tips: Object.fromEntries(miss.map((n) => [n, false])),
-  });
-  /** Ours alone, for the field while there is no pair to run. */
-  const alone = $derived.by(() => {
-    if (!oursRobot || !values || result) return null;
-    try {
-      const preview = previewAlone(oursRobot, look, values);
-      return {
-        preview,
-        route: routesOf(
-          [oursRobot],
-          [preview],
-          Math.max(30, preview.endTime),
-        )[0],
-      };
-    } catch {
-      return null;
-    }
-  });
   const result = $derived.by((): BesideResult | null => {
-    if (!oursRobot || !partnerRobot || !values) return null;
+    const left = oursRobot ?? nobody;
+    if (!left || !partnerRobot || !values) return null;
     try {
-      return runBeside(oursRobot, partnerRobot, look, values);
+      return runBeside(left, partnerRobot, look, values, paired);
     } catch (error) {
       console.error("Could not preview these two together:", error);
       return null;
     }
   });
   const shown = $derived(
-    result && oursRobot && partnerRobot ? [oursRobot, partnerRobot] : [],
+    result && partnerRobot
+      ? paired && oursRobot
+        ? [oursRobot, partnerRobot]
+        : [partnerRobot]
+      : [],
+  );
+  const shownPreviews = $derived(
+    result ? (paired ? result.previews : [result.previews[1]]) : [],
   );
   const routes = $derived(
-    result ? routesOf(shown, result.previews, result.span) : [],
+    result ? routesOf(shown, shownPreviews, result.span) : [],
+  );
+  const colors = $derived(
+    paired ? [OUR_COLOR, PARTNER_COLOR] : [PARTNER_COLOR, PARTNER_COLOR],
   );
   const span = $derived(result?.span ?? 30);
+  const contact = $derived(paired ? (result?.contact ?? null) : null);
+
   /** When each of the partner's drives gets there, by step index. */
   const partnerArrivals = $derived(arrivalsOf(result?.previews[1]));
-  /** The partner's spots on the field while they are being moved: the start, then each drive. */
-  const markerSteps = $derived.by((): (number | "start")[] => [
-    "start",
-    ...partner.steps.flatMap((s, i) => (s.kind === "drive" ? [i] : [])),
-  ]);
-  const markers = $derived.by((): Marker[] | null =>
-    moving
-      ? markerSteps.map((k, n) => {
-          const step = k === "start" ? null : partner.steps[k];
-          return {
-            at: step?.kind === "drive" ? step.to : partner.start,
-            label: k === "start" ? "S" : String(n),
-            active: dragging === n,
-          };
-        })
-      : null,
-  );
-  /** The TIP rows: each the volleys try for in this look, and each set to miss. */
-  const tipRows = $derived.by(() => {
-    const rows: { tip: number; robot: number | null }[] = (
-      result?.toggles ?? []
-    ).map((toggle) => ({ tip: toggle.tip, robot: toggle.robot }));
-    for (const n of miss)
-      if (!rows.some((row) => row.tip === n))
-        rows.push({ tip: n, robot: null });
-    return rows.sort((a, b) => a.tip - b.tip);
+  /** Each of the partner's shots: launch, last ball, and when the CELL it TIPs settles. */
+  const partnerShots = $derived.by((): Record<number, ShotTimes> => {
+    const out: Record<number, ShotTimes> = {};
+    if (!result) return out;
+    const launched = launchesOf(result.previews[1]);
+    const effects = (result.lanes?.hive.volleys ?? [])
+      .filter((v) => v.robot === 1)
+      .sort((a, b) => a.t - b.t);
+    Object.keys(launched)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .forEach((step, k) => {
+        const tip = effects[k]?.tip ?? null;
+        out[step] = {
+          ...launched[step],
+          settled: tip === null ? null : (result.tips[tip]?.settled ?? null),
+        };
+      });
+    return out;
   });
+
+  /** The partner's spots on the field while they are being moved: start, then each drive's bend and end. */
+  type Handle =
+    | { kind: "start" }
+    | { kind: "to"; step: number }
+    | { kind: "bend"; step: number };
+  const handles = $derived.by((): Handle[] => [
+    { kind: "start" },
+    ...partner.steps.flatMap((s, i): Handle[] =>
+      s.kind === "drive"
+        ? [
+            { kind: "bend", step: i },
+            { kind: "to", step: i },
+          ]
+        : [],
+    ),
+  ]);
+  const markers = $derived.by((): Marker[] | null => {
+    if (!moving) return null;
+    let n = 0;
+    return handles.map((h, k) => {
+      if (h.kind === "start")
+        return { at: partner.start, label: "S", active: dragging === k };
+      const step = partner.steps[h.step];
+      if (step.kind !== "drive")
+        return { at: partner.start, label: "", active: false };
+      if (h.kind === "to")
+        return { at: step.to, label: String(++n), active: dragging === k };
+      const from = driveFrom(partner, h.step);
+      return {
+        at: step.bend ?? {
+          x: (from.x + step.to.x) / 2,
+          y: (from.y + step.to.y) / 2,
+        },
+        label: "",
+        active: dragging === k,
+        small: true,
+      };
+    });
+  });
+
+  // ---- Options ----
+  /** Each option's answer in one glance, for its tab: no contact, contact, or not paired yet. */
+  const optionStates = $derived.by(() =>
+    options.map((o, i): "good" | "bad" | "open" => {
+      if (i === active) return !paired ? "open" : contact ? "bad" : "good";
+      const base = o.ours ? robots[o.ours] : null;
+      if (!base || !values) return "open";
+      try {
+        const look = {
+          choices: Object.fromEntries(o.off.map((c) => [c, false])),
+          tips: {},
+        };
+        return contactOnly(
+          withInitWait(base, o.ourWaitS),
+          routeRobot(o.partner, values),
+          look,
+          values,
+        )
+          ? "bad"
+          : "good";
+      } catch {
+        return "open";
+      }
+    }),
+  );
+  function addOption() {
+    if (options.length >= MAX_OPTIONS) return;
+    options = [...options, structuredClone($state.snapshot(option))];
+    active = options.length - 1;
+  }
+  function removeOption() {
+    if (options.length < 2) return;
+    options = options.filter((_, i) => i !== active);
+    if (chosen === active) chosen = 0;
+    else if (chosen > active) chosen--;
+    active = Math.max(0, active - 1);
+  }
+
+  // ---- What would avoid contact ----
+  const fixes = $derived.by(() => {
+    if (!contact || !values || dragging !== null || !oursRobot || !oursBase)
+      return null;
+    const v = values;
+    const them = smallestFix(
+      (extra) =>
+        contactOnly(
+          oursRobot,
+          routeRobot({ ...partner, delayS: partner.delayS + extra }, v),
+          look,
+          v,
+        ) !== null,
+      6,
+    );
+    const now = option.ourWaitS ?? oursWait?.s ?? null;
+    const us =
+      oursWait && partnerRobot && now !== null
+        ? smallestFix(
+            (extra) =>
+              now + extra > 29 ||
+              contactOnly(
+                withInitWait(oursBase, now + extra),
+                partnerRobot,
+                look,
+                v,
+              ) !== null,
+            8,
+          )
+        : null;
+    return { them, us, now };
+  });
+
+  // ---- Their Autos to pick from: the team's own, then the stand-ins ----
+  const cards = $derived.by((): Card[] => [
+    ...(team ? knownAutos(library, team) : []).map((k) => ({
+      key: `team:${k.route.name}`,
+      label: `${team} · ${k.route.name}`,
+      route: k.route,
+      theirs: true,
+    })),
+    ...PRESETS.map((p) => ({
+      key: `preset:${p.name}`,
+      label: p.name,
+      route: p,
+      theirs: false,
+    })),
+  ]);
+  /** The card the partner's Auto is, while it is still that card's start, spots and steps. */
+  const sameShape = (a: PartnerRoute, b: PartnerRoute) =>
+    JSON.stringify([a.start, a.steps]) === JSON.stringify([b.start, b.steps]);
+  const selectedCard = $derived(
+    cards.find(
+      (c) =>
+        sameShape(c.route, partner) &&
+        (!c.theirs || c.route.name === partner.name),
+    )?.key ?? null,
+  );
+  function pickCard(card: Card) {
+    playing = false;
+    miss = [];
+    // A stand-in has no name until the partner gives theirs; a team's own keeps its.
+    patch({
+      partner: {
+        ...card.route,
+        name: card.theirs ? card.route.name : "",
+        delayS: 0,
+      },
+    });
+  }
+
+  // ---- Plans ----
+  /** A saved plan onto the page; none saved: one blank option, their Auto first. */
+  function applyPlan(
+    record: PlanRecord | null,
+    matchAlliance: "red" | "blue" | null,
+  ) {
+    if (matchAlliance) alliance = matchAlliance;
+    playing = false;
+    moving = false;
+    miss = [];
+    options = record?.options.length ? record.options : [blankOption()];
+    chosen = record?.chosen ?? 0;
+    active = chosen;
+  }
 
   // ---- Loading ----
   async function loadRobot(file: string) {
@@ -227,11 +409,12 @@
     const media = matchMedia("(prefers-color-scheme: dark)");
     const theme = () => {
       dark = media.matches;
-      image = new Image();
-      image.onload = () => imageTick++;
-      image.src = publicAsset(
+      const next = new Image();
+      next.onload = () => imageTick++;
+      next.src = publicAsset(
         `/fields/${dark ? "biobuzz-dark.webp" : "biobuzz-light.webp"}`,
       );
+      image = next;
     };
     theme();
     media.addEventListener("change", theme);
@@ -242,11 +425,7 @@
       values = v;
       if (l.stale)
         listError =
-          "GitHub would not list the folders (too many visits from this Wi-Fi, or no internet), so these are the files that were there on 20 Nov. A new one may be missing.";
-      if (!ours || !l.autos.includes(ours))
-        ours = l.autos.includes("r-solo.pp")
-          ? "r-solo.pp"
-          : (l.autos[0] ?? null);
+          "GitHub would not list our Autos (too many visits from this Wi-Fi, or no internet): these are the ones from 20 Nov.";
       await Promise.all(l.autos.map(loadRobot));
     })();
     void (async () => {
@@ -268,13 +447,13 @@
         }
         pairs = out;
       } catch {
-        // No pair notes.
+        // No pair tags.
       }
     })();
     return () => media.removeEventListener("change", theme);
   });
 
-  // The link follows what is picked.
+  // The link follows the option shown.
   $effect(() => {
     const state: PageState = {
       ours,
@@ -346,85 +525,102 @@
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    // No pair yet: ours alone, at its start.
-    const solo = !result;
     drawField(ctx, size, {
-      robots: solo ? (oursRobot && alone ? [oursRobot] : []) : shown,
-      previews: solo ? (alone ? [alone.preview] : []) : result!.previews,
-      colors: COLORS,
-      routes: solo ? (alone ? [alone.route] : []) : routes,
+      robots: shown,
+      previews: shownPreviews,
+      colors,
+      routes,
       // Moving spots: the robots stand at their starts, under the markers.
-      t: solo || moving ? 0 : t,
-      contact: solo ? null : result!.contact,
+      t: moving ? 0 : t,
+      contact,
       blue: alliance === "blue",
       image,
       markers,
     });
   });
 
-  function canvasXY(event: PointerEvent) {
+  function canvasXY(e: PointerEvent) {
     const rect = canvas!.getBoundingClientRect();
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-      w: rect.width,
-    };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width };
   }
 
-  function down(event: PointerEvent) {
+  function down(e: PointerEvent) {
     if (!moving || !canvas || !markers) return;
-    const { x, y, w } = canvasXY(event);
+    const { x, y, w } = canvasXY(e);
     const hit = markerAt(markers, x, y, w, alliance === "blue");
     if (hit < 0) return;
-    event.preventDefault();
-    canvas.setPointerCapture(event.pointerId);
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
     playing = false;
     dragging = hit;
   }
-  function move(event: PointerEvent) {
+  function move(e: PointerEvent) {
     if (dragging === null) return;
-    event.preventDefault();
-    const { x, y, w } = canvasXY(event);
+    e.preventDefault();
+    const { x, y, w } = canvasXY(e);
     const p = toField(x, y, w, alliance === "blue");
-    const k = markerSteps[dragging];
-    if (k === "start") {
-      partner = {
-        ...partner,
-        start: clampSpot({ ...partner.start, x: p.x, y: p.y }),
-      };
-    } else {
-      const step = partner.steps[k];
-      if (step.kind !== "drive") return;
-      partner = {
-        ...partner,
-        steps: partner.steps.map((s, i) =>
-          i === k
-            ? { ...step, to: clampSpot({ ...step.to, x: p.x, y: p.y }) }
-            : s,
-        ),
-      };
+    const h = handles[dragging];
+    if (h.kind === "start") {
+      patch({
+        partner: {
+          ...partner,
+          start: clampSpot({ ...partner.start, x: p.x, y: p.y }),
+        },
+      });
+      return;
     }
+    const step = partner.steps[h.step];
+    if (step.kind !== "drive") return;
+    const moved =
+      h.kind === "to"
+        ? { ...step, to: clampSpot({ ...step.to, x: p.x, y: p.y }) }
+        : { ...step, bend: clampPoint(p) };
+    patch({
+      partner: {
+        ...partner,
+        steps: partner.steps.map((s, i) => (i === h.step ? moved : s)),
+      },
+    });
   }
   function up() {
     dragging = null;
   }
 
-  // ---- Picks ----
+  // ---- Our side ----
   function pickOurs(file: string) {
-    ours = file;
-    off = [];
+    patch({ ours: file, off: [], ourWaitS: null });
     miss = [];
   }
   function setChoice(condition: string, yes: boolean) {
-    off = yes
-      ? off.filter((c) => c !== condition)
-      : [...new Set([...off, condition])];
+    patch({
+      off: yes
+        ? off.filter((c) => c !== condition)
+        : [...new Set([...off, condition])],
+    });
   }
   function setTip(tip: number, lands: boolean) {
     miss = lands
       ? miss.filter((n) => n !== tip)
       : [...new Set([...miss, tip])].sort((a, b) => a - b);
   }
+  function nudgeOurWait(delta: number) {
+    if (!oursWait) return;
+    const now = option.ourWaitS ?? oursWait.s;
+    patch({
+      ourWaitS: Math.min(29, Math.max(0, Math.round((now + delta) * 2) / 2)),
+    });
+  }
+
+  /** The TIP rows: each the volleys try for in this look, and each set to miss. */
+  const tipRows = $derived.by(() => {
+    const rows: { tip: number; robot: number | null }[] = (
+      result?.toggles ?? []
+    ).map((toggle) => ({ tip: toggle.tip, robot: toggle.robot }));
+    for (const n of miss)
+      if (!rows.some((row) => row.tip === n))
+        rows.push({ tip: n, robot: null });
+    return rows.sort((a, b) => a.tip - b.tip);
+  });
 
   const fmt = (s: number) => `${s.toFixed(1)} s`;
   const pretty = (s: string) =>
@@ -434,7 +630,7 @@
       .replace(/\btip\b/g, "TIP")
       .replace(/^./, (c) => c.toUpperCase());
   const who = (robot: number | null) =>
-    robot === 0 ? "us" : robot === 1 ? "partner" : "";
+    robot === 0 ? "us" : robot === 1 ? "them" : "";
 </script>
 
 <div class="wrap">
@@ -464,6 +660,47 @@
 
   <div class="layout">
     <div class="stage">
+      <div class="optbar" role="group" aria-label="Options">
+        {#each options as _, i (i)}
+          <button
+            type="button"
+            class="opt {optionStates[i]}"
+            aria-pressed={active === i}
+            onclick={() => {
+              active = i;
+              moving = false;
+              playing = false;
+            }}
+            >{LETTERS[i]}{#if chosen === i}&nbsp;★{/if}</button
+          >
+        {/each}
+        {#if options.length < MAX_OPTIONS}
+          <button
+            type="button"
+            class="opt add"
+            aria-label="Another option"
+            onclick={addOption}>+</button
+          >
+        {/if}
+        <span class="spacer"></span>
+        {#if options.length > 1}
+          <button
+            type="button"
+            class="optact"
+            aria-pressed={chosen === active}
+            onclick={() => (chosen = active)}
+            >{chosen === active
+              ? "★ Going with this"
+              : "☆ Go with this"}</button
+          >
+          <button
+            type="button"
+            class="optact"
+            aria-label="Remove this option"
+            onclick={removeOption}>✕</button
+          >
+        {/if}
+      </div>
       <div class="fieldbox">
         <canvas
           bind:this={canvas}
@@ -495,10 +732,10 @@
             aria-label="Time after PLAY"
           />
           <div class="ticks" aria-hidden="true">
-            {#if result?.contact}
+            {#if contact}
               <span
                 class="tick contact"
-                style:left="{(result.contact.t / span) * 100}%"
+                style:left="{(contact.t / span) * 100}%"
               ></span>
             {/if}
             {#each result?.tipsInAuto ?? [] as tip, i (i)}
@@ -521,27 +758,20 @@
         </div>
       </div>
 
-      <div class="verdict" aria-live="polite">
-        {#if !result}
-          <p class="quiet">
-            {#if !values || !lists}Loading from biobuzz master…
-            {:else if !oursRobot}Pick our Auto.
-            {:else if !partnerRobot}Pick a partner.
-            {:else}Could not preview these two together.{/if}
-          </p>
-        {:else}
+      {#if result && paired}
+        <div class="verdict" aria-live="polite">
           <div class="tiles">
-            {#if result.contact}
+            {#if contact}
               <button
                 type="button"
                 class="tile bad"
                 onclick={() => {
                   playing = false;
-                  t = result!.contact!.t;
+                  t = contact!.t;
                 }}
-                aria-label="Contact at {fmt(result.contact.t)}: show it"
+                aria-label="Contact at {fmt(contact.t)}: show it"
               >
-                <small>Contact</small><b>{fmt(result.contact.t)}</b>
+                <small>Contact</small><b>{fmt(contact.t)}</b>
               </button>
             {:else}
               <div class="tile good"><small>Contact</small><b>None</b></div>
@@ -553,7 +783,10 @@
                   end.why !== "stays on its start"}
               >
                 <small
-                  ><span class="key" style:background={COLORS[i]}></span>
+                  ><span
+                    class="key"
+                    style:background={i === 0 ? OUR_COLOR : PARTNER_COLOR}
+                  ></span>
                   {i === 0 ? "We park" : "They park"}</small
                 >
                 {#if end.parkedAt !== null}
@@ -569,8 +802,36 @@
               <small>TIPs</small><b>{result.tipsInAuto.length}</b>
             </div>
           </div>
-        {/if}
-      </div>
+          {#if fixes}
+            <div class="fixes">
+              {#if fixes.them !== null}
+                <button
+                  type="button"
+                  onclick={() =>
+                    patch({
+                      partner: {
+                        ...partner,
+                        delayS: partner.delayS + fixes!.them!,
+                      },
+                    })}>No contact if they wait +{fmt(fixes.them)}</button
+                >
+              {/if}
+              {#if fixes.us !== null && fixes.now !== null}
+                <button
+                  type="button"
+                  onclick={() => patch({ ourWaitS: fixes!.now! + fixes!.us! })}
+                  >No contact if our {oursWait?.tip
+                    ? `TIP ${oursWait.tip} wait`
+                    : "wait"} is {fmt(fixes.now + fixes.us)}</button
+                >
+              {/if}
+              {#if fixes.them === null && fixes.us === null}
+                <span class="nofix">No delay up to 6 s avoids it</span>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <div class="controls">
@@ -578,12 +839,32 @@
         bind:event
         bind:team
         bind:match
-        {current}
+        bind:library
+        current={{ options, chosen }}
         keepLinkLook={linkHasLook}
         onApply={applyPlan}
         autoName={nameOf}
-        onPickRoute={pickRoute}
       />
+
+      <section>
+        <h2>Their Auto</h2>
+        <PresetCards
+          {cards}
+          selected={selectedCard}
+          ours={paired ? (routes[0] ?? null) : null}
+          blue={alliance === "blue"}
+          {image}
+          {imageTick}
+          onPick={pickCard}
+        />
+        <RouteEditor
+          route={partner}
+          arrivals={partnerArrivals}
+          shots={partnerShots}
+          bind:moving
+          onChange={(route) => patch({ partner: route })}
+        />
+      </section>
 
       <section>
         <h2>Our Auto</h2>
@@ -606,8 +887,30 @@
         </div>
         {#if ours && failed[ours]}<p class="note warn">{failed[ours]}</p>{/if}
 
-        {#if choices.length || tipRows.length}
+        {#if paired && (choices.length || tipRows.length || oursWait)}
           <div class="switches">
+            {#if oursWait}
+              <div class="sw">
+                <span
+                  >{oursWait.tip
+                    ? `Wait for TIP ${oursWait.tip} until`
+                    : "Wait until"}</span
+                >
+                <div class="stepper">
+                  <button
+                    type="button"
+                    aria-label="Earlier"
+                    onclick={() => nudgeOurWait(-0.5)}>−</button
+                  >
+                  <b>{fmt(option.ourWaitS ?? oursWait.s)}</b>
+                  <button
+                    type="button"
+                    aria-label="Later"
+                    onclick={() => nudgeOurWait(0.5)}>+</button
+                  >
+                </div>
+              </div>
+            {/if}
             {#each choices as choice (choice.condition)}
               <div class="sw">
                 <span>{pretty(choice.option)}</span>
@@ -652,30 +955,111 @@
           </div>
         {/if}
       </section>
-
-      <section>
-        <h2>Partner</h2>
-        <PresetCards
-          presets={PRESETS}
-          selected={preset}
-          ours={result ? (routes[0] ?? null) : (alone?.route ?? null)}
-          blue={alliance === "blue"}
-          {image}
-          {imageTick}
-          onPick={pickPreset}
-        />
-        <RouteEditor
-          route={partner}
-          arrivals={partnerArrivals}
-          bind:moving
-          onChange={(route) => (partner = route)}
-        />
-      </section>
     </div>
   </div>
 </div>
 
 <style>
+  .optbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .optbar .spacer {
+    flex: 1;
+  }
+  .opt {
+    font: inherit;
+    font-weight: 800;
+    font-size: 15px;
+    min-width: 44px;
+    height: 40px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    border-bottom: 4px solid var(--line);
+    background: var(--seg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .opt.good {
+    border-bottom-color: #2e9e57;
+  }
+  .opt.bad {
+    border-bottom-color: var(--warn-dot);
+  }
+  .opt[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .opt.add {
+    border-style: dashed;
+    color: var(--accent);
+  }
+  .optact {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    height: 40px;
+    min-width: 40px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .optact[aria-pressed="true"] {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .fixes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .fixes button {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 40px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--warn-line);
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    cursor: pointer;
+  }
+  .nofix {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--warn-ink);
+    padding: 8px 0;
+  }
+  .stepper {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 6px;
+  }
+  .stepper b {
+    text-align: center;
+  }
+  .stepper button {
+    font: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    height: 44px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--seg);
+    color: var(--ink);
+    cursor: pointer;
+  }
   :global(:root) {
     --bg: #f4f5f7;
     --panel: #ffffff;

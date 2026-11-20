@@ -17,7 +17,6 @@
     type ScoutEvent,
   } from "./ftcscout";
   import {
-    knownAutos,
     loadLibrary,
     loadPlans,
     planFor,
@@ -25,20 +24,18 @@
     savePlan,
     type EventPlans,
     type PartnerLibrary,
+    type PlanOption,
     type PlanRecord,
   } from "./scouting";
-  import type { PartnerRoute } from "./route";
 
   interface Props {
     event: string | null;
     team: number | null;
     match: string | null;
-    /** What the field shows now, as a plan would keep it. */
-    current: {
-      ours: string | null;
-      off: string[];
-      partner: PartnerRoute;
-    };
+    /** The options on the page now, and the one going with, as a plan would keep them. */
+    current: { options: PlanOption[]; chosen: number };
+    /** Every team's known Autos this season (scouting.ts), loaded here for the page. */
+    library: PartnerLibrary | null;
     /** The link already held a look: the first plan loaded does not replace it. */
     keepLinkLook: boolean;
     /** Show a plan on the field (null: none saved, start a fresh drawing), and the match's alliance. */
@@ -47,8 +44,6 @@
       alliance: "red" | "blue" | null,
     ) => void;
     autoName: (file: string) => string;
-    /** Put one of the team's known Autos on the field. */
-    onPickRoute: (route: PartnerRoute) => void;
   }
   let {
     event = $bindable(),
@@ -58,15 +53,13 @@
     keepLinkLook,
     onApply,
     autoName,
-    onPickRoute,
+    library = $bindable(),
   }: Props = $props();
 
   const season = seasonOf(new Date());
   let events = $state.raw<ScoutEvent[]>([]);
   let info = $state.raw<EventInfo | null>(null);
   let plans = $state.raw<EventPlans | null>(null);
-  /** Every team's known Autos this season (scouting.ts). */
-  let library = $state.raw<PartnerLibrary | null>(null);
   let error = $state<string | null>(null);
   let loading = $state(false);
   let notes = $state("");
@@ -92,10 +85,10 @@
     JSON.stringify(a) === JSON.stringify(b);
   const dirty = $derived(
     !record
-      ? current.partner !== null || notes.trim() !== ""
-      : !same(record.partner, current.partner) ||
-          record.ours !== current.ours ||
-          !same([...record.off].sort(), [...current.off].sort()) ||
+      ? notes.trim() !== "" ||
+          current.options.some((o) => o.ours !== null || o.partner.steps.length)
+      : !same(record.options, current.options) ||
+          record.chosen !== current.chosen ||
           record.notes !== notes,
   );
 
@@ -199,9 +192,8 @@
         {
           team,
           match: forMatch ? match : null,
-          ours: current.ours,
-          off: current.off,
-          partner: current.partner,
+          options: current.options,
+          chosen: current.chosen,
           notes: notes.trim(),
         },
         info.event.name,
@@ -347,28 +339,15 @@
         {#if record}
           {record.match ? `Plan for ${record.match} only` : "Plan"} saved{record.savedBy
             ? ` by ${record.savedBy}`
-            : ""}{record.savedAt ? `, ${when(record.savedAt)}` : ""}{record.ours
-            ? `. We run ${autoName(record.ours)}`
+            : ""}{record.savedAt ? `, ${when(record.savedAt)}` : ""}{record
+            .options[record.chosen]?.ours
+            ? `. We run ${autoName(record.options[record.chosen].ours!)}`
             : ""}.
         {:else}
-          No plan yet. Set their Auto under Partner below (start from a
-          stand-in, move its spots, set its times), then save.
+          No plan yet.
         {/if}
         {#if dirty}<span class="unsaved">Not saved</span>{/if}
       </p>
-      {#if knownAutos(library, team).length}
-        <div class="known" role="group" aria-label="Their known Autos">
-          <span>Their Autos</span>
-          {#each knownAutos(library, team) as known (known.route.name)}
-            <button
-              type="button"
-              aria-pressed={current.partner.name === known.route.name}
-              onclick={() => onPickRoute(known.route)}
-              >{known.route.name}</button
-            >
-          {/each}
-        </div>
-      {/if}
       <label class="field notes">
         <span>Notes</span>
         <textarea
@@ -383,7 +362,7 @@
           <button
             type="button"
             class="btn primary"
-            disabled={saving || !current.partner}
+            disabled={saving}
             onclick={() => save(false)}
             >{saving ? "Saving…" : `Save for ${team}`}</button
           >
@@ -391,7 +370,7 @@
             <button
               type="button"
               class="btn"
-              disabled={saving || !current.partner}
+              disabled={saving}
               onclick={() => save(true)}>Save for {match} only</button
             >
           {/if}
@@ -602,36 +581,6 @@
     background: var(--seg);
     color: var(--ink);
     cursor: pointer;
-  }
-  .known {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
-  .known > span {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--muted);
-    margin-right: 4px;
-  }
-  .known button {
-    font: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    min-height: 44px;
-    min-width: 3em;
-    padding: 6px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: var(--seg);
-    color: var(--ink);
-    cursor: pointer;
-  }
-  .known button[aria-pressed="true"] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-ink);
   }
   .btn.primary {
     background: var(--accent);

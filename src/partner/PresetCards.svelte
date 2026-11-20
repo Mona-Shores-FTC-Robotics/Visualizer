@@ -1,16 +1,25 @@
 <script lang="ts">
   /**
-   * The page's stand-ins as pictures: the field with our route, faint, and each stand-in's route
-   * over it, so a partner can point at the one that looks like theirs.
+   * The partner's possible Autos as pictures: the team's own known ones first, then the page's
+   * stand-ins; each the field with its route (and ours, faint, once picked), so a partner can point
+   * at the one that looks like theirs.
    */
   import type { BasePoint } from "../types";
   import { OUR_COLOR, PARTNER_COLOR } from "./beside";
   import { drawField } from "./field";
-  import type { PartnerRoute } from "./route";
+  import { routePath, type PartnerRoute } from "./route";
+
+  export interface Card {
+    key: string;
+    label: string;
+    route: PartnerRoute;
+    /** One of the team's own Autos, not a stand-in. */
+    theirs: boolean;
+  }
 
   interface Props {
-    presets: PartnerRoute[];
-    /** The stand-in picked, by name. */
+    cards: Card[];
+    /** The card picked, by key. */
     selected: string | null;
     /** Our robot's route, drawn faint on every card. */
     ours: BasePoint[] | null;
@@ -18,16 +27,10 @@
     image: HTMLImageElement | null;
     /** Bumps when the field image loads, so the cards draw it. */
     imageTick: number;
-    onPick: (route: PartnerRoute) => void;
+    onPick: (card: Card) => void;
   }
-  let { presets, selected, ours, blue, image, imageTick, onPick }: Props =
+  let { cards, selected, ours, blue, image, imageTick, onPick }: Props =
     $props();
-
-  /** A stand-in's route on the field: its start, then each spot it drives to. */
-  const path = (route: PartnerRoute): BasePoint[] => [
-    route.start,
-    ...route.steps.flatMap((s) => (s.kind === "drive" ? [s.to] : [])),
-  ];
 
   function draw(canvas: HTMLCanvasElement, route: PartnerRoute) {
     const paint = () => {
@@ -43,7 +46,7 @@
         robots: [],
         previews: [],
         colors: [OUR_COLOR + "88", PARTNER_COLOR],
-        routes: [ours ?? [], path(route)],
+        routes: [ours ?? [], routePath(route)],
         t: 0,
         contact: null,
         blue,
@@ -60,16 +63,17 @@
   }
 </script>
 
-<div class="cards" role="group" aria-label="Stand-ins">
-  {#each presets as route (route.name)}
+<div class="cards" role="group" aria-label="Their Autos">
+  {#each cards as card (card.key)}
     <button
       type="button"
       class="card"
-      aria-pressed={selected === route.name}
-      onclick={() => onPick(route)}
+      class:theirs={card.theirs}
+      aria-pressed={selected === card.key}
+      onclick={() => onPick(card)}
     >
-      <canvas use:draw={route} aria-hidden="true"></canvas>
-      <span>{route.name}</span>
+      <canvas use:draw={card.route} aria-hidden="true"></canvas>
+      <span>{card.label}</span>
     </button>
   {/each}
 </div>
@@ -92,6 +96,9 @@
     cursor: pointer;
     text-align: left;
     min-width: 0;
+  }
+  .card.theirs {
+    border-color: #4ecdc4;
   }
   .card[aria-pressed="true"] {
     border-color: var(--accent);
