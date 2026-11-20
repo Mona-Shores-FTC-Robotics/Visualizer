@@ -16,6 +16,13 @@ type ProfileLimits = Pick<
   | "maxDeceleration"
 >;
 
+/** The speed the profile cruises at, in/s (see {@link motionProfile}). */
+export function cruiseSpeed(limits: ProfileLimits): number {
+  return limits.maxVelocity && limits.maxVelocity > 0
+    ? limits.maxVelocity
+    : (limits.forwardVelocity + limits.strafeVelocity) / 2;
+}
+
 /**
  * A trapezoidal velocity profile over `distance` inches, or a triangular one
  * when the distance is too short to reach full speed. Full speed is the
@@ -30,10 +37,7 @@ export function motionProfile(
 ): MotionProfile {
   if (distance <= 0) return { duration: 0, distanceAt: () => 0 };
 
-  const maxVelocity =
-    limits.maxVelocity && limits.maxVelocity > 0
-      ? limits.maxVelocity
-      : (limits.forwardVelocity + limits.strafeVelocity) / 2;
+  const maxVelocity = cruiseSpeed(limits);
   const acceleration = limits.maxAcceleration;
   const deceleration = limits.maxDeceleration || acceleration;
   if (!(acceleration > 0 && deceleration > 0)) {
@@ -104,8 +108,12 @@ export function timeAtDistance(
 
 /**
  * Fork: a run's timing when the robot cannot turn fast enough to hold the heading the path
- * asks for. The trapezoid times the driving; wherever the heading changes faster than
- * `aVelocity` (rad/s) allows, that stretch takes as long as the turn. Without this the preview
+ * asks for. The trapezoid times the driving; and a mecanum drive's wheels do both jobs, so a
+ * stretch `ds` long that turns `dθ` takes at least `ds / maxSpeed + dθ / aVelocity` (driving at
+ * `v` while turning at `w` needs `v / maxSpeed + w / aVelocity <= 1`; biobuzz AutoSim's
+ * TURN_SHARE_RAD_PER_S, fit to the Belding logs: a 90 in curve that turns 270° on the way was
+ * driven at 20 to 30 in/s, 3.6 to 4.6 s, not at full speed). `maxSpeed` 0 (unknown): the turn
+ * alone, `dθ / aVelocity`. Without this the preview
  * spins the robot through a piecewise or tight linear turn at any speed (25 Oct 2026: the robot
  * took 1.17 s for R-Quals' FAR_FLOWER to N_FIRE, a 180° turn in 15.5 in; the drive alone
  * previews at 0.78 s). Null when turning never limits the run.
@@ -115,6 +123,7 @@ export function turnLimitedTimes(
   totalLength: number,
   headingAt: (distance: number) => number,
   aVelocity: number,
+  maxSpeed = 0,
 ): { distances: number[]; times: number[] } | null {
   if (!(totalLength > 0) || !(aVelocity > 0)) return null;
   // A coarse look first: a path whose heading barely changes (most of them) costs 9 samples.
@@ -138,11 +147,17 @@ export function turnLimitedTimes(
   for (let i = 0; i <= steps; i++)
     headings.push(headingAt((totalLength * i) / steps));
   const fastest = totalLength / steps / peakSpeed(profile, totalLength);
-  const turnOf = (i: number) =>
+  const turnOnly = (i: number) =>
     (Math.abs(((((headings[i] - headings[i - 1]) % 360) + 540) % 360) - 180) *
       Math.PI) /
     180 /
     aVelocity;
+  // The least time a step takes for its turn, with the wheels shared with its driving.
+  const share = maxSpeed > 0 ? totalLength / steps / maxSpeed : 0;
+  const turnOf = (i: number) => {
+    const turn = turnOnly(i);
+    return turn > 0 ? share + turn : 0;
+  };
   let anyLimited = false;
   for (let i = 1; i <= steps && !anyLimited; i++)
     anyLimited = turnOf(i) > fastest;

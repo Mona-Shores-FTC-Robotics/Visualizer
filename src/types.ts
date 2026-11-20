@@ -116,6 +116,14 @@ export interface Settings {
   forwardVelocity: number; // inches/sec
   strafeVelocity: number; // inches/sec
   aVelocity: number;
+  /**
+   * Fork, the preview only (never saved, never exported): with it, driving and turning share the
+   * wheels (`v / maxSpeed + w / turnShareRadPerS <= 1`), as biobuzz's Java simulator drives
+   * (timing/simDrive.ts). The export and the endgame guard keep the drawing's timing.
+   */
+  turnShareRadPerS?: number;
+  /** Fork, the preview only: how fast the robot turns in place between paths, rad/s. */
+  maxTurnRadPerS?: number;
   kFriction: number;
   rLength: number; // inches along the heading
   rWidth: number; // inches side to side
