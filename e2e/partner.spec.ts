@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 // Fork: the "Beside a partner" page (partner.html), on a phone, with biobuzz master's files served
-// from test/fixtures/partner instead of GitHub.
+// from test/fixtures/partner instead of GitHub, and FTCScout's answers recorded there too.
 
 const FIXTURES = `${import.meta.dirname}/../test/fixtures/partner`;
 const AUTOS = ["r-solo.pp"];
@@ -13,6 +13,16 @@ const PARTNERS = [
 ];
 
 async function serveBiobuzz(page: Page) {
+  await page.route("https://api.ftcscout.org/graphql", (route) => {
+    const body = route.request().postDataJSON();
+    const file = body.query.includes("teamByNumber")
+      ? "events"
+      : body.variables.code;
+    return route.fulfill({
+      contentType: "application/json",
+      body: readFileSync(`${FIXTURES}/ftcscout/${file}.json`, "utf8"),
+    });
+  });
   await page.route("https://api.github.com/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     const names = path.endsWith("/partners") ? PARTNERS : AUTOS;
@@ -40,8 +50,9 @@ test("runs our Auto beside a stand-in and says whether they touch", async ({
   await page.goto("/partner.html");
   // A first visit: R-Solo beside the stand-in that stays out of the way.
   await expect(page.locator(".tile").first()).toContainText("None");
+  // The link names them (after the event the match menu opened on, whichever it is today).
   await expect(page).toHaveURL(
-    /#ours=r-solo\.pp&partner=partners\/partner-still\.pp/,
+    /[#&]ours=r-solo\.pp&partner=partners\/partner-still\.pp/,
   );
 
   await page.getByRole("button", { name: "L tip park" }).click();
