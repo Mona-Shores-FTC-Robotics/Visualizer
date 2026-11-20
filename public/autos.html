@@ -138,15 +138,16 @@ section > h2{margin:0;font-size:20px}
 .group h4{margin:0;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
 .group h4 .key{display:inline-block;width:22px;height:4px;border-radius:2px}
 .group h4 small{font-weight:600;letter-spacing:0;text-transform:none}
-.beside{margin:12px 0 0;color:var(--muted);font-size:14px}
-.beside a{color:var(--accent);font-weight:700;text-decoration:none}
-.beside a:hover{text-decoration:underline}
+.toplink{display:flex;justify-content:flex-end;margin:-12px 0 10px}
+.toplink a{color:var(--accent);font-weight:700;font-size:14px;text-decoration:none;padding:6px 0}
+.toplink a:hover{text-decoration:underline}
 .ds{flex-basis:100%;margin:0;color:var(--muted);font-size:12px;font-style:italic}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header class="brand">
+  <div class="toplink"><a href="partner.html">Auto Match Planning</a></div>
   <img class="logo" src="autos/mona-shores-logo.svg" alt="Mona Shores Ultraviolet 20245 and Infrared 19429" width="439" height="113">
   <div class="titlebar">
     <h1>Auto Strategy</h1>
@@ -154,7 +155,6 @@ section > h2{margin:0;font-size:20px}
       <div class="seg"><button type="button" data-alliance="red" aria-pressed="true">Red</button><button type="button" data-alliance="blue" aria-pressed="false">Blue</button></div>
     </div>
   </div>
-  <p class="beside"><a href="partner.html">Auto Match Planning →</a> plan each match with your partner: their Auto beside ours, saved for the team.</p>
   <nav class="jump" id="jump" aria-label="Jump to an Auto"></nav>
 </header>
 
