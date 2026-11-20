@@ -23,7 +23,7 @@
 //
 // Run with the dev server up:   pnpm dev --port 5179 &   node scripts/make-auto-gifs.mjs
 // It reads the app through window.__visualizer, which App.svelte sets on the dev server only.
-// Needs Playwright and ffmpeg. Options: --base URL  --only lane,r-solo  --fps 10  --speed 3  --width 480
+// Needs Playwright and ffmpeg. Options: --base URL  --only lane,r-solo  --fps 30  --speed 3  --width 480
 // --keep-gifs (rewrite the manifest; capture only the GIFs that are missing)
 import { execFileSync } from "node:child_process";
 import {
@@ -85,18 +85,21 @@ const arg = (name, fallback) => {
   return i > 0 ? process.argv[i + 1] : fallback;
 };
 const BASE = arg("base", "http://localhost:5179/");
-const FPS = Number(arg("fps", "10"));
+// 30 frames a second at 3×: one frame per 0.1 s of match, so the page's real-time speed (a third)
+// still plays 10 frames a second. The GIF fallback keeps 10 frames a second.
+const FPS = Number(arg("fps", "30"));
+const GIF_FPS = Math.min(FPS, 10);
 const SPEED = Number(arg("speed", "3"));
 const WIDTH = Number(arg("width", "720"));
 // --keep-gifs: rewrite the manifest, and capture only GIFs that are not there yet.
 const KEEP_GIFS = process.argv.includes("--keep-gifs");
 const ONLY = arg("only", "")?.split(",").filter(Boolean);
+const OUT = new URL("../public/autos/", import.meta.url).pathname;
+mkdirSync(OUT, { recursive: true });
 // Each animation is also an H.264 MP4 beside its GIF (same frames and clock): the page plays the
 // MP4, which pauses, seeks and slows, and falls back to the GIF. --mp4 DIR writes them elsewhere.
 const MP4_DIR = arg("mp4", OUT);
 mkdirSync(MP4_DIR, { recursive: true });
-const OUT = new URL("../public/autos/", import.meta.url).pathname;
-mkdirSync(OUT, { recursive: true });
 
 /** "CROSS AND FIX IT" → "Cross & fix"; "WALL_FLOWER" → "Wall flower". */
 const pretty = (s) => {
@@ -582,7 +585,7 @@ async function capture(page, card, look, hide, targets) {
       "-i",
       join(dir, "f%04d.png"),
       "-vf",
-      `${turn}${clockFilter(step, box.width, alliance)},tpad=stop_mode=clone:stop_duration=1.2,` +
+      `${turn}${clockFilter(step, box.width, alliance)},fps=${GIF_FPS},tpad=stop_mode=clone:stop_duration=1.2,` +
         `scale=${WIDTH}:-1:flags=lanczos,split[a][b];` +
         "[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
       "-loop",
