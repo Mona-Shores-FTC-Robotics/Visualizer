@@ -8,8 +8,7 @@
 <style>
 /* Every biobuzz Auto on master, as an animation with its switches: flip a TIP or an INIT choice
    and the animation shows that match. The cards, switches and GIFs come from
-   autos/manifest.json, written by scripts/make-auto-gifs.mjs; the partners list is
-   read live from GitHub. */
+   autos/manifest.json, written by scripts/make-auto-gifs.mjs. */
 :root{
   --bg:#f4f5f7; --panel:#ffffff; --ink:#15181d; --muted:#5d6470; --line:#dcdfe5;
   --accent:#2f6fde; --accent-ink:#ffffff; --seg:#eceff4; --seg-on:#ffffff; --seg-on-ink:#15181d;
@@ -110,11 +109,7 @@ section > h2{margin:0;font-size:20px}
 .btn.primary{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn:hover{border-color:var(--accent)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.list{display:flex;flex-wrap:wrap;gap:6px}
-.list a{padding:5px 10px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-family:var(--mono);font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.list a:hover{border-color:var(--accent)}
 .note{color:var(--muted);font-size:13px}
-.lead{margin:-8px 0 0;color:var(--muted);font-size:14px}
 .brand{display:block}
 .brand .logo{display:block;width:min(100%,420px);height:auto;background:#fff;border-radius:12px;padding:10px 16px;box-sizing:border-box;margin-bottom:12px}
 .brand h1{margin:0;font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
@@ -146,14 +141,6 @@ section > h2{margin:0;font-size:20px}
 
 <section id="pair" aria-label="Pairs"><div class="grid"></div></section>
 <section id="solo" aria-label="Solo Autos"><div class="grid"></div></section>
-
-<section id="partners-section">
-  <h2>Partner stand-ins</h2>
-  <p class="lead">Every file in <code>TeamCode/autos/partners/</code>: what a partner might do, to open beside a solo Auto.</p>
-  <div class="list" id="partners"><span class="note">Loading…</span></div>
-</section>
-
-<p class="note" id="foot">Animations: the Visualizer's preview, played from <code>scripts/make-auto-gifs.mjs</code>. A TIP that misses is its first volley missing; a fix can still TIP it. A red dot marks the pick that makes the robots touch, with the TIPs as set. Blue is the red match turned half a turn about the field's centre.</p>
 </div>
 
 <script>
@@ -332,25 +319,10 @@ fetch("autos/manifest.json").then(r => r.json()).then(m => {
     const short = card.name.replace(/^R-(.+) \+ L-\1$/, "$1");
     jump.insertAdjacentHTML("beforeend", `<a href="#${el.id}">${esc(short)}</a>`);
   }
-  jump.insertAdjacentHTML("beforeend", `<a href="#partners-section">Partners</a>`);
-  document.getElementById("foot").insertAdjacentText("beforeend", ` Made ${m.generated} from ${m.branch}.`);
 }).catch(e => {
   document.querySelector("#pair .grid").innerHTML = `<p class="note">Could not load the animations (${esc(e.message)}).</p>`;
 });
 
-async function list(dir, el) {
-  const box = document.getElementById(el);
-  try {
-    const r = await fetch("https://api.github.com/repos/Mona-Shores-FTC-Robotics/biobuzz/contents/TeamCode/autos/" + dir + "?ref=master");
-    if (!r.ok) throw new Error("GitHub answered " + r.status);
-    const files = (await r.json()).filter(f => f.name.endsWith(".pp")).map(f => f.name).sort();
-    box.innerHTML = files.length ? files.map(n => `<a href="${T(dir + "/" + n)}" title="${dir}/${n}">${esc(n.replace(/\.pp$/, ""))}</a>`).join("")
-      : '<span class="note">None.</span>';
-  } catch (e) {
-    box.innerHTML = `<span class="note">Could not list them from GitHub (${esc(e.message)}). Try again in a minute.</span>`;
-  }
-}
-list("partners", "partners");
 </script>
 </body>
 </html>
