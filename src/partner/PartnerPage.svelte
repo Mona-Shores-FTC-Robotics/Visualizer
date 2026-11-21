@@ -1135,6 +1135,12 @@
       position: sticky;
       top: 12px;
     }
+    /* A tablet on its side: the whole field and its answer fit the screen's height. */
+    .fieldbox {
+      max-width: min(100%, calc(100vh - 150px));
+      max-width: min(100%, calc(100svh - 150px));
+      margin: 0 auto;
+    }
   }
   .stage {
     background: var(--panel);
@@ -1157,9 +1163,10 @@
       box-shadow: 0 6px 10px -8px rgba(0, 0, 0, 0.35);
     }
     .fieldbox {
-      /* vh first, for Chrome before 108 (old tablets), which has no svh. */
-      max-width: min(100%, calc(100vh - 330px));
-      max-width: min(100%, calc(100svh - 330px));
+      /* Under half the screen's height, so the picks below have room on a tablet too.
+         vh first, for Chrome before 108 (old tablets), which has no svh. */
+      max-width: min(100%, 40vh);
+      max-width: min(100%, 40svh);
       margin: 0 auto;
     }
   }
