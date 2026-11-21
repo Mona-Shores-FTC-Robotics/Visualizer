@@ -14,6 +14,8 @@
  * allows about 60 listings an hour per laptop).
  */
 
+import { timeoutSignal } from "../timeoutSignal";
+
 export const TEAM_HASH_PREFIX = "#team=";
 export const TEAM_REPO = "Mona-Shores-FTC-Robotics/biobuzz";
 export const TEAM_DIR = "TeamCode/autos";
@@ -232,7 +234,7 @@ export const fetchText: FetchText = async (url) => {
   try {
     response = await fetch(url, {
       cache: "no-cache",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: timeoutSignal(FETCH_TIMEOUT_MS),
     });
   } catch (error) {
     // A laptop on the robot's Wi-Fi has no internet: the read hangs or fails outright.

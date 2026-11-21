@@ -3,6 +3,8 @@
  * Its GraphQL API allows calls from the Visualizer's own site, so no server is needed. Read only.
  */
 
+import { timeoutSignal } from "../lib/timeoutSignal";
+
 export const OUR_TEAMS = [19429, 20245] as const;
 const GRAPHQL = "https://api.ftcscout.org/graphql";
 const TIMEOUT_MS = 10000;
@@ -55,12 +57,15 @@ async function query<T>(text: string, variables: object): Promise<T> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: text, variables }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: timeoutSignal(TIMEOUT_MS),
     });
   } catch (error) {
-    throw new Error("Could not reach FTCScout. Is this phone online?", {
-      cause: error,
-    });
+    throw new Error(
+      error instanceof DOMException && error.name === "TimeoutError"
+        ? `No answer from FTCScout in ${TIMEOUT_MS / 1000} s. Is this device online?`
+        : `Could not reach FTCScout (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
   }
   if (!response.ok) throw new Error(`FTCScout answered ${response.status}`);
   const body = await response.json();
