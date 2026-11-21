@@ -15,6 +15,7 @@
  */
 
 import { timeoutSignal } from "../timeoutSignal";
+import { readMirror } from "./mirror";
 
 export const TEAM_HASH_PREFIX = "#team=";
 export const TEAM_REPO = "Mona-Shores-FTC-Robotics/biobuzz";
@@ -237,6 +238,10 @@ export const fetchText: FetchText = async (url) => {
       signal: timeoutSignal(FETCH_TIMEOUT_MS),
     });
   } catch (error) {
+    // A device that reaches this site but not GitHub's file server (the pit tablets) reads the
+    // site's own copy.
+    const mirrored = await readMirror(url);
+    if (mirrored !== undefined) return mirrored;
     // A laptop on the robot's Wi-Fi has no internet: the read hangs or fails outright.
     throw new Error(
       error instanceof DOMException && error.name === "TimeoutError"

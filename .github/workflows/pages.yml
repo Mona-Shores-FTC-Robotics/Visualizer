@@ -1,4 +1,5 @@
-# Builds this fork and publishes it with GitHub Pages, on every push to main.
+# Builds this fork and publishes it with GitHub Pages, on every push to main, and every half hour
+# so the site's copy of biobuzz's Autos and scouting plans (scripts/mirror-biobuzz.mjs) stays fresh.
 # One-time setup in the repository: Settings → Pages → Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
@@ -6,6 +7,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: read
@@ -29,6 +32,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      # For devices that reach this site but not GitHub's file server (src/lib/team/mirror.ts).
+      - run: node scripts/mirror-biobuzz.mjs dist/mirror
       # The service worker names its cache after VERSION; a new name per build drops
       # the previous deploy's saved copy (see public/sw.js).
       - name: Stamp the service worker with this commit
