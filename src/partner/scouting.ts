@@ -16,6 +16,7 @@
  * someone else saved in between, it reads again and retries, so nobody's plan is lost. The branch
  * is made from master the first time.
  */
+import { readMirror } from "../lib/team/mirror";
 import {
   branchHeadOrNull,
   commitFiles,
@@ -234,20 +235,31 @@ export function knownAutos(
 
 /** A file on the scouting branch, freshest available; null if it (or the branch) is not there. */
 async function loadText(path: string): Promise<string | null> {
+  const url = `https://raw.githubusercontent.com/${GIT_REPO}/${SCOUTING_BRANCH}/${path}`;
   const token = savedToken();
   if (token) {
-    return readText(token, path, SCOUTING_BRANCH).catch((error) => {
+    return readText(token, path, SCOUTING_BRANCH).catch(async (error) => {
       if (error instanceof GitHubError && error.status === 404) return null;
+      if (!(error instanceof GitHubError)) {
+        const mirrored = await readMirror(url, true);
+        if (mirrored !== undefined) return mirrored;
+      }
       throw error;
     });
   }
-  const url = `https://raw.githubusercontent.com/${GIT_REPO}/${SCOUTING_BRANCH}/${path}`;
-  const response = await fetch(url, { cache: "no-cache" }).catch((error) => {
+  let response: Response;
+  try {
+    response = await fetch(url, { cache: "no-cache" });
+  } catch (error) {
+    // A device that reaches this site but not GitHub's file server (the pit tablets) reads the
+    // site's own copy, up to half an hour old.
+    const mirrored = await readMirror(url, true);
+    if (mirrored !== undefined) return mirrored;
     throw new Error(
       `Could not reach GitHub (${error instanceof Error ? error.message : String(error)})`,
       { cause: error },
     );
-  });
+  }
   if (response.ok) return response.text();
   if (response.status === 404) return null;
   throw new Error(`GitHub answered ${response.status}`);

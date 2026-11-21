@@ -185,3 +185,42 @@ test("options: a second one to compare, marked as the one we go with", async ({
   await fix.click();
   await expect(page.locator(".tile").first()).toContainText("None");
 });
+
+test("a tablet that cannot reach GitHub's file server reads our Autos from the site's copy", async ({
+  page,
+}) => {
+  await page.route("https://api.ftcscout.org/graphql", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: readFileSync(`${FIXTURES}/ftcscout/events.json`, "utf8"),
+    }),
+  );
+  // The pit tablets: GitHub fails outright, as an untrusted certificate does.
+  await page.route("https://api.github.com/**", (route) => route.abort());
+  await page.route("https://raw.githubusercontent.com/**", (route) =>
+    route.abort(),
+  );
+  // The copy the Pages workflow writes (scripts/mirror-biobuzz.mjs).
+  await page.route("**/mirror/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/master/TeamCode/autos/contents.json"))
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(AUTOS.map((name) => ({ name, type: "file" }))),
+      });
+    const name = path.split("/").pop()!;
+    if (path.includes("/master/TeamCode/autos/") && AUTOS.includes(name))
+      return route.fulfill({
+        body: readFileSync(`${FIXTURES}/${name}`, "utf8"),
+      });
+    return route.fulfill({ status: 404, body: "" });
+  });
+  await page.goto("/partner.html");
+  await page
+    .getByRole("group", { name: "Their Autos" })
+    .getByRole("button", { name: "L: shoot, park" })
+    .click();
+  await page.getByRole("button", { name: /^R-Solo/ }).click();
+  await expect(page.locator(".tile").first()).toContainText(/Contact/);
+  await expect(page.getByText(/Could not reach GitHub/)).toHaveCount(0);
+});

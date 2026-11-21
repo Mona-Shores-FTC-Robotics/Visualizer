@@ -33,7 +33,12 @@ const APP_STATIC_RESOURCES = [
 
 /** The app's own code and pages: these must never be served stale when online. */
 function isAppCode(url) {
-  return /\.(js|css|html|webmanifest|pp)$/.test(url.pathname) || url.pathname.endsWith("/");
+  // mirror/: the site's copy of biobuzz's Autos and plans (src/lib/team/mirror.ts), never stale online.
+  return (
+    /\.(js|css|html|webmanifest|pp)$/.test(url.pathname) ||
+    url.pathname.endsWith("/") ||
+    url.pathname.includes("/mirror/")
+  );
 }
 
 self.addEventListener("install", (event) => {
