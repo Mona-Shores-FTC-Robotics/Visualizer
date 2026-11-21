@@ -42,10 +42,10 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    // Fork: old Android tablets in the pits run Chrome 95 (Android 5) or 106 (Android 6), so
+    // Fork: the pit tablets (Alcatel 9007T, Android 5.1.1) run Chrome 95 at best, older if never updated, so
     // syntax and CSS are written down for them; APIs they lack are in src/lib/oldBrowsers.ts.
-    target: ["chrome95", "safari15", "firefox91"],
-    cssTarget: ["chrome95", "safari15", "firefox91"],
+    target: ["chrome85", "safari14", "firefox90"],
+    cssTarget: ["chrome85", "safari14", "firefox90"],
     // Fork: partner.html is a page of its own (src/partner), beside the app.
     rollupOptions: {
       input: {
