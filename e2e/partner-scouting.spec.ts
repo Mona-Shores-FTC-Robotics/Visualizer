@@ -232,3 +232,24 @@ test("before the schedule: pick a team, set their Auto from a stand-in, name it,
       .getByRole("button", { name: "11228 · X" }),
   ).toHaveAttribute("aria-pressed", "true");
 });
+
+test("an old Android tablet, without AbortSignal.timeout or structuredClone, still gets the match menu", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    // Chrome before 103 (and Safari before 16) has neither.
+    delete (AbortSignal as { timeout?: unknown }).timeout;
+    delete (globalThis as { structuredClone?: unknown }).structuredClone;
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await serve(page);
+  await page.goto("/partner.html#event=USMIBEQ");
+  const q1 = page.getByRole("button", { name: /^Q1\b/ });
+  await expect(q1).toBeVisible();
+  await q1.click();
+  await expect(page.getByText(/Plan saved by pit-scout/)).toBeVisible();
+  await page.getByRole("button", { name: "Another option" }).click();
+  await expect(page.getByText(/Could not reach FTCScout/)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

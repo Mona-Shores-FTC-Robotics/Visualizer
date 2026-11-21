@@ -280,7 +280,7 @@
   );
   function addOption() {
     if (options.length >= MAX_OPTIONS) return;
-    options = [...options, structuredClone($state.snapshot(option))];
+    options = [...options, $state.snapshot(option)];
     active = options.length - 1;
   }
   function removeOption() {
