@@ -1157,6 +1157,8 @@
       box-shadow: 0 6px 10px -8px rgba(0, 0, 0, 0.35);
     }
     .fieldbox {
+      /* vh first, for Chrome before 108 (old tablets), which has no svh. */
+      max-width: min(100%, calc(100vh - 330px));
       max-width: min(100%, calc(100svh - 330px));
       margin: 0 auto;
     }
