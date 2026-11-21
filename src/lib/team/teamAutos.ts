@@ -241,7 +241,7 @@ export const fetchText: FetchText = async (url) => {
     throw new Error(
       error instanceof DOMException && error.name === "TimeoutError"
         ? `No answer from GitHub in ${FETCH_TIMEOUT_MS / 1000} s. Is this laptop on the robot's Wi-Fi?`
-        : "Could not reach GitHub. Is this laptop on the robot's Wi-Fi?",
+        : `Could not reach GitHub (${error instanceof Error ? error.message : String(error)}). Is this laptop on the robot's Wi-Fi?`,
       { cause: error },
     );
   }

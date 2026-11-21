@@ -243,9 +243,10 @@ async function loadText(path: string): Promise<string | null> {
   }
   const url = `https://raw.githubusercontent.com/${GIT_REPO}/${SCOUTING_BRANCH}/${path}`;
   const response = await fetch(url, { cache: "no-cache" }).catch((error) => {
-    throw new Error("Could not reach GitHub. Is this phone online?", {
-      cause: error,
-    });
+    throw new Error(
+      `Could not reach GitHub (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
   });
   if (response.ok) return response.text();
   if (response.status === 404) return null;
