@@ -8,7 +8,7 @@ import { encodeRoute } from "../src/partner/route";
 // partner is one of the page's stand-ins, edited as steps.
 
 const FIXTURES = `${import.meta.dirname}/../test/fixtures/partner`;
-const AUTOS = ["r-solo.pp"];
+const AUTOS = ["r-solo.pp", "l-no-cross.pp"];
 
 async function serveBiobuzz(page: Page) {
   // FTCScout's answers were recorded on 20 Nov 2026: the page picks the event by today's date.
@@ -288,5 +288,40 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
     "aria-pressed",
     "true",
   );
+  expect(errors).toEqual([]);
+});
+
+test("FIX IT: their TIP 1 misses and L-NoCross crosses into them; the page says so and what avoids it", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await serveBiobuzz(page);
+  await page.goto("/partner.html");
+  await page
+    .getByRole("group", { name: "Their Autos" })
+    .getByRole("button", { name: "R: shoot, FLOWER, shoot, park" })
+    .click();
+  await page.getByRole("button", { name: /^L-NoCross/i }).click();
+  // As planned their TIP 1 lands: no contact.
+  await expect(page.locator(".tile").first()).toContainText("None");
+  const fixit = page.locator(".fixit");
+  await expect(fixit).toContainText("if their TIP 1 misses");
+  await expect(fixit).toHaveClass(/bad/);
+  const hits = fixit.getByRole("button", { name: /^Hits them at \d+\.\d s$/ });
+  await expect(hits).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "we wait for partner fix" }),
+  ).toBeVisible();
+
+  // Shown on the field: TIP 1 set to miss, the contact in the tiles.
+  await hits.click();
+  await expect(page.locator(".tile").first()).toContainText(/\d+\.\d s/);
+  await expect(fixit).toContainText("Shown: hits them");
+
+  // Waiting for their fix instead: FIX IT is off, and says where it would have hit.
+  await page.getByRole("button", { name: "we wait for partner fix" }).click();
+  await expect(fixit).toContainText("Off: WAIT FOR PARTNER FIX");
+  await expect(fixit).toContainText(/would hit at \d+\.\d s/);
   expect(errors).toEqual([]);
 });

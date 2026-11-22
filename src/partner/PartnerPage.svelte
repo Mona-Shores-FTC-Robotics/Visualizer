@@ -13,6 +13,8 @@
   import type { TimingValues } from "../lib/timing/model";
   import {
     contactOnly,
+    CROSSES,
+    fixItLook,
     initWait,
     OUR_COLOR,
     PARTNER_COLOR,
@@ -20,6 +22,7 @@
     routeChoices,
     runBeside,
     smallestFix,
+    waitLegs,
     withInitWait,
     type BesideResult,
     type Robot,
@@ -333,6 +336,105 @@
         : null;
     return { them, us, now };
   });
+
+  // ---- FIX IT: their TIP misses, and we cross to their end to fix it ----
+  /** The look where our FIX IT runs, or null when our Auto has no crossing leg. */
+  const fixLook = $derived(
+    paired && result ? fixItLook(look, choices, result.toggles) : null,
+  );
+  /** Their TIPs whose first try misses in that look. */
+  const fixTips = $derived(
+    (result?.toggles ?? []).filter((t) => t.robot === 1).map((t) => t.tip),
+  );
+  const sameLook = (a: typeof look, b: typeof look) =>
+    JSON.stringify(Object.entries(a.choices).sort()) ===
+      JSON.stringify(Object.entries(b.choices).sort()) &&
+    JSON.stringify(Object.entries(a.tips).sort()) ===
+      JSON.stringify(Object.entries(b.tips).sort());
+  /** The legs our Auto takes now at its crossing choices; FIX IT is off when none crosses. */
+  const legsNow = $derived(
+    choices
+      .filter((c) => c.legs.some((l) => CROSSES.test(l)))
+      .map((c) => c.legs[look.choices[c.condition] === false ? 1 : 0]),
+  );
+  const fixOff = $derived(
+    legsNow.length > 0 && !legsNow.some((l) => CROSSES.test(l)),
+  );
+  /** The page is showing the FIX IT look already: its answer is the tiles above. */
+  const fixShown = $derived(fixLook !== null && sameLook(look, fixLook));
+  const fixRun = $derived.by((): BesideResult | null => {
+    if (!fixLook || fixShown || dragging !== null) return null;
+    if (!oursRobot || !partnerRobot || !values) return null;
+    try {
+      return runBeside(oursRobot, partnerRobot, fixLook, values, true, false);
+    } catch (error) {
+      console.error("Could not preview FIX IT:", error);
+      return null;
+    }
+  });
+  /** Where FIX IT touches them: in the tiles when it is shown, else in its own run. */
+  const fixContact = $derived(fixShown ? contact : (fixRun?.contact ?? null));
+  /** What keeps FIX IT clear of them: their delay, our wait, or our other leg. */
+  const fixItFixes = $derived.by(() => {
+    if (fixOff || !fixContact || !fixLook || !values || !oursRobot || !oursBase)
+      return null;
+    const v = values;
+    const fl = fixLook;
+    const legs = waitLegs(choices);
+    const waitLeg = choices
+      .filter((c) => c.condition in legs)
+      .map((c) => c.legs[legs[c.condition] ? 0 : 1]);
+    // Shown: the delays are the tiles' own fixes below; only the other leg is FIX IT's.
+    if (fixShown) return { them: null, us: null, now: null, legs, waitLeg };
+    const them = smallestFix(
+      (extra) =>
+        contactOnly(
+          oursRobot,
+          routeRobot({ ...partner, delayS: partner.delayS + extra }, v),
+          fl,
+          v,
+        ) !== null,
+      6,
+    );
+    const now = option.ourWaitS ?? oursWait?.s ?? null;
+    const us =
+      oursWait && partnerRobot && now !== null
+        ? smallestFix(
+            (extra) =>
+              now + extra > 29 ||
+              contactOnly(
+                withInitWait(oursBase, now + extra),
+                partnerRobot,
+                fl,
+                v,
+              ) !== null,
+            8,
+          )
+        : null;
+    return { them, us, now, legs, waitLeg };
+  });
+  /** Shows the FIX IT look on the field: their TIP missing, our crossing leg picked. */
+  function showFix() {
+    if (!fixLook) return;
+    playing = false;
+    miss = Object.entries(fixLook.tips)
+      .filter(([, lands]) => !lands)
+      .map(([n]) => Number(n));
+    patch({
+      off: Object.entries(fixLook.choices)
+        .filter(([, yes]) => !yes)
+        .map(([c]) => c),
+    });
+    t = fixRun?.contact?.t ?? 0;
+  }
+  /** Picks the leg that waits instead of crossing. */
+  function pickWaitLeg(legs: Record<string, boolean>) {
+    const keep = off.filter((c) => !(c in legs));
+    const add = Object.entries(legs)
+      .filter(([, yes]) => !yes)
+      .map(([c]) => c);
+    patch({ off: [...keep, ...add] });
+  }
 
   // ---- Their Autos to pick from: the team's own, then the stand-ins ----
   const cards = $derived.by((): Card[] => [
@@ -853,6 +955,74 @@
               <small>TIPs</small><b>{result.tipsInAuto.length}</b>
             </div>
           </div>
+          {#if fixLook}
+            <div
+              class="fixit"
+              class:good={!fixOff &&
+                (fixShown ? !contact : fixRun && !fixRun.contact)}
+              class:bad={!fixOff && (fixShown ? !!contact : !!fixRun?.contact)}
+            >
+              <span class="what"
+                ><b>FIX IT</b>
+                <small
+                  >{fixTips.length
+                    ? `if their TIP ${fixTips.join(", ")} misses`
+                    : "if no TIP comes from them"}</small
+                ></span
+              >
+              {#if fixOff}
+                <span class="answer off"
+                  >Off: {legsNow.join(", ")}{#if fixRun?.contact}<small
+                      >would hit at {fmt(fixRun.contact.t)}</small
+                    >{/if}</span
+                >
+              {:else if fixShown}
+                <span class="answer"
+                  >{contact ? "Shown: hits them" : "Shown: safe"}</span
+                >
+              {:else if fixRun?.contact}
+                <button type="button" class="answer" onclick={showFix}
+                  >Hits them at {fmt(fixRun.contact.t)}</button
+                >
+              {:else if fixRun}
+                <button type="button" class="answer" onclick={showFix}
+                  >Safe</button
+                >
+              {/if}
+            </div>
+            {#if fixItFixes}
+              <div class="fixes fixitfixes">
+                <span class="clear">Clear if</span>
+                {#if fixItFixes.them !== null}
+                  <button
+                    type="button"
+                    onclick={() =>
+                      patch({
+                        partner: {
+                          ...partner,
+                          delayS: partner.delayS + fixItFixes!.them!,
+                        },
+                      })}>they wait +{fmt(fixItFixes.them)}</button
+                  >
+                {/if}
+                {#if fixItFixes.us !== null && fixItFixes.now !== null}
+                  <button
+                    type="button"
+                    onclick={() =>
+                      patch({ ourWaitS: fixItFixes!.now! + fixItFixes!.us! })}
+                    >our wait {fmt(fixItFixes.now + fixItFixes.us)}</button
+                  >
+                {/if}
+                {#if fixItFixes.waitLeg.length}
+                  <button
+                    type="button"
+                    onclick={() => pickWaitLeg(fixItFixes!.legs)}
+                    >we {fixItFixes.waitLeg.join(", ").toLowerCase()}</button
+                  >
+                {/if}
+              </div>
+            {/if}
+          {/if}
           {#if fixes}
             <div class="fixes">
               {#if fixes.them !== null}
@@ -1172,6 +1342,73 @@
   .optact[aria-pressed="true"] {
     color: var(--accent);
     border-color: var(--accent);
+  }
+  .fixit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 10px 8px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--seg);
+  }
+  .fixit .what {
+    display: grid;
+    line-height: 1.2;
+  }
+  .fixit .what small {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .fixitfixes {
+    align-items: center;
+    margin: -2px 10px 8px;
+  }
+  .fixitfixes .clear {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .fixitfixes button {
+    min-height: 36px;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .fixit .answer {
+    white-space: nowrap;
+    font: inherit;
+    font-weight: 800;
+    font-size: 17px;
+    border: 0;
+    background: none;
+    color: inherit;
+    padding: 6px 0;
+    cursor: pointer;
+    text-align: right;
+  }
+  .fixit .answer.off {
+    font-size: 14px;
+    display: grid;
+    cursor: default;
+  }
+  .fixit .answer.off small {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .fixit.good {
+    border-color: #2e9e57;
+  }
+  .fixit.good .answer {
+    color: #2e9e57;
+  }
+  .fixit.bad {
+    border-color: var(--warn-dot);
+  }
+  .fixit.bad .answer {
+    color: var(--warn-dot);
+    text-decoration: underline;
   }
   .fixes {
     display: flex;
