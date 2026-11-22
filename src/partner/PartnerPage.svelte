@@ -28,6 +28,9 @@
   import PresetCards, { type Card } from "./PresetCards.svelte";
   import RouteEditor, { type ShotTimes } from "./RouteEditor.svelte";
   import ScoutPanel from "./ScoutPanel.svelte";
+  import QrCode from "./QrCode.svelte";
+  import QrScanner from "./QrScanner.svelte";
+  import { routeFromPp } from "./import";
   import {
     knownAutos,
     type PartnerLibrary,
@@ -55,6 +58,13 @@
     type Lists,
     type PageState,
   } from "./load";
+
+  /**
+   * "plan": ours, in the pits (partner.html). "share": the page a partner opens from our QR code
+   * (share.html): they show us their Auto beside ours and send it back as a link or a QR code.
+   */
+  let { mode = "plan" }: { mode?: "plan" | "share" } = $props();
+  const sharing = $derived(mode === "share");
 
   const SPEEDS = [1, 2, 4];
   const LETTERS = "ABCDEF";
@@ -362,6 +372,75 @@
     });
   }
 
+  // ---- A partner's own file, and their Auto sent to us ----
+  let fileProblem = $state<string | null>(null);
+  let scanning = $state(false);
+  let copied = $state(false);
+  async function openFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try {
+      const route = routeFromPp(
+        file.name,
+        await file.text(),
+        values ?? undefined,
+      );
+      fileProblem = null;
+      playing = false;
+      miss = [];
+      patch({ partner: route });
+    } catch (error) {
+      fileProblem = error instanceof Error ? error.message : String(error);
+    }
+  }
+  /** Our planning page with their Auto beside the one of ours they looked at. */
+  const sendLink = $derived(
+    new URL(
+      `partner.html${stateHash({
+        ours,
+        partner,
+        alliance,
+        off,
+        miss: [],
+        event: null,
+        team,
+        match: null,
+      })}`,
+      location.href,
+    ).href,
+  );
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(sendLink);
+      copied = true;
+      setTimeout(() => (copied = false), 2000);
+    } catch {
+      copied = false;
+    }
+  }
+  /** A partner's QR code read on our side: its look opens here. */
+  function readCode(text: string) {
+    scanning = false;
+    let url: URL;
+    try {
+      url = new URL(text);
+    } catch {
+      fileProblem = "That QR code is not a link from this page.";
+      return;
+    }
+    if (
+      !/partner\.html$/.test(url.pathname) ||
+      !url.hash.includes("partner=")
+    ) {
+      fileProblem = "That QR code is not a partner's Auto from this page.";
+      return;
+    }
+    location.hash = url.hash;
+    location.reload();
+  }
+
   // ---- Plans ----
   /** A saved plan onto the page; none saved: one blank option, their Auto first. */
   function applyPlan(
@@ -603,12 +682,14 @@
 
 <div class="wrap">
   <header>
-    <nav class="crumbs">
-      <a href="autos.html">← Auto Strategy</a>
-      <a href="./">Visualizer</a>
-    </nav>
+    {#if !sharing}
+      <nav class="crumbs">
+        <a href="autos.html">← Auto Strategy</a>
+        <a href="./">Visualizer</a>
+      </nav>
+    {/if}
     <div class="titlebar">
-      <h1>Auto Match Planning</h1>
+      <h1>{sharing ? "Plan our Auto together" : "Auto Match Planning"}</h1>
       <div class="seg alliance" role="group" aria-label="Alliance">
         <button
           type="button"
@@ -628,47 +709,49 @@
 
   <div class="layout">
     <div class="stage">
-      <div class="optbar" role="group" aria-label="Options">
-        {#each options as _, i (i)}
-          <button
-            type="button"
-            class="opt {optionStates[i]}"
-            aria-pressed={active === i}
-            onclick={() => {
-              active = i;
-              moving = false;
-              playing = false;
-            }}
-            >{LETTERS[i]}{#if chosen === i}&nbsp;★{/if}</button
-          >
-        {/each}
-        {#if options.length < MAX_OPTIONS}
-          <button
-            type="button"
-            class="opt add"
-            aria-label="Another option"
-            onclick={addOption}>+</button
-          >
-        {/if}
-        <span class="spacer"></span>
-        {#if options.length > 1}
-          <button
-            type="button"
-            class="optact"
-            aria-pressed={chosen === active}
-            onclick={() => (chosen = active)}
-            >{chosen === active
-              ? "★ Going with this"
-              : "☆ Go with this"}</button
-          >
-          <button
-            type="button"
-            class="optact"
-            aria-label="Remove this option"
-            onclick={removeOption}>✕</button
-          >
-        {/if}
-      </div>
+      {#if !sharing}
+        <div class="optbar" role="group" aria-label="Options">
+          {#each options as _, i (i)}
+            <button
+              type="button"
+              class="opt {optionStates[i]}"
+              aria-pressed={active === i}
+              onclick={() => {
+                active = i;
+                moving = false;
+                playing = false;
+              }}
+              >{LETTERS[i]}{#if chosen === i}&nbsp;★{/if}</button
+            >
+          {/each}
+          {#if options.length < MAX_OPTIONS}
+            <button
+              type="button"
+              class="opt add"
+              aria-label="Another option"
+              onclick={addOption}>+</button
+            >
+          {/if}
+          <span class="spacer"></span>
+          {#if options.length > 1}
+            <button
+              type="button"
+              class="optact"
+              aria-pressed={chosen === active}
+              onclick={() => (chosen = active)}
+              >{chosen === active
+                ? "★ Going with this"
+                : "☆ Go with this"}</button
+            >
+            <button
+              type="button"
+              class="optact"
+              aria-label="Remove this option"
+              onclick={removeOption}>✕</button
+            >
+          {/if}
+        </div>
+      {/if}
       <div class="fieldbox">
         <canvas
           bind:this={canvas}
@@ -803,19 +886,58 @@
     </div>
 
     <div class="controls">
-      <ScoutPanel
-        bind:event
-        bind:team
-        bind:match
-        bind:library
-        current={{ options, chosen }}
-        keepLinkLook={linkHasLook}
-        onApply={applyPlan}
-        autoName={nameOf}
-      />
+      {#if sharing}
+        <section>
+          <h2>Your team</h2>
+          <label class="teamnum">
+            <span>Team number</span>
+            <input
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="99999"
+              placeholder="e.g. 12345"
+              value={team ?? ""}
+              oninput={(e) => {
+                const n = Number(e.currentTarget.value);
+                team = Number.isInteger(n) && n > 0 && n < 100000 ? n : null;
+              }}
+            />
+          </label>
+        </section>
+      {:else}
+        <ScoutPanel
+          bind:event
+          bind:team
+          bind:match
+          bind:library
+          current={{ options, chosen }}
+          keepLinkLook={linkHasLook}
+          onApply={applyPlan}
+          autoName={nameOf}
+        />
+      {/if}
 
       <section>
-        <h2>Their Auto</h2>
+        <h2>{sharing ? "Your Auto" : "Their Auto"}</h2>
+        <div class="fromfile">
+          <label class="filebtn">
+            <input
+              type="file"
+              accept=".pp,application/json"
+              onchange={openFile}
+            />
+            {sharing ? "Open your Pedro .pp file" : "Open their .pp file"}
+          </label>
+          {#if !sharing}
+            <button
+              type="button"
+              class="filebtn"
+              onclick={() => (scanning = true)}>Scan their QR code</button
+            >
+          {/if}
+        </div>
+        {#if fileProblem}<p class="note warn">{fileProblem}</p>{/if}
         <PresetCards
           {cards}
           selected={selectedCard}
@@ -835,7 +957,7 @@
       </section>
 
       <section>
-        <h2>Our Auto</h2>
+        <h2>{sharing ? "Our Autos" : "Our Auto"}</h2>
         {#if listError}<p class="note warn">{listError}</p>{/if}
         <div class="picks">
           {#each lists?.autos ?? [] as file (file)}
@@ -920,11 +1042,81 @@
           </div>
         {/if}
       </section>
+
+      {#if sharing}
+        <section class="send">
+          <h2>Send it to us</h2>
+          {#if team}
+            <p class="note">
+              Show this to Mona Shores, or copy the link and send it.
+            </p>
+            <QrCode
+              text={sendLink}
+              label="QR code of your Auto for Mona Shores"
+            />
+            <button type="button" class="filebtn" onclick={copyLink}
+              >{copied ? "Copied" : "Copy the link"}</button
+            >
+          {:else}
+            <p class="note">Put in your team number first.</p>
+          {/if}
+        </section>
+      {/if}
     </div>
   </div>
 </div>
 
+{#if scanning}
+  <QrScanner onRead={readCode} onClose={() => (scanning = false)} />
+{/if}
+
 <style>
+  .fromfile {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .filebtn {
+    font: inherit;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--seg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .filebtn input {
+    display: none;
+  }
+  .teamnum {
+    display: grid;
+    gap: 6px;
+    font-weight: 700;
+  }
+  .teamnum input {
+    font: inherit;
+    font-size: 18px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    max-width: 200px;
+  }
+  .send {
+    display: grid;
+    gap: 12px;
+  }
+  .send .filebtn {
+    justify-self: center;
+  }
   .optbar {
     display: flex;
     align-items: center;

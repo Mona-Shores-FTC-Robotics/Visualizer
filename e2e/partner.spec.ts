@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import jsQR from "jsqr";
 import { encodeRoute } from "../src/partner/route";
 
 // Fork: the Auto Match Planning page (partner.html), on a phone, with biobuzz master's files served
@@ -10,6 +11,8 @@ const FIXTURES = `${import.meta.dirname}/../test/fixtures/partner`;
 const AUTOS = ["r-solo.pp"];
 
 async function serveBiobuzz(page: Page) {
+  // FTCScout's answers were recorded on 20 Nov 2026: the page picks the event by today's date.
+  await page.clock.setFixedTime(new Date("2026-11-20T12:00:00"));
   await page.route("https://api.ftcscout.org/graphql", (route) => {
     const body = route.request().postDataJSON();
     const file = body.query.includes("teamByNumber")
@@ -223,4 +226,65 @@ test("a tablet that cannot reach GitHub's file server reads our Autos from the s
   await page.getByRole("button", { name: /^R-Solo/ }).click();
   await expect(page.locator(".tile").first()).toContainText(/Contact/);
   await expect(page.getByText(/Could not reach GitHub/)).toHaveCount(0);
+});
+
+test("a partner opens share.html, loads their .pp beside ours, and the link brings it to us", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await serveBiobuzz(page);
+  await page.goto("/share.html");
+  await expect(
+    page.getByRole("heading", { name: "Plan our Auto together" }),
+  ).toBeVisible();
+  // Nothing of our scouting on their page.
+  await expect(page.getByLabel("Partner team")).toHaveCount(0);
+  await expect(page.getByText("Put in your team number first.")).toBeVisible();
+
+  await page.getByLabel("Team number").fill("12345");
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(
+      `${import.meta.dirname}/../test/fixtures/projects/features-1.5.pp`,
+    );
+  await expect(page.getByLabel("Name")).toHaveValue("features-1.5");
+  await page.getByRole("button", { name: /^R-Solo/ }).click();
+  await expect(page.locator(".tile").first()).toContainText(/Contact/);
+  await expect(
+    page.getByRole("img", { name: "QR code of your Auto for Mona Shores" }),
+  ).toBeVisible();
+
+  // The link in the QR code: our planning page, their team and Auto beside R-Solo.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy the link" }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toMatch(/\/partner\.html#team=12345&ours=r-solo\.pp&partner=/);
+
+  // The QR code reads back as that link, as our scanner reads it.
+  const pixels = await page.evaluate(async () => {
+    const svg = document.querySelector(".qr svg")!.outerHTML;
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 800;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, 800, 800);
+    context.drawImage(image, 0, 0, 800, 800);
+    return Array.from(context.getImageData(0, 0, 800, 800).data);
+  });
+  expect(jsQR(Uint8ClampedArray.from(pixels), 800, 800)?.data).toBe(copied);
+
+  await page.goto(copied.replace(/^https?:\/\/[^/]+/, ""));
+  await expect(
+    page.getByRole("heading", { name: "Auto Match Planning" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Name")).toHaveValue("features-1.5");
+  await expect(page.getByRole("button", { name: /^R-Solo/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(errors).toEqual([]);
 });
