@@ -33,6 +33,8 @@
   import ScoutPanel from "./ScoutPanel.svelte";
   import QrCode from "./QrCode.svelte";
   import QrScanner from "./QrScanner.svelte";
+  import InboxPanel from "./InboxPanel.svelte";
+  import { formLink, OUR_NAMES } from "./inbox";
   import { routeFromPp } from "./import";
   import {
     knownAutos,
@@ -539,9 +541,15 @@
       fileProblem = "That QR code is not a partner's Auto from this page.";
       return;
     }
-    location.hash = url.hash;
+    openLook(url.hash);
+  }
+  /** A partner's look sent to us (a QR code, the inbox): it opens here. */
+  function openLook(hash: string) {
+    location.hash = hash;
     location.reload();
   }
+  /** The form that brings their Auto to our inbox, with their team and link filled in. */
+  const sendForm = $derived(team ? formLink(team, sendLink) : null);
 
   // ---- Plans ----
   /** A saved plan onto the page; none saved: one blank option, their Auto first. */
@@ -1108,6 +1116,7 @@
           {/if}
         </div>
         {#if fileProblem}<p class="note warn">{fileProblem}</p>{/if}
+        {#if !sharing}<InboxPanel onOpen={openLook} />{/if}
         <PresetCards
           {cards}
           selected={selectedCard}
@@ -1217,12 +1226,25 @@
         <section class="send">
           <h2>Send it to us</h2>
           {#if team}
+            {#if sendForm}
+              <p class="note">
+                Online? Send it to our inbox: the form opens with your team and
+                Auto filled in, so just press Submit.
+              </p>
+              <a
+                class="filebtn primary"
+                href={sendForm}
+                target="_blank"
+                rel="noopener noreferrer">Send to {OUR_NAMES}</a
+              >
+            {/if}
             <p class="note">
-              Show this to Mona Shores, or copy the link and send it.
+              No internet? Show this QR code to {OUR_NAMES}, or copy the link
+              and send it.
             </p>
             <QrCode
               text={sendLink}
-              label="QR code of your Auto for Mona Shores"
+              label={`QR code of your Auto for ${OUR_NAMES}`}
             />
             <button type="button" class="filebtn" onclick={copyLink}
               >{copied ? "Copied" : "Copy the link"}</button
@@ -1286,6 +1308,10 @@
   }
   .send .filebtn {
     justify-self: center;
+    text-decoration: none;
+  }
+  .send .filebtn.primary {
+    border: 2px solid var(--accent);
   }
   .optbar {
     display: flex;

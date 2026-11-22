@@ -10,7 +10,20 @@ import { encodeRoute } from "../src/partner/route";
 const FIXTURES = `${import.meta.dirname}/../test/fixtures/partner`;
 const AUTOS = ["r-solo.pp", "l-no-cross.pp"];
 
+const INBOX = "https://docs.google.com/spreadsheets/**";
+
+/** The inbox's published sheet: these rows (Timestamp, Team Number, Auto Link) under its header. */
+function serveInbox(page: Page, rows: string[][] = []) {
+  const csv = [["Timestamp", "Team Number", "Auto Link"], ...rows]
+    .map((r) => r.map((f) => `"${f.replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+  return page.route(INBOX, (route) =>
+    route.fulfill({ contentType: "text/csv", body: csv }),
+  );
+}
+
 async function serveBiobuzz(page: Page) {
+  await serveInbox(page);
   // FTCScout's answers were recorded on 20 Nov 2026: the page picks the event by today's date.
   await page.clock.setFixedTime(new Date("2026-11-20T12:00:00"));
   await page.route("https://api.ftcscout.org/graphql", (route) => {
@@ -198,6 +211,7 @@ test("a tablet that cannot reach GitHub's file server reads our Autos from the s
       body: readFileSync(`${FIXTURES}/ftcscout/events.json`, "utf8"),
     }),
   );
+  await serveInbox(page);
   // The pit tablets: GitHub fails outright, as an untrusted certificate does.
   await page.route("https://api.github.com/**", (route) => route.abort());
   await page.route("https://raw.githubusercontent.com/**", (route) =>
@@ -252,7 +266,9 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   await page.getByRole("button", { name: /^R-Solo/ }).click();
   await expect(page.locator(".tile").first()).toContainText(/Contact/);
   await expect(
-    page.getByRole("img", { name: "QR code of your Auto for Mona Shores" }),
+    page.getByRole("img", {
+      name: "QR code of your Auto for Ultraviolet (20245) / Infrared (19429)",
+    }),
   ).toBeVisible();
 
   // The link in the QR code: our planning page, their team and Auto beside R-Solo.
@@ -262,6 +278,16 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   expect(copied).toMatch(
     /\/partner\.html#team=12345&ours=r-solo\.pp&r=1\$FEATURES-1\.5\$/,
   );
+
+  // Online, the form instead: their team number and that same link filled in.
+  const send = page.getByRole("link", {
+    name: "Send to Ultraviolet (20245) / Infrared (19429)",
+  });
+  await expect(send).toHaveAttribute("target", "_blank");
+  const form = new URL((await send.getAttribute("href"))!);
+  expect(form.pathname).toMatch(/\/viewform$/);
+  expect(form.searchParams.get("entry.1253318350")).toBe("12345");
+  expect(form.searchParams.get("entry.1690950498")).toBe(copied);
 
   // The QR code reads back as that link, as our scanner reads it.
   const pixels = await page.evaluate(async () => {
@@ -324,4 +350,68 @@ test("FIX IT: their TIP 1 misses and L-NoCross crosses into them; the page says 
   await expect(fixit).toContainText("Off: WAIT FOR PARTNER FIX");
   await expect(fixit).toContainText(/would hit at \d+\.\d s/);
   expect(errors).toEqual([]);
+});
+
+test("the inbox lists partners' Autos newest first, leaves out the rest, and opens one in a tap", async ({
+  page,
+  baseURL,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await serveBiobuzz(page);
+  const link = (team: number, name: string) =>
+    `${baseURL}/partner.html#team=${team}&ours=r-solo.pp&r=1$${name}$62.3/133.8/270$3.5$0$SU*D14.5/117.4/0/K`;
+  await serveInbox(page, [
+    ["11/20/2026 9:00:00", "111", link(111, "EARLY")],
+    ["11/20/2026 11:30:00", "222", link(222, "LATE")],
+    [
+      "11/20/2026 11:00:00",
+      "333",
+      "https://evil.example/partner.html#r=1$X$1/1/1$3.5$0$",
+    ],
+    ["11/20/2026 11:45:00", "<b>444</b>", link(444, "BOLD")],
+    [
+      "11/20/2026 11:50:00",
+      "555",
+      `${baseURL}/partner.html#r=<img src=x onerror=alert(1)>`,
+    ],
+  ]);
+  await page.goto("/partner.html");
+  const inbox = page.getByLabel("Inbox");
+  const rows = inbox.getByRole("listitem");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText("222");
+  await expect(rows.nth(0)).toContainText("LATE");
+  await expect(rows.nth(1)).toContainText("111");
+  await expect(inbox).toContainText("a few minutes");
+  await expect(inbox.locator("img")).toHaveCount(0);
+
+  await rows.nth(0).getByRole("button").click();
+  await expect(page.getByLabel("Name")).toHaveValue("LATE");
+  await expect(page).toHaveURL(/[#&]team=222&ours=r-solo\.pp&r=1\$LATE\$/);
+  await expect(page.getByRole("button", { name: /^R-Solo/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(errors).toEqual([]);
+});
+
+test("offline at an event, the inbox says so and the QR code still works", async ({
+  page,
+}) => {
+  await serveBiobuzz(page);
+  await page.route(INBOX, (route) => route.abort("internetdisconnected"));
+  await page.goto("/partner.html");
+  const inbox = page.getByLabel("Inbox");
+  await expect(inbox).toContainText(/Could not read the inbox/);
+  await expect(inbox).toContainText("Scan their QR code instead");
+  await expect(
+    page.getByRole("button", { name: "Scan their QR code" }),
+  ).toBeVisible();
+  // Back online: checking again reads it.
+  await page.unroute(INBOX);
+  await serveInbox(page);
+  await inbox.getByRole("button", { name: "Check again" }).click();
+  await expect(inbox).toContainText("Nothing sent yet.");
+  await expect(inbox).not.toContainText(/Could not read/);
 });
