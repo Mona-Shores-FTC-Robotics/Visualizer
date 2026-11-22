@@ -51,6 +51,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         partner: resolve(import.meta.dirname, "partner.html"),
+        share: resolve(import.meta.dirname, "share.html"),
       },
     },
     // Increase chunk size warning limit to 1.2 MB to avoid noisy warnings

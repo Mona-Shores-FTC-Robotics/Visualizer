@@ -67,6 +67,8 @@ interface Fake {
 
 async function serve(page: Page): Promise<Fake> {
   const fake: Fake = { commits: [] };
+  // FTCScout's answers were recorded on 20 Nov 2026: the page picks the event by today's date.
+  await page.clock.setFixedTime(new Date("2026-11-20T12:00:00"));
   const scoutingFiles: Record<string, string> = {
     "scouting/2026/USMIBEQ.json": JSON.stringify(BELDING_PLANS),
     "scouting/2026/partners.json": JSON.stringify(LIBRARY),
