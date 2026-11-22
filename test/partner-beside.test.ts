@@ -354,7 +354,7 @@ describe("the page's link", () => {
     };
     const hash = stateHash(state);
     expect(hash).toMatch(
-      /^#event=USMIFRQ2&team=11228&match=Q12&ours=r-solo\.pp&partner=[\w-]+&alliance=blue&off=Pickup&miss=2$/,
+      /^#event=USMIFRQ2&team=11228&match=Q12&ours=r-solo\.pp&alliance=blue&off=Pickup&miss=2&r=1\$X\$[0-9A-Z$*+\-./:]+$/,
     );
     expect(parseState(hash)).toEqual(state);
   });

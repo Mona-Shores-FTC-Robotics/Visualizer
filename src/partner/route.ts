@@ -526,6 +526,102 @@ export function encodeRoute(r: PartnerRoute): string {
   return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/**
+ * A route in a link's `r=`, as short as it goes and only in QR's alphanumeric characters (capitals,
+ * digits and ` $%*+-./:`), which a QR code packs at 5.5 bits each, not 8: a partner's Auto fits a
+ * code an old tablet's camera still reads. Fields are split by `$`: `1` (the format), the name
+ * (capitals, `+` for a space), the start `x/y/h`, the volley, the delay, then the steps split by `*`:
+ * `S` shoot (`SU` when its CELL is up, `S12` at 12 s), `P` pick, `G` gather, `F` SUPER FLOWER,
+ * `W12` wait until 12 s, `Dx/y/h` drive, then `/Bx/y` its bend, `/T9` by 9 s, `/K` the park.
+ */
+export function encodeShort(r: PartnerRoute): string {
+  const n = (v: number) => String(Math.round(v * 10) / 10);
+  const spot = (s: Spot) => `${n(s.x)}/${n(s.y)}/${n(s.h)}`;
+  const name = r.name
+    .toUpperCase()
+    .replace(/[^0-9A-Z .:-]/g, "")
+    .trim()
+    .replace(/ +/g, "+");
+  const steps = r.steps.map((s) => {
+    switch (s.kind) {
+      case "shoot":
+        return `S${s.at === "up" ? "U" : s.at === null ? "" : n(s.at)}`;
+      case "pick":
+        return "P";
+      case "gather":
+        return "G";
+      case "superFlower":
+        return "F";
+      case "wait":
+        return `W${n(s.until)}`;
+      case "drive":
+        return (
+          `D${spot(s.to)}` +
+          (s.bend ? `/B${n(s.bend.x)}/${n(s.bend.y)}` : "") +
+          (s.by !== null ? `/T${n(s.by)}` : "") +
+          (s.park ? "/K" : "")
+        );
+    }
+  });
+  return [
+    "1",
+    name,
+    spot(r.start),
+    n(r.volleyS),
+    n(r.delayS),
+    steps.join("*"),
+  ].join("$");
+}
+
+export function decodeShort(code: string): PartnerRoute | null {
+  const [format, name, start, volley, delay, steps = ""] = code.split("$");
+  if (format !== "1" || start === undefined) return null;
+  const nums = (text: string) => text.split("/").map(Number);
+  const spotOf = (text: string) => {
+    const [x, y, h] = nums(text);
+    return { x, y, h };
+  };
+  const raw = {
+    name: (name ?? "").replace(/\+/g, " "),
+    start: spotOf(start),
+    volleyS: Number(volley),
+    delayS: Number(delay),
+    steps: (steps ? steps.split("*") : []).map((token) => {
+      const head = token[0];
+      const rest = token.slice(1);
+      if (head === "S")
+        return {
+          kind: "shoot",
+          at: rest === "U" ? "up" : rest === "" ? null : Number(rest),
+        };
+      if (head === "P") return { kind: "pick" };
+      if (head === "G") return { kind: "gather" };
+      if (head === "F") return { kind: "superFlower" };
+      if (head === "W") return { kind: "wait", until: Number(rest) };
+      if (head === "D") {
+        const parts = rest.split("/");
+        const step: Record<string, unknown> = {
+          kind: "drive",
+          to: spotOf(parts.slice(0, 3).join("/")),
+          bend: null,
+          by: null,
+          park: false,
+        };
+        for (let i = 3; i < parts.length; i++) {
+          const p = parts[i];
+          if (p.startsWith("B")) {
+            step.bend = { x: Number(p.slice(1)), y: Number(parts[++i]) };
+          } else if (p.startsWith("T")) step.by = Number(p.slice(1));
+          else if (p === "K") step.park = true;
+        }
+        return step;
+      }
+      return { kind: "?" };
+    }),
+  };
+  return cleanRoute(raw);
+}
+
 export function decodeRoute(code: string): PartnerRoute | null {
   try {
     const text = atob(code.replace(/-/g, "+").replace(/_/g, "/"));
