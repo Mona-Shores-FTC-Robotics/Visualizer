@@ -68,7 +68,7 @@ test("their Auto first, then ours on top: contact, parks, TIPs", async ({
   await expect(page.locator(".tile").first()).toContainText(
     /Contact\s*\d+\.\d s/,
   );
-  await expect(page).toHaveURL(/[#&]ours=r-solo\.pp&partner=[\w-]+/);
+  await expect(page).toHaveURL(/[#&]ours=r-solo\.pp&r=1\$/);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
@@ -259,7 +259,9 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Copy the link" }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toMatch(/\/partner\.html#team=12345&ours=r-solo\.pp&partner=/);
+  expect(copied).toMatch(
+    /\/partner\.html#team=12345&ours=r-solo\.pp&r=1\$FEATURES-1\.5\$/,
+  );
 
   // The QR code reads back as that link, as our scanner reads it.
   const pixels = await page.evaluate(async () => {
@@ -281,7 +283,7 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   await expect(
     page.getByRole("heading", { name: "Auto Match Planning" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Name")).toHaveValue("features-1.5");
+  await expect(page.getByLabel("Name")).toHaveValue("FEATURES-1.5");
   await expect(page.getByRole("button", { name: /^R-Solo/ })).toHaveAttribute(
     "aria-pressed",
     "true",

@@ -20,7 +20,12 @@ import {
   parseTimingFile,
   type TimingValues,
 } from "../lib/timing/model";
-import { decodeRoute, encodeRoute, type PartnerRoute } from "./route";
+import {
+  decodeRoute,
+  decodeShort,
+  encodeShort,
+  type PartnerRoute,
+} from "./route";
 
 export const REF = DEFAULT_REF;
 
@@ -127,8 +132,14 @@ export function parseState(hash: string): PageState {
     return v && FILE.test(v) ? v : null;
   };
   const ours = file("ours");
+  // `r=` (the short form, raw: `+` is a space's stand-in, not a space) or, in older links, `partner=`.
+  const short = /(?:^|[#&])r=([^&]*)/.exec(hash)?.[1];
   const code = params.get("partner");
-  const partner = code ? decodeRoute(code) : null;
+  const partner = short
+    ? decodeShort(decodeURIComponent(short.replace(/\+/g, "%2B")))
+    : code
+      ? decodeRoute(code)
+      : null;
   const event = params.get("event") ?? "";
   const team = Number(params.get("team") ?? NaN);
   const match = params.get("match") ?? "";
@@ -155,9 +166,10 @@ export function stateHash(state: PageState): string {
   if (state.team) parts.push(`team=${state.team}`);
   if (state.match) parts.push(`match=${state.match}`);
   if (state.ours) parts.push(`ours=${state.ours}`);
-  if (state.partner) parts.push(`partner=${encodeRoute(state.partner)}`);
   if (state.alliance === "blue") parts.push("alliance=blue");
   if (state.off.length) parts.push(`off=${state.off.join(",")}`);
   if (state.miss.length) parts.push(`miss=${state.miss.join(",")}`);
+  // Last, so a QR code holds it in one alphanumeric run (QrCode.svelte).
+  if (state.partner) parts.push(`r=${encodeShort(state.partner)}`);
   return parts.length ? `#${parts.join("&")}` : "";
 }

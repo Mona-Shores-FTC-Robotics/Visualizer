@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { routeFromPp } from "../src/partner/import";
-import { decodeRoute, encodeRoute } from "../src/partner/route";
+import {
+  decodeRoute,
+  decodeShort,
+  encodeRoute,
+  encodeShort,
+} from "../src/partner/route";
 
 const read = (path: string) =>
   readFileSync(`${import.meta.dirname}/${path}`, "utf8");
@@ -44,6 +49,17 @@ describe("a partner's own .pp file as a route", () => {
     const code = encodeRoute(route);
     expect(decodeRoute(code)).toEqual(route);
     expect(code.length).toBeLessThan(1500);
+  });
+
+  it("has a short form for a QR code, in its alphanumeric characters, a third the length", () => {
+    const route = routeFromPp(
+      "features.pp",
+      read("fixtures/projects/features-1.5.pp"),
+    );
+    const short = encodeShort(route);
+    expect(short).toMatch(/^[0-9A-Z$%*+\-./:]+$/);
+    expect(decodeShort(short)).toEqual({ ...route, name: "FEATURES" });
+    expect(short.length * 3).toBeLessThan(encodeRoute(route).length);
   });
 
   it("says what is wrong with a file that is not one", () => {

@@ -432,7 +432,7 @@
     }
     if (
       !/partner\.html$/.test(url.pathname) ||
-      !url.hash.includes("partner=")
+      !/[#&](r|partner)=/.test(url.hash)
     ) {
       fileProblem = "That QR code is not a partner's Auto from this page.";
       return;
