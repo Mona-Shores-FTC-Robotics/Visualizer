@@ -266,7 +266,9 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   await page.getByRole("button", { name: /^R-Solo/ }).click();
   await expect(page.locator(".tile").first()).toContainText(/Contact/);
   await expect(
-    page.getByRole("img", { name: "QR code of your Auto for Mona Shores" }),
+    page.getByRole("img", {
+      name: "QR code of your Auto for Ultraviolet (20245) / Infrared (19429)",
+    }),
   ).toBeVisible();
 
   // The link in the QR code: our planning page, their team and Auto beside R-Solo.
@@ -278,7 +280,9 @@ test("a partner opens share.html, loads their .pp beside ours, and the link brin
   );
 
   // Online, the form instead: their team number and that same link filled in.
-  const send = page.getByRole("link", { name: "Send to Mona Shores" });
+  const send = page.getByRole("link", {
+    name: "Send to Ultraviolet (20245) / Infrared (19429)",
+  });
   await expect(send).toHaveAttribute("target", "_blank");
   const form = new URL((await send.getAttribute("href"))!);
   expect(form.pathname).toMatch(/\/viewform$/);

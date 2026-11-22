@@ -34,7 +34,7 @@
   import QrCode from "./QrCode.svelte";
   import QrScanner from "./QrScanner.svelte";
   import InboxPanel from "./InboxPanel.svelte";
-  import { formLink } from "./inbox";
+  import { formLink, OUR_NAMES } from "./inbox";
   import { routeFromPp } from "./import";
   import {
     knownAutos,
@@ -1235,16 +1235,16 @@
                 class="filebtn primary"
                 href={sendForm}
                 target="_blank"
-                rel="noopener noreferrer">Send to Mona Shores</a
+                rel="noopener noreferrer">Send to {OUR_NAMES}</a
               >
             {/if}
             <p class="note">
-              No internet? Show this QR code to Mona Shores, or copy the link
+              No internet? Show this QR code to {OUR_NAMES}, or copy the link
               and send it.
             </p>
             <QrCode
               text={sendLink}
-              label="QR code of your Auto for Mona Shores"
+              label={`QR code of your Auto for ${OUR_NAMES}`}
             />
             <button type="button" class="filebtn" onclick={copyLink}
               >{copied ? "Copied" : "Copy the link"}</button

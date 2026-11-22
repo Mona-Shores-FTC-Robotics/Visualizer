@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
    * The inbox on the planning page: partners' Autos sent through the Google Form (share.html's
-   * "Send to Mona Shores"), newest first. A tap opens one as their Auto. Rows are untrusted:
+   * "Send to Ultraviolet / Infrared"), newest first. A tap opens one as their Auto. Rows are untrusted:
    * `readInbox` keeps only our own links, rebuilt by our code, and they are shown as text only.
    */
   import { onMount } from "svelte";
-  import { fetchInbox, readInbox, type InboxEntry } from "./inbox";
+  import { fetchInbox, OUR_NAMES, readInbox, type InboxEntry } from "./inbox";
 
   let { onOpen }: { onOpen: (hash: string) => void } = $props();
 
@@ -70,7 +70,7 @@
     <p class="note">Nothing sent yet.</p>
   {/if}
   <p class="note">
-    Partners send these from the share page's "Send to Mona Shores". A new one
+    Partners send these from the share page's "Send to {OUR_NAMES}". A new one
     takes a few minutes to show up here{checkedAt
       ? ` (checked ${clock(checkedAt)})`
       : ""}.

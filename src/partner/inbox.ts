@@ -1,6 +1,6 @@
 /**
  * The inbox: a partner online sends us their Auto through a Google Form (share.html's "Send to
- * Mona Shores"), and the planning page reads the form's published response sheet back as CSV.
+ * Ultraviolet / Infrared"), and the planning page reads the form's published response sheet back as CSV.
  *
  * The form asks only for a team number and the Auto's link (the one the QR code holds). Both are
  * public by design. Anyone can submit the form, so every row is untrusted: a row counts only when
@@ -10,6 +10,9 @@
  */
 import { timeoutSignal } from "../lib/timeoutSignal";
 import { parseState, stateHash } from "./load";
+
+/** Our teams, as partners see us named (never the club's name). */
+export const OUR_NAMES = "Ultraviolet (20245) / Infrared (19429)";
 
 /** The form, pre-filled: Team Number and Auto Link. */
 const FORM =
