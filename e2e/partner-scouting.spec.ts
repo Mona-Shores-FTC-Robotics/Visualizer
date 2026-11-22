@@ -73,6 +73,13 @@ async function serve(page: Page): Promise<Fake> {
     "scouting/2026/USMIBEQ.json": JSON.stringify(BELDING_PLANS),
     "scouting/2026/partners.json": JSON.stringify(LIBRARY),
   };
+  // The inbox's sheet: empty, so no test reads the real one.
+  await page.route("https://docs.google.com/spreadsheets/**", (route) =>
+    route.fulfill({
+      contentType: "text/csv",
+      body: "Timestamp,Team Number,Auto Link",
+    }),
+  );
   await page.route("https://api.ftcscout.org/graphql", (route) => {
     const body = route.request().postDataJSON();
     const file = body.query.includes("teamByNumber")
