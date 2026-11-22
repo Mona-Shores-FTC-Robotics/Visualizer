@@ -389,3 +389,41 @@ export function smallestFix(
     if (!touches(extra)) return extra;
   return null;
 }
+
+/** A route leg that crosses to the partner's end to fix its TIP: "CROSS AND FIX IT". */
+export const CROSSES = /\bcross/i;
+
+/**
+ * The look where our FIX IT runs: the first try at each TIP the partner goes for misses, and each
+ * of our route choices takes its leg that crosses to the partner's end. A partner's missed TIP is
+ * fixed only at its end (a CELL opens one way), so that crossing is where contact happens. Null
+ * when our Auto has no such leg.
+ */
+export function fixItLook(
+  base: Look,
+  choices: RouteChoice[],
+  toggles: TipToggle[],
+): Look | null {
+  const crossing = choices.filter((c) => c.legs.some((l) => CROSSES.test(l)));
+  if (!crossing.length) return null;
+  const picks = { ...base.choices };
+  for (const c of crossing) {
+    if (CROSSES.test(c.legs[0])) delete picks[c.condition];
+    else picks[c.condition] = false;
+  }
+  const tips = { ...base.tips };
+  for (const t of toggles) if (t.robot === 1) tips[t.tip] = false;
+  return { choices: picks, tips };
+}
+
+/** The other leg of each crossing choice: what to pick when FIX IT would hit this partner. */
+export function waitLegs(choices: RouteChoice[]): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const c of choices) {
+    if (CROSSES.test(c.legs[0]) && !CROSSES.test(c.legs[1]))
+      out[c.condition] = false;
+    else if (CROSSES.test(c.legs[1]) && !CROSSES.test(c.legs[0]))
+      out[c.condition] = true;
+  }
+  return out;
+}
