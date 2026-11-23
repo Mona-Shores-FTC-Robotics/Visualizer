@@ -26,6 +26,10 @@ for (const path of autos) {
   writeFileSync(join(out, "autos", path.split("/").pop()), git("show", `origin/master:${path}`));
 }
 
+// The robot's controls, as biobuzz's CheatSheetTest exports them (TeamCode/cheat-sheets/controls.json),
+// for the driver drill's tests (src/drill/controls.ts reads the live file).
+writeFileSync(join(out, "controls.json"), git("show", "origin/master:TeamCode/cheat-sheets/controls.json"));
+
 /** Seconds from a timeline line's start to the next step of the robot's own Auto. */
 const STEP = /^\s*([\d.]+) (path|wait|command) (.*?)(?: \(holds \d+\))?$/;
 const median = (values) => {
