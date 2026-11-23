@@ -147,6 +147,13 @@
         "cardS": {
           "value": 4.45,
           "source": "GardenGather card median, n=8; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "piecesPerGather": {
+          "value": {
+            "0": 5,
+            "1": 3
+          },
+          "source": "pieces into the lane per GardenGather card, counts, n=8; Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
         }
       },
       "firePressToGateS": {
@@ -156,6 +163,14 @@
       "autoGateWaitS": {
         "value": 0.29,
         "source": "Auto gate wait after SpinUp; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      },
+      "gateToFourthBallS": {
+        "value": 2.04,
+        "source": "Auto four-ball volleys, gate open to the fourth ball, median of 14 (1.6 to 3.54 s); Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
+      },
+      "teleopGateOpenAfterLastBallS": {
+        "value": 0.96,
+        "source": "TeleOp four-ball feeds, gate open to shut 3.0 s median, minus gate to the fourth ball; Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
       }
     },
     "20245": {
@@ -202,6 +217,14 @@
         "cardS": {
           "value": 4.16,
           "source": "GardenGather card median, n=3; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "piecesPerGather": {
+          "value": {
+            "1": 1,
+            "2": 1,
+            "3": 1
+          },
+          "source": "pieces into the lane per GardenGather card, counts, n=3; Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
         }
       },
       "firePressToGateS": {
@@ -211,6 +234,14 @@
       "autoGateWaitS": {
         "value": 0.41,
         "source": "Auto gate wait after SpinUp; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      },
+      "gateToFourthBallS": {
+        "value": 2.08,
+        "source": "Auto four-ball volleys, gate open to the fourth ball, median of 36 (1.63 to 3.54 s); Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
+      },
+      "teleopGateOpenAfterLastBallS": {
+        "value": 0.42,
+        "source": "TeleOp four-ball feeds, gate open to shut 2.5 s median, minus gate to the fourth ball; Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
       }
     }
   }
