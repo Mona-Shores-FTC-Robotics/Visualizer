@@ -124,12 +124,12 @@
         "source": "PLACEHOLDER, RobotDesign.intakeMaxSpeedInPerS"
       },
       "stickReachIn": {
-        "value": 4.9,
-        "source": "GardenGather notes, 72 logged gathers: with the stick down the robot stops with the stick on the audience wall, its centre about 13 in out; 13 - 8.1 (half frame) = 4.9 in of stick ahead of the front"
+        "value": 5.7,
+        "source": "biobuzz cad/advantagescope/Robot_BIOBUZZ (the Onshape CAD): model_1.glb, the FLOWER stick, swung 162 deg out about its axis in components.json: its tip lies on the floor 0.351 m (13.8 in) ahead of the axles' middle, 5.7 in past the 8.1 in half frame. The logs agree: with the stick down the robot stops with its centre about 13 in from the wall (GardenGather notes, 72 gathers)."
       },
       "stickWidthIn": {
-        "value": 10,
-        "source": "PLACEHOLDER fitted to the mentor's 13 Nov 2026 note in GardenGather: three of the GARDEN's four POLLEN come over the stick, not the corner one (a 10 in ramp centred on the robot, pressed on the side wall, reaches the 2nd to 4th)"
+        "value": 12.6,
+        "source": "biobuzz cad/advantagescope/Robot_BIOBUZZ (the Onshape CAD): model_1.glb, the FLOWER stick, swung 162 deg out about its axis in components.json: the shaft on the floor spans y -0.160 to 0.161 m. Pressed on the side wall it covers 1.8 to 14.4 in from it, so the corner POLLEN (centre 1.4 in out) stays, as the mentor saw (13 Nov 2026)"
       }
     }
   },
@@ -464,8 +464,8 @@
         "source": "biobuzz RobotDifferences 19429 (mentor, 21 Nov 2026): GardenGather.driveIn.extraDepthIn = -1"
       },
       "stickStopIn": {
-        "value": 13.0,
-        "source": "biobuzz opmodes/GardenGather.java notes, 72 logged gathers: the stick on the audience wall stops the robot with its centre about 13 in out"
+        "value": 13.8,
+        "source": "8.1 in half frame + the stick's 5.7 in reach (CAD); the logs' 'about 13 in' (GardenGather notes, 72 gathers) agrees to within an inch"
       },
       "dwellMs": {
         "value": 850,
