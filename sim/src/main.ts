@@ -8,7 +8,7 @@ import { MatchAudio } from './audio';
 import { Coach } from './auto/coach';
 import { Referee } from './ref/referee';
 import { Review, clockText, type SystemMark } from './review';
-import { TraceRecorder } from './trace';
+import { TraceRecorder, type Trace } from './trace';
 import { tipTiming } from './sim/tip-lag';
 import { Inspector } from './render/inspector';
 import { PALETTE } from './auto/palette';
@@ -566,3 +566,14 @@ function tick(now: number) {
   requestAnimationFrame(tick);
 }
 void CAMERAS; requestAnimationFrame(tick);
+
+// Mona Shores: replays a real match, a trace written from our robots' match logs by biobuzz
+// tools/pull-logs/to_sim_trace.py, in the review: from the Open replay button, or ?replay=replays/NAME.json.
+function openReplay(tr: Trace) {
+  closeConfig(); closeModals(); editor.close();
+  const tl = timeline('full'); review.attach(tr, tl.span, tl.marks); review.enter(tr);
+  $('nsaved').textContent = `Replay: ${tr.name} (${Object.entries(tr.settings).filter(([k]) => /^[RB]\d$/.test(k)).map(([k, v]) => `${k} ${v}`).join(', ')})`;
+}
+$<HTMLInputElement>('replayfile').onchange = async e => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) openReplay(JSON.parse(await f.text()) as Trace); };
+const replayParam = new URLSearchParams(location.search).get('replay');
+if (replayParam) fetch(new URL(replayParam, new URL(import.meta.env.BASE_URL, location.href))).then(r => r.json()).then(t => openReplay(t as Trace)).catch(err => { $('nsaved').textContent = `Replay failed: ${err}`; });
