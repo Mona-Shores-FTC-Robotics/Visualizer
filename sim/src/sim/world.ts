@@ -70,6 +70,10 @@ export interface RobotState {
    * speed, acceleration and turn rate (src/sim/robots/mona-shores.json). Default: unset, the motor model.
    */
   velDrive?: { vx: number; vz: number; w: number } | null;
+  /** Mona Shores: the FLOWER stick is down (cfg.intake.stick). Default: unset, up. */
+  stickDown?: boolean;
+  /** Mona Shores: the intake takes no piece before this physics time (cfg.intake.intervalSec). */
+  intakeReadyAt?: number;
   /** The drive command of the last step, for the referee: what the robot was trying to do. */
   lastCmd: DriveCommand;
 }
@@ -443,8 +447,14 @@ export class Sim {
       const r = this.toRobot(p.x, p.z);
       // A dual-sided intake has the same box on the rear face.
       const ahead = c.intake.dualSided ? Math.abs(r.f) : r.f;
-      if (ahead < c.length / 2 - 0.01 || ahead > c.length / 2 + c.intake.reach + b.radius || Math.abs(r.l) > c.intake.width / 2) continue;
-      if (this.rng.bernoulli(c.intake.successP)) { this.carried.push(b.kind); this.remove(b); }
+      // Mona Shores: with the stick down, a piece in front of it is lifted over it into the intake.
+      const me = this.robots[this.me], st = c.intake.stick && me.stickDown ? c.intake.stick : null;
+      const inMouth = !(ahead < c.length / 2 - 0.01 || ahead > c.length / 2 + c.intake.reach + b.radius || Math.abs(r.l) > c.intake.width / 2);
+      const onStick = !!st && ahead >= c.length / 2 - 0.01 && ahead <= c.length / 2 + st.reach + b.radius && Math.abs(r.l) <= st.width / 2;
+      if (!inMouth && !onStick) continue;
+      if (c.intake.intervalSec && this.simTime < (me.intakeReadyAt ?? 0)) break;
+      if (c.intake.maxRelSpeed !== undefined) { const bv = b.body.linvel(), rv = this.robot.linvel(); if (Math.hypot(bv.x - rv.x, bv.z - rv.z) > c.intake.maxRelSpeed) continue; }
+      if (this.rng.bernoulli(c.intake.successP)) { this.carried.push(b.kind); this.remove(b); if (c.intake.intervalSec) me.intakeReadyAt = this.simTime + c.intake.intervalSec; }
       else b.retryAt = this.simTime + c.intake.retrySec;
     }
     // POLLEN can also be removed from the bottom of a FLOWER (G418.B).
