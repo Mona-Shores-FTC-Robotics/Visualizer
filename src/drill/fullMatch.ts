@@ -86,6 +86,41 @@ export async function loadAutoTrace(
 const rad = (d: number) => (d * Math.PI) / 180;
 
 /**
+ * Where TeleOp starts the robot in its alliance's LOADING ZONE: the zone from the field CAD's
+ * gaffer-tape box (FIELD.loadingZone, sim/src/sim/config.ts), centred along it, the robot's back
+ * 2 cm off our wall and facing the field. PARK needs only part of the robot in the zone (section
+ * 10.5.4); this puts the whole chassis inside it along the wall.
+ */
+export function loadingZonePose(
+  alliance: "red" | "blue",
+  robotLength: number,
+): { x: number; z: number; h: number } {
+  const [, , z0, z1] = FIELD.loadingZone[alliance];
+  const s = alliance === "red" ? -1 : 1;
+  return {
+    x: s * (FIELD.half - robotLength / 2 - 0.02),
+    z: (z0 + z1) / 2,
+    h: alliance === "red" ? 0 : Math.PI,
+  };
+}
+
+/** Puts robot `k` at `p` (sim X, Z, heading), at rest. */
+export function placeRobot(
+  sim: Sim,
+  k: number,
+  p: { x: number; z: number; h: number },
+): void {
+  const b = sim.view(k).robot;
+  b.setTranslation({ x: p.x, y: b.translation().y, z: p.z }, true);
+  b.setRotation(
+    { x: 0, y: Math.sin(p.h / 2), z: 0, w: Math.cos(p.h / 2) },
+    true,
+  );
+  b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+}
+
+/**
  * Replays an AUTO trace onto robot `k` of the simulator, and hands over at 38 s. The physics does not
  * step during the replay: the robot and the HIVEs are posed from the trace each frame.
  */

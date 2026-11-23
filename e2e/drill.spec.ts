@@ -259,15 +259,15 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
     () => (window as unknown as { __drill: Drill }).__drill.session.t > 0.1,
   );
   await setPad(page, 0);
-  // The drill opened after a 1-TIP Auto, so our rear CELL is up and empty: three volleys of four in
-  // front of it (12 POLLEN; the TIP weight is 7.4, so a miss or two still TIPs it) are one more
+  // The drill opened on our R-Solo's hand-off (2 AUTO TIPs), so our audience CELL is up and empty: three
+  // volleys of four in front of it (12 POLLEN; the TIP weight is 7.4, so a miss or two still TIPs it) are one more
   // TIP. Fired on the session's own clock with Circle held (the readout still times each cycle),
   // so a slow CI machine does not run out the test's time.
   await page.evaluate(() => {
     const s = (window as unknown as { __drill: Drill }).__drill.session;
     const circle = { lx: 0, ly: 0, rx: 0, held: (i: string) => i === "CIRCLE" };
     for (const n of [4, 8, 12]) {
-      s.sim.robot.setTranslation({ x: -0.32, y: 0.17, z: -1.3 }, true);
+      s.sim.robot.setTranslation({ x: -0.32, y: 0.17, z: 1.3 }, true);
       s.sim.carried = ["pollen", "pollen", "pollen", "pollen"];
       for (let t = 0; t < 10 && s.teleop.launched < n; t += 0.1)
         s.advance(0.1, circle);
@@ -290,7 +290,7 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await expect(page.locator("#results-card")).toContainText("of 7 TIPs");
   await expect(page.locator("#results-card")).toContainText("spin-up and aim");
   await expect(page.locator("#results-card")).toContainText("new best");
-  await expect(page.locator("#history")).toContainText("Best: 2 TIPs");
+  await expect(page.locator("#history")).toContainText("Best: 3 TIPs");
 
   // Options on the results screen starts the next run.
   await setPad(page, 0, [BTN.OPTIONS]);
@@ -299,7 +299,7 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
 
   // Kept in this browser: a reload still shows it.
   await page.reload();
-  await expect(page.locator("#history")).toContainText("Best: 2 TIPs");
+  await expect(page.locator("#history")).toContainText("Best: 3 TIPs");
 });
 
 test("alliance: two controllers drive Ultraviolet and Infrared on one field", async ({

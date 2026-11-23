@@ -19,7 +19,13 @@ import {
   robotConfig,
   sanitize,
 } from "../../sim/src/setup";
-import { AutoPlayback, type AutoTrace } from "./fullMatch";
+import {
+  AutoPlayback,
+  HANDOFF_S,
+  loadingZonePose,
+  placeRobot,
+  type AutoTrace,
+} from "./fullMatch";
 import {
   HUMAN_PLAYERS,
   PlaybookHumanPlayer,
@@ -110,8 +116,10 @@ export interface RunResult {
   goalAtS: number | null;
   /** A match population: the opponents' skill this match, and their TIPs. */
   opponents?: { skill: OpponentSkill; tips: number };
-  /** The 2:00 drill opened after a 1-TIP Auto: the AUTO TIPs it started with (opensAfterAuto). */
+  /** The 2:00 drill opened after an Auto: the AUTO TIPs it started with (openingAuto, opensAfterAuto). */
   openingTips?: number;
+  /** The Auto whose hand-off the 2:00 drill opened on (openingAuto), absent for the generic opening. */
+  openingAuto?: string;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
   auto?: { name: string; tips: number; design: string | null; seed: number };
   robots: RobotRunResult[];
@@ -319,6 +327,13 @@ export class DrillSession {
    * default; the page turns it on. Ignored in a full match, whose AUTO is the trace's.
    */
   opensAfterAuto = false;
+  /**
+   * The 2:00 drill opens on the field as this Auto's trace hands it over (the mentor, 23 Nov 2026:
+   * our R-Solo): both HIVEs with the AUTO's TIPs, the loose pieces and the FLOWERs, with no
+   * replay; then our robot moves into our LOADING ZONE to start TeleOp. The trace's TIPs count as
+   * AUTO TIPs. Takes the place of opensAfterAuto; ignored in a full match.
+   */
+  openingAuto: AutoTrace | null = null;
   /** The AUTO TIPs the 2:00 drill opened with (opensAfterAuto). */
   openingTips = 0;
 
@@ -326,9 +341,20 @@ export class DrillSession {
     if (this.started) return;
     this.started = true;
     if (this.playback) return; // TeleOp starts at the hand-off
-    if (this.opensAfterAuto) this.openAfterAuto();
+    if (this.openingAuto) this.openOnAuto(this.openingAuto);
+    else if (this.opensAfterAuto) this.openAfterAuto();
     this.sim.start();
     for (const r of this.readouts) r.start(0);
+  }
+
+  private openOnAuto(trace: AutoTrace) {
+    new AutoPlayback(trace, this.sim, 0).advance(HANDOFF_S);
+    placeRobot(
+      this.sim,
+      0,
+      loadingZonePose(this.sim.alliance, this.sim.view(0).cfg.length),
+    );
+    this.openingTips = this.sim.hives[this.sim.alliance].tips;
   }
 
   private openAfterAuto() {
@@ -479,6 +505,9 @@ export class DrillSession {
         : {}),
       ...(!this.playback && this.openingTips
         ? { openingTips: this.openingTips }
+        : {}),
+      ...(!this.playback && this.openingAuto
+        ? { openingAuto: this.openingAuto.auto }
         : {}),
       ...(this.playback
         ? {

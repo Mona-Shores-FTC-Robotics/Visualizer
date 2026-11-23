@@ -6,6 +6,7 @@ import {
   fieldAtHandoff,
   type AutoTrace,
 } from "../../src/drill/fullMatch";
+import { FIELD } from "../../sim/src/sim/config";
 import { toPedro } from "../../src/drill/launchSpot";
 import { DrillSession } from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
@@ -145,6 +146,50 @@ describe("the 2:00 drill opens after a 1-TIP Auto", () => {
     s.advance(121);
     const r = s.result("2026-11-23T00:00:00Z");
     expect(r.openingTips).toBe(1);
+    expect(r.auto).toBeUndefined();
+  }, 60000);
+});
+
+describe("the 2:00 drill opens on our R-Solo's hand-off, in our LOADING ZONE", () => {
+  test("the field as R-Solo leaves it, its TIPs the AUTO's, and our robot wholly in the zone along the wall", async () => {
+    const t = trace("r-solo");
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    s.openingAuto = t;
+    s.opensAfterAuto = true; // the R-Solo opening takes its place
+    s.start();
+    const red = s.sim.hives.red;
+    expect(s.openingTips).toBe(t.autoTips);
+    expect(red.tips).toBe(t.handoff.hives.red.tips);
+    expect(red.upCell).toBe(t.handoff.hives.red.up);
+    expect(s.sim.hives.blue.upCell).toBe(t.handoff.hives.blue.up);
+    expect(s.remainingS).toBe(120);
+    expect(s.tips).toHaveLength(0);
+    expect(s.totalTips).toBe(t.autoTips);
+    // In the LOADING ZONE (PARK's test), and the whole chassis inside it along the wall.
+    const v = s.sim.view(0);
+    expect(v.robotInLoadingZone()).toBe(true);
+    const [x0, x1, z0, z1] = FIELD.loadingZone.red;
+    const hl = v.cfg.length / 2,
+      hw = v.cfg.width / 2;
+    for (const [f, l] of [
+      [-hl, -hw],
+      [-hl, hw],
+    ] as const) {
+      const c = v.toWorld(f, l);
+      expect(c.x).toBeGreaterThanOrEqual(-FIELD.half);
+      expect(c.x).toBeLessThanOrEqual(x1);
+      expect(c.z).toBeGreaterThanOrEqual(z0);
+      expect(c.z).toBeLessThanOrEqual(z1);
+    }
+    expect(x0).toBe(-FIELD.half);
+    // Facing the field, and still there once TeleOp runs (nothing under it pushed it off).
+    s.advance(2);
+    expect(v.robotInLoadingZone()).toBe(true);
+    expect(Math.cos(v.heading)).toBeGreaterThan(0.99);
+    s.advance(120);
+    const r = s.result("2026-11-23T00:00:00Z");
+    expect(r.openingTips).toBe(t.autoTips);
+    expect(r.openingAuto).toBe("r-solo");
     expect(r.auto).toBeUndefined();
   }, 60000);
 });

@@ -162,6 +162,9 @@ const PHASE_LABEL: Record<DrillSession["phase"], string> = {
   ended: "ended",
 };
 
+/** The Auto the 2:00 drill opens after: ours, as the mentor asked. */
+const OPENING_AUTO = "r-solo";
+
 /** Loads an Auto's trace once; "" (the 2:00 drill) needs none. */
 async function ensureTrace(auto: string) {
   if (!auto || traces.has(auto)) return;
@@ -190,8 +193,13 @@ function newSession() {
   );
   const trace = traces.get(matchSel.value);
   if (matchSel.value && trace) session.playAuto(trace);
-  // The 2:00 drill starts after a 1-TIP Auto: our preloads tip our CELL before the clock runs.
-  else session.opensAfterAuto = true;
+  else {
+    // The 2:00 drill opens on the field as our R-Solo leaves it, our robot in our LOADING ZONE
+    // (the mentor, 23 Nov 2026); should its trace not load, after a 1-TIP Auto.
+    const opening = traces.get(OPENING_AUTO);
+    if (opening) session.openingAuto = opening;
+    else session.opensAfterAuto = true;
+  }
   $("start").textContent = session.playback
     ? "Start the match (Options)"
     : "Start 2:00 (Options)";
@@ -317,7 +325,7 @@ function showResults(r: RunResult) {
   $("results-card").innerHTML = `
     <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
-    ${r.openingTips ? `<p>Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00): AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
+    ${r.openingTips ? `<p>${r.openingAuto ? `Opened on the field as ${esc(r.openingAuto)} leaves it, our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
@@ -572,6 +580,7 @@ async function main() {
     PRESETS[20245].frameIn * IN,
   );
   view.mode = (camSel.value as CameraMode) || "driver";
+  await ensureTrace(OPENING_AUTO);
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
