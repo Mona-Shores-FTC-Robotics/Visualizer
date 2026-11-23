@@ -101,6 +101,36 @@
     "intakeWidthIn": {
       "value": 14,
       "source": "Visualizer src/drill/presets.ts (PR #150)"
+    },
+    "intake": {
+      "widthIn": {
+        "value": 14.58,
+        "source": "RobotDesign.real: 0.9 x the 16.2 in frame (the intake between the front wheels)"
+      },
+      "contactSlackIn": {
+        "value": 0.25,
+        "source": "FieldSim.INTAKE_CONTACT_SLACK_IN; RobotDesign.real intakeOnContact: a piece is taken only once it touches the intake's face"
+      },
+      "grabChance": {
+        "value": 0.85,
+        "source": "PLACEHOLDER, RobotDesign.intakeGrabChance: never measured; toss pieces in and count"
+      },
+      "intervalS": {
+        "value": 0.35,
+        "source": "PLACEHOLDER, RobotDesign.intakeIntervalS: 4 pieces in about 1 s (mentor review); never timed"
+      },
+      "maxRelSpeedInPerS": {
+        "value": 60,
+        "source": "PLACEHOLDER, RobotDesign.intakeMaxSpeedInPerS"
+      },
+      "stickReachIn": {
+        "value": 4.9,
+        "source": "GardenGather notes, 72 logged gathers: with the stick down the robot stops with the stick on the audience wall, its centre about 13 in out; 13 - 8.1 (half frame) = 4.9 in of stick ahead of the front"
+      },
+      "stickWidthIn": {
+        "value": 10,
+        "source": "PLACEHOLDER fitted to the mentor's 13 Nov 2026 note in GardenGather: three of the GARDEN's four POLLEN come over the stick, not the corner one (a 10 in ramp centred on the robot, pressed on the side wall, reaches the 2nd to 4th)"
+      }
     }
   },
   "robots": {
@@ -242,6 +272,156 @@
       "teleopGateOpenAfterLastBallS": {
         "value": 0.42,
         "source": "TeleOp four-ball feeds, gate open to shut 2.5 s median, minus gate to the fourth ball; Visualizer src/drill/presets.ts (drill chat), from events/2026-11-fruitport and -belding: read_logs.py steps and cycles"
+      }
+    }
+  },
+  "routines": {
+    "flowerPick": {
+      "approachStandoffIn": {
+        "value": 24.0,
+        "source": "biobuzz opmodes/FlowerPicker.java LineUp.approachStandoffIn: the staging spot, square to the FLOWER, this far from its centre"
+      },
+      "atApproachIn": {
+        "value": 1.5,
+        "source": "biobuzz opmodes/FlowerPicker.java LineUp.atApproachIn"
+      },
+      "atApproachDeg": {
+        "value": 5.0,
+        "source": "biobuzz opmodes/FlowerPicker.java LineUp.atApproachDeg"
+      },
+      "lowerWithinIn": {
+        "value": 24.0,
+        "source": "biobuzz opmodes/FlowerPicker.java Stick.lowerWithinIn"
+      },
+      "stickDownMs": {
+        "value": 700,
+        "source": "biobuzz opmodes/FlowerPicker.java Stick.stickDownMs"
+      },
+      "contactStandoffIn": {
+        "value": 9.0,
+        "source": "biobuzz opmodes/FlowerPicker.java Push.contactStandoffIn"
+      },
+      "pushSpeed": {
+        "value": 0.5,
+        "source": "biobuzz opmodes/FlowerPicker.java Push.pushSpeed (master: drive power; here a fraction of top speed)"
+      },
+      "stallProgressIn": {
+        "value": 0.25,
+        "source": "biobuzz opmodes/FlowerPicker.java Push.stallProgressIn"
+      },
+      "stallMs": {
+        "value": 250,
+        "source": "biobuzz opmodes/FlowerPicker.java Push.stallMs"
+      },
+      "dwellMs": {
+        "value": 2000,
+        "source": "biobuzz opmodes/FlowerPicker.java Dwell.dwellMs"
+      },
+      "dwellEndsOnFull": {
+        "value": true,
+        "source": "biobuzz opmodes/FlowerPicker.java Dwell.dwellEndsOnFull"
+      },
+      "dwellEmptyMs": {
+        "value": 1300,
+        "source": "biobuzz opmodes/FlowerPicker.java Dwell.dwellEmptyMs"
+      },
+      "backSpeed": {
+        "value": 0.5,
+        "source": "biobuzz opmodes/FlowerPicker.java Back.backSpeed (fraction of top speed here)"
+      },
+      "retractAfterBackIn": {
+        "value": 6.0,
+        "source": "biobuzz opmodes/FlowerPicker.java Stick.retractAfterBackIn"
+      },
+      "flowerPullS": {
+        "value": 0.5,
+        "source": "PLACEHOLDER, RobotDesign.flowerPullS: time to drag one POLLEN out of a FLOWER; never timed per robot (19429 roller, 20245 passive)"
+      }
+    },
+    "gardenGather": {
+      "gatherPose": {
+        "value": [
+          8.5,
+          9.5,
+          270
+        ],
+        "source": "biobuzz localization/GardenFieldPoints.RED.gather (Pedro x, y in, heading deg); blue is it turned"
+      },
+      "lineUpPose": {
+        "value": [
+          8.5,
+          19.1,
+          270
+        ],
+        "source": "biobuzz localization/GardenFieldPoints.RED.lineUp"
+      },
+      "lineUpOutIn": {
+        "value": -2.0,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.lineUpOutIn: negative presses the robot onto the side wall"
+      },
+      "lineUpBackIn": {
+        "value": 14.0,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.lineUpBackIn"
+      },
+      "atLineUpDeg": {
+        "value": 5.0,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.atLineUpDeg"
+      },
+      "lowerWithinIn": {
+        "value": 16.0,
+        "source": "biobuzz opmodes/GardenGather.java Stick.lowerWithinIn"
+      },
+      "lowerWithinDeg": {
+        "value": 20.0,
+        "source": "biobuzz opmodes/GardenGather.java Stick.lowerWithinDeg"
+      },
+      "stickDownMs": {
+        "value": 250,
+        "source": "biobuzz opmodes/GardenGather.java Stick.stickDownMs"
+      },
+      "inSpeed": {
+        "value": 0.5,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.inSpeed (fraction of top speed here)"
+      },
+      "stallProgressIn": {
+        "value": 0.25,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.stallProgressIn"
+      },
+      "stallMs": {
+        "value": 300,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.stallMs"
+      },
+      "inTimeoutMs": {
+        "value": 4000,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.inTimeoutMs"
+      },
+      "extraDepthIn": {
+        "value": -3.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.extraDepthIn"
+      },
+      "extraDepthIn19429": {
+        "value": -1.0,
+        "source": "biobuzz RobotDifferences 19429 (mentor, 21 Nov 2026): GardenGather.driveIn.extraDepthIn = -1"
+      },
+      "stickStopIn": {
+        "value": 13.0,
+        "source": "biobuzz opmodes/GardenGather.java notes, 72 logged gathers: the stick on the audience wall stops the robot with its centre about 13 in out"
+      },
+      "dwellMs": {
+        "value": 850,
+        "source": "biobuzz opmodes/GardenGather.java Dwell.dwellMs"
+      },
+      "dwellEndsOnFull": {
+        "value": true,
+        "source": "biobuzz opmodes/GardenGather.java Dwell.dwellEndsOnFull"
+      },
+      "backSpeed": {
+        "value": 0.8,
+        "source": "biobuzz opmodes/GardenGather.java Back.backSpeed (fraction of top speed here)"
+      },
+      "raiseAfterStopMs": {
+        "value": 250,
+        "source": "biobuzz opmodes/GardenGather.java Stick.raiseAfterStopMs"
       }
     }
   }
