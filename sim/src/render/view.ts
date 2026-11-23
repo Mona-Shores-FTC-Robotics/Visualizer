@@ -118,7 +118,7 @@ export class View {
 
   private loadField() {
     this.onProgress('Loading the field CAD…');
-    new GLTFLoader().load('/field.glb', gltf => {
+    new GLTFLoader().load(`${import.meta.env.BASE_URL}field.glb`, gltf => {
       gltf.scene.traverse(o => {
         if (o.name === 'hive_red') this.hiveNodes.red = o; if (o.name === 'hive_blue') this.hiveNodes.blue = o;
         const m = o as THREE.Mesh;
@@ -139,7 +139,7 @@ export class View {
    * and swaps them in for the smooth spheres. If the file is missing, the spheres stay.
    */
   private loadBalls() {
-    new GLTFLoader().load('/balls.gltf', gltf => {
+    new GLTFLoader().load(`${import.meta.env.BASE_URL}balls.gltf`, gltf => {
       for (const kind of ['pollen', 'nectar'] as const) {
         const mesh = gltf.scene.getObjectByName(kind) as THREE.Mesh | undefined; if (!mesh?.isMesh) continue;
         if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
