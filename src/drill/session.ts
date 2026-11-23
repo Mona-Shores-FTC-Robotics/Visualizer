@@ -3,19 +3,14 @@
  * toward the goal, with the practice readout's split for every cycle and pick-up of each robot. No DOM: the page and the tests drive it.
  */
 import type RAPIER_NS from "@dimforge/rapier3d-compat";
-import { DEFAULT_ROBOT, setSquareSize } from "./vendor/biobuzz-sim/config";
-import { DT, NO_INPUT, Sim } from "./vendor/biobuzz-sim/world";
+import { DEFAULT_ROBOT, setSquareSize } from "../../sim/src/sim/config";
+import { DT, NO_INPUT, Sim } from "../../sim/src/sim/world";
 import { Controls, NO_PAD, type ControlsFile, type PadRead } from "./controls";
-import type { CellSide } from "./vendor/biobuzz-sim/hive";
+import type { CellSide } from "../../sim/src/sim/hive";
+import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
-import {
-  IN,
-  PRESETS,
-  tipDwellS,
-  type RobotPreset,
-  type TeamNumber,
-} from "./presets";
-import { TeleOp, pastTippingPollen } from "./teleop";
+import { IN, PRESETS, type RobotPreset, type TeamNumber } from "./presets";
+import { TeleOp } from "./teleop";
 
 export const GOAL_TIPS = 7;
 export const TELEOP_S = 120;
@@ -31,16 +26,11 @@ export interface TipRecord {
 export type DrillMode = "two" | "driver" | "alliance";
 
 /**
- * Which TIP timing the HIVE runs (mentor, 23 Nov 2026: ours is not assumed right, so theirs stays
- * selectable). "uv-ir": our films and logs, a CELL over its weight dwells before it swings
- * (presets.TIP_DWELL). "ncssm": the simulator's own rocker, which swings with no wait. The
- * labels are sim/src/sim/tip-lag.ts's `TIP_TIMINGS`.
+ * Which TIP timing the HIVE runs (mentor, 23 Nov 2026: neither is assumed right, so both stay
+ * selectable): the simulator's own `SimOptions.tipTiming` (sim/src/sim/tip-lag.ts). "uv-ir", our
+ * films, holds a CELL over its weight on its stop before it swings; "ncssm" is the rocker alone.
  */
-export type TipTiming = "uv-ir" | "ncssm";
-export const TIP_TIMINGS: { value: TipTiming; label: string }[] = [
-  { value: "uv-ir", label: "UV/IR TIP timing" },
-  { value: "ncssm", label: "NCSSM TIP timing" },
-];
+export { TIP_TIMINGS, type TipTiming };
 
 /** One robot in a drill: whose numbers it runs, and whether it has an operator. */
 export interface RobotSlot {
@@ -110,9 +100,6 @@ export class DrillSession {
   readonly ends: CellSide[] = [];
   readonly tips: TipRecord[] = [];
   private rand: () => number;
-  private dwellFrom = NaN;
-  private dwellCount = 0;
-  private dwellDraw = 0;
   private lastCarried: number[] = [];
   private started = false;
   finished = false;
@@ -146,6 +133,7 @@ export class DrillSession {
     // alliance wall: one at each end, as the cycle playbook splits them.
     this.sim = new Sim(rapier, cfgFor(this.presets[0]), "teleop", seed, {
       flowerPullByPush: false,
+      tipTiming,
       partners: this.slots.length > 1,
       configFor: (_a, slot) =>
         this.presets[slot] ? cfgFor(this.presets[slot]) : undefined,
@@ -168,7 +156,6 @@ export class DrillSession {
       this.teleops[i].nearCell = this.ends[i];
       this.lastCarried.push(0);
     });
-    this.dwellDraw = this.rand();
   }
 
   /** Robot 1 (gamepad 1). */
@@ -229,7 +216,6 @@ export class DrillSession {
           );
         if (this.finished) this.sim.robots[k].velDrive = { vx: 0, vz: 0, w: 0 };
       });
-      this.dwell();
       const tipsBefore = this.sim.hives[this.sim.alliance].tips;
       this.sim.step(
         this.teleops.map((tele) => ({
@@ -260,29 +246,12 @@ export class DrillSession {
     }
   }
 
-  /** The CELL over its weight dwells on its stop, from the last piece to land (presets.TIP_DWELL). */
-  private dwell(): void {
-    const a = this.sim.alliance,
-      hive = this.sim.hives[a];
-    const count = this.sim.cellCount(a);
-    if (count > this.dwellCount || Number.isNaN(this.dwellFrom))
-      this.dwellFrom = this.sim.simTime;
-    this.dwellCount = count;
-    hive.held =
-      this.tipTiming === "uv-ir" &&
-      this.sim.simTime - this.dwellFrom <
-        tipDwellS(pastTippingPollen(this.sim), this.dwellDraw);
-  }
-
   private onTip(): void {
     const at = this.t;
     const shots = this.teleops.flatMap((t) => t.shots).filter((s) => s <= at);
     const last = shots.length ? Math.max(...shots) : NaN;
     if (this.started && at <= TELEOP_S + 1e-9)
       this.tips.push({ atS: at, lastBallS: last, lagS: at - last });
-    this.dwellDraw = this.rand();
-    this.dwellCount = 0;
-    this.dwellFrom = NaN;
   }
 
   result(date = new Date().toISOString()): RunResult {

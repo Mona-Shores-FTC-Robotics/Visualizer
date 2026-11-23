@@ -33,8 +33,40 @@ function samples(): Plugin {
   };
 }
 
+/**
+ * Fork: the driver drill draws the field from the simulator's own models (sim/public/field.glb and
+ * balls.gltf, FIRST's field CAD converted by ftc-biobuzz-sim), published at drill/ beside the page
+ * and served the same way in dev, so the repository holds one copy.
+ */
+function drillAssets(): Plugin {
+  const dir = resolve(import.meta.dirname, "sim/public");
+  const files = ["field.glb", "balls.gltf"];
+  return {
+    name: "drill-assets",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const match = /\/drill\/(field\.glb|balls\.gltf)$/.exec(
+          (req.url ?? "").split("?")[0],
+        );
+        if (!match) return next();
+        res.setHeader(
+          "Content-Type",
+          match[1].endsWith(".glb") ? "model/gltf-binary" : "model/gltf+json",
+        );
+        res.end(readFileSync(resolve(dir, match[1])));
+      });
+    },
+    writeBundle(options) {
+      const out = resolve(options.dir ?? "dist", "drill");
+      mkdirSync(out, { recursive: true });
+      for (const name of files)
+        copyFileSync(resolve(dir, name), resolve(out, name));
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [svelte(), samples()],
+  plugins: [svelte(), samples(), drillAssets()],
   server: {
     // Allow the sandboxed preview host used for live previews.
     host: "0.0.0.0",

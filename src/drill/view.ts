@@ -1,16 +1,16 @@
 /**
  * Draws the drill with three.js: the official field CAD, the balls, the HIVE rockers and our
  * robot with its turret. Adapted from ftc-biobuzz-sim's `src/render/view.ts` (MIT, see
- * ./vendor/biobuzz-sim/LICENSE).
+ * sim/LICENSE).
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { FIELD, HIVE } from "./vendor/biobuzz-sim/config";
+import { FIELD, HIVE } from "../../sim/src/sim/config";
 import {
   flowerHeights,
   type BallKind,
   type Sim,
-} from "./vendor/biobuzz-sim/world";
+} from "../../sim/src/sim/world";
 
 const COLOR: Record<BallKind, number> = {
   pollen: 0xf2c81e,
