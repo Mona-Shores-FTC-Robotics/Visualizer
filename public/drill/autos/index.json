@@ -1,0 +1,68 @@
+{
+ "source": "biobuzz master 1a344e6 (TeamCode/autos) and its sim-results branch",
+ "autos": [
+  {
+   "auto": "l-clockwise",
+   "alliance": "RED",
+   "design": "real robot, turret locked forward",
+   "seed": 1,
+   "autoTips": 1,
+   "finishedAt": "2026-11-18T19:42:26.019236+00:00",
+   "commit": "7621f167de7827658f9e6966b893ba261ed9fa20"
+  },
+  {
+   "auto": "l-left-under-hive",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 19,
+   "autoTips": 0,
+   "finishedAt": "2026-11-20T16:07:02.140864+00:00",
+   "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824"
+  },
+  {
+   "auto": "l-no-cross",
+   "alliance": "RED",
+   "design": "real robot, turret locked forward, POLLEN only",
+   "seed": 1,
+   "autoTips": 1,
+   "finishedAt": "2026-11-22T20:57:10.467565+00:00",
+   "commit": "284f008ea5ff831c39230e44efa18a45260a8999"
+  },
+  {
+   "auto": "r-clockwise",
+   "alliance": "RED",
+   "design": "real robot, turret locked forward",
+   "seed": 1,
+   "autoTips": 1,
+   "finishedAt": "2026-11-18T20:07:17.253735+00:00",
+   "commit": "7621f167de7827658f9e6966b893ba261ed9fa20"
+  },
+  {
+   "auto": "r-left-under-hive",
+   "alliance": "RED",
+   "design": "real robot, turret locked forward",
+   "seed": 10,
+   "autoTips": 1,
+   "finishedAt": "2026-11-20T16:12:05.093702+00:00",
+   "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824"
+  },
+  {
+   "auto": "r-no-cross",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 5,
+   "autoTips": 1,
+   "finishedAt": "2026-11-22T21:04:30.752561+00:00",
+   "commit": "284f008ea5ff831c39230e44efa18a45260a8999"
+  },
+  {
+   "auto": "r-solo",
+   "alliance": "RED",
+   "design": "real robot, turret locked forward, POLLEN only",
+   "seed": 5,
+   "autoTips": 2,
+   "finishedAt": "2026-11-03T08:25:44.654250+00:00",
+   "commit": "c6533c88e6452801ac79afba077f29e0d14b5fee"
+  }
+ ]
+}
