@@ -11,6 +11,7 @@ import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
 import { PRESETS, type RobotPreset, type TeamNumber } from "./presets";
 import { TeleOp } from "./teleop";
+import { AutoPlayback, type AutoTrace } from "./fullMatch";
 import {
   HUMAN_PLAYERS,
   PlaybookHumanPlayer,
@@ -85,8 +86,12 @@ export interface RunResult {
   pickUps: PickUpResult[];
   /** Every robot's launches. */
   balls: number;
-  /** When the 7th TIP settled, or null. */
+  /** When the 7th TIP settled (the AUTO's counted, in a full match), or null. */
   goalAtS: number | null;
+  /** The 2:00 drill opened after a 1-TIP Auto: the AUTO TIPs it started with (opensAfterAuto). */
+  openingTips?: number;
+  /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
+  auto?: { name: string; tips: number; design: string | null; seed: number };
   robots: RobotRunResult[];
 }
 
@@ -121,6 +126,8 @@ export class DrillSession {
   private lastCarried: number[] = [];
   private started = false;
   finished = false;
+  /** Full Match: the Auto being replayed before TeleOp (./fullMatch.ts), or null for the 2:00 drill. */
+  playback: AutoPlayback | null = null;
 
   /**
    * One robot (`team`), or an alliance (an array of slots): our robots as partners on one field,
@@ -212,14 +219,65 @@ export class DrillSession {
   }
 
   get remainingS(): number {
+    if (this.playback && !this.playback.handedOver) return this.playback.timer;
     return this.started ? Math.max(0, this.sim.clock) : TELEOP_S;
   }
+
+  /** Which part of the match is running: the AUTO and transition only in a full match. */
+  get phase(): "pre" | "auto" | "transition" | "teleop" | "ended" {
+    if (this.finished) return "ended";
+    if (!this.started) return "pre";
+    return this.playback ? this.playback.phase : "teleop";
+  }
+
+  /** TIPs that count toward 7: the AUTO's (a full match) and TeleOp's. */
+  get totalTips(): number {
+    const auto = this.playback
+      ? this.playback.handedOver
+        ? this.playback.trace.autoTips
+        : this.playback.tipsSoFar
+      : this.openingTips;
+    return auto + this.tips.length;
+  }
+
+  /**
+   * Full Match: play `trace` (one of our Autos, as the AutoSim ran it) for the AUTO and the
+   * transition before TeleOp, robot 1 starting where it ends. Call before start().
+   */
+  playAuto(trace: AutoTrace): void {
+    if (this.started) throw new Error("playAuto: the run has started");
+    this.playback = new AutoPlayback(trace, this.sim, 0);
+  }
+
+  /**
+   * The 2:00 drill opens after a 1-TIP Auto (Hub, 23 Nov 2026): our robot's 4 preloads go into our
+   * raised CELL with its 3 NECTAR, over the TIP weight, and the field runs (clock stopped) until the
+   * TIP settles and spills, as most of our Autos leave it. That TIP counts as the AUTO's. Off by
+   * default; the page turns it on. Ignored in a full match, whose AUTO is the trace's.
+   */
+  opensAfterAuto = false;
+  /** The AUTO TIPs the 2:00 drill opened with (opensAfterAuto). */
+  openingTips = 0;
 
   start(): void {
     if (this.started) return;
     this.started = true;
+    if (this.playback) return; // TeleOp starts at the hand-off
+    if (this.opensAfterAuto) this.openAfterAuto();
     this.sim.start();
     for (const r of this.readouts) r.start(0);
+  }
+
+  private openAfterAuto() {
+    const a = this.sim.alliance,
+      hive = this.sim.hives[a];
+    this.sim.handoff({ [a]: { up: hive.upCell, tips: 0, cellPollen: 4 } });
+    // Before PLAY the clock stands and nobody drives: only the HIVE and the pieces move.
+    for (let i = 0; i < 12 / DT && hive.tips === 0; i++)
+      this.sim.step(NO_INPUT);
+    for (let i = 0; i < 3 / DT; i++) this.sim.step(NO_INPUT); // the spill comes to rest
+    this.openingTips = hive.tips;
+    this.sim.handoff({ [a]: { up: hive.upCell, tips: hive.tips } });
   }
 
   /** Advances the drill by `seconds` of simulated time with robot 1's pads. */
@@ -236,6 +294,17 @@ export class DrillSession {
     seconds: number,
     pads: { driver: PadRead; operator: PadRead }[],
   ): void {
+    // Full Match: the AUTO and the transition replay the trace; the pads do nothing until 2:00.
+    if (this.playback && !this.playback.handedOver) {
+      if (!this.started) return;
+      const before = this.playback.t;
+      if (!this.playback.advance(seconds)) return;
+      this.sim.start();
+      for (const r of this.readouts) r.start(0);
+      this.lastCarried = this.sim.robots.map((r) => r.carried.length);
+      seconds -= this.playback.t - before;
+      if (seconds <= 1e-9) return;
+    }
     const steps = Math.max(1, Math.round(seconds / DT));
     // The TeleOp's loop runs at about the robot's 50 Hz; the physics at the simulator's 240 Hz.
     for (let i = 0; i < steps; i++) {
@@ -324,9 +393,31 @@ export class DrillSession {
       cycles: robots[0].cycles,
       pickUps: robots[0].pickUps,
       balls: robots.reduce((a, r) => a + r.balls, 0),
-      goalAtS:
-        this.tips.length >= GOAL_TIPS ? this.tips[GOAL_TIPS - 1].atS : null,
+      goalAtS: this.goalAtS(),
       robots,
+      ...(!this.playback && this.openingTips
+        ? { openingTips: this.openingTips }
+        : {}),
+      ...(this.playback
+        ? {
+            auto: {
+              name: this.playback.trace.auto,
+              tips: this.playback.trace.autoTips,
+              design: this.playback.trace.design,
+              seed: this.playback.trace.seed,
+            },
+          }
+        : {}),
     };
+  }
+
+  /** When the 7th TIP settled, seconds from TeleOp's start (the AUTO's TIPs counted first), or null. */
+  private goalAtS(): number | null {
+    const auto = this.playback
+      ? this.playback.trace.autoTips
+      : this.openingTips;
+    if (auto >= GOAL_TIPS) return 0;
+    const k = GOAL_TIPS - auto;
+    return this.tips.length >= k ? this.tips[k - 1].atS : null;
   }
 }

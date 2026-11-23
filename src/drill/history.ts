@@ -12,6 +12,8 @@ export interface StoredRun {
   team: number;
   teams?: number[];
   mode: DrillMode;
+  /** A full match: the Auto played before TeleOp; `tips` then counts its TIPs too. */
+  auto?: string;
   /** Missing on runs from before the switch: those ran our timing. */
   tipTiming?: TipTiming;
   date: string;
@@ -31,9 +33,10 @@ export function summarize(r: RunResult): StoredRun {
     team: r.team,
     teams: r.robots.map((x) => x.team),
     mode: r.mode,
+    ...(r.auto ? { auto: r.auto.name } : {}),
     tipTiming: r.tipTiming,
     date: r.date,
-    tips: r.tips,
+    tips: r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0),
     goalAtS: r.goalAtS,
     balls: r.balls,
     cycles: c.length,
@@ -82,12 +85,15 @@ export function bestRun(
   team: number,
   mode?: string,
   tipTiming?: TipTiming,
+  /** "" for the 2:00 drill, an Auto's name for its full matches; undefined for any. */
+  auto?: string,
 ): StoredRun | null {
   const mine = list.filter(
     (r) =>
       r.team === team &&
       (!mode || r.mode === mode) &&
-      (!tipTiming || (r.tipTiming ?? "uv-ir") === tipTiming),
+      (!tipTiming || (r.tipTiming ?? "uv-ir") === tipTiming) &&
+      (auto === undefined || (r.auto ?? "") === auto),
   );
   return mine.length ? [...mine].sort(compareRuns)[0] : null;
 }

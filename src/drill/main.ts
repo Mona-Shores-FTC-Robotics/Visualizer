@@ -33,6 +33,7 @@ import {
   type RunResult,
 } from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
+import { loadAutoIndex, loadAutoTrace, type AutoTrace } from "./fullMatch";
 import {
   PadBinder,
   PadDecoder,
@@ -59,6 +60,7 @@ const prefs = (() => {
       camera?: string;
       tipTiming?: string;
       humanPlayer?: string;
+      match?: string;
     };
   } catch {
     return {};
@@ -74,6 +76,7 @@ function savePrefs() {
         camera: camSel.value,
         tipTiming: tipSel.value,
         humanPlayer: hpSel.value,
+        match: matchSel.value,
       }),
     );
   } catch {
@@ -90,6 +93,9 @@ tipSel.innerHTML = TIP_TIMINGS.map(
 ).join("");
 if (prefs.tipTiming) tipSel.value = prefs.tipTiming;
 const hpSel = $<HTMLSelectElement>("human-player");
+/** Full Match: "" for the 2:00 drill, else the Auto to play first (public/drill/autos/). */
+const matchSel = $<HTMLSelectElement>("match");
+const traces = new Map<string, AutoTrace>();
 hpSel.innerHTML = HUMAN_PLAYERS.map(
   (t) => `<option value="${t.value}">${t.label}</option>`,
 ).join("");
@@ -134,6 +140,25 @@ function teams(): TeamNumber[] {
   return alliance() ? [first, first === 20245 ? 19429 : 20245] : [first];
 }
 
+const PHASE_LABEL: Record<DrillSession["phase"], string> = {
+  pre: "press Options to start",
+  auto: "AUTO",
+  transition: "transition",
+  teleop: "TeleOp",
+  ended: "ended",
+};
+
+/** Loads an Auto's trace once; "" (the 2:00 drill) needs none. */
+async function ensureTrace(auto: string) {
+  if (!auto || traces.has(auto)) return;
+  try {
+    traces.set(auto, await loadAutoTrace(auto));
+  } catch (e) {
+    $("progress").textContent =
+      `The Auto ${auto} did not load: ${(e as Error).message}`;
+  }
+}
+
 function newSession() {
   const mode = modeSel.value as DrillMode;
   session = new DrillSession(
@@ -148,6 +173,13 @@ function newSession() {
     tipSel.value as TipTiming,
     hpSel.value as HumanPlayerKind,
   );
+  const trace = traces.get(matchSel.value);
+  if (matchSel.value && trace) session.playAuto(trace);
+  // The 2:00 drill starts after a 1-TIP Auto: our preloads tip our CELL before the clock runs.
+  else session.opensAfterAuto = true;
+  $("start").textContent = session.playback
+    ? "Start the match (Options)"
+    : "Start 2:00 (Options)";
   saved = false;
   $("results").hidden = true;
   showNumbers();
@@ -249,7 +281,8 @@ function cycleTable(x: RobotRunResult) {
 function showResults(r: RunResult) {
   const list = saveRun(summarize(r));
   showHistory(list);
-  const best = bestRun(list, r.team, r.mode, r.tipTiming);
+  const best = bestRun(list, r.team, r.mode, r.tipTiming, r.auto?.name ?? "");
+  const total = r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0);
   const isBest = best && best.date === r.date;
   const who = r.mode.startsWith("alliance")
     ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, ${r.mode === "alliance" ? "a driver each" : "a driver and an operator each"}`
@@ -267,7 +300,9 @@ function showResults(r: RunResult) {
         .join("")
     : cycleTable(r.robots[0]);
   $("results-card").innerHTML = `
-    <h2>${r.tips >= GOAL_TIPS ? `<span class="goal">${r.tips} TIPs: goal!</span>` : `<span class="miss">${r.tips} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
+    <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
+    ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
+    ${r.openingTips ? `<p>Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00): AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${nectarLine}
@@ -326,9 +361,12 @@ function humanPlayerBox() {
 
 function hud() {
   $("clock").innerHTML =
-    `${clock(Math.ceil(session.remainingS))}<small>${session.finished ? "ended" : session.t > 0 ? "TeleOp" : "press Options to start"}</small>`;
+    `${clock(Math.ceil(session.remainingS))}<small>${PHASE_LABEL[session.phase]}${session.playback && session.phase !== "teleop" && session.phase !== "ended" ? ` · ${esc(session.playback.trace.auto)}` : ""}</small>`;
+  const autoTips = session.playback
+    ? session.totalTips - session.tips.length
+    : 0;
   $("tips").innerHTML =
-    `${session.tips.length} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
+    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""} · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
   const all = session.teleops.map((_, k) => k);
   $("robot").innerHTML = all.map(robotBox).join("");
   $("note").textContent = session.teleops
@@ -519,6 +557,30 @@ async function main() {
       padsKey = "";
       newSession();
     };
+  matchSel.onchange = async () => {
+    savePrefs();
+    await ensureTrace(matchSel.value);
+    newSession();
+  };
+  // The Autos for Full Match, from public/drill/autos/index.json (scripts/drill-auto-traces.py).
+  void loadAutoIndex()
+    .then(async (autos) => {
+      for (const a of autos) {
+        const o = document.createElement("option");
+        o.value = a.auto;
+        o.textContent = `Full match: ${a.auto} (${a.autoTips} AUTO TIP${a.autoTips === 1 ? "" : "s"})`;
+        matchSel.append(o);
+      }
+      const want = prefs.match;
+      if (want && autos.some((a) => a.auto === want)) {
+        matchSel.value = want;
+        await ensureTrace(want);
+        newSession();
+      }
+    })
+    .catch(() => {
+      /* no Autos published: the 2:00 drill only */
+    });
   camSel.onchange = () => {
     view.mode = camSel.value as CameraMode;
     savePrefs();
