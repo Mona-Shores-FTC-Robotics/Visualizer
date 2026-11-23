@@ -58,6 +58,16 @@ export interface LaunchSpotFile {
   settleTurnDegPerS: number;
   approachWithinIn: number;
   approachTurnDegPerS: number;
+  /** biobuzz #734: a press that stalls short of its spot fires Circle's AIM shot from there. Absent before it. */
+  fireOnStall?: boolean;
+  stallS?: number;
+  stallToleranceIn?: number;
+  stallSpeedInPerSec?: number;
+  stallTurnDegPerSec?: number;
+  stallProgressIn?: number;
+  /** The speed table's measured rows: a stall shot only from inside them. */
+  stallRangeLowIn?: number;
+  stallRangeHighIn?: number;
   spots: {
     name: string;
     row: Row;
@@ -162,7 +172,91 @@ const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const within = (v: number, tol: number) => !(tol > 0) || v <= tol;
 const nonNegative = (s: number) => (s > 0 ? s : 0);
 
-type Phase = "IDLE" | "DRIVING" | "HOLDING" | "REFUSED" | "ENDED";
+type Phase =
+  "IDLE" | "DRIVING" | "HOLDING" | "STALL_FIRING" | "REFUSED" | "ENDED";
+
+/** SpotStall.guarded: NaN or missing is the fallback; held to [lo, hi]. */
+const guarded = (
+  v: number | undefined,
+  fallback: number,
+  lo: number,
+  hi: number,
+) =>
+  v === undefined || !Number.isFinite(v)
+    ? fallback
+    : Math.max(lo, Math.min(hi, v));
+
+/**
+ * biobuzz `opmodes/SpotStall`: whether a press still driving has stalled short of its spot. Slow
+ * (under `slowInPerSec` and `slowTurnDegPerSec`), more than `toleranceIn` from the spot, and closing
+ * on it by less than `progressIn` since the slow began, for `stallS`.
+ */
+export class SpotStall {
+  private sinceS = NaN;
+  private remainingAtSinceIn = NaN;
+
+  reset() {
+    this.sinceS = NaN;
+    this.remainingAtSinceIn = NaN;
+  }
+
+  update(
+    nowS: number,
+    remainingIn: number,
+    speedInPerSec: number,
+    turnDegPerSec: number,
+    stallS: number,
+    toleranceIn: number,
+    slowInPerSec: number,
+    slowTurnDegPerSec: number,
+    progressIn: number,
+  ): boolean {
+    const slow =
+      remainingIn > toleranceIn &&
+      Math.abs(speedInPerSec) < slowInPerSec &&
+      Math.abs(turnDegPerSec) < slowTurnDegPerSec;
+    if (!slow) {
+      this.reset();
+      return false;
+    }
+    if (
+      Number.isNaN(this.sinceS) ||
+      this.remainingAtSinceIn - remainingIn > progressIn
+    ) {
+      this.sinceS = nowS;
+      this.remainingAtSinceIn = remainingIn;
+      return false;
+    }
+    return nowS - this.sinceS >= stallS;
+  }
+}
+
+/** What a stalled press asks the TeleOp: may Circle's AIM shot fire from here (null), or why not; and its range. */
+export interface StallShot {
+  refusal(): string | null;
+  rangeIn(): number;
+}
+
+/**
+ * SpotStall.refusal: why Circle's AIM shot may not fire from where the press stalled, or null. The
+ * turret must be aiming, the robot short of the centre line, the range inside the speed table's
+ * measured rows, and the aim inside the firing arc (or Circle turns into it).
+ */
+export function stallRefusal(
+  turretAims: boolean,
+  pastLineIn: number,
+  rangeIn: number,
+  rangeMeasured: boolean,
+  aimInsideArc: boolean,
+  turnsIntoArc: boolean,
+): string | null {
+  if (!turretAims) return "turret not aiming (AIM needed)";
+  if (!(pastLineIn < 0)) return "past the centre line";
+  if (Number.isNaN(rangeIn)) return "range unknown";
+  if (!rangeMeasured) return `out of range (${rangeIn.toFixed(0)} in)`;
+  if (!aimInsideArc && !turnsIntoArc) return "aim outside the firing arc";
+  return null;
+}
 type VolleyPhase = "OFF" | "DRIVING" | "WAITING" | "FEEDING";
 
 /** The drive's arrival, Pedro's path end: within this of the spot, and of its heading. */
@@ -197,6 +291,10 @@ export class LaunchSpotDrive {
   /** When the button's feed started, s; NaN before. */
   feedStartS = NaN;
   feedWhy = "";
+  private stall = new SpotStall();
+  private stallAtS = NaN;
+  private stallShortIn = NaN;
+  private stallRangeIn = NaN;
   /** How the last press ended, or why it was refused, for the status line. */
   result = "";
 
@@ -204,10 +302,22 @@ export class LaunchSpotDrive {
     private file: LaunchSpotFile,
     private team: Team,
     private alsoFires: boolean,
+    /** Circle's AIM shot for a press that stalls; null: a stalled press just ends. */
+    private stallShot: StallShot | null = null,
   ) {}
 
   get active(): boolean {
     return this.phase === "DRIVING" || this.phase === "HOLDING";
+  }
+
+  /** Stalled short of its spot and handed its shot to Circle's AIM path (biobuzz #734). */
+  get firingFromStall(): boolean {
+    return this.phase === "STALL_FIRING";
+  }
+
+  /** The press owns the robot one way or another: driving, holding, or firing from a stall. */
+  get busy(): boolean {
+    return this.active || this.firingFromStall;
   }
 
   get spotName(): string | null {
@@ -235,17 +345,20 @@ export class LaunchSpotDrive {
   ): SpotStep {
     const idle: SpotStep = { drive: null, feed: false, wantsLauncher: false };
     if (!held) {
-      if (this.active) this.end(sim, now, "let go");
+      if (this.busy) this.end(sim, now, "let go");
       this.phase = "IDLE";
       return idle;
     }
     if (this.phase === "IDLE") this.start(sim, now);
-    if (!this.active) return idle;
+    if (!this.busy) return idle;
     // `sticksMoved` is FreshSticks' answer (the TeleOp keeps one for Square).
     if (sticksMoved) {
       this.end(sim, now, "sticks moved");
       return idle;
     }
+    // Circle's AIM shot fires from here until Square is let go or a stick moves; the robot stays put.
+    if (this.phase === "STALL_FIRING")
+      return { drive: null, feed: false, wantsLauncher: this.fires };
     const s = now - this.startS;
     const remaining = this.remainingIn(sim);
     const headingErr = wrap(this.to.h - sim.heading);
@@ -256,9 +369,31 @@ export class LaunchSpotDrive {
       ) {
         this.phase = "HOLDING";
         this.arriveS = s;
-      } else if (!(s * 1000 <= this.file.timeoutMs)) {
-        this.end(sim, now, "timed out");
-        return idle;
+      } else {
+        const f = this.file;
+        const timedOut = !(s * 1000 <= f.timeoutMs);
+        const lv = sim.robot.linvel();
+        const stalled =
+          !!f.fireOnStall &&
+          this.fires &&
+          this.volley !== "FEEDING" &&
+          this.stall.update(
+            s,
+            remaining,
+            Math.hypot(lv.x, lv.z) / IN,
+            (sim.robot.angvel().y * 180) / Math.PI,
+            guarded(f.stallS, 0.6, 0.2, 5),
+            guarded(f.stallToleranceIn, 2, 0, 24),
+            guarded(f.stallSpeedInPerSec, 3, 0, 20),
+            guarded(f.stallTurnDegPerSec, 20, 0, 180),
+            guarded(f.stallProgressIn, 1, 0.1, 12),
+          );
+        if (stalled || timedOut) {
+          this.stalled(sim, now, timedOut ? "timed out" : "stalled");
+          return this.busy
+            ? { drive: null, feed: false, wantsLauncher: this.fires }
+            : idle;
+        }
       }
     }
     const drive = this.drive(sim, dt);
@@ -274,6 +409,8 @@ export class LaunchSpotDrive {
       return `Launch spot: driving to ${name}, ${this.remainingIn(sim).toFixed(0)} in to go · ${(now - this.startS).toFixed(1)} s${this.volleyNote()}`;
     if (this.phase === "HOLDING")
       return `Launch spot: AT ${name}, holding (arrived in ${this.arriveS.toFixed(1)} s)${this.volleyNote()} · let go to drive`;
+    if (this.phase === "STALL_FIRING")
+      return `Launch spot: STALLED ${this.stallShortIn.toFixed(0)} in short of ${name} · firing from ${this.stallRangeIn.toFixed(0)} in (Circle's shot) · let go to stop`;
     return this.result;
   }
 
@@ -291,6 +428,10 @@ export class LaunchSpotDrive {
     this.arrivedVolleyS = NaN;
     this.feedStartS = NaN;
     this.feedWhy = "";
+    this.stallAtS = NaN;
+    this.stallShortIn = NaN;
+    this.stallRangeIn = NaN;
+    this.stall.reset();
     const p = sim.robot.translation();
     const [x, y] = toPedro(p.x, p.z, sim.heading, this.file.fieldCentreIn);
     this.choice = chooseSpot(this.file, sim.alliance, x, y);
@@ -306,17 +447,41 @@ export class LaunchSpotDrive {
     this.volley = this.fires ? "DRIVING" : "OFF";
   }
 
+  /** LaunchSpotDrive.stalled: hand the shot to Circle's AIM path from here, or end with why not. */
+  private stalled(sim: Sim, now: number, why: string) {
+    if (!this.file.fireOnStall || !this.fires) {
+      this.end(sim, now, why);
+      return;
+    }
+    const refusal = this.stallShot
+      ? this.stallShot.refusal()
+      : "no stall shot here";
+    if (refusal !== null) {
+      this.end(sim, now, `${why}, ${refusal}`);
+      return;
+    }
+    this.stallAtS = now - this.startS;
+    this.stallShortIn = this.remainingIn(sim);
+    this.stallRangeIn = this.stallShot!.rangeIn();
+    this.volley = "OFF";
+    this.phase = "STALL_FIRING";
+  }
+
   private end(sim: Sim, now: number, why: string) {
     const name = this.spotName;
     const s = now - this.startS;
-    this.result =
-      this.phase === "DRIVING"
+    const fromStall = this.phase === "STALL_FIRING";
+    this.result = fromStall
+      ? `Last launch spot: ${why} after ${s.toFixed(2)} s, stalled ${this.stallShortIn.toFixed(0)} in short of ${name} at ${this.stallAtS.toFixed(2)} s and fired from ${this.stallRangeIn.toFixed(0)} in (Circle's AIM shot)`
+      : this.phase === "DRIVING"
         ? `Last launch spot: ${why} early after ${s.toFixed(2)} s, ${this.remainingIn(sim).toFixed(0)} in short of ${name}`
         : `Last launch spot: ${why} after arriving at ${name} in ${this.arriveS.toFixed(2)} s`;
     if (this.fires)
-      this.result += Number.isNaN(this.feedStartS)
-        ? "; gate never opened by the button"
-        : `; gate opened ${(this.feedStartS - this.startS).toFixed(2)} s after the press (${this.feedWhy})`;
+      this.result += fromStall
+        ? "; fired by Circle's AIM shot (stalled)"
+        : Number.isNaN(this.feedStartS)
+          ? "; gate never opened by the button"
+          : `; gate opened ${(this.feedStartS - this.startS).toFixed(2)} s after the press (${this.feedWhy})`;
     this.volley = "OFF";
     this.phase = "ENDED";
   }

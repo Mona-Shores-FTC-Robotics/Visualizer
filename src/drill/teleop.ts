@@ -23,7 +23,7 @@ import { Controls, type PadRead } from "./controls";
 import { IN, type RobotPreset } from "./presets";
 import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
 import robotModel from "../../sim/src/sim/robots/mona-shores.json";
-import { LaunchSpotDrive, type SpotStep } from "./launchSpot";
+import { LaunchSpotDrive, stallRefusal, type SpotStep } from "./launchSpot";
 import { FreshSticks } from "./freshSticks";
 import {
   CornerGather,
@@ -139,6 +139,8 @@ export class TeleOp {
   private spotWas = false;
   private spotStartS = Infinity;
   private lastNow = 0;
+  private stallRange = NaN;
+  private circleWas = false;
   private arcTurning = false;
   private arcCancelled = false;
   private chassisAiming = false;
@@ -183,6 +185,27 @@ export class TeleOp {
         spots,
         String(preset.team) as "19429" | "20245",
         t.goToSpotAlsoFires !== false,
+        {
+          // BasicDriveTeleOp's StallShot: Circle's AIM shot from where Square stalled, if it may fire.
+          refusal: () => {
+            const aim = this.aimNow();
+            const range = this.rangeIn(aim);
+            this.stallRange = range;
+            const rel = wrap180(aim.deg - this.aimTrimDeg);
+            const p = this.sim.robot.translation();
+            return stallRefusal(
+              this.turretMode === "AIM",
+              (this.sim.alliance === "red" ? p.x : -p.x) / IN,
+              range,
+              range >= (spots.stallRangeLowIn ?? 35) &&
+                range <= (spots.stallRangeHighIn ?? 74),
+              rel <= this.num("turretArcLeftDeg", 90) &&
+                rel >= -this.num("turretArcRightDeg", 90),
+              this.flag("circleTurnsIntoArc", true),
+            );
+          },
+          rangeIn: () => this.stallRange,
+        },
       );
     sim.robots[sim.me].velDrive = { vx: 0, vz: 0, w: 0 };
   }
@@ -322,9 +345,18 @@ export class TeleOp {
 
     // --- fire (driver's Circle) -------------------------------------------------------------
     // A Square press that fires owns the shot: Circle feeds nothing until it ends (BasicDriveTeleOp.fire).
-    const fireHeld = c.held("CHASSIS_AIM") && !this.spotStep.wantsLauncher;
-    this.firePress = fireHeld && !this.fireHeldWas;
-    if (this.firePress) {
+    // A press that stalled short of its spot has handed its shot to Circle's AIM path: it fires
+    // as a held Circle in AIM does, with the arc turn (spotStallFires).
+    const stallFires =
+      !!this.spot?.firingFromStall && this.turretMode === "AIM";
+    const circle =
+      c.held("CHASSIS_AIM") &&
+      !(this.spotStep.wantsLauncher && !this.spot?.firingFromStall);
+    const fireHeld = circle || stallFires;
+    // The readout's press is the driver's own; a Square volley times from the gate (CycleReadout).
+    this.firePress = circle && !this.circleWas;
+    this.circleWas = circle;
+    if (fireHeld && !this.fireHeldWas) {
       const spun =
         this.spinning(now) &&
         now - this.spinSince >= this.preset.spinUpFromIdleS;
@@ -395,6 +427,13 @@ export class TeleOp {
     let target: { vx: number; vz: number; w: number };
     if (this.routine?.last) target = this.routine.last.drive;
     else if (this.spotStep.drive) target = { ...this.spotStep.drive };
+    else if (this.spot?.firingFromStall)
+      // Square still owns the robot: it stays put but for Circle's arc turn.
+      target = {
+        vx: 0,
+        vz: 0,
+        w: this.arcTurning ? turnCmd * rad(this.preset.turnRateDegPerS) : 0,
+      };
     else {
       const a = this.fieldForward;
       const F = { x: Math.cos(a), z: -Math.sin(a) },
@@ -578,6 +617,15 @@ export class TeleOp {
     return { deg: deg(Math.atan2(left, fwd)) + this.aimTrimDeg, ox, oz, mouth };
   }
 
+  /** From the turret to the raised CELL's mouth, inches (TurretAim's range for the speed table). */
+  private rangeIn(aim: {
+    ox: number;
+    oz: number;
+    mouth: { x: number; z: number };
+  }): number {
+    return Math.hypot(aim.mouth.x - aim.ox, aim.mouth.z - aim.oz) / IN;
+  }
+
   /** One ball out of the launcher, at the speed the speed table would pick for the range. */
   private launch(
     aim: { ox: number; oz: number; mouth: { x: number; y: number; z: number } },
@@ -721,7 +769,7 @@ export class TeleOp {
         this.endRoutine();
       }
     };
-    if (this.spot?.active) return;
+    if (this.spot?.busy) return;
     // The operator's stick toggle holds while no grab runs.
     this.sim.robots[this.sim.me].stickDown = this.stickOut;
     if (c.on("FLOWER_PICK")) start("pick");
@@ -765,7 +813,7 @@ export class TeleOp {
       now,
       this.num("staleStickCancelsAfterS", 0.6),
     );
-    const wasActive = this.spot.active,
+    const wasActive = this.spot.busy,
       wasPhase = this.spot.phase,
       wasFiring = this.spotStep.wantsLauncher;
     this.spotStep = this.spot.step(this.sim, held, moved, spun, now, dt);
@@ -777,7 +825,7 @@ export class TeleOp {
     }
     if (this.spot.phase === "REFUSED" && wasPhase !== "REFUSED")
       this.say(this.spot.result, now, 4);
-    else if (wasActive && !this.spot.active) this.say(this.spot.result, now, 4);
+    else if (wasActive && !this.spot.busy) this.say(this.spot.result, now, 4);
     this.spotWas = held;
   }
 
@@ -824,7 +872,7 @@ export class TeleOp {
       lane: this.sim.carried.length,
       routine: this.routine
         ? `${this.routine.kind === "pick" ? "FLOWER pick" : "GARDEN gather"}: ${this.routine.last?.phase ?? "starting"}`
-        : this.spot?.active
+        : this.spot?.busy
           ? this.spot.line(this.sim, this.lastNow)
           : null,
       arcTurning: this.arcTurning,
