@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { TIP_LOAD } from '../src/sim/config';
-import { DEFAULT_TIP_TIMING, TIP_LAG, TipLagHold, tipTiming } from '../src/sim/tip-lag';
+import { DEFAULT_TIP_TIMING, TIP_LAG, TipLagHold, swingS, tipTiming } from '../src/sim/tip-lag';
 
 const median = (v: number[]) => { const s = [...v].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
 describe('TIP lag (Mona Shores override, biobuzz TeamCode/autos/timing-terms.md)', () => {
   it('at the tipping weight: hold + upstream swing + flight lands on the films, 3.4 to 6.5 s, median 3.9', () => {
-    const h = new TipLagHold(7), lags = Array.from({ length: 4000 }, () => h.drawLag(1) + TIP_LAG.upstreamSwingAtWeightS + TIP_LAG.flightS);
+    const h = new TipLagHold(7), lags = Array.from({ length: 4000 }, () => h.drawLag(1) + swingS(1) + TIP_LAG.flightS);
     expect(Math.min(...lags)).toBeGreaterThanOrEqual(3.4 - 1e-9);
     expect(Math.max(...lags)).toBeLessThanOrEqual(6.5 + 1e-9);
     expect(median(lags)).toBeGreaterThan(3.7); expect(median(lags)).toBeLessThan(4.1);
   });
   it('well past it: 2.2 to 2.5 s', () => {
-    const h = new TipLagHold(7), lags = Array.from({ length: 1000 }, () => h.drawLag(3) + TIP_LAG.upstreamSwingWellPastS + TIP_LAG.flightS);
+    const h = new TipLagHold(7), lags = Array.from({ length: 1000 }, () => h.drawLag(3) + swingS(3) + TIP_LAG.flightS);
     expect(Math.min(...lags)).toBeGreaterThanOrEqual(2.2 - 1e-9);
     expect(Math.max(...lags)).toBeLessThanOrEqual(2.5 + 1e-9);
   });
@@ -58,4 +58,25 @@ describe('TIP timing in a match', () => {
       expect(uvir, `seed ${seed}`).toBeLessThan(7.5);
     }
   });
+});
+
+describe('TIP lag in a match, against the films (last ball out = last piece in - flight)', () => {
+  beforeAll(async () => { await RAPIER.init(); });
+  /** Seconds from dropping `n` POLLEN on the raised red CELL's 3 NECTAR to the TIP settling, plus the flight. */
+  const lag = (n: number, seed: number) => {
+    const s = new Sim(RAPIER, undefined, 'practice', seed, { tipTiming: 'uv-ir' }), hive = s.hives.red, t0 = s.time;
+    for (let k = 0; k < n; k++) { const w = hive.raisedCellPoint(((k % 3) - 1) * 0.15, 0.02 + 0.07 * Math.floor(k / 6), 0.3 + 0.08 * (Math.floor(k / 3) % 2)); s.spawn('pollen', w.x, w.y, w.z); }
+    for (let i = 0; i < 12 / DT && hive.tips === 0; i++) s.step(NO_INPUT);
+    return s.time - t0 + TIP_LAG.flightS;
+  };
+  const med = (v: number[]) => [...v].sort((a, b) => a - b)[v.length >> 1];
+  it('at the tipping weight (4 POLLEN on 3 NECTAR): within 3.4-6.5 s, median near 3.9', () => {
+    const l = Array.from({ length: 15 }, (_, i) => lag(4, i + 1));
+    expect(Math.min(...l)).toBeGreaterThan(3.3); expect(Math.max(...l)).toBeLessThan(6.7);
+    expect(med(l)).toBeGreaterThan(3.6); expect(med(l)).toBeLessThan(4.3);
+  }, 120000);
+  it('well past it (9 POLLEN on 3 NECTAR): 2.2-2.5 s', () => {
+    const l = Array.from({ length: 6 }, (_, i) => lag(9, i + 1));
+    expect(Math.min(...l)).toBeGreaterThan(2.1); expect(Math.max(...l)).toBeLessThan(2.6);
+  }, 120000);
 });
