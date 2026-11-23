@@ -140,3 +140,46 @@ describe("the NECTAR gate", () => {
     expect(s.teleop.nectarLaunched).toBe(1);
   }, 60000);
 });
+
+describe("POLLEN only: every NECTAR rejected at the intake (ColorSensorSubsystem.rejectAllNectar)", () => {
+  // Our NECTAR in front of the intake: in it goes with the switch off, back out with it on.
+  const intakeOurs = async (pollenOnly: boolean) => {
+    const s = await solo();
+    s.pollenOnly = pollenOnly;
+    place(s, -1.0, 1.2, 0);
+    s.advance(0.2);
+    const front = s.sim.toWorld(s.sim.cfg.length / 2 + 0.05, 0);
+    const red = s.sim.spawn(
+      "nectar_red",
+      front.x,
+      FIELD.nectarRadius + 0.005,
+      front.z,
+    );
+    s.advance(1.5);
+    return { s, red };
+  };
+
+  test("off: our NECTAR goes into the lane, as before", async () => {
+    const { s } = await intakeOurs(false);
+    expect(s.sim.carried).toContain("nectar_red");
+    expect(s.teleop.rejects).toBe(0);
+    expect(s.result().pollenOnly).toBeUndefined();
+  }, 60000);
+
+  test("on: our NECTAR is burst back out like the other alliance's, and a POLLEN still comes in", async () => {
+    const { s, red } = await intakeOurs(true);
+    expect(s.sim.carried).toEqual([]);
+    expect(s.teleop.rejects).toBe(1);
+    expect(s.sim.balls.has(red.id)).toBe(true);
+    // Rolled clear in front of the robot, and the intake takes POLLEN only.
+    expect(
+      s.sim.toRobot(red.body.translation().x, red.body.translation().z).f,
+    ).toBeGreaterThan(s.sim.cfg.length / 2 + 0.2);
+    expect(s.teleop.intakeFilter).toBe("pollen");
+    const front = s.sim.toWorld(s.sim.cfg.length / 2 + 0.04, 0);
+    s.sim.spawn("pollen", front.x, FIELD.pollenRadius + 0.005, front.z);
+    s.advance(1);
+    expect(s.sim.carried).toEqual(["pollen"]);
+    expect(s.result().pollenOnly).toBe(true);
+  }, 60000);
+});

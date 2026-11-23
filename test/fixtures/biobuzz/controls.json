@@ -210,5 +210,6 @@
       {"alliance": "BLUE", "x": 45.5, "y": 9.5, "spot": null}
     ]
   },
+  "indicator": {"flashMs": 250.0, "arcTurnPulseMs": 400.0, "arcLightClearMs": 300},
   "practiceReadout": {"budgetS": 9.3, "budgetPieces": 4, "mergeS": 1.0, "split": ["drive to pieces", "pick up", "drive loaded", "spin-up and aim", "feed"]}
 }

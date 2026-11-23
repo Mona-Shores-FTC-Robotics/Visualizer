@@ -25,6 +25,7 @@ import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
 import robotModel from "../../sim/src/sim/robots/mona-shores.json";
 import { LaunchSpotDrive, stallRefusal, type SpotStep } from "./launchSpot";
 import { FreshSticks } from "./freshSticks";
+import { Indicator } from "./indicator";
 import {
   CornerGather,
   FlowerPick,
@@ -176,6 +177,9 @@ export class TeleOp {
     /** Only gamepad 1: no operator (the turret still aims in AIM). */
     public driverOnly = false,
   ) {
+    this.light = new Indicator(controls.indicator);
+    // INIT, before PLAY: the alliance's colour, steady.
+    this.light.init(sim.alliance);
     const t = controls.teleOp;
     this.turretMode = t.startTurretAiming === false ? "LOCKED" : "AIM";
     this.fieldForward = sim.alliance === "red" ? 0 : Math.PI;
@@ -480,7 +484,9 @@ export class TeleOp {
       (this.routine?.last && !this.routine.last.intake) ||
       now < this.holdOffUntil
         ? "none"
-        : "all";
+        : this.rejectAllNectar
+          ? "pollen"
+          : "all";
 
     // --- the feed ---------------------------------------------------------------------------------
     const aimed = Math.abs(wrap180(aim.deg - this.turretDeg)) <= tol;
@@ -530,10 +536,33 @@ export class TeleOp {
       } else this.emptySince = Infinity;
     }
     if (now > this.noteUntil) this.note = "";
+
+    // --- the indicator light (RobotOpMode.showIndicator, BasicDriveTeleOp's arc light) ----------
+    // outsideArc: the turret, or in AIM the aim, behind the firing arc (TurretArc.allowsFeed).
+    const turretRel = wrap180(this.turretDeg - this.aimTrimDeg);
+    const outsideArc =
+      !(turretRel <= arcLeft && turretRel >= -arcRight) ||
+      (this.turretMode === "AIM" && !insideArc);
+    this.light.update(
+      now * 1000,
+      outsideArc,
+      fireHeld || this.spotStep.feed,
+      this.arcTurning,
+      this.flag("circleTurnsIntoArc", true),
+      sim.carried.length >= this.preset.laneCapacity,
+    );
   }
   private arcTurningWas = false;
   /** What the simulator's intake takes this loop. */
-  intakeFilter: "all" | "none" = "all";
+  intakeFilter: "all" | "pollen" | "none" = "all";
+  /**
+   * POLLEN only (biobuzz `ColorSensorSubsystem.rejectAllNectar`, `NectarReject.judge`'s `allNectar`):
+   * both NECTAR colours are wrong, ours too, so the gate bursts every NECTAR back out at the entrance
+   * and the lane only ever holds POLLEN. Off: only the other alliance's NECTAR is wrong.
+   */
+  rejectAllNectar = false;
+  /** The robot's indicator light (biobuzz `IndicatorSubsystem`, ./indicator.ts). */
+  readonly light: Indicator;
 
   /**
    * The other alliance's NECTAR in front of the intake: burst it back out, stop the intake for the
@@ -544,9 +573,12 @@ export class TeleOp {
     const sim = this.sim,
       c = sim.cfg;
     if (now < this.rejectUntil || now < this.holdOffUntil) return;
-    const wrong = sim.alliance === "red" ? "nectar_blue" : "nectar_red";
+    // NectarReject.judge: the other alliance's NECTAR is wrong, and with allNectar ours too.
+    const wrong = (k: string) =>
+      k === (sim.alliance === "red" ? "nectar_blue" : "nectar_red") ||
+      (this.rejectAllNectar && k !== "pollen");
     for (const b of sim.balls.values()) {
-      if (b.kind !== wrong) continue;
+      if (!wrong(b.kind)) continue;
       const p = b.body.translation();
       if (p.y > 0.13) continue;
       const r = sim.toRobot(p.x, p.z);
@@ -566,7 +598,12 @@ export class TeleOp {
         { x: Math.cos(th) * 0.8, y: 0, z: -Math.sin(th) * 0.8 },
         true,
       );
-      this.say("Wrong NECTAR: rejected", now);
+      this.say(
+        this.rejectAllNectar
+          ? "NECTAR: rejected (POLLEN only)"
+          : "Wrong NECTAR: rejected",
+        now,
+      );
       return;
     }
   }

@@ -5,6 +5,7 @@
  */
 import * as THREE from "three";
 import { MonaShoresRobotModel } from "../../sim/src/render/mona-shores-robot";
+import type { LightColour } from "./indicator";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FIELD, HIVE } from "../../sim/src/sim/config";
 import {
@@ -266,7 +267,28 @@ export class DrillView {
     label.scale.set(0.3, 0.11, 1);
     label.position.set(0, 0.42, 0);
     const lane = new THREE.Group();
-    group.add(chassis, intake, arrow, turret, lane, label);
+    // The indicator light (biobuzz IndicatorSubsystem): a glowing ball and a halo, big enough to read
+    // at the drill's zoom. On top of the body: the CAD has no light in it, and biobuzz records only
+    // "where the drive team can see it from the field" (doc/robot-session-4.md). It moves up to the
+    // top of the CAD body once that is in.
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const light = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 16, 12),
+      lightMat,
+    );
+    const haloMat = new THREE.SpriteMaterial({
+      map: haloTexture(),
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+    });
+    const halo = new THREE.Sprite(haloMat);
+    halo.scale.set(0.2, 0.2, 1);
+    light.add(halo);
+    light.position.set(-0.05, 0.36, 0);
+    light.visible = false;
+    group.add(chassis, intake, arrow, turret, lane, label, light);
     this.scene.add(group);
     // Ours as the CAD (the box stays until it is in); an opponent stays a box.
     const box = [chassis, arrow, turret, ...wheels];
@@ -276,6 +298,13 @@ export class DrillView {
       .then(() => {
         group.add(model!.group);
         for (const o of box) o.visible = false;
+        // The light on the body's top, toward the back (the turret turns over the front).
+        const top = new THREE.Box3().setFromObject(model!.group);
+        if (Number.isFinite(top.max.y)) {
+          light.position.y = top.max.y + 0.03;
+          // The team's label above the light, so neither covers the other.
+          label.position.y = light.position.y + 0.14;
+        }
         const strip = new THREE.Mesh(
           new THREE.BoxGeometry(frame + 0.012, 0.035, frame + 0.012),
           new THREE.MeshStandardMaterial({
@@ -311,6 +340,9 @@ export class DrillView {
       intakeMat,
       aimLine,
       model,
+      light,
+      lightMat,
+      haloMat,
     };
   }
 
@@ -345,7 +377,13 @@ export class DrillView {
 
   sync(
     sim: Sim,
-    robots: { team: number; turretDeg: number; aim?: boolean }[],
+    robots: {
+      team: number;
+      turretDeg: number;
+      aim?: boolean;
+      /** The indicator light's colour now; null off, undefined: no light (not ours). */
+      light?: LightColour | null;
+    }[],
     showAim: boolean,
     /** The Auto replay's pieces: drawn instead of the simulator's balls and FLOWER stacks. */
     replay: { kind: BallKind; x: number; y: number; z: number }[] | null = null,
@@ -362,6 +400,14 @@ export class DrillView {
         r.turretDeg,
         showAim && r.aim !== false,
       );
+      const rm = this.robots[i];
+      rm.light.visible = r.light !== undefined;
+      if (r.light !== undefined) {
+        // Off reads as a dark lens, not as nothing.
+        rm.lightMat.color.set(r.light ? LIGHT_HEX[r.light] : 0x22252b);
+        rm.haloMat.color.set(r.light ? LIGHT_HEX[r.light] : 0x000000);
+        rm.haloMat.opacity = r.light ? 0.45 : 0;
+      }
     });
     const p = sim.robot.translation();
     const seen = new Set<number>();
@@ -496,7 +542,38 @@ interface RobotMesh {
   aimLine: THREE.Line;
   /** Ours only: an opponent is drawn as a box. */
   model: MonaShoresRobotModel | null;
+  light: THREE.Mesh;
+  lightMat: THREE.MeshBasicMaterial;
+  haloMat: THREE.SpriteMaterial;
 }
+
+/** A round, soft glow for the indicator light's halo (one texture, shared). */
+let halo: THREE.Texture | null = null;
+function haloTexture(): THREE.Texture | null {
+  if (halo) return halo;
+  if (typeof document === "undefined") return null;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, "rgba(255,255,255,1)");
+  r.addColorStop(0.35, "rgba(255,255,255,0.55)");
+  r.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  halo = new THREE.CanvasTexture(c);
+  return halo;
+}
+
+/** The indicator light's colours on screen (goBILDA's light: IndicatorSubsystem's named positions). */
+const LIGHT_HEX: Record<LightColour, number> = {
+  red: 0xff2a2a,
+  green: 0x2bff5e,
+  orange: 0xff8c1a,
+  blue: 0x3a7bff,
+  white: 0xffffff,
+};
 
 /** The teams' colours, as their printed cheat sheets (biobuzz `CheatSheet.Team`). */
 const TEAM_COLORS: Record<number, { deep: number; bright: number }> = {

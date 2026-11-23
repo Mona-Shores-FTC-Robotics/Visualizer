@@ -66,6 +66,7 @@ const prefs = (() => {
       match?: string;
       population?: string;
       opening?: string;
+      nectar?: string;
     };
   } catch {
     return {};
@@ -84,6 +85,7 @@ function savePrefs() {
         match: matchSel.value,
         population: popSel.value,
         opening: openSel.value,
+        nectar: nectarSel.value,
       }),
     );
   } catch {
@@ -114,6 +116,8 @@ function population(): Population {
 }
 /** The 2:00 drill's opening: R-Solo's 2-TIP or 1-TIP outcome, or either one by turns. */
 const openSel = $<HTMLSelectElement>("opening");
+/** Our robots' NECTAR gate: "pollen" rejects every NECTAR (on for now), "ours" only the other alliance's. */
+const nectarSel = $<HTMLSelectElement>("nectar");
 const traces = new Map<string, AutoTrace>();
 hpSel.innerHTML = HUMAN_PLAYERS.map(
   (t) => `<option value="${t.value}">${t.label}</option>`,
@@ -124,6 +128,8 @@ if (prefs.mode) modeSel.value = prefs.mode;
 if (prefs.camera) camSel.value = prefs.camera;
 if (prefs.opening) openSel.value = prefs.opening;
 if (!openSel.value) openSel.value = "varied";
+if (prefs.nectar) nectarSel.value = prefs.nectar;
+if (!nectarSel.value) nectarSel.value = "pollen";
 
 let file: ControlsFile;
 let session: DrillSession;
@@ -198,6 +204,7 @@ function newSession() {
     hpSel.value as HumanPlayerKind,
     population(),
   );
+  session.pollenOnly = nectarSel.value !== "ours";
   const trace = traces.get(matchSel.value);
   if (matchSel.value && trace) session.playAuto(trace);
   else {
@@ -335,7 +342,7 @@ function showResults(r: RunResult) {
     <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
     ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
-    <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
+    <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
     ${nectarLine}
@@ -357,7 +364,7 @@ function robotBox(k: number) {
       : "";
   return `<div class="robot-box">${head}${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
     Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
-    Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.presets[k].laneCapacity - st.lane))} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
+    Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.presets[k].laneCapacity - st.lane))}${session.teleops[k].rejectAllNectar ? ' <span class="dim">POLLEN only</span>' : ""} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
     ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}${st.nectarGate ? `<br><span style="color:var(--warn)">${st.nectarGate}</span>` : ""}</div>`;
 }
 
@@ -554,7 +561,19 @@ function frame(now: number) {
     // Ours (driven), our dead partner (our other robot), and the opponents (team 0: a blue box).
     session.sim.robots.map((r, k) => {
       const t = session.teleops[k];
-      if (t) return { team: session.slots[k].team, turretDeg: t.turretDeg };
+      if (t)
+        return {
+          team: session.slots[k].team,
+          turretDeg: t.turretDeg,
+          // During a full match's AUTO the TeleOp is not running: after PLAY the light is green
+          // when the lane is full and off otherwise (no fire held, no arc).
+          light:
+            session.phase === "auto" || session.phase === "transition"
+              ? r.carried.length >= session.presets[k].laneCapacity
+                ? "green"
+                : null
+              : t.light.colour(session.t * 1000),
+        };
       return r.alliance === session.sim.alliance
         ? {
             team: session.slots[0].team === 20245 ? 19429 : 20245,
@@ -604,7 +623,15 @@ async function main() {
   $("reset").onclick = () => newSession();
   if (prefs.population) popSel.value = prefs.population;
   if (!popSel.value) popSel.value = "empty";
-  for (const sel of [teamSel, modeSel, tipSel, hpSel, popSel, openSel])
+  for (const sel of [
+    teamSel,
+    modeSel,
+    tipSel,
+    hpSel,
+    popSel,
+    openSel,
+    nectarSel,
+  ])
     sel.onchange = () => {
       savePrefs();
       padsKey = "";
