@@ -1,3 +1,4 @@
+import { INDICATOR_DEFAULTS, type IndicatorNumbers } from "./indicator";
 /**
  * The robot's controls, read from biobuzz: `TeamCode/cheat-sheets/controls.json`, which
  * biobuzz's `CheatSheetTest` writes from `controls/ControlScheme` (`ControlsExport`). Nothing
@@ -25,6 +26,8 @@ export interface ControlsFile {
   teleOp: Record<string, number | boolean>;
   /** The driver's Square: the launch spots and the numbers its drive and volley use (biobuzz `LaunchSpotsExport`). Absent from a file older than it. */
   launchSpots?: LaunchSpotFile;
+  /** The indicator light's numbers (biobuzz `IndicatorSubsystem`, `ArcLight`). Absent from a file older than them. */
+  indicator?: Partial<IndicatorNumbers>;
   practiceReadout: {
     budgetS: number;
     budgetPieces: number;
@@ -196,6 +199,11 @@ export class Controls {
 
   get teleOp(): Record<string, number | boolean> {
     return this.file.teleOp;
+  }
+
+  /** The indicator light's numbers: the export's, else master's (./indicator.ts). */
+  get indicator(): IndicatorNumbers {
+    return { ...INDICATOR_DEFAULTS, ...(this.file.indicator ?? {}) };
   }
 
   get launchSpots(): LaunchSpotFile | undefined {

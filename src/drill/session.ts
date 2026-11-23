@@ -121,6 +121,8 @@ export interface RunResult {
   openingTips?: number;
   /** The Auto whose hand-off the 2:00 drill opened on (openingAuto), absent for the generic opening. */
   openingAuto?: string;
+  /** Our robots rejected every NECTAR (POLLEN only, DrillSession.pollenOnly). */
+  pollenOnly?: boolean;
   /** POLLEN in our raised CELL at the opening (the 1-TIP opening's ONE_TIP_CELL), with openingAuto. */
   openingCell?: number;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
@@ -309,6 +311,18 @@ export class DrillSession {
   get remainingS(): number {
     if (this.playback && !this.playback.handedOver) return this.playback.timer;
     return this.started ? Math.max(0, this.sim.clock) : TELEOP_S;
+  }
+
+  /**
+   * POLLEN only: our robots reject every NECTAR at the intake, ours too, as the robot does with
+   * `ColorSensorSubsystem.rejectAllNectar` on (TeleOp.rejectAllNectar). The page has it on for now
+   * (the mentor, 23 Nov 2026: we can't take NECTAR yet); off is the colour gate as before.
+   */
+  get pollenOnly(): boolean {
+    return this.teleops.some((t) => t.rejectAllNectar);
+  }
+  set pollenOnly(on: boolean) {
+    for (const t of this.teleops) t.rejectAllNectar = on;
   }
 
   /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
@@ -584,6 +598,7 @@ export class DrillSession {
       ...(!this.playback && this.openingTips
         ? { openingTips: this.openingTips }
         : {}),
+      ...(this.pollenOnly ? { pollenOnly: true } : {}),
       ...(!this.playback && this.openingAuto
         ? { openingAuto: this.openingAuto.auto, openingCell: this.openingCell }
         : {}),
