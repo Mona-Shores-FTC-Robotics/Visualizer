@@ -1,0 +1,217 @@
+{
+  "about": "Mona Shores' two robots, 19429 (Infrared) and 20245 (Ultraviolet), for the match and drill simulator. Data only: src/sim/robots/mona-shores.ts maps it onto upstream's RobotConfig. Every number has a source: a biobuzz file (master), a measured log or film, or 'upstream' where neither team has data. null means not measured yet, so upstream's value stays.",
+  "shared": {
+    "frameIn": {
+      "value": 16.2,
+      "source": "biobuzz RobotDesign.REAL_FRAME_IN = 2 * ResetPositions.WALL_TO_CENTRE_IN (8.1 in, tape)"
+    },
+    "laneCapacity": {
+      "value": 4,
+      "source": "biobuzz LaneTracker.SLOTS = 4 (G407)"
+    },
+    "turret": {
+      "arcLeftDeg": {
+        "value": 90,
+        "source": "biobuzz TurretSubsystem.arcLeftDeg"
+      },
+      "arcRightDeg": {
+        "value": 90,
+        "source": "biobuzz TurretSubsystem.arcRightDeg"
+      },
+      "aimOffsetDeg": {
+        "value": 5,
+        "source": "biobuzz RobotDifferences, both robots (18-20 Nov 2026)"
+      },
+      "slewDegPerSec": {
+        "value": null,
+        "source": "not measured; floor is 10-13 deg/s (RobotDifferences 19429, 20 Nov), top rate unlogged"
+      },
+      "circleTurnsIntoArc": {
+        "value": true,
+        "source": "biobuzz TeleOpConfig.circleTurnsIntoArc"
+      }
+    },
+    "launch": {
+      "speedTable": {
+        "rangeIn": [
+          35,
+          37,
+          39,
+          42,
+          45,
+          48,
+          51,
+          55
+        ],
+        "ticksPerSecond": [
+          1495,
+          1495,
+          1495,
+          1495,
+          1500,
+          1505,
+          1520,
+          1550
+        ],
+        "source": "biobuzz LaunchSpeedTable rows 1-8"
+      },
+      "inRateByRangeIn": {
+        "rangeIn": [
+          36.0,
+          42.4,
+          53.9
+        ],
+        "fraction": [
+          0.7,
+          0.95,
+          0.9
+        ],
+        "source": "biobuzz BeldingCalibration.STAY_IN (Belding Qualifier, 17 Auto logs)"
+      },
+      "release": {
+        "value": "one at a time",
+        "source": "the feeder sends the lane through the throat in order"
+      },
+      "betweenBallsS": {
+        "value": 0.45,
+        "source": "biobuzz timing-terms.md, Belding: about 0.45 s between balls"
+      },
+      "gateToFirstBallS": {
+        "value": [
+          0.6,
+          0.95
+        ],
+        "source": "biobuzz timing-terms.md, Belding"
+      },
+      "spinUpWaitS": {
+        "value": [
+          0.05,
+          0.8
+        ],
+        "source": "biobuzz timing-terms.md, Belding, launcher already running"
+      },
+      "gateToFourthBallS": {
+        "value": [
+          2.0,
+          2.5
+        ],
+        "source": "biobuzz timing-terms.md, Belding; logs 2.04 s (19429, n=14) / 2.08 s (20245, n=36): drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      }
+    },
+    "intakeWidthIn": {
+      "value": 14,
+      "source": "Visualizer src/drill/presets.ts (PR #150)"
+    }
+  },
+  "robots": {
+    "19429": {
+      "name": "Infrared",
+      "flowerStick": {
+        "value": "active",
+        "source": "biobuzz RobotDifferences: roller on its end, a CR servo (17 Nov 2026)"
+      },
+      "enforceFiringArcTeleOp": {
+        "value": true,
+        "source": "biobuzz TeleOpConfig.enforceFiringArc (no RobotDifferences line)"
+      },
+      "drive": {
+        "topSpeedInPerS": {
+          "value": 61,
+          "source": "fastest Auto legs (read_logs.py legs); drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "accelInPerS2": {
+          "value": 82,
+          "source": "98th percentile rise of /Drive/OdometrySpeedInPerSec at full stick below 35 in/s; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "turnDegPerS": {
+          "value": 299,
+          "source": "98th percentile heading rate at full turn; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "flowerPick": {
+        "cardS": {
+          "value": 3.74,
+          "source": "PickFlower card median, n=46; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "piecesPerPick": {
+          "value": {
+            "0": 18,
+            "1": 16,
+            "2": 7,
+            "3": 5
+          },
+          "source": "pieces into the lane per pick, counts; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "gardenGather": {
+        "cardS": {
+          "value": 4.45,
+          "source": "GardenGather card median, n=8; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "firePressToGateS": {
+        "value": 0.6,
+        "source": "TeleOp driver volleys, fire press to gate open; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      },
+      "autoGateWaitS": {
+        "value": 0.29,
+        "source": "Auto gate wait after SpinUp; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      }
+    },
+    "20245": {
+      "name": "Ultraviolet",
+      "flowerStick": {
+        "value": "passive",
+        "source": "biobuzz FlowerStickSubsystem: no roller; held out"
+      },
+      "enforceFiringArcTeleOp": {
+        "value": false,
+        "source": "biobuzz RobotDifferences 20245 (mentor, 20 Nov 2026)"
+      },
+      "drive": {
+        "topSpeedInPerS": {
+          "value": 64,
+          "source": "fastest Auto legs (read_logs.py legs); drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "accelInPerS2": {
+          "value": 79,
+          "source": "98th percentile rise of /Drive/OdometrySpeedInPerSec at full stick below 35 in/s; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "turnDegPerS": {
+          "value": 306,
+          "source": "98th percentile heading rate at full turn; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "flowerPick": {
+        "cardS": {
+          "value": 3.62,
+          "source": "PickFlower card median, n=60; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "piecesPerPick": {
+          "value": {
+            "0": 8,
+            "1": 16,
+            "2": 21,
+            "3": 12,
+            "4": 3
+          },
+          "source": "pieces into the lane per pick, counts; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "gardenGather": {
+        "cardS": {
+          "value": 4.16,
+          "source": "GardenGather card median, n=3; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        }
+      },
+      "firePressToGateS": {
+        "value": 0.4,
+        "source": "TeleOp driver volleys, fire press to gate open; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      },
+      "autoGateWaitS": {
+        "value": 0.41,
+        "source": "Auto gate wait after SpinUp; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+      }
+    }
+  }
+}
