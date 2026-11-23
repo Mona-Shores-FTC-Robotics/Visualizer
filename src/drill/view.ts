@@ -255,7 +255,7 @@ export class DrillView {
       g.font = "800 72px ui-sans-serif, system-ui, sans-serif";
       g.textAlign = "center";
       g.textBaseline = "middle";
-      g.fillText(String(team), 128, 52);
+      g.fillText(team > 0 ? String(team) : "OPP", 128, 52);
     }
     const label = new THREE.Sprite(
       new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(plate) }),
@@ -265,12 +265,13 @@ export class DrillView {
     const lane = new THREE.Group();
     group.add(chassis, intake, arrow, turret, lane, label);
     this.scene.add(group);
-    // The CAD: the box stays until it is in.
+    // Ours as the CAD (the box stays until it is in); an opponent stays a box.
     const box = [chassis, arrow, turret, ...wheels];
-    const model = new MonaShoresRobotModel("robots/mona-shores/");
-    model.ready
+    const model =
+      team > 0 ? new MonaShoresRobotModel("robots/mona-shores/") : null;
+    model?.ready
       .then(() => {
-        group.add(model.group);
+        group.add(model!.group);
         for (const o of box) o.visible = false;
         const strip = new THREE.Mesh(
           new THREE.BoxGeometry(frame + 0.012, 0.035, frame + 0.012),
@@ -316,7 +317,7 @@ export class DrillView {
    */
   sync(
     sim: Sim,
-    robots: { team: number; turretDeg: number }[],
+    robots: { team: number; turretDeg: number; aim?: boolean }[],
     showAim: boolean,
   ) {
     robots.forEach((r, i) => {
@@ -325,7 +326,12 @@ export class DrillView {
           this.scene.remove(this.robots[i].group, this.robots[i].aimLine);
         this.robots[i] = this.buildRobot(r.team);
       }
-      this.syncRobot(this.robots[i], sim.view(i), r.turretDeg, showAim);
+      this.syncRobot(
+        this.robots[i],
+        sim.view(i),
+        r.turretDeg,
+        showAim && r.aim !== false,
+      );
     });
     const p = sim.robot.translation();
     const seen = new Set<number>();
@@ -417,8 +423,8 @@ export class DrillView {
     r.group.position.set(p.x, 0, p.z);
     r.group.rotation.y = th;
     r.turret.rotation.y = (turretDeg * Math.PI) / 180;
-    r.model.setTurretDeg(turretDeg);
-    r.model.setStickOut(!!sim.robots[sim.me].stickDown);
+    r.model?.setTurretDeg(turretDeg);
+    r.model?.setStickOut(!!sim.robots[sim.me].stickDown);
     r.intakeMat.color.set(
       sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
     );
@@ -457,11 +463,14 @@ interface RobotMesh {
   laneKey: string;
   intakeMat: THREE.MeshStandardMaterial;
   aimLine: THREE.Line;
-  model: MonaShoresRobotModel;
+  /** Ours only: an opponent is drawn as a box. */
+  model: MonaShoresRobotModel | null;
 }
 
 /** The teams' colours, as their printed cheat sheets (biobuzz `CheatSheet.Team`). */
 const TEAM_COLORS: Record<number, { deep: number; bright: number }> = {
   19429: { deep: 0xb0101e, bright: 0xff6a00 },
   20245: { deep: 0x3a0ca3, bright: 0xb14eff },
+  /** An opponent: the simulator's planner robot, a box in blue. */
+  0: { deep: 0x123a8c, bright: 0x2f6bff },
 };

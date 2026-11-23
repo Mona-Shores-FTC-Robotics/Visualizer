@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { HANDOFF_S, type AutoTrace } from "../../src/drill/fullMatch";
+import {
+  HANDOFF_S,
+  fieldAtHandoff,
+  type AutoTrace,
+} from "../../src/drill/fullMatch";
 import { toPedro } from "../../src/drill/launchSpot";
 import { DrillSession } from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
@@ -64,6 +68,42 @@ describe("Full Match", () => {
     s.advance(1, pad([], { ly: -1 }));
     const b = s.sim.robot.translation();
     expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeGreaterThan(0.2);
+  }, 60000);
+
+  test("the field's pieces go where the Auto left them: each FLOWER's stack and the floor", async () => {
+    for (const auto of ["r-no-cross", "l-clockwise"]) {
+      const t = trace(auto);
+      const s = await fullMatch(auto);
+      const want = fieldAtHandoff(t, s.sim);
+      s.advance(HANDOFF_S);
+      for (const f of s.sim.flowers)
+        expect(f.stack, `${auto} FLOWER ${f.id}`).toEqual(want.flowers[f.id]);
+      // Every floor piece of the trace is a loose ball in the simulator, close by: the 1 s settle
+      // moves one spawned against a FLOWER's frame or another piece a little.
+      const loose = [...s.sim.balls.values()].map((b) => ({
+        kind: b.kind,
+        p: b.body.translation(),
+      }));
+      for (const q of want.pieces) {
+        const near = loose.some(
+          (b) =>
+            b.kind === q.kind && Math.hypot(b.p.x - q.x, b.p.z - q.z) < 0.15,
+        );
+        expect(near, `${auto} ${q.kind} at ${q.x}, ${q.z}`).toBe(true);
+      }
+      // All 40 POLLEN are in play: lanes, FLOWERs, CELLs and the floor.
+      const pollen =
+        [...s.sim.balls.values()].filter((b) => b.kind === "pollen").length +
+        s.sim.flowers.reduce(
+          (a, f) => a + f.stack.filter((k) => k === "pollen").length,
+          0,
+        ) +
+        s.sim.robots.reduce(
+          (a, r) => a + r.carried.filter((k) => k === "pollen").length,
+          0,
+        );
+      expect(pollen, auto).toBe(40);
+    }
   }, 60000);
 
   test("the results carry the AUTO's TIPs, and 7 counts them", async () => {

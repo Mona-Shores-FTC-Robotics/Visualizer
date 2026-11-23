@@ -6,11 +6,19 @@ import type RAPIER_NS from "@dimforge/rapier3d-compat";
 import { monaShoresConfig } from "../../sim/src/sim/robots/mona-shores";
 import { DT, NO_INPUT, Sim } from "../../sim/src/sim/world";
 import { Controls, NO_PAD, type ControlsFile, type PadRead } from "./controls";
-import type { CellSide } from "../../sim/src/sim/hive";
+import type { Alliance, CellSide } from "../../sim/src/sim/hive";
 import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
 import { PRESETS, type RobotPreset, type TeamNumber } from "./presets";
 import { TeleOp } from "./teleop";
+import { Coach } from "../../sim/src/auto/coach";
+import {
+  OPPONENT_SKILL_TELEOP,
+  defaultBot,
+  opponentSetup,
+  robotConfig,
+  sanitize,
+} from "../../sim/src/setup";
 import { AutoPlayback, type AutoTrace } from "./fullMatch";
 import {
   HUMAN_PLAYERS,
@@ -37,6 +45,18 @@ export interface TipRecord {
  * alliance with a driver and an operator each (4 controllers).
  */
 export type DrillMode = "two" | "driver" | "alliance" | "alliance-ops";
+
+/** The opponents' strength: the TIPs a match they average (sim/src/setup.ts OPPONENT_SKILL). */
+export type OpponentSkill = 1 | 3 | 5 | 7;
+
+/**
+ * Who else is on the field. "empty": nobody, for testing. "match": our partner robot dead in its
+ * start (an obstacle that never moves; in an alliance drill both our robots are driven), and two
+ * opponent robots on the simulator's planner at a skill drawn per match from 1, 3, 5 or 7 TIPs a
+ * match, or a fixed one. Their TIPs spill POLLEN back onto the field as a real match's do.
+ */
+export type Population =
+  { kind: "empty" } | { kind: "match"; skill: OpponentSkill | "random" };
 
 /**
  * Which TIP timing the HIVE runs (mentor, 23 Nov 2026: neither is assumed right, so both stay
@@ -88,6 +108,8 @@ export interface RunResult {
   balls: number;
   /** When the 7th TIP settled (the AUTO's counted, in a full match), or null. */
   goalAtS: number | null;
+  /** A match population: the opponents' skill this match, and their TIPs. */
+  opponents?: { skill: OpponentSkill; tips: number };
   /** The 2:00 drill opened after a 1-TIP Auto: the AUTO TIPs it started with (opensAfterAuto). */
   openingTips?: number;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
@@ -126,6 +148,10 @@ export class DrillSession {
   private lastCarried: number[] = [];
   private started = false;
   finished = false;
+  /** The opponents' skill this match (a match population), or null on an empty field. */
+  readonly opponentSkill: OpponentSkill | null = null;
+  /** The planner driving each opponent (blue), null for ours and the dead partner. */
+  private coaches: (Coach | null)[] = [];
   /** Full Match: the Auto being replayed before TeleOp (./fullMatch.ts), or null for the 2:00 drill. */
   playback: AutoPlayback | null = null;
 
@@ -141,6 +167,7 @@ export class DrillSession {
     seed = Date.now() & 0xffff,
     public tipTiming: TipTiming = "uv-ir",
     public humanPlayer: HumanPlayerKind = "playbook",
+    population: Population = { kind: "empty" },
   ) {
     this.slots = Array.isArray(team)
       ? team
@@ -151,15 +178,51 @@ export class DrillSession {
     const cfgFor = (p: RobotPreset) =>
       monaShoresConfig(String(p.team) as "19429" | "20245");
     for (const s of this.slots) this.presets.push(PRESETS[s.team]);
+    const match = population.kind === "match";
+    if (match) {
+      const skills: OpponentSkill[] = [1, 3, 5, 7];
+      this.opponentSkill =
+        population.skill === "random"
+          ? skills[Math.floor(this.rand() * skills.length)]
+          : population.skill;
+    }
+    // The dead partner, when only one of ours is driven: our other robot, standing at its start.
+    const partnerPreset = PRESETS[this.slots[0].team === 20245 ? 19429 : 20245];
+    // The opponents (blue): the planner's robot at the skill's dial setting. They play TeleOp only
+    // on the planner (a full match replays only our Auto), so the TeleOp-calibrated dial.
+    const opponentCfg = (slot: number) =>
+      robotConfig(
+        sanitize(
+          {
+            ...defaultBot(2 + slot),
+            ...opponentSetup(OPPONENT_SKILL_TELEOP[this.opponentSkill!]),
+          },
+          2 + slot,
+        ),
+      );
     // The simulator's partner starts on the rear wall by the rear FLOWER, the first robot on the
     // alliance wall: one at each end, as the cycle playbook splits them.
+    // Ours are the Sim's first robots and always red (it builds red first); only theirs pull POLLEN
+    // from a FLOWER by pushing into it, the planner's way. Ours pick by the FLOWER pick routine.
+    const ours: Alliance = "red";
     this.sim = new Sim(rapier, cfgFor(this.presets[0]), "teleop", seed, {
-      flowerPullByPush: false,
+      flowerPullByPush: (a) => a !== ours,
       tipTiming,
-      partners: this.slots.length > 1,
-      configFor: (_a, slot) =>
-        this.presets[slot] ? cfgFor(this.presets[slot]) : undefined,
+      partners: this.slots.length > 1 || match,
+      opponent: match,
+      configFor: (a, slot) =>
+        a === "blue"
+          ? opponentCfg(slot)
+          : cfgFor(this.presets[slot] ?? partnerPreset),
     });
+    if (match)
+      this.coaches = this.sim.robots.map((r) => {
+        if (r.alliance !== "blue") return null;
+        const c = new Coach();
+        c.autoRoutine = "default";
+        c.flowerStartSec = 0;
+        return c;
+      });
     this.slots.forEach((slot, i) => {
       const v = this.sim.view(i);
       // TeleOp after the Auto shot the preloads: the lane starts empty.
@@ -321,10 +384,20 @@ export class DrillSession {
       });
       const tipsBefore = this.sim.hives[this.sim.alliance].tips;
       this.sim.step(
-        this.teleops.map((tele) => ({
-          ...NO_INPUT,
-          intake: this.finished ? ("none" as const) : tele.intakeFilter,
-        })),
+        this.sim.robots.map((_, k) => {
+          const tele = this.teleops[k];
+          if (tele)
+            return {
+              ...NO_INPUT,
+              intake: this.finished ? ("none" as const) : tele.intakeFilter,
+            };
+          // The opponents play on; the dead partner never moves.
+          const c = this.coaches[k];
+          return c && !this.finished
+            ? c.update(this.sim.view(k), DT)
+            : NO_INPUT;
+        }),
+        this.sim.robots.map((_, k) => !!this.coaches[k]),
       );
       if (this.sim.hives[this.sim.alliance].tips > tipsBefore) this.onTip();
       if (loop && this.started) {
@@ -395,6 +468,15 @@ export class DrillSession {
       balls: robots.reduce((a, r) => a + r.balls, 0),
       goalAtS: this.goalAtS(),
       robots,
+      ...(this.opponentSkill
+        ? {
+            opponents: {
+              skill: this.opponentSkill,
+              tips: this.sim.hives[this.sim.alliance === "red" ? "blue" : "red"]
+                .tips,
+            },
+          }
+        : {}),
       ...(!this.playback && this.openingTips
         ? { openingTips: this.openingTips }
         : {}),

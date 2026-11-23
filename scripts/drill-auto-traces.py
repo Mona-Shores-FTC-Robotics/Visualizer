@@ -5,7 +5,8 @@ Builds the driver drill's Full Match Autos: for each of our generated Autos on b
 sim-results branch (<auto>/latest.json and latest-typical.wpilog, from the Java AutoSim), as a
 compact JSON the drill plays for AUTO and hands TeleOp over from.
 
-  python3 -I scripts/drill-auto-traces.py [AUTO ...]      (default: every Auto on master)
+  python3 -I scripts/drill-auto-traces.py [--design NAME] [AUTO ...]   (default: every Auto on master,
+  each from its root run; --design reads <auto>/designs/NAME/, e.g. real-robot)
 
 Writes public/drill/autos/<auto>.json and public/drill/autos/index.json. Standard library only;
 it fetches from GitHub (raw.githubusercontent.com, and a sparse clone for the list of Autos).
@@ -107,9 +108,11 @@ def num(v, default=0.0):
         return default
 
 
-def build(auto):
-    meta = json.loads(fetch(f'{RAW}/sim-results/{auto}/latest.json'))
-    log = read_log(fetch(f'{RAW}/sim-results/{auto}/latest-typical.wpilog'))
+def build(auto, design=None):
+    # --design <name> reads the run published for that design (<auto>/designs/<name>/), not the root.
+    base = f'{auto}/designs/{design}' if design else auto
+    meta = json.loads(fetch(f'{RAW}/sim-results/{base}/latest.json'))
+    log = read_log(fetch(f'{RAW}/sim-results/{base}/latest-typical.wpilog'))
     start = next(t for t, v in log['/Events'] if str(v) == 'AUTO starts')
     seed = meta.get('typicalSeed')
     row = next((r for r in meta.get('runs', []) if r.get('seed') == seed), {})
@@ -143,7 +146,7 @@ def build(auto):
     last = frames[-1]
     return {
         'auto': auto,
-        'source': f'biobuzz sim-results/{auto}: latest.json and latest-typical.wpilog (Java AutoSim, "Simulate Auto")',
+        'source': f'biobuzz sim-results/{base}: latest.json and latest-typical.wpilog (Java AutoSim, "Simulate Auto")',
         'design': meta.get('design'),
         'calibration': meta.get('calibration'),
         'alliance': meta.get('alliance'),
@@ -170,12 +173,18 @@ def build(auto):
 
 def main(argv):
     names, commit = master_autos()
-    wanted = argv[1:] or names
+    args = argv[1:]
+    design = None
+    if '--design' in args:
+        i = args.index('--design')
+        design = args[i + 1]
+        del args[i:i + 2]
+    wanted = args or names
     os.makedirs(OUT, exist_ok=True)
     index = []
     for auto in wanted:
         try:
-            tr = build(auto)
+            tr = build(auto, design)
         except Exception as e:  # an Auto with no published run is listed as missing, not fatal
             print(f'{auto}: skipped ({e})', file=sys.stderr)
             continue
