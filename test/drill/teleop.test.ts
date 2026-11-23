@@ -77,6 +77,18 @@ describe("drive", () => {
     expect(early).toBeGreaterThan(PRESETS[19429].accelInPerS2 * 0.2);
   });
 
+  test("full stick sideways strafes at the robot's sideways top speed, slower than forward", async () => {
+    for (const team of [19429, 20245] as const) {
+      const s = await session(team);
+      place(s, -1.5, -1.4, 0); // clear of the field's pieces for the 1.2 s strafe
+      s.advance(0.1);
+      s.advance(1.2, pad([], { lx: 1 }));
+      const side = s.sim.telemetry.speed / 0.0254;
+      expect(side).toBeCloseTo(PRESETS[team].envelope.topInPerS[2], 0);
+      expect(side).toBeLessThan(PRESETS[team].topSpeedInPerS * 0.7);
+    }
+  });
+
   test("L1 is slow: the TeleOp's slowSpeed", async () => {
     const s = await session();
     place(s, -1.5, -1.2);

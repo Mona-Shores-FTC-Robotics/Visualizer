@@ -327,7 +327,9 @@ test("alliance: two controllers drive Ultraviolet and Infrared on one field", as
   await waitSim(page, before.t + 0.8);
   await setPad(page, 1);
   const after = await at();
-  expect(after.robots[1].x - before.robots[1].x).toBeGreaterThan(0.3);
+  // The partner starts side-on at the rear wall: up on the stick is a strafe (about 40 in/s),
+  // and the rear FLOWER stops it at about 0.17 m. Which robot moves is the check, not how far.
+  expect(after.robots[1].x - before.robots[1].x).toBeGreaterThan(0.1);
   expect(Math.abs(after.robots[0].x - before.robots[0].x)).toBeLessThan(0.02);
 
   await page.evaluate(() =>
@@ -399,7 +401,7 @@ test("alliance with operators: four controllers, a driver and an operator per ro
         }
       ).__drill.session.sim.robots[1].body.translation().x,
   );
-  expect(x1 - x0).toBeGreaterThan(0.3);
+  expect(x1 - x0).toBeGreaterThan(0.1); // a strafe into the rear FLOWER, as in the test above
 });
 
 test("a PlayStation pad without the standard mapping: the robot holds still at PLAY, and the check says why", async ({
