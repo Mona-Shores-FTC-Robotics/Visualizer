@@ -24,6 +24,7 @@ import { IN, type RobotPreset } from "./presets";
 import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
 import robotModel from "../../sim/src/sim/robots/mona-shores.json";
 import { LaunchSpotDrive, type SpotStep } from "./launchSpot";
+import { FreshSticks } from "./freshSticks";
 import {
   CornerGather,
   FlowerPick,
@@ -46,10 +47,6 @@ const ELEVATION_STD_DEG = 1.0;
 const SPEED_STD = 0.015;
 const YAW_STD_DEG = 1.2;
 /** `TeleOpConfig.launcherTrimStepTps` over `LauncherSubsystem.targetTicksPerSecond`. */
-const LAUNCHER_TRIM_STEP = 25 / 1595;
-const LAUNCHER_TRIM_FINE_STEP = 10 / 1595;
-const AIM_TRIM_STEP_DEG = 1.5;
-const AIM_TRIM_FINE_STEP_DEG = 0.5;
 const RESET_HOLD_S = 0.5;
 const UNJAM_EJECT_S = 0.4;
 /**
@@ -124,7 +121,14 @@ export class TeleOp {
   private nextShotAt = 0;
   private emptySince = Infinity;
   private routine: Routine | null = null;
-  private routineSticks = { armed: false };
+  /** FreshSticks per routine, as BasicDriveTeleOp keeps one for each button. */
+  private pickSticks = new FreshSticks();
+  private gatherSticks = new FreshSticks();
+  private spotSticks = new FreshSticks();
+  /** The operator's FLOWER stick toggle (FlowerStickSubsystem.toggle); a grab runs the stick itself. */
+  private stickOut = false;
+  /** After Square is let go the launcher keeps spinning until this (launcherKeepSpinningAfterSquareS). */
+  private squareKeepUntil = -Infinity;
   /** The driver's Square (LaunchSpotDrive); null with a controls file that has no launch spots. */
   private spot: LaunchSpotDrive | null = null;
   private spotStep: SpotStep = {
@@ -234,24 +238,45 @@ export class TeleOp {
     // --- operator: launcher, trims, stick -------------------------------------------------
     if (c.on("LAUNCHER_TOGGLE")) {
       this.operatorSpin = !this.operatorSpin;
-      this.say(`Launcher ${this.operatorSpin ? "spinning up" : "idle"}`, now);
+      // LauncherOwner.operatorToggle: during Square's volley the launcher keeps spinning, and
+      // idles once Square is let go.
+      this.say(
+        this.spotStep.wantsLauncher && !this.operatorSpin
+          ? "Launcher: kept spinning for Square's volley (idles after Square is let go)"
+          : `Launcher ${this.operatorSpin ? "spinning up" : "idle"}`,
+        now,
+      );
     }
+    // The trims: TeleOpConfig's steps (fine with Circle held) and caps, from the controls export.
+    // The launcher trim is in ticks/s on the robot: here a fraction of the launch speed.
     const fine = c.held("FINE_TRIM");
+    const tps = this.num("launcherTargetTps", 1595);
+    const lStep =
+      (fine
+        ? this.num("launcherTrimFineStepTps", 10)
+        : this.num("launcherTrimStepTps", 25)) / tps;
+    const lCap = this.num("maxLauncherTrimTps", 150) / tps;
+    const aStep = fine
+      ? this.num("trimFineStepDeg", 0.5)
+      : this.num("trimStepDeg", 1.5);
+    const aCap = this.num("maxAimTrimDeg", 180);
     if (c.on("LAUNCHER_TRIM_UP"))
-      this.launcherTrim += fine ? LAUNCHER_TRIM_FINE_STEP : LAUNCHER_TRIM_STEP;
+      this.launcherTrim = clamp(this.launcherTrim + lStep, -lCap, lCap);
     if (c.on("LAUNCHER_TRIM_DOWN"))
-      this.launcherTrim -= fine ? LAUNCHER_TRIM_FINE_STEP : LAUNCHER_TRIM_STEP;
+      this.launcherTrim = clamp(this.launcherTrim - lStep, -lCap, lCap);
     if (c.on("LAUNCHER_TRIM_RESET")) this.launcherTrim = 0;
     if (c.on("TRIM_LEFT"))
-      this.aimTrimDeg += fine ? AIM_TRIM_FINE_STEP_DEG : AIM_TRIM_STEP_DEG;
+      this.aimTrimDeg = clamp(this.aimTrimDeg + aStep, -aCap, aCap);
     if (c.on("TRIM_RIGHT"))
-      this.aimTrimDeg -= fine ? AIM_TRIM_FINE_STEP_DEG : AIM_TRIM_STEP_DEG;
+      this.aimTrimDeg = clamp(this.aimTrimDeg - aStep, -aCap, aCap);
     if (c.on("TRIM_RESET")) {
       this.aimTrimDeg = 0;
       this.launcherTrim = 0;
     }
-    if (c.on("FLOWER_STICK"))
-      this.say("FLOWER stick toggled (Cross runs it itself)", now);
+    if (c.on("FLOWER_STICK")) {
+      this.stickOut = !this.stickOut;
+      this.say(`FLOWER stick ${this.stickOut ? "deployed" : "retracted"}`, now);
+    }
 
     // --- held resets (D-pad, 0.5 s) -----------------------------------------------------------
     for (const a of [
@@ -271,6 +296,14 @@ export class TeleOp {
         if (a === "RESET_HEADING") {
           this.fieldForward = sim.heading;
           this.say("Gyro reset: forward is where the robot faces", now);
+        } else if (a === "TURRET_ZERO") {
+          // A trim that corrected the old zero would now aim that far off: the new zero starts clean.
+          const hadTrim = this.aimTrimDeg !== 0;
+          this.aimTrimDeg = 0;
+          this.say(
+            `Turret zeroed here${hadTrim ? ", aim trim back to 0" : ""} (the simulated turret never slips)`,
+            now,
+          );
         } else
           this.say(
             `${c.binding(a)?.description.split(" (")[0] ?? a}: the simulated pose is exact`,
@@ -293,7 +326,7 @@ export class TeleOp {
     this.firePress = fireHeld && !this.fireHeldWas;
     if (this.firePress) {
       const spun =
-        this.operatorSpin &&
+        this.spinning(now) &&
         now - this.spinSince >= this.preset.spinUpFromIdleS;
       this.readyAt =
         now +
@@ -302,8 +335,9 @@ export class TeleOp {
     }
     if (!fireHeld) this.readyAt = Infinity;
     this.fireHeldWas = fireHeld;
-    if (this.operatorSpin && this.spinSince === -Infinity) this.spinSince = now;
-    if (!this.operatorSpin) this.spinSince = -Infinity;
+    if (this.spinning(now) && this.spinSince === -Infinity)
+      this.spinSince = now;
+    if (!this.spinning(now)) this.spinSince = -Infinity;
 
     // The arc turn (AIM) and the chassis aim (LOCKED): either holds the feed until the shot is on.
     const tol = this.num("aimToleranceDeg", 3);
@@ -627,13 +661,21 @@ export class TeleOp {
   ) {
     const pickHeld = c.held("FLOWER_PICK");
     const gatherHeld = c.held("GARDEN_GATHER");
+    const stale = this.num("staleStickCancelsAfterS", 0.6);
+    const pickMoved = this.pickSticks.moved(pickHeld, sticksMoved, now, stale);
+    const gatherMoved = this.gatherSticks.moved(
+      gatherHeld,
+      sticksMoved,
+      now,
+      stale,
+    );
     const r = this.routine;
     if (r) {
       const held = r.kind === "pick" ? pickHeld : gatherHeld;
       const name = r.kind === "pick" ? "FLOWER pick" : "GARDEN gather";
-      // FreshSticks: a stick still moving from the drive up to the press counts once it centres.
-      if (!sticksMoved) this.routineSticks.armed = true;
-      const moved = sticksMoved && this.routineSticks.armed;
+      // FreshSticks: a stick still held from the drive up to the press counts once it centres, or
+      // once it has been held staleStickCancelsAfterS past the press.
+      const moved = r.kind === "pick" ? pickMoved : gatherMoved;
       const finishes =
         r.last &&
         (r.last.phase === "dwell" ||
@@ -660,7 +702,6 @@ export class TeleOp {
       return;
     }
     const start = (kind: "pick" | "gather") => {
-      this.routineSticks.armed = !sticksMoved;
       const team = String(this.preset.team) as "19429" | "20245";
       this.routine = {
         kind,
@@ -681,6 +722,8 @@ export class TeleOp {
       }
     };
     if (this.spot?.active) return;
+    // The operator's stick toggle holds while no grab runs.
+    this.sim.robots[this.sim.me].stickDown = this.stickOut;
     if (c.on("FLOWER_PICK")) start("pick");
     else if (c.on("GARDEN_GATHER")) start("gather");
   }
@@ -710,13 +753,28 @@ export class TeleOp {
     const held = c.held("LAUNCH_SPOT") && !this.routine;
     if (held && !this.spotWas) this.spotStartS = now;
     if (!held) this.spotStartS = Infinity;
-    const spun =
-      (this.operatorSpin &&
-        now - this.spinSince >= this.preset.spinUpFromIdleS) ||
-      now - this.spotStartS >= this.preset.spinUpFromIdleS;
+    // Spinning from before the press, or since it: at speed spinUpFromIdleS after it started.
+    const since = Math.min(
+      this.spinning(now) ? this.spinSince : Infinity,
+      this.spotStartS,
+    );
+    const spun = now - since >= this.preset.spinUpFromIdleS;
+    const moved = this.spotSticks.moved(
+      held,
+      sticksMoved,
+      now,
+      this.num("staleStickCancelsAfterS", 0.6),
+    );
     const wasActive = this.spot.active,
-      wasPhase = this.spot.phase;
-    this.spotStep = this.spot.step(this.sim, held, sticksMoved, spun, now, dt);
+      wasPhase = this.spot.phase,
+      wasFiring = this.spotStep.wantsLauncher;
+    this.spotStep = this.spot.step(this.sim, held, moved, spun, now, dt);
+    if (wasFiring && !this.spotStep.wantsLauncher) {
+      // LauncherOwner.spotPressEnded: letting go is "done shooting", whoever spun it up.
+      this.operatorSpin = false;
+      this.squareKeepUntil =
+        now + clamp(this.num("launcherKeepSpinningAfterSquareS", 3), 0, 10);
+    }
     if (this.spot.phase === "REFUSED" && wasPhase !== "REFUSED")
       this.say(this.spot.result, now, 4);
     else if (wasActive && !this.spot.active) this.say(this.spot.result, now, 4);
@@ -727,7 +785,20 @@ export class TeleOp {
     // The robot carries on from the routine's speed; the stick comes up.
     if (this.routine?.last) this.vel = { ...this.routine.last.drive };
     this.routine = null;
+    this.stickOut = false;
     this.sim.robots[this.sim.me].stickDown = false;
+  }
+
+  /**
+   * The launcher spins (LauncherOwner): the operator's toggle, Square's press while it fires, and
+   * launcherKeepSpinningAfterSquareS after Square is let go.
+   */
+  private spinning(now: number): boolean {
+    return (
+      this.operatorSpin ||
+      this.spotStep.wantsLauncher ||
+      now < this.squareKeepUntil
+    );
   }
 
   status(): TeleOpStatus {
@@ -746,7 +817,7 @@ export class TeleOp {
         this.gate ||
         (Number.isFinite(now) && this.fireHeldWas && this.sim.time >= now)
           ? "AT SPEED"
-          : this.fireHeldWas || this.operatorSpin
+          : this.fireHeldWas || this.spinning(this.lastNow)
             ? "SPINNING UP"
             : "IDLE",
       gateOpen: this.gate,

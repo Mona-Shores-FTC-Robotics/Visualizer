@@ -92,7 +92,16 @@
     "turretLockedForwardShared": true,
     "turretArcLeftDeg": 90.0,
     "turretArcRightDeg": 90.0,
-    "turretTopSpeedDps": 180.0
+    "turretTopSpeedDps": 180.0,
+    "trimStepDeg": 1.5,
+    "trimFineStepDeg": 0.5,
+    "maxAimTrimDeg": 180.0,
+    "launcherTargetTps": 1595.0,
+    "launcherTrimStepTps": 25.0,
+    "launcherTrimFineStepTps": 10.0,
+    "maxLauncherTrimTps": 150.0,
+    "launcherKeepSpinningAfterSquareS": 3.0,
+    "staleStickCancelsAfterS": 0.6
   },
   "launchSpots": {
     "about": "The driver's Square (LaunchSpots, LaunchSpotDrive): Pedro's frame, inches from the red audience corner, headings in degrees. drawn: as drawn, for red; red and blue: where the button drives, with the numbers below. examples: LaunchSpots.choose from each pose (null with a refusal).",
