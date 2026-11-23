@@ -3,13 +3,13 @@
  * toward the goal, with the practice readout's split for every cycle and pick-up of each robot. No DOM: the page and the tests drive it.
  */
 import type RAPIER_NS from "@dimforge/rapier3d-compat";
-import { DEFAULT_ROBOT, setSquareSize } from "../../sim/src/sim/config";
+import { monaShoresConfig } from "../../sim/src/sim/robots/mona-shores";
 import { DT, NO_INPUT, Sim } from "../../sim/src/sim/world";
 import { Controls, NO_PAD, type ControlsFile, type PadRead } from "./controls";
 import type { CellSide } from "../../sim/src/sim/hive";
 import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
-import { IN, PRESETS, type RobotPreset, type TeamNumber } from "./presets";
+import { PRESETS, type RobotPreset, type TeamNumber } from "./presets";
 import { TeleOp } from "./teleop";
 import {
   HUMAN_PLAYERS,
@@ -139,14 +139,10 @@ export class DrillSession {
       ? team
       : [{ team, driverOnly: mode === "driver" }];
     this.rand = mulberry32(seed);
-    const cfgFor = (p: RobotPreset) => {
-      const cfg = structuredClone(DEFAULT_ROBOT);
-      setSquareSize(cfg, p.frameIn * IN);
-      cfg.intake.width = p.intakeWidthIn * IN;
-      cfg.capacity = p.laneCapacity;
-      cfg.intake.successP = 1;
-      return cfg;
-    };
+    // Our robot as the simulator models it (sim/src/sim/robots/mona-shores.ts), intake and
+    // FLOWER stick included, so master's FLOWER pick and GARDEN gather routines pick up physically.
+    const cfgFor = (p: RobotPreset) =>
+      monaShoresConfig(String(p.team) as "19429" | "20245");
     for (const s of this.slots) this.presets.push(PRESETS[s.team]);
     // The simulator's partner starts on the rear wall by the rear FLOWER, the first robot on the
     // alliance wall: one at each end, as the cycle playbook splits them.

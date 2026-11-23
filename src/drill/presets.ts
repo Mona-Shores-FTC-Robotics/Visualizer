@@ -25,8 +25,9 @@ export interface RobotPreset {
   intakeWidthIn: number;
   laneCapacity: number;
   /** How long the pick takes, s, and how many pieces each brought (counts by 0, 1, 2, ...). */
-  flowerPick: { seconds: number; yield: number[] };
-  gardenGather: { seconds: number; yield: number[] };
+  /** The logged card times, shown in the robot table; the routines themselves run in the simulator. */
+  flowerPick: { seconds: number };
+  gardenGather: { seconds: number };
   /** Fire press to gate open, s: launcher idling, and with the operator's spin-up already on. */
   spinUpFromIdleS: number;
   spinUpWhenSpunS: number;
@@ -40,13 +41,6 @@ export interface RobotPreset {
 
 /** `DriveSubsystem.turnAccelPerSec`: the turn command's limiter, per second. */
 const TURN_ACCEL_PER_S = 8;
-
-/** Counts by value from the file's `{ "0": n, "1": n, ... }`. */
-function counts(byValue: Record<string, number>): number[] {
-  const out: number[] = [];
-  for (const [k, v] of Object.entries(byValue)) out[Number(k)] = v;
-  return Array.from(out, (v) => v ?? 0);
-}
 
 const mid = (r: number[]) => (r[0] + r[1]) / 2;
 
@@ -65,11 +59,9 @@ function preset(team: TeamNumber): RobotPreset {
     laneCapacity: s.laneCapacity.value,
     flowerPick: {
       seconds: r.flowerPick.cardS.value,
-      yield: counts(r.flowerPick.piecesPerPick.value),
     },
     gardenGather: {
       seconds: r.gardenGather.cardS.value,
-      yield: counts(r.gardenGather.piecesPerGather.value),
     },
     spinUpFromIdleS: r.firePressToGateS.value,
     spinUpWhenSpunS: r.autoGateWaitS.value,
@@ -88,14 +80,3 @@ export const PRESETS: Record<TeamNumber, RobotPreset> = {
   19429: preset(19429),
   20245: preset(20245),
 };
-
-/** A draw from counts by value (`yield`): how many pieces a pick brings. */
-export function drawCount(counts: number[], u: number): number {
-  const total = counts.reduce((a, b) => a + b, 0);
-  let x = u * total;
-  for (let i = 0; i < counts.length; i++) {
-    x -= counts[i];
-    if (x < 0) return i;
-  }
-  return counts.length - 1;
-}

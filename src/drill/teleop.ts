@@ -20,7 +20,12 @@ import { BALL, FIELD, HIVE } from "../../sim/src/sim/config";
 import type { Alliance, CellSide } from "../../sim/src/sim/hive";
 import type { Sim } from "../../sim/src/sim/world";
 import { Controls, type PadRead } from "./controls";
-import { IN, drawCount, type RobotPreset } from "./presets";
+import { IN, type RobotPreset } from "./presets";
+import {
+  FlowerPick,
+  GardenGather,
+  type RoutineStep,
+} from "../../sim/src/sim/robots/routines";
 
 const STICK_DEADBAND = 0.05;
 /** `TurretAimer.SWITCH_BAND_IN`: the band about the HIVE's axle line, inches. */
@@ -55,22 +60,12 @@ const WRONG_NECTAR_CLEAR_S = 1.0;
 const WRONG_NECTAR_EJECT_CLEAR_S = 1.0;
 
 export type TurretMode = "AIM" | "LOCKED";
-type Routine =
-  | {
-      kind: "pick";
-      phase: "drive" | "work";
-      flower: string;
-      until: number;
-      due: number[];
-      start: number;
-    }
-  | {
-      kind: "gather";
-      phase: "drive" | "work";
-      until: number;
-      due: number[];
-      start: number;
-    };
+/** A FLOWER pick or GARDEN gather in progress: master's routine, run by the simulator. */
+type Routine = {
+  kind: "pick" | "gather";
+  r: FlowerPick | GardenGather;
+  last: RoutineStep | null;
+};
 
 const wrap180 = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 const deg = (r: number) => (r * 180) / Math.PI;
@@ -328,12 +323,12 @@ export class TeleOp {
     this.turretDeg += clamp(wrap180(want - this.turretDeg), -step, step);
 
     // --- routines: FLOWER pick, GARDEN gather ----------------------------------------------
-    this.updateRoutine(c, now, leftStick || rightStick);
+    this.updateRoutine(c, now, leftStick || rightStick, dt);
 
     // --- drive --------------------------------------------------------------------------------
     const vmax = this.preset.topSpeedInPerS * IN;
     let target: { vx: number; vz: number; w: number };
-    if (this.routine) target = this.routineDrive(now);
+    if (this.routine?.last) target = this.routine.last.drive;
     else {
       const a = this.fieldForward;
       const F = { x: Math.cos(a), z: -Math.sin(a) },
@@ -373,7 +368,9 @@ export class TeleOp {
       this.suspectUntil = Math.min(this.suspectUntil, now);
     this.nectarGate(now);
     this.intakeFilter =
-      unjam || this.routine?.phase === "work" || now < this.holdOffUntil
+      unjam ||
+      (this.routine?.last && !this.routine.last.intake) ||
+      now < this.holdOffUntil
         ? "none"
         : "all";
 
@@ -575,184 +572,65 @@ export class TeleOp {
 
   // ---------------------------------------------------------------------- routines
 
-  private updateRoutine(c: Controls, now: number, sticksMoved: boolean) {
+  /**
+   * Cross held: a FLOWER pick; Triangle held: a GARDEN gather. Both are master's routines
+   * (`FlowerPicker`, `GardenGather`) as the simulator runs them (sim/src/sim/robots/routines.ts):
+   * they drive the robot, lower the FLOWER stick and run the intake, and the pieces come in
+   * physically. Letting go, or a stick moved after the press (FreshSticks), hands the robot back.
+   */
+  private updateRoutine(
+    c: Controls,
+    now: number,
+    sticksMoved: boolean,
+    dt: number,
+  ) {
     const pickHeld = c.held("FLOWER_PICK");
     const gatherHeld = c.held("GARDEN_GATHER");
     const r = this.routine;
     if (r) {
       const held = r.kind === "pick" ? pickHeld : gatherHeld;
+      const name = r.kind === "pick" ? "FLOWER pick" : "GARDEN gather";
       // FreshSticks: a stick still moving from the drive up to the press counts once it centres.
       if (!sticksMoved) this.routineSticks.armed = true;
       if (!held || (sticksMoved && this.routineSticks.armed)) {
         this.say(
-          `${r.kind === "pick" ? "FLOWER pick" : "GARDEN gather"} stopped (${held ? "sticks moved" : "released"})`,
+          `${name} stopped (${held ? "sticks moved" : "released"})`,
           now,
         );
-        this.routine = null;
+        this.endRoutine();
         return;
       }
-      if (r.phase === "work") {
-        while (r.due.length && now >= r.due[0]) {
-          r.due.shift();
-          if (r.kind === "pick") this.takeFromFlower(r.flower);
-          else this.takeFromGarden();
-        }
-        if (now >= r.until) {
-          this.say(
-            `${r.kind === "pick" ? "FLOWER pick" : "GARDEN gather"} done`,
-            now,
-          );
-          this.routine = null;
-        }
+      r.last = r.r.step(dt);
+      this.sim.robots[this.sim.me].stickDown = r.last.stickDown;
+      if (r.last.done) {
+        this.say(`${name} done`, now);
+        this.endRoutine();
       }
       return;
     }
-    if (c.on("FLOWER_PICK")) this.startPick(now, sticksMoved);
-    else if (c.on("GARDEN_GATHER")) this.startGather(now, sticksMoved);
-  }
-
-  /** The FLOWER pick's square-up spot: facing the FLOWER, the intake against it. */
-  private flowerSpot(id: string): { x: number; z: number; heading: number } {
-    const f = this.sim.flowers.find((q) => q.id === id)!;
-    const n =
-      Math.abs(f.x) > Math.abs(f.z)
-        ? { x: -Math.sign(f.x), z: 0 }
-        : { x: 0, z: -Math.sign(f.z) };
-    const off = FIELD.flowerHalfSize + (this.preset.frameIn / 2) * IN + 0.01;
-    return {
-      x: f.x + n.x * off,
-      z: f.z + n.z * off,
-      heading: Math.atan2(n.z, -n.x),
+    const start = (kind: "pick" | "gather") => {
+      this.routineSticks.armed = !sticksMoved;
+      const team = String(this.preset.team) as "19429" | "20245";
+      this.routine = {
+        kind,
+        r:
+          kind === "pick"
+            ? new FlowerPick(this.sim, team)
+            : new GardenGather(this.sim, team),
+        last: null,
+      };
+      this.routine.last = this.routine.r.step(dt);
+      this.sim.robots[this.sim.me].stickDown = this.routine.last.stickDown;
     };
+    if (c.on("FLOWER_PICK")) start("pick");
+    else if (c.on("GARDEN_GATHER")) start("gather");
   }
 
-  private gardenSpot(): { x: number; z: number; heading: number } {
-    const g = FIELD.garden[this.sim.alliance];
-    const cz = (g[2] + g[3]) / 2,
-      sz = Math.sign(cz);
-    const half = (this.preset.frameIn / 2) * IN;
-    // Facing the wall the GARDEN is on, the intake toward it.
-    return {
-      x: (g[0] + g[1]) / 2,
-      z: sz * (FIELD.half - half - 0.02),
-      heading: Math.atan2(-sz, 0),
-    };
-  }
-
-  private startPick(now: number, sticksMoved: boolean) {
-    const p = this.sim.robot.translation();
-    let best: { id: string; d: number } | null = null;
-    for (const f of this.sim.flowers) {
-      const d = Math.hypot(f.x - p.x, f.z - p.z);
-      if (d < 1.0 && (!best || d < best.d)) best = { id: f.id, d };
-    }
-    if (!best) {
-      this.say("FLOWER pick: no FLOWER within reach", now);
-      return;
-    }
-    this.routineSticks.armed = !sticksMoved;
-    this.routine = {
-      kind: "pick",
-      phase: "drive",
-      flower: best.id,
-      until: Infinity,
-      due: [],
-      start: now,
-    };
-  }
-
-  private startGather(now: number, sticksMoved: boolean) {
-    const s = this.gardenSpot(),
-      p = this.sim.robot.translation();
-    if (Math.hypot(s.x - p.x, s.z - p.z) > 1.2) {
-      this.say("GARDEN gather: drive to our GARDEN first", now);
-      return;
-    }
-    this.routineSticks.armed = !sticksMoved;
-    this.routine = {
-      kind: "gather",
-      phase: "drive",
-      until: Infinity,
-      due: [],
-      start: now,
-    };
-  }
-
-  /** Drives to the routine's spot; once there, holds still while it works. */
-  private routineDrive(now: number): { vx: number; vz: number; w: number } {
-    const r = this.routine!;
-    if (r.phase === "work") return { vx: 0, vz: 0, w: 0 };
-    const s = r.kind === "pick" ? this.flowerSpot(r.flower) : this.gardenSpot();
-    const p = this.sim.robot.translation();
-    const dx = s.x - p.x,
-      dz = s.z - p.z,
-      d = Math.hypot(dx, dz);
-    const herr = Math.atan2(
-      Math.sin(s.heading - this.sim.heading),
-      Math.cos(s.heading - this.sim.heading),
-    );
-    if (d < 0.025 && Math.abs(herr) < rad(4)) {
-      const spec =
-        r.kind === "pick" ? this.preset.flowerPick : this.preset.gardenGather;
-      const n = drawCount(spec.yield, this.rand());
-      r.phase = "work";
-      r.until = now + spec.seconds;
-      r.due = Array.from(
-        { length: n },
-        (_, i) => now + (spec.seconds * (i + 1)) / (n + 1),
-      );
-      return { vx: 0, vz: 0, w: 0 };
-    }
-    const v = Math.min(0.7 * this.preset.topSpeedInPerS * IN, 2.5 * d);
-    const w = clamp(
-      4 * herr,
-      -rad(this.preset.turnRateDegPerS) * 0.6,
-      rad(this.preset.turnRateDegPerS) * 0.6,
-    );
-    return {
-      vx: d > 1e-6 ? (dx / d) * v : 0,
-      vz: d > 1e-6 ? (dz / d) * v : 0,
-      w,
-    };
-  }
-
-  private takeFromFlower(id: string) {
-    const f = this.sim.flowers.find((q) => q.id === id);
-    if (
-      !f ||
-      f.stack[0] !== "pollen" ||
-      this.sim.carried.length >= this.preset.laneCapacity
-    )
-      return;
-    f.stack.shift();
-    this.sim.carried.push("pollen");
-  }
-
-  private takeFromGarden() {
-    const sim = this.sim,
-      g = FIELD.garden[sim.alliance];
-    if (sim.carried.length >= this.preset.laneCapacity) return;
-    const p = sim.robot.translation();
-    let best: { id: number; d: number } | null = null;
-    for (const b of sim.balls.values()) {
-      if (b.kind !== "pollen") continue;
-      const q = b.body.translation();
-      if (
-        q.y > 0.12 ||
-        q.x < g[0] - 0.1 ||
-        q.x > g[1] + 0.1 ||
-        q.z < g[2] - 0.15 ||
-        q.z > g[3] + 0.1
-      )
-        continue;
-      const d = Math.hypot(q.x - p.x, q.z - p.z);
-      if (!best || d < best.d) best = { id: b.id, d };
-    }
-    if (!best) return;
-    const b = sim.balls.get(best.id)!;
-    sim.world.removeRigidBody(b.body);
-    sim.balls.delete(b.id);
-    sim.carried.push("pollen");
+  private endRoutine() {
+    // The robot carries on from the routine's speed; the stick comes up.
+    if (this.routine?.last) this.vel = { ...this.routine.last.drive };
+    this.routine = null;
+    this.sim.robots[this.sim.me].stickDown = false;
   }
 
   status(): TeleOpStatus {
@@ -777,7 +655,7 @@ export class TeleOp {
       gateOpen: this.gate,
       lane: this.sim.carried.length,
       routine: this.routine
-        ? `${this.routine.kind === "pick" ? "FLOWER pick" : "GARDEN gather"}: ${this.routine.phase === "drive" ? "squaring up" : "picking"}`
+        ? `${this.routine.kind === "pick" ? "FLOWER pick" : "GARDEN gather"}: ${this.routine.last?.phase ?? "starting"}`
         : null,
       arcTurning: this.arcTurning,
       chassisAiming: this.chassisAiming,
