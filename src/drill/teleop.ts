@@ -21,6 +21,7 @@ import type { Alliance, CellSide } from "../../sim/src/sim/hive";
 import type { Sim } from "../../sim/src/sim/world";
 import { Controls, type PadRead } from "./controls";
 import { IN, type RobotPreset } from "./presets";
+import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
 import {
   FlowerPick,
   GardenGather,
@@ -326,6 +327,9 @@ export class TeleOp {
     this.updateRoutine(c, now, leftStick || rightStick, dt);
 
     // --- drive --------------------------------------------------------------------------------
+    // Full stick is the forward top speed; `limitDrive` caps it to the robot's envelope in the
+    // direction of travel (a mecanum strafes slower than it drives forward), and the change to
+    // that direction's acceleration.
     const vmax = this.preset.topSpeedInPerS * IN;
     let target: { vx: number; vz: number; w: number };
     if (this.routine?.last) target = this.routine.last.drive;
@@ -343,13 +347,16 @@ export class TeleOp {
       }
       target = { vx, vz, w: turnCmd * rad(this.preset.turnRateDegPerS) };
     }
-    const acc = this.preset.accelInPerS2 * IN * dt;
-    const dvx = target.vx - this.vel.vx,
-      dvz = target.vz - this.vel.vz,
-      dv = Math.hypot(dvx, dvz);
-    const k = dv > acc ? acc / dv : 1;
-    this.vel.vx += dvx * k;
-    this.vel.vz += dvz * k;
+    const lim = limitDrive(
+      String(this.preset.team) as "19429" | "20245",
+      sim.heading,
+      this.vel,
+      target,
+      dt,
+    );
+    this.vel.vx = lim.vx;
+    this.vel.vz = lim.vz;
+    target.w = lim.w;
     const wacc = rad(this.preset.turnAccelDegPerS2) * dt;
     this.vel.w += clamp(target.w - this.vel.w, -wacc, wacc);
     sim.robots[sim.me].velDrive = { ...this.vel };

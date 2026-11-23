@@ -184,8 +184,8 @@ function showNumbers() {
 function numbersFor(team: TeamNumber) {
   const p = PRESETS[team];
   return `<p><b>${TEAM_NAMES[team]}</b></p><table>
-    <tr><td>Top speed</td><td>${p.topSpeedInPerS} in/s</td></tr>
-    <tr><td>Acceleration</td><td>${p.accelInPerS2} in/s²</td></tr>
+    <tr><td>Top speed (forward / 45° / sideways)</td><td>${p.envelope.topInPerS.join(" / ")} in/s</td></tr>
+    <tr><td>Acceleration (forward / 45° / sideways)</td><td>${p.envelope.accelInPerS2.join(" / ")} in/s²</td></tr>
     <tr><td>Turn</td><td>${p.turnRateDegPerS}°/s</td></tr>
     <tr><td>FLOWER pick</td><td>${p.flowerPick.seconds} s</td></tr>
     <tr><td>GARDEN gather</td><td>${p.gardenGather.seconds} s</td></tr>

@@ -16,8 +16,11 @@ export type TeamNumber = 19429 | 20245;
 export interface RobotPreset {
   team: TeamNumber;
   name: string;
+  /** Forward (0°) top speed and acceleration; the drive caps each direction by `envelope`. */
   topSpeedInPerS: number;
   accelInPerS2: number;
+  /** The drive envelope by direction of travel in robot axes (robot file `drive.envelope`). */
+  envelope: { angleDeg: number[]; topInPerS: number[]; accelInPerS2: number[] };
   turnRateDegPerS: number;
   /** Angular acceleration, deg/s²: the turn limiter (`DriveSubsystem.turnAccelPerSec`, 8 /s) times the rate. */
   turnAccelDegPerS2: number;
@@ -50,10 +53,15 @@ function preset(team: TeamNumber): RobotPreset {
   return {
     team,
     name: r.name,
-    topSpeedInPerS: r.drive.topSpeedInPerS.value,
-    accelInPerS2: r.drive.accelInPerS2.value,
-    turnRateDegPerS: r.drive.turnDegPerS.value,
-    turnAccelDegPerS2: TURN_ACCEL_PER_S * r.drive.turnDegPerS.value,
+    topSpeedInPerS: r.drive.envelope.topInPerS.value[0],
+    accelInPerS2: r.drive.envelope.accelInPerS2.value[0],
+    envelope: {
+      angleDeg: r.drive.envelope.angleDeg.value,
+      topInPerS: r.drive.envelope.topInPerS.value,
+      accelInPerS2: r.drive.envelope.accelInPerS2.value,
+    },
+    turnRateDegPerS: r.drive.envelope.turnDegPerS.value,
+    turnAccelDegPerS2: TURN_ACCEL_PER_S * r.drive.envelope.turnDegPerS.value,
     frameIn: s.frameIn.value,
     intakeWidthIn: s.intakeWidthIn.value,
     laneCapacity: s.laneCapacity.value,
