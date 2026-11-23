@@ -1,0 +1,50 @@
+diff --git a/TeamCode/cheat-sheets/controls.json b/TeamCode/cheat-sheets/controls.json
+index 5f8abe0..b4cec9b 100644
+--- a/TeamCode/cheat-sheets/controls.json
++++ b/TeamCode/cheat-sheets/controls.json
+@@ -92,7 +92,16 @@
+     "turretLockedForwardShared": true,
+     "turretArcLeftDeg": 90.0,
+     "turretArcRightDeg": 90.0,
+-    "turretTopSpeedDps": 180.0
++    "turretTopSpeedDps": 180.0,
++    "trimStepDeg": 1.5,
++    "trimFineStepDeg": 0.5,
++    "maxAimTrimDeg": 180.0,
++    "launcherTargetTps": 1595.0,
++    "launcherTrimStepTps": 25.0,
++    "launcherTrimFineStepTps": 10.0,
++    "maxLauncherTrimTps": 150.0,
++    "launcherKeepSpinningAfterSquareS": 3.0,
++    "staleStickCancelsAfterS": 0.6
+   },
+   "launchSpots": {
+     "about": "The driver's Square (LaunchSpots, LaunchSpotDrive): Pedro's frame, inches from the red audience corner, headings in degrees. drawn: as drawn, for red; red and blue: where the button drives, with the numbers below. examples: LaunchSpots.choose from each pose (null with a refusal).",
+diff --git a/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
+index 4c27b3a..1bc530b 100644
+--- a/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
++++ b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
+@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.controls;
+ import org.firstinspires.ftc.teamcode.opmodes.CycleReadout;
+ import org.firstinspires.ftc.teamcode.opmodes.TeleOpConfig;
+ import org.firstinspires.ftc.teamcode.subsystems.DriveSubsystem;
++import org.firstinspires.ftc.teamcode.subsystems.LauncherSubsystem;
+ import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
+ 
+ import java.util.Locale;
+@@ -74,6 +75,15 @@ public final class ControlsExport {
+                 {"turretArcLeftDeg", num(TurretSubsystem.arcLeftDeg)},
+                 {"turretArcRightDeg", num(TurretSubsystem.arcRightDeg)},
+                 {"turretTopSpeedDps", num(TurretSubsystem.topSpeedDps)},
++                {"trimStepDeg", num(TeleOpConfig.trimStepDeg)},
++                {"trimFineStepDeg", num(TeleOpConfig.trimFineStepDeg)},
++                {"maxAimTrimDeg", num(TeleOpConfig.maxAimTrimDeg)},
++                {"launcherTargetTps", num(LauncherSubsystem.targetTicksPerSecond)},
++                {"launcherTrimStepTps", num(TeleOpConfig.launcherTrimStepTps)},
++                {"launcherTrimFineStepTps", num(TeleOpConfig.launcherTrimFineStepTps)},
++                {"maxLauncherTrimTps", num(TeleOpConfig.maxLauncherTrimTps)},
++                {"launcherKeepSpinningAfterSquareS", num(TeleOpConfig.launcherKeepSpinningAfterSquareS)},
++                {"staleStickCancelsAfterS", num(TeleOpConfig.staleStickCancelsAfterS)},
+         };
+         for (int i = 0; i < switches.length; i++) {
+             indent(out, 2).append(quote(switches[i][0])).append(": ").append(switches[i][1])
