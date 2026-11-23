@@ -23,3 +23,20 @@ describe('Full Match hand-off (Sim.handoff, Hive.setState)', () => {
     expect(sim.cellCount('red')).toBe(before + 3);
   });
 });
+
+describe('Full Match hand-off: pieces and FLOWERS', () => {
+  beforeAll(async () => { await RAPIER.init(); });
+  it('replaces the loose pieces, keeps CELL contents, and sets FLOWER stacks', () => {
+    const sim = new Sim(RAPIER, undefined, 'teleop', 3, { opponent: true, partners: true });
+    const inCell = sim.cellCount('red') + sim.cellCount('blue');
+    const pieces = [{ kind: 'pollen' as const, x: 0.5, y: 0, z: 0.5 }, { kind: 'nectar_blue' as const, x: -0.5, y: 0.05, z: 0.8 }];
+    sim.handoff({}, 1, { pieces, flowers: { rear: 2, audience: ['pollen', 'nectar_red'] } });
+    const loose = [...sim.balls.values()].filter(b => b.body.isEnabled() && b.body.translation().y < 0.2 && Math.abs(b.body.translation().x) < 1.79 && Math.abs(b.body.translation().z) < 1.79);
+    expect(loose.map(b => b.kind).sort()).toEqual(['nectar_blue', 'pollen']);
+    const p = loose.find(b => b.kind === 'pollen')!.body.translation();
+    expect(Math.hypot(p.x - 0.5, p.z - 0.5)).toBeLessThan(0.02);
+    expect(sim.cellCount('red') + sim.cellCount('blue')).toBe(inCell);
+    expect(sim.flowers.find(f => f.id === 'rear')!.stack).toEqual(['pollen', 'pollen']);
+    expect(sim.flowers.find(f => f.id === 'audience')!.stack).toEqual(['pollen', 'nectar_red']);
+  });
+});

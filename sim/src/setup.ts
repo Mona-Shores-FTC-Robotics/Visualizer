@@ -53,10 +53,11 @@ export function opponentSetup(skill: number): Partial<BotSetup> {
 }
 /**
  * The dial's setting for a target number of TIPs a match by a two-robot opponent alliance, both on the planner, against
- * an alliance that doesn't move, under UV/IR TIP timing. Measured over 12 seeds each with scripts/opponent-skill.ts
- * (23 Nov 2026): 0 gave 1.08 TIPs a match, 0.37 gave 2.92, 0.57 gave 5.08, 0.68 gave 6.92. The default robot (1) gives about 14.
+ * an alliance that doesn't move, under UV/IR TIP timing and the 'films' spill. Measured over 12 seeds each with
+ * scripts/opponent-skill.ts (23 Nov 2026, after the spill fit): 0 gave 1.00 TIPs a match, 0.37 gave 3.17, 0.58 gave
+ * 4.83 (0.57 gave 4.75, 0.59 gave 5.33), 0.68 gave 6.92. The default robot (1) gives about 14.
  */
-export const OPPONENT_SKILL = { 1: 0, 3: 0.37, 5: 0.57, 7: 0.68 } as const;
+export const OPPONENT_SKILL = { 1: 0, 3: 0.37, 5: 0.58, 7: 0.68 } as const;
 /** The robot that the HUD, the chase camera, the shot preview, and the robot camera follow: the first robot with a human driver, or R0. */
 export const focusRobot = (bots: BotSetup[]) => Math.max(0, bots.findIndex(b => b.driver !== 'planner'));
 
