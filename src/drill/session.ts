@@ -6,14 +6,14 @@ import type RAPIER_NS from "@dimforge/rapier3d-compat";
 import { monaShoresConfig } from "../../sim/src/sim/robots/mona-shores";
 import { DT, NO_INPUT, Sim } from "../../sim/src/sim/world";
 import { Controls, NO_PAD, type ControlsFile, type PadRead } from "./controls";
-import type { CellSide } from "../../sim/src/sim/hive";
+import type { Alliance, CellSide } from "../../sim/src/sim/hive";
 import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
 import { PRESETS, type RobotPreset, type TeamNumber } from "./presets";
 import { TeleOp } from "./teleop";
 import { Coach } from "../../sim/src/auto/coach";
 import {
-  OPPONENT_SKILL,
+  OPPONENT_SKILL_TELEOP,
   defaultBot,
   opponentSetup,
   robotConfig,
@@ -188,21 +188,25 @@ export class DrillSession {
     }
     // The dead partner, when only one of ours is driven: our other robot, standing at its start.
     const partnerPreset = PRESETS[this.slots[0].team === 20245 ? 19429 : 20245];
-    // The opponents (blue): the planner's robot at the skill's dial setting.
+    // The opponents (blue): the planner's robot at the skill's dial setting. They play TeleOp only
+    // on the planner (a full match replays only our Auto), so the TeleOp-calibrated dial.
     const opponentCfg = (slot: number) =>
       robotConfig(
         sanitize(
           {
             ...defaultBot(2 + slot),
-            ...opponentSetup(OPPONENT_SKILL[this.opponentSkill!]),
+            ...opponentSetup(OPPONENT_SKILL_TELEOP[this.opponentSkill!]),
           },
           2 + slot,
         ),
       );
     // The simulator's partner starts on the rear wall by the rear FLOWER, the first robot on the
     // alliance wall: one at each end, as the cycle playbook splits them.
+    // Ours are the Sim's first robots and always red (it builds red first); only theirs pull POLLEN
+    // from a FLOWER by pushing into it, the planner's way. Ours pick by the FLOWER pick routine.
+    const ours: Alliance = "red";
     this.sim = new Sim(rapier, cfgFor(this.presets[0]), "teleop", seed, {
-      flowerPullByPush: false,
+      flowerPullByPush: (a) => a !== ours,
       tipTiming,
       partners: this.slots.length > 1 || match,
       opponent: match,
