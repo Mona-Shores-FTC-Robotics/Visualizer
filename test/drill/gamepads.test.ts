@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { readPad } from "../../src/drill/controls";
-import { PadDecoder, connectedPads } from "../../src/drill/gamepads";
+import { PadBinder, PadDecoder, connectedPads } from "../../src/drill/gamepads";
 import { DrillSession } from "../../src/drill/session";
 import { CONTROLS, rapier } from "./helpers";
 
@@ -12,10 +12,11 @@ function pad(
   mapping = "",
   buttons: number[] = [],
   id = "054c-09cc-Wireless Controller",
+  index = 0,
 ): Gamepad {
   return {
     id,
-    index: 0,
+    index,
     connected: true,
     mapping,
     timestamp: 0,
@@ -88,4 +89,124 @@ describe("the standard mapping", () => {
     expect(list).toHaveLength(1);
     expect(list[0].mapping).toBe("standard");
   });
+});
+
+describe("binding controllers by Cross (A)", () => {
+  // The mentor's laptop: slot 0 empty, another device at 1 with its axes off centre, the real
+  // controller (an Xbox 360 pad, standard mapping) at 2.
+  const junk = (buttons: number[] = []) =>
+    pad(
+      [0.42, -0.65, 1, 0.3],
+      "standard",
+      buttons,
+      "Virtual Gamepad (vJoy)",
+      1,
+    );
+  const xbox = (buttons: number[] = [], axes = [0, 0, 0, 0]) =>
+    pad(
+      axes,
+      "standard",
+      buttons,
+      "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
+      2,
+    );
+
+  test("a pad that never presses is never bound; the one that presses Cross is the driver", () => {
+    const b = new PadBinder(["0:driver", "0:operator"]);
+    const list = () => connectedPads([null, junk(), xbox()]);
+    b.update(list());
+    expect(b.padFor("0:driver", list())).toBeNull();
+    expect(b.waiting()).toBe("0:driver");
+    b.update(connectedPads([null, junk(), xbox([0])]));
+    // Held: its press is the binding, not the driver's Cross.
+    expect(
+      b.padFor("0:driver", connectedPads([null, junk(), xbox([0])])),
+    ).toBeNull();
+    expect(b.boundPad("0:driver", list())?.index).toBe(2);
+    b.update(list());
+    expect(b.padFor("0:driver", list())?.id).toContain("Xbox 360");
+    expect(b.roleOf(junk())).toBeNull();
+    expect(b.waiting()).toBe("0:operator");
+  });
+
+  test("the drill driven by the bound pad holds still at PLAY with the other device off centre", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      b = new PadBinder(["0:driver", "0:operator"]);
+    b.update(connectedPads([null, junk(), xbox([0])]));
+    b.update(connectedPads([null, junk(), xbox()]));
+    const read = (role: string) =>
+      d.read(b.padFor(role, connectedPads([null, junk(), xbox()])));
+    s.start();
+    const h0 = s.sim.heading,
+      p0 = s.sim.robot.translation();
+    s.advance(3, read("0:driver"), read("0:operator"));
+    const p1 = s.sim.robot.translation();
+    expect(Math.abs(s.sim.heading - h0)).toBeLessThan(1e-6);
+    expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeLessThan(1e-6);
+  }, 60000);
+
+  test("a single pad at index 0, every axis and button at 0: nothing moves at PLAY", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      g = pad([0, 0, 0, 0], "standard", [], "Xbox 360 Controller", 0);
+    s.start();
+    const h0 = s.sim.heading,
+      p0 = s.sim.robot.translation();
+    s.advance(3, d.read(g));
+    const p1 = s.sim.robot.translation();
+    expect(Math.abs(s.sim.heading - h0)).toBeLessThan(1e-6);
+    expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeLessThan(1e-6);
+    expect(s.teleop.status().launcher).toBe("IDLE");
+  }, 60000);
+});
+
+describe("at rest for a whole minute", () => {
+  test("an Xbox-like pad at all zeros: the robot holds its pose for 60 s from PLAY", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      g = pad(
+        [0, 0, 0, 0],
+        "standard",
+        [],
+        "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
+        1,
+      );
+    s.start();
+    const p0 = s.sim.robot.translation(),
+      h0 = s.sim.heading;
+    let worst = 0;
+    for (let t = 5; t <= 60; t += 5) {
+      s.advance(5, d.read(g));
+      const p = s.sim.robot.translation();
+      worst = Math.max(
+        worst,
+        Math.hypot(p.x - p0.x, p.z - p0.z),
+        Math.abs(s.sim.heading - h0),
+      );
+    }
+    expect(worst).toBeLessThan(1e-4);
+  }, 120000);
+
+  test("a stick resting off centre after use (an old Xbox 360 stick, 0.1) creeps; Re-zero stops it", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      xbox = (axes: number[]) =>
+        pad(axes, "standard", [], "Xbox 360 Controller", 1);
+    d.read(xbox([0, 0, 0, 0])); // plugged in: centred
+    s.start();
+    // Pushed and let go: it comes back to 0.1, past the robot's 0.05 deadband.
+    const drifting = xbox([0, -0.1, 0, 0]);
+    const p0 = s.sim.robot.translation();
+    s.advance(2, d.read(drifting));
+    const p1 = s.sim.robot.translation();
+    expect(p1.x - p0.x).toBeGreaterThan(0.05);
+    // Re-zero (hands off): the resting 0.1 is the new centre.
+    d.rezero([drifting]);
+    s.advance(0.5, d.read(drifting)); // the robot coasts to a stop
+    const p2 = s.sim.robot.translation();
+    s.advance(5, d.read(drifting));
+    const p3 = s.sim.robot.translation();
+    expect(Math.hypot(p3.x - p2.x, p3.z - p2.z)).toBeLessThan(1e-4);
+  }, 60000);
 });

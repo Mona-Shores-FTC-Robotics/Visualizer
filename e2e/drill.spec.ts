@@ -30,6 +30,11 @@ const BTN = {
 interface PadShape {
   mapping: string;
   axes: number[];
+  /**
+   * What the browser lists, slot by slot: our controllers, an empty slot, or another device that
+   * never presses anything (a virtual pad, say) with its axes off centre. Default: four controllers.
+   */
+  slots?: ("pad" | "junk" | null)[];
 }
 
 async function open(
@@ -53,7 +58,17 @@ async function open(
         value: 0,
       })),
     });
-    const pads = [make(0), make(1), make(2), make(3)];
+    const slots = shape.slots ?? ["pad", "pad", "pad", "pad"];
+    const pads = slots.map((kind, index) => {
+      if (kind === null) return null;
+      const p = make(index);
+      if (kind === "junk") {
+        p.id = "Virtual Gamepad (vJoy)";
+        p.mapping = "standard";
+        p.axes = [0.42, -0.65, 1, 0.3];
+      }
+      return p;
+    });
     (window as unknown as { __pads: unknown }).__pads = pads;
     Object.defineProperty(navigator, "getGamepads", {
       value: () => pads,
@@ -91,6 +106,20 @@ async function setPad(
     },
     { pad, held, axes },
   );
+}
+
+/** Binds the roles in order: each of these pads presses Cross (A) and lets go, as at the start screen. */
+async function bind(page: Page, ...pads: number[]) {
+  for (const [n, pad] of pads.entries()) {
+    await setPad(page, pad, [BTN.CROSS]);
+    await page.waitForFunction(
+      (n) =>
+        (window as unknown as { __drill: { binder: { boundCount: number } } })
+          .__drill.binder.boundCount > n,
+      n,
+    );
+    await setPad(page, pad);
+  }
 }
 
 /** Waits until the drill's clock reaches `t` seconds from PLAY. */
@@ -150,6 +179,8 @@ test("the drill lists the robot's own controls, from biobuzz's export", async ({
   await expect(page.locator("#operator-controls")).toContainText(
     "Launcher Spin Up / Idle",
   );
+  // The bound controller is named beside its role.
+  await bind(page, 0);
   await expect(page.locator("#pads")).toContainText(
     "DualSense Wireless Controller",
   );
@@ -160,6 +191,8 @@ test("a simulated PS controller drives, toggles the turret and fires a volley", 
 }) => {
   await open(page);
   await expect(page.locator("#clock")).toContainText("2:00");
+  await expect(page.locator("#pads")).toContainText("press Cross (A)");
+  await bind(page, 0);
   // Options starts the 2:00 TeleOp.
   await setPad(page, 0, [BTN.OPTIONS]);
   await page.waitForFunction(
@@ -217,6 +250,7 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   page,
 }) => {
   await open(page);
+  await bind(page, 0);
   await setPad(page, 0, [BTN.OPTIONS]);
   await page.waitForFunction(
     () => (window as unknown as { __drill: Drill }).__drill.session.t > 0.1,
@@ -266,6 +300,7 @@ test("alliance: two controllers drive Ultraviolet and Infrared on one field", as
   );
   await expect(page.locator("#pads")).toContainText("Infrared (19429) driver");
   await expect(page.locator("#robot")).toContainText("Infrared (19429)");
+  await bind(page, 0, 1);
   await setPad(page, 0, [BTN.OPTIONS]);
   await waitSim(page, 0.2);
   await setPad(page, 0);
@@ -311,12 +346,13 @@ test("alliance with operators: four controllers, a driver and an operator per ro
 }) => {
   await open(page);
   await page.locator("#mode").selectOption("alliance-ops");
-  // The start screen: each role on a gamepad, with the connected controller's name.
-  await expect(page.locator("#pads select")).toHaveCount(4);
+  // The start screen: four roles, each bound by its controller's Cross, in order.
+  await expect(page.locator("#pads tr")).toHaveCount(4);
   await expect(page.locator("#pads")).toContainText(
     "Infrared (19429) operator",
   );
   await expect(page.locator("#operator-section")).toBeVisible();
+  await bind(page, 0, 1, 2, 3);
   await setPad(page, 0, [BTN.OPTIONS]);
   await waitSim(page, 0.2);
   await setPad(page, 0);
@@ -377,6 +413,7 @@ test("a PlayStation pad without the standard mapping: the robot holds still at P
     "Not the browser's standard mapping",
   );
   await expect(page.locator("#pad-debug")).toContainText(/turn\s+0\.00/);
+  await bind(page, 0);
   await page.locator("#start").click();
   const pose = () =>
     page.evaluate(() => {
@@ -407,4 +444,55 @@ test("a PlayStation pad without the standard mapping: the robot holds still at P
   await setPad(page, 0, [], [0, 0, -1, 0, 0, -1]);
   const c = await pose();
   expect(Math.abs(c.h - b.h)).toBeGreaterThan(0.3);
+});
+
+test("another device in the browser's list never drives: the role binds to the controller that presses Cross", async ({
+  page,
+}) => {
+  // The mentor's laptop: slot 0 empty, a virtual pad at 1 with its axes off centre, the real
+  // controller at 2. Taken by position, the virtual pad would be the driver and drive at PLAY.
+  await open(page, {
+    mapping: "standard",
+    axes: [0, 0, 0, 0],
+    slots: [null, "junk", "pad"],
+  });
+  await expect(page.locator("#pads")).toContainText("press Cross (A)");
+  await expect(page.locator("#pads")).toContainText(
+    "other controllers connected",
+  );
+  await bind(page, 2);
+  await expect(page.locator("#pads")).toContainText("(index 2)");
+  await page.locator("#pad-check summary").click();
+  await expect(page.locator("#pad-debug")).toContainText("not bound: ignored");
+  await expect(page.locator("#pad-debug")).toContainText("pose x");
+  await page.locator("#start").click();
+  const pose = () =>
+    page.evaluate(() => {
+      const s = (
+        window as unknown as {
+          __drill: {
+            session: {
+              t: number;
+              sim: {
+                heading: number;
+                robot: { translation(): { x: number; z: number } };
+              };
+            };
+          };
+        }
+      ).__drill.session;
+      const p = s.sim.robot.translation();
+      return { t: s.t, h: s.sim.heading, x: p.x, z: p.z };
+    });
+  const a = await pose();
+  await waitSim(page, a.t + 1.5);
+  const b = await pose();
+  expect(Math.abs(b.h - a.h)).toBeLessThan(1e-3);
+  expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeLessThan(1e-3);
+  // The bound controller drives.
+  await setPad(page, 2, [], [0, -1, 0, 0]);
+  await waitSim(page, b.t + 0.8);
+  await setPad(page, 2);
+  const c = await pose();
+  expect(c.x - b.x).toBeGreaterThan(0.3);
 });

@@ -184,3 +184,82 @@ export class PadDecoder {
 }
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+
+/**
+ * Which controller is whose: each role (a robot's driver or operator) binds to the controller
+ * that presses Cross (A on an Xbox pad) while that role waits, the roles filled in order. A pad
+ * that never presses anything is never bound, so a phantom device in the browser's list (a
+ * virtual pad, a wheel, a second entry for the same controller, at any index) never drives.
+ */
+export class PadBinder {
+  private bound = new Map<string, { index: number; id: string }>();
+  private crossWas = new Map<string, boolean>();
+  /** Pads bound by a Cross still held: ignored until it is let go, so the press is not also the driver's Cross. */
+  private justBound = new Set<string>();
+
+  constructor(public roles: string[] = []) {}
+
+  /** The roles this mode has, in binding order; keeps the bindings of roles still present. */
+  setRoles(roles: string[]): void {
+    this.roles = roles;
+    for (const r of [...this.bound.keys()])
+      if (!roles.includes(r)) this.bound.delete(r);
+  }
+
+  clear(): void {
+    this.bound.clear();
+    this.justBound.clear();
+  }
+
+  /** How many roles have a controller. */
+  get boundCount(): number {
+    return this.bound.size;
+  }
+
+  /** The first role still waiting for a controller, or null. */
+  waiting(): string | null {
+    return this.roles.find((r) => !this.bound.has(r)) ?? null;
+  }
+
+  /** The role a pad is bound to, or null. */
+  roleOf(g: Gamepad): string | null {
+    for (const [role, b] of this.bound)
+      if (b.index === g.index && b.id === g.id) return role;
+    return null;
+  }
+
+  /** One frame: a controller whose Cross went down binds to the first waiting role. */
+  update(list: readonly Gamepad[]): void {
+    for (const g of list) {
+      const key = `${g.index}|${g.id}`;
+      const b = g.buttons[0];
+      const cross = !!b && (b.pressed || b.value > 0.5);
+      const was = this.crossWas.get(key) ?? false;
+      this.crossWas.set(key, cross);
+      if (!cross) this.justBound.delete(key);
+      if (!cross || was || this.roleOf(g)) continue;
+      const role = this.waiting();
+      if (role) {
+        this.bound.set(role, { index: g.index, id: g.id });
+        this.justBound.add(key);
+      }
+    }
+  }
+
+  /** The controller bound to `role` this frame: the same index and id, or the same id moved to another index. */
+  padFor(role: string, list: readonly Gamepad[]): Gamepad | null {
+    const g = this.boundPad(role, list);
+    return g && !this.justBound.has(`${g.index}|${g.id}`) ? g : null;
+  }
+
+  /** The controller bound to `role`, its binding press held or not: for showing who is bound. */
+  boundPad(role: string, list: readonly Gamepad[]): Gamepad | null {
+    const b = this.bound.get(role);
+    if (!b) return null;
+    return (
+      list.find((g) => g.index === b.index && g.id === b.id) ??
+      list.find((g) => g.id === b.id && !this.roleOf(g)) ??
+      null
+    );
+  }
+}
