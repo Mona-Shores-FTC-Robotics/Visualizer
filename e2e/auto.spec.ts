@@ -86,22 +86,15 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
   if (await discard.isVisible().catch(() => false)) await discard.click();
   const steps = page.getByLabel("Steps");
   const palette = page.locator("[aria-label='Add a step']");
-  await expect(
-    page.getByRole("button", { name: "Right start" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Right start" })).toHaveAttribute("aria-pressed", "true");
   await palette.getByRole("button", { name: "Launch all" }).click();
   await palette.getByRole("button", { name: "Drive to" }).click();
   const field = (await page.locator("[role=application]").boundingBox())!;
   // (26.7, 47.4): lined up with the WALL FLOWER, so the spot faces it.
-  await page.mouse.click(
-    field.x + (26.7 / 141.5) * field.width,
-    field.y + (1 - 47.4 / 141.5) * field.height,
-  );
+  await page.mouse.click(field.x + (26.7 / 141.5) * field.width, field.y + (1 - 47.4 / 141.5) * field.height);
   await page.fill("#simple-spot-name", "wall pick");
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await palette
-    .getByRole("button", { name: "Pick flower", exact: true })
-    .click();
+  await palette.getByRole("button", { name: "Pick flower", exact: true }).click();
   await expect
     .poll(() =>
       steps
@@ -114,9 +107,7 @@ test("a new Auto is built from the palette: Launch all, then Drive to a clicked 
   await expect(steps.getByText("Pick WALL FLOWER")).toHaveCount(0);
 });
 
-test("a Drive step opens the Step panel; Edit path shape opens the path editor", async ({
-  page,
-}) => {
+test("a Drive step opens the Step panel; Edit path shape opens the path editor", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /^File/ }).first().click();
   await page.getByRole("menuitem", { name: /^New project/ }).click();
@@ -125,10 +116,7 @@ test("a Drive step opens the Step panel; Edit path shape opens the path editor",
   const palette = page.locator("[aria-label='Add a step']");
   await palette.getByRole("button", { name: "Drive to" }).click();
   const field = (await page.locator("[role=application]").boundingBox())!;
-  await page.mouse.click(
-    field.x + (40 / 141.5) * field.width,
-    field.y + (1 - 60 / 141.5) * field.height,
-  );
+  await page.mouse.click(field.x + (40 / 141.5) * field.width, field.y + (1 - 60 / 141.5) * field.height);
   await page.fill("#simple-spot-name", "middle");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const inspector = page.getByRole("complementary", { name: "Inspector" });
