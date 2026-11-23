@@ -43,7 +43,6 @@ describe("TIP lag", () => {
       expect(Math.min(...l)).toBeGreaterThan(3.0);
       expect(Math.max(...l)).toBeLessThan(7.0);
     },
-    120000,
   );
 
   test("well past it: about 2.5 s", async () => {
