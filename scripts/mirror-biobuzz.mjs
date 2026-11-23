@@ -1,5 +1,5 @@
-// Copies biobuzz's Autos (master: TeamCode/autos/) and scouting plans (scouting: scouting/) into the
-// built site, for devices that reach this site but not GitHub's file server (src/lib/team/mirror.ts).
+// Copies biobuzz's Autos (master: TeamCode/autos/), its controls export (master:
+// TeamCode/cheat-sheets/) and scouting plans (scouting: scouting/) into the built site, for devices that reach this site but not GitHub's file server (src/lib/team/mirror.ts).
 //   node scripts/mirror-biobuzz.mjs dist/mirror
 // Each file lands at <out>/<branch>/<path>; each folder also gets contents.json, a listing shaped
 // like GitHub's contents API ([{ name, type }]). A branch that cannot be fetched is skipped.
@@ -16,6 +16,8 @@ if (!out) {
 const URL = "https://github.com/Mona-Shores-FTC-Robotics/biobuzz.git";
 const COPIES = [
   { branch: "master", dir: "TeamCode/autos" },
+  // The robot's controls export, for the driver drill (src/drill/controls.ts).
+  { branch: "master", dir: "TeamCode/cheat-sheets" },
   { branch: "scouting", dir: "scouting" },
 ];
 

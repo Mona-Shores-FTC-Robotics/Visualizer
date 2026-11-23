@@ -52,6 +52,8 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         partner: resolve(import.meta.dirname, "partner.html"),
         share: resolve(import.meta.dirname, "share.html"),
+        // Fork: the driver drill (src/drill), its own page at drill/.
+        drill: resolve(import.meta.dirname, "drill/index.html"),
       },
     },
     // Increase chunk size warning limit to 1.2 MB to avoid noisy warnings
