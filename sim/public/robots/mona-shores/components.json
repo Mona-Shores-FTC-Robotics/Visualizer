@@ -1,0 +1,37 @@
+{
+ "about": "Robot_BIOBUZZ's components, in config.json's order. Frame: metres, +X forward, +Y left, +Z up, origin on the floor under the middle of the drive axles. Component c is drawn in model_c.glb at drawn_at_deg, a fixed angle (the CAD may be left at another; from_onshape.py turns it). To show it at angle a (degrees, the 'angle' named here), rotate it by t = a - drawn_at_deg about axis_direction through axis_point_m: the AdvantageScope pose is translation p - R(t) p, rotation quaternion (cos t/2, sin t/2 * axis_direction).",
+ "components": [
+  {
+   "index": 0,
+   "name": "turret",
+   "angle": "TurretSubsystem.angleDegrees(): degrees counter-clockwise from home (pointing along the nose), seen from above",
+   "axis_point_m": [
+    -0.0844,
+    -0.06791,
+    0.33035
+   ],
+   "axis_direction": [
+    -0.00107,
+    0.0,
+    1.0
+   ],
+   "drawn_at_deg": 51.5
+  },
+  {
+   "index": 1,
+   "name": "flower stick",
+   "angle": "FlowerStickSubsystem.commandedDegrees(): degrees swung out from stowed, 0 in, swingDegrees() (162) out; the commanded state, not a measured angle",
+   "axis_point_m": [
+    0.15449,
+    0.13883,
+    0.18462
+   ],
+   "axis_direction": [
+    0.00107,
+    1.0,
+    0.0
+   ],
+   "drawn_at_deg": 0
+  }
+ ]
+}
