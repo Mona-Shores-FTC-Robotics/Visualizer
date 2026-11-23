@@ -15,5 +15,5 @@ our measured models replace its models where we have data, each change citing it
 
 **Overrides stay switchable** (mentor, 23 Nov 2026). Where we replace one of upstream's models and aren't sure
 ours is better, upstream's stays as a choice in the sim's setup and in a script's options. The first is TIP
-timing: `UV/IR` (our films, `src/sim/tip-lag.ts`, the default) or `NCSSM` (upstream's rocker alone); in a
+timing: `UV/IR` (our films, `src/sim/tip-lag.ts`) or `NCSSM` (upstream's rocker alone, the default until upstream's planner waits for a TIP); in a
 script, `TIP_TIMING=ncssm` or `uv-ir`; in code, `SimOptions.tipTiming`.
