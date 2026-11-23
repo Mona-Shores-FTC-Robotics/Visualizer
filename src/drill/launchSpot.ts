@@ -194,7 +194,6 @@ export class LaunchSpotDrive {
   private arriveS = NaN;
   private arrivedVolleyS = NaN;
   private fires = false;
-  private sticksArmed = false;
   /** When the button's feed started, s; NaN before. */
   feedStartS = NaN;
   feedWhy = "";
@@ -240,15 +239,10 @@ export class LaunchSpotDrive {
       this.phase = "IDLE";
       return idle;
     }
-    if (this.phase === "IDLE") {
-      this.start(sim, now);
-      // FreshSticks, as the FLOWER pick: a stick still moving from the drive up to the press
-      // counts once it has come back to centre.
-      this.sticksArmed = !sticksMoved;
-    }
+    if (this.phase === "IDLE") this.start(sim, now);
     if (!this.active) return idle;
-    if (!sticksMoved) this.sticksArmed = true;
-    else if (this.sticksArmed) {
+    // `sticksMoved` is FreshSticks' answer (the TeleOp keeps one for Square).
+    if (sticksMoved) {
       this.end(sim, now, "sticks moved");
       return idle;
     }
