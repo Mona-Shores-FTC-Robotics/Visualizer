@@ -16,9 +16,9 @@
  * - The operator: Cross spins the launcher up or idles it, L1/R1 trim its speed, the D-pad trims
  *   the aim (Circle held for fine steps), R2/L2 intake and unjam, Square the FLOWER stick.
  */
-import { BALL, FIELD, HIVE, TIP_LOAD } from "./vendor/biobuzz-sim/config";
-import type { Alliance, CellSide } from "./vendor/biobuzz-sim/hive";
-import type { Sim } from "./vendor/biobuzz-sim/world";
+import { BALL, FIELD, HIVE } from "../../sim/src/sim/config";
+import type { Alliance, CellSide } from "../../sim/src/sim/hive";
+import type { Sim } from "../../sim/src/sim/world";
 import { Controls, type PadRead } from "./controls";
 import { IN, drawCount, type RobotPreset } from "./presets";
 
@@ -483,7 +483,7 @@ export class TeleOp {
       },
       { x: 0, y: 0, z: 0 },
     );
-    b.retryAt = sim.simTime + 1; // as the simulator's own launch: not taken back in on its way out
+    b.retryAt = sim.simNow + 1; // as the simulator's own launch: not taken back in on its way out
     this.launched++;
     this.shots.push(now);
   }
@@ -505,7 +505,7 @@ export class TeleOp {
         z: -Math.sin(th) * 0.6,
       },
     );
-    b.retryAt = sim.simTime + 1;
+    b.retryAt = sim.simNow + 1;
   }
 
   // ---------------------------------------------------------------------- routines
@@ -768,11 +768,6 @@ export function solveSpeed(
     else hi = mid;
   }
   return (lo + hi) / 2;
-}
-
-/** The load in our raised CELL past its tipping weight, in POLLEN. */
-export function pastTippingPollen(sim: Sim): number {
-  return Math.max(0, sim.cellLoad(sim.alliance) - TIP_LOAD.threshold);
 }
 
 /**

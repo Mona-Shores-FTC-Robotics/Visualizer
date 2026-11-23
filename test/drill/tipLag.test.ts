@@ -29,16 +29,24 @@ async function lags(volleys: number, seeds: number[]): Promise<number[]> {
 }
 
 describe("TIP lag", () => {
-  test("at its tipping weight: about 3.9 s, 3.4 to 6.7", async () => {
-    const l = await lags(1, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    expect(median(l)).toBeGreaterThan(3.6);
-    expect(median(l)).toBeLessThan(4.2);
-    expect(Math.min(...l)).toBeGreaterThan(3.0);
-    expect(Math.max(...l)).toBeLessThan(7.0);
-  }, 120000);
+  test(
+    "at its tipping weight: about 3.9 s, 3.4 to 6.7",
+    { timeout: 180000 },
+    async () => {
+      // 31 seeds: the draw is skewed (most near 3.4 s, a slow tail), so a dozen can land low by chance.
+      const l = await lags(
+        1,
+        Array.from({ length: 31 }, (_, i) => i + 1),
+      );
+      expect(median(l)).toBeGreaterThan(3.6);
+      expect(median(l)).toBeLessThan(4.2);
+      expect(Math.min(...l)).toBeGreaterThan(3.0);
+      expect(Math.max(...l)).toBeLessThan(7.0);
+    },
+  );
 
   test("well past it: about 2.5 s", async () => {
-    const l = await lags(2, [1, 2, 3, 4, 5]);
+    const l = await lags(2, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(median(l)).toBeGreaterThan(2.1);
     expect(median(l)).toBeLessThan(2.8);
   }, 120000);

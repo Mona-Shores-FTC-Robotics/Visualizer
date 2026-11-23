@@ -79,15 +79,17 @@ What the fork adds:
     known Autos, which a plan's named partner Autos join): anyone can read them; saving takes
     the GitHub token Save to GitHub uses. A quick look, not the Java simulator.
 - **Driver Drill** (`drill/`, <https://mona-shores-ftc-robotics.github.io/Visualizer/drill/>). Driver
-  practice on a laptop with a PlayStation controller: a 2:00 TeleOp, solo, toward 7 TIPs, with the
-  robot's practice readout (each pick-up, each cycle and its split, as on the Driver Station) and the
-  best runs kept in the browser. Gamepad 1 is the driver, gamepad 2 the operator (or driver only).
+  practice on a laptop with a PlayStation controller: a 2:00 TeleOp toward 7 TIPs, solo or as an
+  alliance (Ultraviolet and Infrared on one field, a controller each), with the robot's practice
+  readout (each pick-up, each cycle and its split, as on the Driver Station) and the best runs kept in
+  the browser. Solo, gamepad 1 is the driver and gamepad 2 the operator (or driver only).
   The buttons are the robot's: read from biobuzz's controls export
   (`TeamCode/cheat-sheets/controls.json`, written by `CheatSheetTest`), never typed in here. The
-  robot numbers per team (speed, acceleration, FLOWER and GARDEN times, volley, TIP lag) are from
-  the Fruitport and Belding logs (`src/drill/presets.ts` says which). The physics, field and HIVE are
-  [ftc-biobuzz-sim](https://github.com/teddytennant/ftc-biobuzz-sim)'s (MIT, by Carl Ryden and NCSSM
-  FTC), vendored in `src/drill/vendor/biobuzz-sim/` with its licence.
+  robot numbers per team (speed, acceleration, FLOWER and GARDEN times, volley) come from the
+  simulator's robot file, `sim/src/sim/robots/mona-shores.json`, sourced to the Fruitport and Belding
+  logs. The physics, field and HIVE are the simulator in `sim/`,
+  [ftc-biobuzz-sim](https://github.com/teddytennant/ftc-biobuzz-sim) (MIT, by Carl Ryden and NCSSM
+  FTC), with its TIP timing selectable (ours from the films, or theirs).
 - **Drafts in Team Autos.** `TeamCode/autos/drafts/` (Autos of ours the robot does not run yet) is
   listed too, and a link may name one: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`.
   A draft opens and saves like any Auto: Save to GitHub suggests its own `drafts/` path, and Save to
