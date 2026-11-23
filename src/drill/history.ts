@@ -36,7 +36,7 @@ export function summarize(r: RunResult): StoredRun {
     ...(r.auto ? { auto: r.auto.name } : {}),
     tipTiming: r.tipTiming,
     date: r.date,
-    tips: r.tips + (r.auto?.tips ?? 0),
+    tips: r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0),
     goalAtS: r.goalAtS,
     balls: r.balls,
     cycles: c.length,

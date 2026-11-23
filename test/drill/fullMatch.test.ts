@@ -84,3 +84,27 @@ describe("Full Match", () => {
     expect(r.goalAtS).toBeNull();
   }, 60000);
 });
+
+describe("the 2:00 drill opens after a 1-TIP Auto", () => {
+  test("our 4 preloads tip our CELL before the clock runs; that TIP is the AUTO's and its spill is on the floor", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const floor = () =>
+      [...s.sim.balls.values()].filter(
+        (b) => b.kind === "pollen" && b.body.translation().y < 0.3,
+      ).length;
+    const before = floor();
+    expect(s.sim.hives.red.upCell).toBe("audience");
+    s.opensAfterAuto = true;
+    s.start();
+    expect(s.openingTips).toBe(1);
+    expect(s.sim.hives.red.upCell).toBe("rear");
+    expect(s.remainingS).toBe(120);
+    expect(s.tips).toHaveLength(0); // TeleOp's: none yet
+    expect(s.totalTips).toBe(1);
+    expect(floor()).toBeGreaterThan(before);
+    s.advance(121);
+    const r = s.result("2026-11-23T00:00:00Z");
+    expect(r.openingTips).toBe(1);
+    expect(r.auto).toBeUndefined();
+  }, 60000);
+});
