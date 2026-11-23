@@ -92,6 +92,18 @@ export class Hive {
     this.body.addTorque({ x: tq, y: 0, z: 0 }, true);
   }
 
+  /**
+   * Mona Shores (the drill's Full Match hand-off): puts the rocker at rest on the stop that raises `up`, and sets the
+   * TIPs so far. It releases any TIP-lag hold. Pieces in a CELL are not moved: call it before seeding a CELL.
+   */
+  setState(up: CellSide, tips: number): void {
+    const sign = up === 'rear' ? 1 : -1, phi = sign * HIVE.tiltLimit;
+    this.body.setRotation({ x: Math.sin(phi / 2), y: 0, z: 0, w: Math.cos(phi / 2) }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true); this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.lastStable = sign; this.tips = Math.max(0, Math.floor(tips)); this.held = false;
+    if (this.epoch !== null) this.epoch++;
+  }
+
   /** Checks whether the hive settled on the opposite stop since the last call. */
   pollTip(): boolean {
     const phi = this.phi;

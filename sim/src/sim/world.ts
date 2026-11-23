@@ -356,6 +356,24 @@ export class Sim {
     this.say(hasAuto ? 'AUTO begins' : 'TELEOP begins'); this.events.push('match_start');
   }
 
+  /**
+   * Mona Shores (the drill's Full Match mode): sets each HIVE to where an AUTO trace ended, before TELEOP. `up` is the
+   * raised CELL and `tips` the AUTO TIPs, which also count as the AUTO TIPs in the score. `cellPollen` drops that many
+   * POLLEN at random spots in the raised CELL (drawn from `seed`, its own stream) and lets them settle 1 s with the
+   * clock stopped. A trace doesn't carry a CELL's contents; after a TIP the newly raised CELL starts empty and holds
+   * only what was scored into it since, so 0 is the honest default. Removes nothing already in a CELL.
+   */
+  handoff(state: Partial<Record<Alliance, { up: CellSide; tips: number; cellPollen?: number }>>, seed = 1) {
+    const rng = new Rng(seed * 11 + 5); let dropped = false;
+    for (const a of ['red', 'blue'] as Alliance[]) {
+      const st = state[a]; if (!st) continue;
+      this.hives[a].setState(st.up, st.tips); this.autoTips[a] = this.hives[a].tips;
+      const n = Math.max(0, Math.min(12, Math.floor(st.cellPollen ?? 0)));
+      if (n) { this.dropInCell(this.hives[a], 'pollen', n, rng); dropped = true; }
+    }
+    if (dropped) this.settle(1);
+  }
+
   /** Seconds remaining in the MATCH as shown on the FIELD timer (TELEOP counts from 2:00). */
   get timer(): number { return this.phase === 'pre' ? (this.mode === 'full' || this.mode === 'auto' ? MATCH.auto : MATCH.teleop) : this.clock; }
   get flowersUnlocked(): boolean { return this.mode === 'practice' || (this.phase === 'teleop' && this.clock <= MATCH.flowerUnlock) || this.phase === 'post'; }
