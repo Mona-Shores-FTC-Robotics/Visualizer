@@ -1,0 +1,267 @@
+diff --git a/TeamCode/cheat-sheets/controls.json b/TeamCode/cheat-sheets/controls.json
+index 38edf44..5f8abe0 100644
+--- a/TeamCode/cheat-sheets/controls.json
++++ b/TeamCode/cheat-sheets/controls.json
+@@ -94,5 +94,104 @@
+     "turretArcRightDeg": 90.0,
+     "turretTopSpeedDps": 180.0
+   },
++  "launchSpots": {
++    "about": "The driver's Square (LaunchSpots, LaunchSpotDrive): Pedro's frame, inches from the red audience corner, headings in degrees. drawn: as drawn, for red; red and blue: where the button drives, with the numbers below. examples: LaunchSpots.choose from each pose (null with a refusal).",
++    "tileIn": 23.583333333333332,
++    "fieldCentreIn": 70.75,
++    "axleYIn": 70.75,
++    "maxPastCentreIn": 24.0,
++    "wallCentreBiasIn": 12.0,
++    "closeCentreBiasIn": 10.0,
++    "closeBackIn": 3.0,
++    "wallGapIn": 0.04,
++    "speed": 0.8,
++    "timeoutMs": 6000.0,
++    "turretForwardIn": -3.33,
++    "turretLeftIn": -2.68,
++    "gateOnApproach": true,
++    "maxSpinUpWaitS": 2.5,
++    "maxSettleWaitS": 1.0,
++    "settleAimToleranceDeg": 3.0,
++    "settleSpeedInPerS": 6.0,
++    "settleTurnDegPerS": 5.0,
++    "approachWithinIn": 6.0,
++    "approachTurnDegPerS": 30.0,
++    "spots": [
++      {"name": "RIGHT_WALL_NEAR", "row": "WALL", "column": "NEAR", "left": false, "drawn": [35.90, 10.60, 67.80], "red": [35.90, 11.64, 67.35], "blue": [105.60, 129.86, 247.35]},
++      {"name": "RIGHT_START", "row": "WALL", "column": "HIVE", "left": false, "drawn": [55.60, 7.70, 90.00], "red": [55.60, 8.74, 90.00], "blue": [85.90, 132.76, 270.00]},
++      {"name": "RIGHT_WALL_FAR", "row": "WALL", "column": "FAR", "left": false, "drawn": [75.80, 10.60, 113.80], "red": [75.80, 11.64, 114.26], "blue": [65.70, 129.86, 294.26]},
++      {"name": "RIGHT_CLOSE_NEAR", "row": "CLOSE", "column": "NEAR", "left": false, "drawn": [45.20, 27.90, 71.50], "red": [45.20, 24.90, 73.02], "blue": [96.30, 116.60, 253.02]},
++      {"name": "RIGHT_CLOSE_HIVE", "row": "CLOSE", "column": "HIVE", "left": false, "drawn": [56.10, 25.30, 90.00], "red": [56.10, 22.30, 90.00], "blue": [85.40, 119.20, 270.00]},
++      {"name": "RIGHT_CLOSE_FAR", "row": "CLOSE", "column": "FAR", "left": false, "drawn": [66.90, 27.60, 111.40], "red": [66.90, 24.60, 109.56], "blue": [74.60, 116.90, 289.56]},
++      {"name": "LEFT_WALL_NEAR", "row": "WALL", "column": "NEAR", "left": true, "drawn": [37.80, 130.70, 296.30], "red": [37.80, 129.66, 296.86], "blue": [103.70, 11.84, 116.86]},
++      {"name": "LEFT_WALL_HIVE", "row": "WALL", "column": "HIVE", "left": true, "drawn": [59.90, 133.40, 270.00], "red": [59.90, 132.36, 270.00], "blue": [81.60, 9.14, 90.00]},
++      {"name": "LEFT_WALL_FAR", "row": "WALL", "column": "FAR", "left": true, "drawn": [79.50, 130.90, 248.40], "red": [79.50, 129.86, 247.98], "blue": [62.00, 11.64, 67.98]},
++      {"name": "LEFT_CLOSE_NEAR", "row": "CLOSE", "column": "NEAR", "left": true, "drawn": [49.10, 113.90, 291.40], "red": [49.10, 116.90, 289.56], "blue": [92.40, 24.60, 109.56]},
++      {"name": "LEFT_CLOSE_HIVE", "row": "CLOSE", "column": "HIVE", "left": true, "drawn": [59.90, 116.20, 270.00], "red": [59.90, 119.20, 270.00], "blue": [81.60, 22.30, 90.00]},
++      {"name": "LEFT_CLOSE_FAR", "row": "CLOSE", "column": "FAR", "left": true, "drawn": [70.80, 113.60, 251.50], "red": [70.80, 116.60, 253.02], "blue": [70.70, 24.90, 73.02]}
++    ],
++    "examples": [
++      {"alliance": "RED", "x": 12.0, "y": 10.0, "spot": "RIGHT_WALL_NEAR"},
++      {"alliance": "RED", "x": 12.0, "y": 30.0, "spot": "RIGHT_CLOSE_NEAR"},
++      {"alliance": "RED", "x": 12.0, "y": 60.0, "spot": null},
++      {"alliance": "RED", "x": 12.0, "y": 82.0, "spot": null},
++      {"alliance": "RED", "x": 12.0, "y": 112.0, "spot": "LEFT_CLOSE_NEAR"},
++      {"alliance": "RED", "x": 12.0, "y": 132.0, "spot": "LEFT_WALL_NEAR"},
++      {"alliance": "RED", "x": 36.0, "y": 10.0, "spot": "RIGHT_WALL_NEAR"},
++      {"alliance": "RED", "x": 36.0, "y": 30.0, "spot": "RIGHT_CLOSE_NEAR"},
++      {"alliance": "RED", "x": 36.0, "y": 60.0, "spot": null},
++      {"alliance": "RED", "x": 36.0, "y": 82.0, "spot": null},
++      {"alliance": "RED", "x": 36.0, "y": 112.0, "spot": "LEFT_CLOSE_NEAR"},
++      {"alliance": "RED", "x": 36.0, "y": 132.0, "spot": "LEFT_WALL_NEAR"},
++      {"alliance": "RED", "x": 60.0, "y": 10.0, "spot": "RIGHT_START"},
++      {"alliance": "RED", "x": 60.0, "y": 30.0, "spot": "RIGHT_CLOSE_HIVE"},
++      {"alliance": "RED", "x": 60.0, "y": 60.0, "spot": null},
++      {"alliance": "RED", "x": 60.0, "y": 82.0, "spot": null},
++      {"alliance": "RED", "x": 60.0, "y": 112.0, "spot": "LEFT_CLOSE_HIVE"},
++      {"alliance": "RED", "x": 60.0, "y": 132.0, "spot": "LEFT_WALL_HIVE"},
++      {"alliance": "RED", "x": 84.0, "y": 10.0, "spot": "RIGHT_WALL_FAR"},
++      {"alliance": "RED", "x": 84.0, "y": 30.0, "spot": "RIGHT_CLOSE_FAR"},
++      {"alliance": "RED", "x": 84.0, "y": 60.0, "spot": null},
++      {"alliance": "RED", "x": 84.0, "y": 82.0, "spot": null},
++      {"alliance": "RED", "x": 84.0, "y": 112.0, "spot": "LEFT_CLOSE_FAR"},
++      {"alliance": "RED", "x": 84.0, "y": 132.0, "spot": "LEFT_WALL_FAR"},
++      {"alliance": "RED", "x": 96.0, "y": 10.0, "spot": null},
++      {"alliance": "RED", "x": 96.0, "y": 30.0, "spot": null},
++      {"alliance": "RED", "x": 96.0, "y": 60.0, "spot": null},
++      {"alliance": "RED", "x": 96.0, "y": 82.0, "spot": null},
++      {"alliance": "RED", "x": 96.0, "y": 112.0, "spot": null},
++      {"alliance": "RED", "x": 96.0, "y": 132.0, "spot": null},
++      {"alliance": "BLUE", "x": 129.5, "y": 131.5, "spot": "RIGHT_WALL_NEAR"},
++      {"alliance": "BLUE", "x": 129.5, "y": 111.5, "spot": "RIGHT_CLOSE_NEAR"},
++      {"alliance": "BLUE", "x": 129.5, "y": 81.5, "spot": null},
++      {"alliance": "BLUE", "x": 129.5, "y": 59.5, "spot": null},
++      {"alliance": "BLUE", "x": 129.5, "y": 29.5, "spot": "LEFT_CLOSE_NEAR"},
++      {"alliance": "BLUE", "x": 129.5, "y": 9.5, "spot": "LEFT_WALL_NEAR"},
++      {"alliance": "BLUE", "x": 105.5, "y": 131.5, "spot": "RIGHT_WALL_NEAR"},
++      {"alliance": "BLUE", "x": 105.5, "y": 111.5, "spot": "RIGHT_CLOSE_NEAR"},
++      {"alliance": "BLUE", "x": 105.5, "y": 81.5, "spot": null},
++      {"alliance": "BLUE", "x": 105.5, "y": 59.5, "spot": null},
++      {"alliance": "BLUE", "x": 105.5, "y": 29.5, "spot": "LEFT_CLOSE_NEAR"},
++      {"alliance": "BLUE", "x": 105.5, "y": 9.5, "spot": "LEFT_WALL_NEAR"},
++      {"alliance": "BLUE", "x": 81.5, "y": 131.5, "spot": "RIGHT_START"},
++      {"alliance": "BLUE", "x": 81.5, "y": 111.5, "spot": "RIGHT_CLOSE_HIVE"},
++      {"alliance": "BLUE", "x": 81.5, "y": 81.5, "spot": null},
++      {"alliance": "BLUE", "x": 81.5, "y": 59.5, "spot": null},
++      {"alliance": "BLUE", "x": 81.5, "y": 29.5, "spot": "LEFT_CLOSE_HIVE"},
++      {"alliance": "BLUE", "x": 81.5, "y": 9.5, "spot": "LEFT_WALL_HIVE"},
++      {"alliance": "BLUE", "x": 57.5, "y": 131.5, "spot": "RIGHT_WALL_FAR"},
++      {"alliance": "BLUE", "x": 57.5, "y": 111.5, "spot": "RIGHT_CLOSE_FAR"},
++      {"alliance": "BLUE", "x": 57.5, "y": 81.5, "spot": null},
++      {"alliance": "BLUE", "x": 57.5, "y": 59.5, "spot": null},
++      {"alliance": "BLUE", "x": 57.5, "y": 29.5, "spot": "LEFT_CLOSE_FAR"},
++      {"alliance": "BLUE", "x": 57.5, "y": 9.5, "spot": "LEFT_WALL_FAR"},
++      {"alliance": "BLUE", "x": 45.5, "y": 131.5, "spot": null},
++      {"alliance": "BLUE", "x": 45.5, "y": 111.5, "spot": null},
++      {"alliance": "BLUE", "x": 45.5, "y": 81.5, "spot": null},
++      {"alliance": "BLUE", "x": 45.5, "y": 59.5, "spot": null},
++      {"alliance": "BLUE", "x": 45.5, "y": 29.5, "spot": null},
++      {"alliance": "BLUE", "x": 45.5, "y": 9.5, "spot": null}
++    ]
++  },
+   "practiceReadout": {"budgetS": 9.3, "budgetPieces": 4, "mergeS": 1.0, "split": ["drive to pieces", "pick up", "drive loaded", "spin-up and aim", "feed"]}
+ }
+diff --git a/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
+index 18d76bb..4c27b3a 100644
+--- a/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
++++ b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/ControlsExport.java
+@@ -15,6 +15,9 @@ import java.util.Map;
+  * from the same layout as, and fails while the committed copy is stale. The Visualizer's driver
+  * drill reads that file, so the drill's buttons are the robot's and never typed in by hand.
+  *
++ * <p>Also the driver's Square ({@link LaunchSpotsExport}): the launch spots, where the button drives
++ * for each alliance, and the pick from a grid of poses, so the drill drives where the robot does.
++ *
+  * <p>Shared values only: a robot's {@code RobotDifferences} lines are not applied here (they can be
+  * applied once per app run), so a drill that needs a per-robot value says so where it uses it.
+  */
+@@ -77,6 +80,7 @@ public final class ControlsExport {
+                     .append(i + 1 < switches.length ? ",\n" : "\n");
+         }
+         indent(out, 1).append("},\n");
++        out.append(LaunchSpotsExport.json(1)).append(",\n");
+         indent(out, 1).append("\"practiceReadout\": {\"budgetS\": ").append(num(CycleReadout.BUDGET_S))
+                 .append(", \"budgetPieces\": ").append(CycleReadout.BUDGET_PIECES)
+                 .append(", \"mergeS\": ").append(num(CycleReadout.MERGE_S))
+diff --git a/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/LaunchSpotsExport.java b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/LaunchSpotsExport.java
+new file mode 100644
+index 0000000..3559541
+--- /dev/null
++++ b/TeamCode/src/main/java/org/firstinspires/ftc/teamcode/controls/LaunchSpotsExport.java
+@@ -0,0 +1,130 @@
++package org.firstinspires.ftc.teamcode.controls;
++
++import com.pedropathing.math.Pose;
++
++import org.firstinspires.ftc.teamcode.localization.HiveFieldPoints;
++import org.firstinspires.ftc.teamcode.localization.LaunchSpots;
++import org.firstinspires.ftc.teamcode.opmodes.LaunchSpotDrive;
++import org.firstinspires.ftc.teamcode.opmodes.TeleOpConfig;
++import org.firstinspires.ftc.teamcode.opmodes.auto.LaunchCards;
++import org.firstinspires.ftc.teamcode.opmodes.auto.PathEndSettle;
++import org.firstinspires.ftc.teamcode.subsystems.TurretSubsystem;
++import org.firstinspires.ftc.teamcode.util.Alliance;
++import org.firstinspires.ftc.teamcode.util.FieldFrame;
++
++import java.util.Locale;
++
++/**
++ * The driver's Square (go to launch spot) as data, for {@link ControlsExport}: the twelve
++ * {@link LaunchSpots}, each as drawn and where {@link LaunchSpotDrive} drives for each alliance with
++ * its starting Panels numbers, the numbers the pick is made with, and the pick itself
++ * ({@link LaunchSpots#choose}) from a grid of poses, so the Visualizer's driver drill can check its
++ * port of the pick against this one; and the numbers its volley waits on ({@code SpotVolley}:
++ * {@link PathEndSettle}'s settle and approach checks, {@link LaunchCards#maxSpinUpWaitS}). Shared values only, as the rest of the file: the turret
++ * offsets are {@link TurretSubsystem}'s shared ones.
++ */
++final class LaunchSpotsExport {
++
++    private LaunchSpotsExport() {
++    }
++
++    /** The grid the pick is exported from, for red (blue's is turned half a turn): inches. */
++    static final double[] GRID_X = {12, 36, 60, 84, 96};
++    static final double[] GRID_Y = {10, 30, 60, 82, 112, 132};
++
++    /** The "launchSpots" object, its key indented {@code depth} levels, without a trailing comma. */
++    static String json(int depth) {
++        StringBuilder out = new StringBuilder();
++        String in = indent(depth), in1 = indent(depth + 1), in2 = indent(depth + 2);
++        out.append(in).append("\"launchSpots\": {\n");
++        out.append(in1).append("\"about\": ").append(ControlsExport.quote("The driver's Square (LaunchSpots,"
++                + " LaunchSpotDrive): Pedro's frame, inches from the red audience corner, headings in degrees."
++                + " drawn: as drawn, for red; red and blue: where the button drives, with the numbers below."
++                + " examples: LaunchSpots.choose from each pose (null with a refusal).")).append(",\n");
++        String[][] numbers = {
++                {"tileIn", num(FieldFrame.TILE_INCHES)},
++                {"fieldCentreIn", num(FieldFrame.FIELD_CENTRE_INCHES)},
++                {"axleYIn", num(HiveFieldPoints.AXLE_Y_IN)},
++                {"maxPastCentreIn", num(LaunchSpotDrive.maxPastCentreIn)},
++                {"wallCentreBiasIn", num(LaunchSpotDrive.wallCentreBiasIn)},
++                {"closeCentreBiasIn", num(LaunchSpotDrive.closeCentreBiasIn)},
++                {"closeBackIn", num(LaunchSpotDrive.closeBackIn)},
++                {"wallGapIn", num(LaunchSpotDrive.wallGapIn)},
++                {"speed", num(LaunchSpotDrive.speed)},
++                {"timeoutMs", num(LaunchSpotDrive.timeoutMs)},
++                {"turretForwardIn", num(TurretSubsystem.turretForwardIn)},
++                {"turretLeftIn", num(TurretSubsystem.turretLeftIn)},
++                {"gateOnApproach", String.valueOf(TeleOpConfig.squareGateOnApproach)},
++                {"maxSpinUpWaitS", num(LaunchCards.maxSpinUpWaitS)},
++                {"maxSettleWaitS", num(PathEndSettle.maxSettleWaitS)},
++                {"settleAimToleranceDeg", num(PathEndSettle.aimToleranceDeg)},
++                {"settleSpeedInPerS", num(PathEndSettle.slowSpeedInPerSec)},
++                {"settleTurnDegPerS", num(PathEndSettle.stillTurnDegPerSec)},
++                {"approachWithinIn", num(PathEndSettle.launchWithinIn)},
++                {"approachTurnDegPerS", num(PathEndSettle.launchTurnDegPerSec)},
++        };
++        for (String[] n : numbers) out.append(in1).append(ControlsExport.quote(n[0])).append(": ").append(n[1]).append(",\n");
++        out.append(in1).append("\"spots\": [\n");
++        LaunchSpots.Spot[] spots = LaunchSpots.Spot.values();
++        for (int i = 0; i < spots.length; i++) {
++            LaunchSpots.Spot s = spots[i];
++            out.append(in2).append("{\"name\": ").append(ControlsExport.quote(s.name()))
++                    .append(", \"row\": ").append(ControlsExport.quote(s.row.name()))
++                    .append(", \"column\": ").append(ControlsExport.quote(s.column.name()))
++                    .append(", \"left\": ").append(s.left)
++                    .append(", \"drawn\": ").append(pose(s.red))
++                    .append(", \"red\": ").append(pose(target(s, Alliance.RED)))
++                    .append(", \"blue\": ").append(pose(target(s, Alliance.BLUE))).append('}')
++                    .append(i + 1 < spots.length ? ",\n" : "\n");
++        }
++        out.append(in1).append("],\n");
++        out.append(in1).append("\"examples\": [\n");
++        StringBuilder rows = new StringBuilder();
++        double c = FieldFrame.FIELD_CENTRE_INCHES;
++        for (Alliance alliance : new Alliance[] {Alliance.RED, Alliance.BLUE}) {
++            for (double gx : GRID_X) {
++                for (double gy : GRID_Y) {
++                    boolean blue = alliance == Alliance.BLUE;
++                    Pose p = new Pose(blue ? 2 * c - gx : gx, blue ? 2 * c - gy : gy, 0.0);
++                    LaunchSpots.Choice choice = choose(p, alliance);
++                    if (rows.length() > 0) rows.append(",\n");
++                    rows.append(in2).append("{\"alliance\": ").append(ControlsExport.quote(alliance.name()))
++                            .append(", \"x\": ").append(num(p.x())).append(", \"y\": ").append(num(p.y()))
++                            .append(", \"spot\": ").append(choice.refused() ? "null" : ControlsExport.quote(choice.spot.name()))
++                            .append('}');
++                }
++            }
++        }
++        out.append(rows).append('\n').append(in1).append("]\n");
++        out.append(in).append('}');
++        return out.toString();
++    }
++
++    private static Pose target(LaunchSpots.Spot s, Alliance alliance) {
++        return s.target(alliance, LaunchSpotDrive.wallGapIn, LaunchSpotDrive.closeBackIn,
++                TurretSubsystem.turretForwardIn, TurretSubsystem.turretLeftIn);
++    }
++
++    private static LaunchSpots.Choice choose(Pose p, Alliance alliance) {
++        return LaunchSpots.choose(p, true, alliance, LaunchSpotDrive.wallGapIn, LaunchSpotDrive.maxPastCentreIn,
++                TurretSubsystem.turretForwardIn, TurretSubsystem.turretLeftIn, LaunchSpotDrive.wallCentreBiasIn,
++                LaunchSpotDrive.closeCentreBiasIn, LaunchSpotDrive.closeBackIn);
++    }
++
++    /** [x, y, heading in degrees, 0 to 360], to 0.01. */
++    private static String pose(Pose p) {
++        double deg = Math.toDegrees(p.heading()) % 360.0;
++        if (deg < 0) deg += 360.0;
++        return String.format(Locale.ROOT, "[%.2f, %.2f, %.2f]", p.x(), p.y(), deg);
++    }
++
++    private static String num(double v) {
++        return v == Math.rint(v) && Math.abs(v) < 1e9 ? String.format(Locale.ROOT, "%.1f", v) : String.valueOf(v);
++    }
++
++    private static String indent(int depth) {
++        StringBuilder b = new StringBuilder();
++        for (int i = 0; i < depth; i++) b.append("  ");
++        return b.toString();
++    }
++}
