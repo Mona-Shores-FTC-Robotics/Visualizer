@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NCSSM FTC BIOBUZZ Lab</title>
-<meta name="description" content="A BIOBUZZ match simulator, an interactive results lab, and ten lessons for FTC teams, from the students and mentors of NCSSM FTC teams 5064, 8569, and 22377." />
+<title>UV/IR BIOBUZZ Sim Lab</title>
+<meta name="description" content="Teams Ultraviolet (20245) and Infrared (19429)'s BIOBUZZ simulator and driver drill, built on NCSSM FTC's simulator." />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 <style>
   :root { --ground: #eef1f4; --panel: #ffffff; --ink: #15202b; --dim: #55626f; --grid: #c5ced8; --faint: #dde3e9; --red: #d8342a; --blue: #2f5fd0; --you: #b88a00;
@@ -32,46 +32,46 @@
   :root:not([data-units="us"]) .u-us { display: none; } :root[data-units="us"] .u-si { display: none; }
   .units { display: inline-flex; border: 1px solid var(--grid); border-radius: 999px; overflow: hidden; } .units button { font: 500 12px var(--mono); letter-spacing: .04em; color: var(--dim); background: none; border: 0; padding: 4px 10px; cursor: pointer; }
   .units button[aria-pressed="true"] { background: var(--ink); color: var(--ground); } .units button:focus-visible { outline: 2px solid var(--you); outline-offset: -2px; }
+  .found a { color: inherit; text-decoration-color: var(--you); text-underline-offset: 3px; }
   footer { margin-top: 56px; border-top: 1px solid var(--grid); padding-top: 16px; color: var(--dim); font-size: 13px; }
 </style>
 </head>
 <body>
-<nav aria-label="Site"><a class="brand" href="/">NCSSM FTC · BIOBUZZ</a><a href="/sim/">Simulator</a><a href="/lab/">Match Lab</a><a href="/lessons/">Ten lessons</a><span class="units" role="group" aria-label="Units"><button type="button" data-setunits="metric">Metric</button><button type="button" data-setunits="us">US</button></span><a class="gh" href="https://github.com/caryden/ftc-biobuzz-sim" aria-label="Source code on GitHub" title="Source code on GitHub"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a></nav>
+<nav aria-label="Site"><a class="brand" href="./">UV/IR · BIOBUZZ Sim Lab</a><a href="sim/">Simulator</a><a href="../drill/">Driver Drill</a><a href="../">Visualizer</a><a href="lab/">NCSSM Match Lab</a><a href="lessons/">NCSSM lessons</a><span class="units" role="group" aria-label="Units"><button type="button" data-setunits="metric">Metric</button><button type="button" data-setunits="us">US</button></span><a class="gh" href="https://github.com/caryden/ftc-biobuzz-sim" aria-label="Source code on GitHub" title="Source code on GitHub"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a></nav>
 <main>
   <header>
-    <div class="eyebrow"><i>FIRST</i> Tech Challenge 2026-2027 · BIOBUZZ</div>
-    <h1><span id="count">12,375</span> matches played so far…</h1>
-    <p class="lede">We are the students and mentors of the three FTC teams at NCSSM. We built a physics simulator of this season's game, ran thousands of matches in it, and changed one thing at a time. This is what we learned, and the tools that we used, for any team that wants them.</p>
-    <p class="eyebrow" id="where" hidden></p>
-    <div class="teams" aria-label="Our teams"><b>5064</b><b>8569</b><b>22377</b></div>
+    <div class="eyebrow"><i>FIRST</i> Tech Challenge 2026-2027 · BIOBUZZ · our testing ground</div>
+    <h1>Ultraviolet &amp; Infrared <span>Sim Lab</span></h1>
+    <p class="lede">The match simulator that teams Ultraviolet (20245) and Infrared (19429) use to test Autos, drill drivers and check ideas before they reach the robot. Its engine is NCSSM FTC's BIOBUZZ simulator; our robot, our controls and the TIP timing we measured on film sit on top of it.</p>
+    <div class="teams" aria-label="Our teams"><b>19429 Infrared</b><b>20245 Ultraviolet</b></div>
   </header>
 
   <div class="doors">
-    <a class="door" href="/lessons/"><div class="fig">10</div><h2>Ten lessons</h2><p>What to build, what to practice, and how to plan a match. Each lesson gives the advice, the numbers, and something to try at practice.</p><span class="go">Read the lessons →</span></a>
-    <a class="door" href="/lab/"><div class="fig">79</div><h2>Match Lab</h2><p>Configure an alliance and see its likely scores and its chance of beating an opponent. All 79 setups that we tested are there, with a dot for every match.</p><span class="go">Open the lab →</span></a>
-    <a class="door" href="/sim/"><div class="fig">2:30</div><h2>Simulator</h2><p>Watch four robots play a full match on the official field, or drive one with a controller. Configure each robot, and then review and annotate the match. Best on a laptop: the field model is 17 MB.</p><span class="go">Start a match →</span></a>
+    <a class="door" href="../drill/"><div class="fig">7</div><h2>Driver Drill</h2><p>Our robot with our real buttons, toward 7 TIPs alone: the 2:00 TeleOp, or a Full Match from one of our Autos. A dead partner and two opponents, or an empty field for testing. Use a PS5 controller.</p><span class="go">Start a drill →</span></a>
+    <a class="door" href="sim/"><div class="fig">2:30</div><h2>Simulator</h2><p>A full four-robot match on the official field, or drive one robot yourself. Set up each robot, then review and annotate the match. TIP timing is switchable: UV/IR (our films, the default) or NCSSM's. Best on a laptop: the field model is 17 MB.</p><span class="go">Start a match →</span></a>
+    <a class="door" href="../"><div class="fig">0:30</div><h2>Our Autos</h2><p>The Visualizer: draw and export our Autos, plan them beside a partner's, and send them to the Java simulator, which runs the robot's own code.</p><span class="go">Open the Visualizer →</span></a>
   </div>
 
-  <section class="found" aria-label="What we found">
-    <h2>Four numbers to start with</h2>
-    <div><b class="minus">-150</b><span>points per match when a launcher is 3 times less repeatable. Nothing else that we tested comes close.</span></div>
-    <div><b class="minus">-82</b><span>points for an alliance that runs no AUTO. Two solo routines that ignore each other lose 52.</span></div>
-    <div><b class="plus">73%</b><span>of TELEOP is driving, and 5% is launching. A shorter trip buys more than a faster shooter.</span></div>
-    <div><b class="plus"><span class="u-si">+6</span><span class="u-us">+2.7</span></b><span>points for every <span class="u-si">kilogram</span><span class="u-us">pound</span> that you leave off the robot. Top speed bought nothing.</span></div>
+  <section class="found" aria-label="What we changed">
+    <h2>What we changed</h2>
+    <div><b class="plus">Robot</b><span>Our robot from the CAD: its frame, FLOWER stick, turret and launcher, with speeds and pick times from the Fruitport and Belding logs.</span></div>
+    <div><b class="plus">Buttons</b><span>The drill's controls are read from our robot code's controls export, so every button does what it does on the robot.</span></div>
+    <div><b class="plus">TIP</b><span>TIP lag and spill fitted to 16 films of real CELLs. NCSSM's timing is one switch away, because ours may be wrong.</span></div>
+    <div><b class="plus">Auto</b><span>Full Match replays our seven Autos from the Java simulator's runs of the robot's own code.</span></div>
+  </section>
+
+  <section class="found" aria-label="Credit">
+    <h2>Built on NCSSM FTC's work</h2>
+    <div style="grid-column:1/-1"><span>The physics, field, HIVE, four-robot match, referee and 3D view are the <a href="https://github.com/caryden/ftc-biobuzz-sim">BIOBUZZ simulator</a> by the students and mentors of NCSSM FTC teams 5064, 8569 and 22377 (Carl Ryden and team), used under its MIT licence. Their <a href="lab/">Match Lab</a> and <a href="lessons/">ten lessons</a> are kept here as they wrote them. Thank you.</span></div>
+    <div class="teams" aria-label="NCSSM teams" style="grid-column:1/-1;flex-direction:row"><b>5064</b><b>8569</b><b>22377</b></div>
   </section>
 </main>
-<footer><p>A project of the students and mentors of the NCSSM FTC teams 5064, 8569, and 22377. This site isn't affiliated with or endorsed by <i>FIRST</i>. <i>FIRST</i> and <i>FIRST</i> Tech Challenge are trademarks of For Inspiration and Recognition of Science and Technology.</p></footer>
+<footer><p>Teams Ultraviolet (20245) and Infrared (19429)'s fork of the NCSSM FTC BIOBUZZ simulator (MIT; see LICENSE and NOTICE.md). Not affiliated with or endorsed by NCSSM FTC or <i>FIRST</i>. <i>FIRST</i> and <i>FIRST</i> Tech Challenge are trademarks of For Inspiration and Recognition of Science and Technology.</p></footer>
 <script>
   // Display units: metric unless the reader chose US. The choice is shared with the other pages through the browser's storage.
   (function () { var u = 'metric'; try { if (localStorage.getItem('biobuzz.units') === 'us') u = 'us'; } catch (e) {}
     function apply(v) { document.documentElement.dataset.units = v; document.querySelectorAll('[data-setunits]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.setunits === v)); }); }
     apply(u); document.addEventListener('click', function (e) { var b = e.target.closest('[data-setunits]'); if (!b) return; try { localStorage.setItem('biobuzz.units', b.dataset.setunits); } catch (err) {} apply(b.dataset.setunits); }); })();
-  // The live count of simulated matches: ours, plus every match that a visitor finishes in the simulator.
-  fetch('/api/matches').then(r => (r.ok ? r.json() : null)).then(d => {
-    if (d && d.count) document.getElementById('count').textContent = d.count.toLocaleString('en-US');
-    // Countries are counted from finished matches only, as a two-letter code, with nothing about the visitor.
-    if (d && d.countries > 0) { var w = document.getElementById('where'); w.textContent = 'Visitors have played in ' + d.countries + (d.countries === 1 ? ' country' : ' countries') + ' so far'; w.hidden = false; }
-  }).catch(() => {});
 </script>
 </body>
 </html>
