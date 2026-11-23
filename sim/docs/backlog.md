@@ -9,6 +9,22 @@ Stalls are still about 3 per robot per MATCH, mostly at the launch spots, where 
 0.6 m apart. A rule that let the nearer partner take the straight spot lost 59 points, because the spot changed while a
 robot approached it. A rule that fixes the choice at the start of the approach isn't tested.
 
+## Partners that avoid each other in AUTO
+
+Onboard AUTO plans around the FIELD elements and the center-line wall but doesn't see other robots. So a partner can
+drive into its alliance-mate at a launch spot and push it over the center line (G402). The four-robot side-discipline
+test in `test/auto.test.ts` is pinned to the 'ncssm' spill because of this. Over seeds 1 to 12, the furthest x that
+red reached and the nearest x that blue reached in AUTO, in meters, fail the test's 0.15 m margin on these seeds:
+
+| Spill | Failing seeds |
+|---|---|
+| 'ncssm' | 9 (blue -0.31), 12 (red +0.31) |
+| 'films' | 4 (red +0.04), 9 (blue -0.31), 12 (red +0.31) |
+
+In seed 4 under 'films', red R1 drives into R0 while R0 stands shooting at (-0.29, -1.35), at 21.7 s, and shoves it +x
+at about 0.45 m/s. A fix: plan around the partner's AUTO path, which real teams agree in advance, or have partners give
+way at shared launch spots. Not urgent for the driver drill, where our partner sits dead in its corner.
+
 ## Opponents that adapt to a defender
 
 The full-time defender takes about 70 to 87 points from an alliance whose planner doesn't react. A real drive team

@@ -4,6 +4,7 @@
  * sim/LICENSE).
  */
 import * as THREE from "three";
+import { MonaShoresRobotModel } from "../../sim/src/render/mona-shores-robot";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FIELD, HIVE } from "../../sim/src/sim/config";
 import {
@@ -184,7 +185,12 @@ export class DrillView {
     });
   }
 
-  /** One robot: the chassis in its team's colours, the intake bar, the turret and the lane. */
+  /**
+   * One robot: our robot's CAD (sim/src/render/mona-shores-robot.ts, the model AdvantageScope
+   * shows), its turret and FLOWER stick moving, with a bumper strip in its team's colours (the CAD
+   * is the same grey for both robots), the team number and the lane. Until the meshes load, and if
+   * they never do, a box in the team's colours stands in.
+   */
   private buildRobot(team: number): RobotMesh {
     const frame = this.frame,
       group = new THREE.Group(),
@@ -211,6 +217,7 @@ export class DrillView {
     arrow.position.set(frame / 2 - 0.08, 0.16, 0);
     const wheelGeo = new THREE.CylinderGeometry(0.052, 0.052, 0.038, 18);
     const wheelMat = new THREE.MeshStandardMaterial({ color: 0x15171a });
+    const wheels: THREE.Mesh[] = [];
     for (const [a, b] of [
       [1, 1],
       [1, -1],
@@ -221,6 +228,7 @@ export class DrillView {
       w.rotation.x = Math.PI / 2;
       w.position.set(a * frame * 0.36, 0.052, b * frame * 0.45);
       group.add(w);
+      wheels.push(w);
     }
     // The turret: a disc with the launcher's barrel, behind and right of centre (TurretSubsystem).
     const turret = new THREE.Group();
@@ -257,6 +265,26 @@ export class DrillView {
     const lane = new THREE.Group();
     group.add(chassis, intake, arrow, turret, lane, label);
     this.scene.add(group);
+    // The CAD: the box stays until it is in.
+    const box = [chassis, arrow, turret, ...wheels];
+    const model = new MonaShoresRobotModel("robots/mona-shores/");
+    model.ready
+      .then(() => {
+        group.add(model.group);
+        for (const o of box) o.visible = false;
+        const strip = new THREE.Mesh(
+          new THREE.BoxGeometry(frame + 0.012, 0.035, frame + 0.012),
+          new THREE.MeshStandardMaterial({
+            color: colors.bright,
+            roughness: 0.5,
+          }),
+        );
+        strip.position.y = 0.045;
+        group.add(strip);
+      })
+      .catch(() => {
+        /* the box stays */
+      });
     const aimLine = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(),
@@ -270,7 +298,16 @@ export class DrillView {
     );
     aimLine.frustumCulled = false;
     this.scene.add(aimLine);
-    return { team, group, turret, lane, laneKey: "", intakeMat, aimLine };
+    return {
+      team,
+      group,
+      turret,
+      lane,
+      laneKey: "",
+      intakeMat,
+      aimLine,
+      model,
+    };
   }
 
   /**
@@ -380,6 +417,8 @@ export class DrillView {
     r.group.position.set(p.x, 0, p.z);
     r.group.rotation.y = th;
     r.turret.rotation.y = (turretDeg * Math.PI) / 180;
+    r.model.setTurretDeg(turretDeg);
+    r.model.setStickOut(!!sim.robots[sim.me].stickDown);
     r.intakeMat.color.set(
       sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
     );
@@ -418,6 +457,7 @@ interface RobotMesh {
   laneKey: string;
   intakeMat: THREE.MeshStandardMaterial;
   aimLine: THREE.Line;
+  model: MonaShoresRobotModel;
 }
 
 /** The teams' colours, as their printed cheat sheets (biobuzz `CheatSheet.Team`). */
