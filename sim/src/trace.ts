@@ -76,8 +76,9 @@ export class TraceRecorder {
  * Builds the minimal sim-shaped object that the view needs to draw one trace frame, from the point of view of the
  * template's robot. Balls come from the latest frame that has them.
  */
+// Mona Shores: `me` is clamped, since a replay from match logs may hold fewer robots than the template.
 export function frameAsSim(trace: Trace, index: number, template: Sim): Sim {
-  const f = trace.frames[index], me = template.me; let bi = index; while (bi > 0 && !trace.frames[bi].balls) bi--;
+  const f = trace.frames[index], me = Math.min(template.me, f.robots.length - 1); let bi = index; while (bi > 0 && !trace.frames[bi].balls) bi--;
   const robots = f.robots.map((r, i) => ({ alliance: r.id[0] === 'R' ? 'red' : 'blue', slot: Number(r.id[1]), cfg: template.robots[Math.min(i, template.robots.length - 1)].cfg, carried: r.carried.map(k => KIND[k]),
     body: { translation: () => ({ x: r.x, y: 0.17, z: r.z }) }, heading: r.h }));
   const view = (i: number) => ({ cfg: robots[i].cfg, robot: robots[i].body, heading: robots[i].heading, alliance: robots[i].alliance, carried: robots[i].carried });

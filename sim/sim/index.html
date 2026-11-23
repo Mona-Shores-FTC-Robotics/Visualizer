@@ -184,6 +184,8 @@
     <label title="How long a loaded CELL waits before the HIVE tips. UV/IR: our films (last ball to settled about 3.9 s at the tipping weight). NCSSM: the rocker alone, with no wait.">TIP timing <select id="tiptiming"><option value="uv-ir">UV/IR (our films)</option><option value="ncssm" selected>NCSSM (rocker only)</option></select></label>
     <h2>This match</h2>
     <div class="btns"><button id="nexport" title="Downloads the notes as Markdown and the match trace as JSON.">Export</button><button id="ncopy" title="Copies the path of the annotation file in the repository.">Copy notes path</button></div>
+    <h2>Replay a real match</h2>
+    <div class="btns"><label class="btn" title="A trace written from our robots' match logs by biobuzz tools/pull-logs/to_sim_trace.py, played in the review. Or open the page with ?replay=replays/NAME.json.">Open replay <input id="replayfile" type="file" accept=".json,application/json" hidden></label></div>
     <div id="nsaved">Click a robot in the review to add a note.</div>
   </div><div>
     <h2>Options</h2>

@@ -32,6 +32,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      # The match and drill simulator (sim/, its own npm project), at /Visualizer/sim-lab/sim/.
+      - run: npm ci --ignore-scripts
+        working-directory: sim
+      - run: npx vite build --base=/Visualizer/sim-lab/ --outDir ../dist/sim-lab
+        working-directory: sim
       # For devices that reach this site but not GitHub's file server (src/lib/team/mirror.ts).
       - run: node scripts/mirror-biobuzz.mjs dist/mirror
       # The service worker names its cache after VERSION; a new name per build drops
