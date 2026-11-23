@@ -5,14 +5,14 @@ import { DEFAULT_TIP_TIMING, TIP_LAG, TipLagHold, tipTiming } from '../src/sim/t
 const median = (v: number[]) => { const s = [...v].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
 describe('TIP lag (Mona Shores override, biobuzz TeamCode/autos/timing-terms.md)', () => {
-  it('at the tipping weight: hold + upstream swing lands on the films, 3.4 to 6.5 s, median 3.9', () => {
-    const h = new TipLagHold(7), lags = Array.from({ length: 4000 }, () => h.drawLag(1) + TIP_LAG.upstreamSwingAtWeightS);
+  it('at the tipping weight: hold + upstream swing + flight lands on the films, 3.4 to 6.5 s, median 3.9', () => {
+    const h = new TipLagHold(7), lags = Array.from({ length: 4000 }, () => h.drawLag(1) + TIP_LAG.upstreamSwingAtWeightS + TIP_LAG.flightS);
     expect(Math.min(...lags)).toBeGreaterThanOrEqual(3.4 - 1e-9);
     expect(Math.max(...lags)).toBeLessThanOrEqual(6.5 + 1e-9);
     expect(median(lags)).toBeGreaterThan(3.7); expect(median(lags)).toBeLessThan(4.1);
   });
   it('well past it: 2.2 to 2.5 s', () => {
-    const h = new TipLagHold(7), lags = Array.from({ length: 1000 }, () => h.drawLag(3) + TIP_LAG.upstreamSwingWellPastS);
+    const h = new TipLagHold(7), lags = Array.from({ length: 1000 }, () => h.drawLag(3) + TIP_LAG.upstreamSwingWellPastS + TIP_LAG.flightS);
     expect(Math.min(...lags)).toBeGreaterThanOrEqual(2.2 - 1e-9);
     expect(Math.max(...lags)).toBeLessThanOrEqual(2.5 + 1e-9);
   });
