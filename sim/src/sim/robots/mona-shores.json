@@ -156,6 +156,36 @@
         "turnDegPerS": {
           "value": 299,
           "source": "98th percentile heading rate at full turn; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "envelope": {
+          "angleDeg": {
+            "value": [
+              0,
+              45,
+              90
+            ],
+            "source": "direction of travel in robot axes: forward, diagonal, strafe (back and the other side mirror these)"
+          },
+          "topInPerS": {
+            "value": [
+              61.8,
+              39.1,
+              39.8
+            ],
+            "source": "98th percentile speed, 74 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          },
+          "accelInPerS2": {
+            "value": [
+              94.7,
+              58.3,
+              60.1
+            ],
+            "source": "90th percentile rise from under 25 in/s over 5 samples, 74 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          },
+          "turnDegPerS": {
+            "value": 331.7,
+            "source": "98th percentile heading rate with turn held at 0.95 or more and no drive, 74 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          }
         }
       },
       "flowerPick": {
@@ -225,6 +255,36 @@
         "turnDegPerS": {
           "value": 306,
           "source": "98th percentile heading rate at full turn; drill chat, Visualizer src/drill/presets.ts (PR #150), from events/2026-11-fruitport and -belding: 104 logs 19429, 95 logs 20245"
+        },
+        "envelope": {
+          "angleDeg": {
+            "value": [
+              0,
+              45,
+              90
+            ],
+            "source": "direction of travel in robot axes: forward, diagonal, strafe (back and the other side mirror these)"
+          },
+          "topInPerS": {
+            "value": [
+              62.8,
+              40.5,
+              40.7
+            ],
+            "source": "98th percentile speed, 60 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          },
+          "accelInPerS2": {
+            "value": [
+              94.2,
+              53.6,
+              59.3
+            ],
+            "source": "90th percentile rise from under 25 in/s over 5 samples, 60 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          },
+          "turnDegPerS": {
+            "value": 372.4,
+            "source": "98th percentile heading rate with turn held at 0.95 or more and no drive, 60 logs; TeleOp in robot axes (Pinpoint pose rotated by heading, stick held at 0.9 or more, no turn), events/2026-11-fruitport and -belding, matches and practice"
+          }
         }
       },
       "flowerPick": {
