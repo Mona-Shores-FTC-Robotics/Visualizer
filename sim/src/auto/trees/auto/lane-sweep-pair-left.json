@@ -1,0 +1,297 @@
+{
+ "kind": "bt.tree",
+ "id": "lane-sweep-pair-left",
+ "name": "Lane-sweep pair: left robot",
+ "env": "onboard",
+ "description": "For the left start position, on the rear wall: fill the rear CELL for the second TIP, sweep the rear spill, and PARK.",
+ "meta": {
+  "start": "left"
+ },
+ "defs": {
+  "full": "bots.me.transfer.full",
+  "len": "bots.me.dimensions.length",
+  "flip": "if(bots.me.shooter.facing == 'front', 180, 0)",
+  "stand": "len / 2 + field.flowerHalfSize + 0.02",
+  "rearFlower": "pose(-field.flowerNear, field.flowerFar - stand, 90)",
+  "park": "pose(-(field.half - len / 2 - 0.09), 0.8954, 180)",
+  "angledRear": "pose(field.hiveX - 0.62, 1.17, 129.4 + flip)",
+  "parkLeft": "pose(park.x, 0.8954 + 0.33, park.headingDeg)"
+ },
+ "root": {
+  "sequence": {
+   "children": [
+    {
+     "id": "steps",
+     "parallel": {
+      "policy": "any",
+      "children": [
+       {
+        "id": "finish",
+        "note": "When the clock shows 3 s, the last step starts, whatever step is running then.",
+        "ref": "waitUntil",
+        "params": {
+         "condition": "clock.remaining <= 3"
+        }
+       },
+       {
+        "sequence": {
+         "children": [
+          {
+           "id": "s1",
+           "ref": "drive.driveTo",
+           "params": {
+            "pose": "angledRear",
+            "timeoutSec": 3
+           }
+          },
+          {
+           "id": "s2",
+           "note": "The camera wait keeps the robot from launching at the CELL before its partner's TIP raises it.",
+           "ref": "waitUntil",
+           "params": {
+            "condition": "bots.me.vision.seesRaised('rear')",
+            "timeoutSec": 8
+           }
+          },
+          {
+           "id": "s3",
+           "ref": "shooter.shoot",
+           "params": {
+            "count": 4,
+            "timeoutSec": 2.5,
+            "cell": "rear"
+           }
+          },
+          {
+           "id": "s4",
+           "ref": "drive.driveTo",
+           "params": {
+            "pose": "offset(rearFlower, 0, -0.2)",
+            "timeoutSec": 3
+           }
+          },
+          {
+           "id": "collect-s5",
+           "parallel": {
+            "policy": "any",
+            "children": [
+             {
+              "ref": "intake.run",
+              "params": {
+               "filter": "pollen"
+              }
+             },
+             {
+              "sequence": {
+               "children": [
+                {
+                 "id": "s5",
+                 "ref": "drive.driveTo",
+                 "params": {
+                  "pose": "rearFlower",
+                  "timeoutSec": 1.5
+                 }
+                },
+                {
+                 "id": "full-s6",
+                 "parallel": {
+                  "policy": "any",
+                  "children": [
+                   {
+                    "ref": "waitUntil",
+                    "params": {
+                     "condition": "full"
+                    }
+                   },
+                   {
+                    "id": "s6",
+                    "ref": "drive.push",
+                    "params": {
+                     "power": 0.35,
+                     "timeoutSec": 2.2
+                    }
+                   }
+                  ]
+                 }
+                }
+               ]
+              }
+             }
+            ]
+           }
+          },
+          {
+           "id": "s7",
+           "ref": "drive.driveTo",
+           "params": {
+            "pose": "angledRear",
+            "timeoutSec": 3
+           }
+          },
+          {
+           "id": "s8",
+           "ref": "shooter.shoot",
+           "params": {
+            "count": 4,
+            "timeoutSec": 2.5
+           }
+          },
+          {
+           "id": "s9",
+           "note": "That volley tips the rear CELL. The robot watches the TIP and lets the spill reach the rear wall before it sweeps.",
+           "ref": "vision.waitTip",
+           "params": {
+            "cell": "rear",
+            "timeoutSec": 4
+           }
+          },
+          {
+           "id": "s10",
+           "ref": "wait",
+           "params": {
+            "timeoutSec": 1.2
+           }
+          },
+          {
+           "id": "collect-s11",
+           "parallel": {
+            "policy": "any",
+            "children": [
+             {
+              "ref": "waitUntil",
+              "params": {
+               "condition": "full"
+              }
+             },
+             {
+              "ref": "intake.run",
+              "params": {
+               "filter": "all"
+              }
+             },
+             {
+              "id": "s11",
+              "note": "A blind sweep: a TIP spills the CELL where the robot can't see. scripts/plan-sweeps.ts records where the spill comes to rest over many simulated matches and writes the lanes that collect the most. The path ends early once the transfer is full.",
+              "ref": "drive.followPath",
+              "params": {
+               "waypoints": [
+                {
+                 "x": -1.565,
+                 "y": 1.115,
+                 "headingDeg": null
+                },
+                {
+                 "x": -1.565,
+                 "y": 0.515,
+                 "headingDeg": null
+                },
+                {
+                 "x": -0.365,
+                 "y": 1.115,
+                 "headingDeg": null
+                }
+               ],
+               "timeoutSec": 6.0,
+               "tag": "sweep-left"
+              }
+             }
+            ]
+           }
+          },
+          {
+           "id": "s12",
+           "note": "The right robot's third TIP raises the rear CELL again: launch what the sweep found, then sweep once more so that TELEOP starts with a full transfer.",
+           "ref": "drive.driveTo",
+           "params": {
+            "pose": "angledRear",
+            "timeoutSec": 3
+           }
+          },
+          {
+           "id": "s13",
+           "ref": "shooter.shoot",
+           "params": {
+            "count": 4,
+            "timeoutSec": 4,
+            "cell": "rear"
+           }
+          },
+          {
+           "id": "collect-s14",
+           "parallel": {
+            "policy": "any",
+            "children": [
+             {
+              "ref": "waitUntil",
+              "params": {
+               "condition": "full"
+              }
+             },
+             {
+              "ref": "intake.run",
+              "params": {
+               "filter": "all"
+              }
+             },
+             {
+              "id": "s14",
+              "note": "A blind sweep: a TIP spills the CELL where the robot can't see. scripts/plan-sweeps.ts records where the spill comes to rest over many simulated matches and writes the lanes that collect the most. The path ends early once the transfer is full.",
+              "ref": "drive.followPath",
+              "params": {
+               "waypoints": [
+                {
+                 "x": -1.565,
+                 "y": 1.115,
+                 "headingDeg": null
+                },
+                {
+                 "x": -1.565,
+                 "y": 0.515,
+                 "headingDeg": null
+                },
+                {
+                 "x": -0.365,
+                 "y": 1.115,
+                 "headingDeg": null
+                }
+               ],
+               "timeoutSec": 6.0,
+               "tag": "sweep-left"
+              }
+             }
+            ]
+           }
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "id": "collect-s15",
+     "parallel": {
+      "policy": "any",
+      "children": [
+       {
+        "ref": "intake.run",
+        "params": {
+         "filter": "all"
+        }
+       },
+       {
+        "id": "s15",
+        "note": "Every drive to PARK runs the intake: the robot faces the alliance wall, where NECTAR from the LOADING ZONE collects, and a full transfer at the end of AUTO is a head start in TELEOP. LEAVE needs the robot clear of the wall by half its size plus 2 cm. The pose is 9 cm off the wall, which leaves margin for a 5 cm drive tolerance.",
+        "ref": "drive.driveTo",
+        "params": {
+         "pose": "parkLeft",
+         "timeoutSec": 6
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

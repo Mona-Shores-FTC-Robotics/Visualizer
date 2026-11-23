@@ -115,6 +115,7 @@ export default ts.config(
       "out/",
       "public/",
       "node_modules/",
+      "sim/",
       "*.config.js",
       "*.config.ts",
       "vite.config.d.ts",
