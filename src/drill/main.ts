@@ -1,6 +1,8 @@
 /**
- * The driver drill page (drill/index.html): a 2:00 TeleOp, solo, toward 7 TIPs, on our robot's
- * controls and numbers. Gamepad 1 is the driver, gamepad 2 the operator.
+ * The driver drill page (drill/index.html): a 2:00 TeleOp toward 7 TIPs, on our robot's controls
+ * and numbers. Solo, gamepad 1 is the driver and gamepad 2 the operator. As an alliance, our two
+ * robots share one field: gamepad 1 drives the robot picked under Robot, gamepad 2 its partner,
+ * each a driver alone with the turret aiming (AIM).
  */
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
@@ -19,7 +21,16 @@ import {
 } from "./history";
 import { PRESETS, IN, type TeamNumber } from "./presets";
 import { BUDGET_PIECES, BUDGET_S } from "./readout";
-import { DrillSession, GOAL_TIPS, type RunResult } from "./session";
+import {
+  DrillSession,
+  GOAL_TIPS,
+  TEAM_NAMES,
+  TIP_TIMINGS,
+  type TipTiming,
+  type DrillMode,
+  type RobotRunResult,
+  type RunResult,
+} from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -39,6 +50,7 @@ const prefs = (() => {
       team?: string;
       mode?: string;
       camera?: string;
+      tipTiming?: string;
     };
   } catch {
     return {};
@@ -52,6 +64,7 @@ function savePrefs() {
         team: teamSel.value,
         mode: modeSel.value,
         camera: camSel.value,
+        tipTiming: tipSel.value,
       }),
     );
   } catch {
@@ -62,6 +75,11 @@ function savePrefs() {
 const teamSel = $<HTMLSelectElement>("team");
 const modeSel = $<HTMLSelectElement>("mode");
 const camSel = $<HTMLSelectElement>("camera");
+const tipSel = $<HTMLSelectElement>("tip-timing");
+tipSel.innerHTML = TIP_TIMINGS.map(
+  (t) => `<option value="${t.value}">${t.label}</option>`,
+).join("");
+if (prefs.tipTiming) tipSel.value = prefs.tipTiming;
 if (prefs.team) teamSel.value = prefs.team;
 if (prefs.mode) modeSel.value = prefs.mode;
 if (prefs.camera) camSel.value = prefs.camera;
@@ -79,12 +97,24 @@ function fatal(msg: string) {
     `<h2>The drill cannot start</h2><p>${esc(msg)}</p><p class="dim">The controls come from biobuzz (TeamCode/cheat-sheets/controls.json). Check the connection and reload.</p>`;
 }
 
+const alliance = () => modeSel.value === "alliance";
+/** Robot 1 is the team picked under Robot; in an alliance its partner is the other. */
+function teams(): TeamNumber[] {
+  const first = Number(teamSel.value) as TeamNumber;
+  return alliance() ? [first, first === 20245 ? 19429 : 20245] : [first];
+}
+
 function newSession() {
+  const mode = modeSel.value as DrillMode;
   session = new DrillSession(
     RAPIER,
     file,
-    Number(teamSel.value) as TeamNumber,
-    modeSel.value as "two" | "driver",
+    alliance()
+      ? teams().map((team) => ({ team, driverOnly: true }))
+      : (Number(teamSel.value) as TeamNumber),
+    mode,
+    undefined,
+    tipSel.value as TipTiming,
   );
   saved = false;
   $("results").hidden = true;
@@ -116,8 +146,12 @@ function showControls() {
 }
 
 function showNumbers() {
-  const p = PRESETS[Number(teamSel.value) as TeamNumber];
-  $("numbers").innerHTML = `<table>
+  $("numbers").innerHTML = teams().map(numbersFor).join("");
+}
+
+function numbersFor(team: TeamNumber) {
+  const p = PRESETS[team];
+  return `<p><b>${TEAM_NAMES[team]}</b></p><table>
     <tr><td>Top speed</td><td>${p.topSpeedInPerS} in/s</td></tr>
     <tr><td>Acceleration</td><td>${p.accelInPerS2} in/s²</td></tr>
     <tr><td>Turn</td><td>${p.turnRateDegPerS}°/s</td></tr>
@@ -130,47 +164,75 @@ function showNumbers() {
   </table><p>${p.sources.map(esc).join("; ")}.</p>`;
 }
 
+const modeName = (m: string) =>
+  m === "two" ? "two players" : m === "driver" ? "driver only" : "alliance";
+
 function showHistory(list: StoredRun[] = loadHistory()) {
   const team = Number(teamSel.value);
+  const ally = alliance();
   const mine = list
-    .filter((r) => r.team === team)
+    .filter((r) => r.team === team && (r.mode === "alliance") === ally)
     .slice(-8)
     .reverse();
-  const best = bestRun(list, team);
+  const timing = tipSel.value as TipTiming;
+  const best = ally
+    ? bestRun(list, team, "alliance", timing)
+    : bestRun(mine, team, undefined, timing);
   if (!mine.length) {
-    $("history").textContent = `No ${team} runs on this laptop yet.`;
+    $("history").textContent = ally
+      ? "No alliance runs on this laptop yet."
+      : `No ${team} runs on this laptop yet.`;
     return;
   }
   $("history").innerHTML =
     (best
-      ? `<p>Best: <b>${best.tips} TIPs</b>${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s (${best.mode === "two" ? "two players" : "driver only"}, ${best.date.slice(0, 10)})</p>`
+      ? `<p>Best: <b>${best.tips} TIPs</b>${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s (${modeName(best.mode)}, ${TIP_TIMINGS.find((t) => t.value === timing)?.label}, ${best.date.slice(0, 10)})</p>`
       : "") +
     `<table>${mine.map((r) => `<tr><td>${r.date.slice(5, 16).replace("T", " ")}</td><td>${r.tips} TIPs · ${r.cycles} cycles · med ${f1(r.medianCycleS ?? NaN)} s</td></tr>`).join("")}</table>`;
 }
 
-function showResults(r: RunResult) {
-  const list = saveRun(summarize(r));
-  showHistory(list);
-  const best = bestRun(list, r.team, r.mode);
-  const isBest = best && best.date === r.date;
-  const s = session.readout.stats();
-  const rows = r.cycles
+function cycleTable(x: RobotRunResult) {
+  const rows = x.cycles
     .map(
       (c) =>
         `<tr><td>${c.n}</td><td>${f1(c.atS)}</td><td class="${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "goal" : ""}">${f1(c.cycleS)}</td><td>${f1(c.toPiecesS)}</td><td>${f1(c.pickUpS)}</td><td>${f1(c.driveLoadedS)}</td><td>${f1(c.spinUpAimS)}</td><td>${f1(c.feedS)}</td><td>${c.balls}${c.emptyFeeds ? ` (+${c.emptyFeeds} empty)` : ""}</td></tr>`,
     )
     .join("");
-  const picks = r.pickUps
+  const picks = x.pickUps
     .map((p) => `${f1(p.s)} s (${p.pieces} in${p.full ? "" : ", fired short"})`)
     .join(" · ");
+  const c = x.cycles.map((q) => q.cycleS).sort((a, b) => a - b);
+  const p = x.pickUps.map((q) => q.s).sort((a, b) => a - b);
+  return `<p>Cycles: best ${f1(c[0] ?? NaN)} s, median ${f1(c[Math.floor(c.length / 2)] ?? NaN)} s against the ${BUDGET_S} s budget with ${BUDGET_PIECES} pieces. Pick-ups: best ${f1(p[0] ?? NaN)} s, median ${f1(p[Math.floor(p.length / 2)] ?? NaN)} s.</p>
+    <table><tr><th>#</th><th>at</th><th>cycle</th><th>to pieces</th><th>pick up</th><th>drive loaded</th><th>spin-up and aim</th><th>feed</th><th>balls</th></tr>${rows || '<tr><td colspan="9">No volley this run.</td></tr>'}</table>
+    <p class="dim">Pick-ups: ${picks || "–"}</p>`;
+}
+
+function showResults(r: RunResult) {
+  const list = saveRun(summarize(r));
+  showHistory(list);
+  const best = bestRun(list, r.team, r.mode, r.tipTiming);
+  const isBest = best && best.date === r.date;
+  const who =
+    r.mode === "alliance"
+      ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, a driver each`
+      : `${TEAM_NAMES[r.team]}, ${r.mode === "two" ? "driver + operator" : "driver only"}`;
+  const timingLabel = TIP_TIMINGS.find((t) => t.value === r.tipTiming)?.label;
+  const robots =
+    r.mode === "alliance"
+      ? r.robots
+          .map(
+            (x) =>
+              `<h3>${TEAM_NAMES[x.team]} <span class="dim">· the ${x.end} end · ${x.balls} balls · ${x.volleys} volleys, ${x.volleysOffEnd} off its end, ${x.volleysAtDown} at a down CELL</span></h3>${cycleTable(x)}`,
+          )
+          .join("")
+      : cycleTable(r.robots[0]);
   $("results-card").innerHTML = `
     <h2>${r.tips >= GOAL_TIPS ? `<span class="goal">${r.tips} TIPs: goal!</span>` : `<span class="miss">${r.tips} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
-    <p>${PRESETS[r.team].name} ${r.team}, ${r.mode === "two" ? "driver + operator" : "driver only"}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
+    <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
-    <p>Cycles: best ${f1(s.bestCycleS)} s, median ${f1(s.medianCycleS)} s against the ${BUDGET_S} s budget with ${BUDGET_PIECES} pieces. Pick-ups: best ${f1(s.bestPickUpS)} s, median ${f1(s.medianPickUpS)} s.</p>
-    <table><tr><th>#</th><th>at</th><th>cycle</th><th>to pieces</th><th>pick up</th><th>drive loaded</th><th>spin-up and aim</th><th>feed</th><th>balls</th></tr>${rows || '<tr><td colspan="9">No volley this run.</td></tr>'}</table>
-    <p class="dim">Pick-ups: ${picks || "–"}</p>
-    ${best && !isBest ? `<p class="dim">Best ${r.mode === "two" ? "two-player" : "driver-only"} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
+    ${robots}
+    ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
     <p><button class="primary" id="again">Run again (Options)</button></p>`;
   $("results").hidden = false;
   $("again").onclick = () => {
@@ -179,23 +241,28 @@ function showResults(r: RunResult) {
   };
 }
 
-function hud() {
-  const st = session.teleop.status();
-  $("clock").innerHTML =
-    `${clock(Math.ceil(session.remainingS))}<small>${session.finished ? "ended" : session.t > 0 ? "TeleOp" : "press Options to start"}</small>`;
-  $("tips").innerHTML =
-    `${session.tips.length} / ${GOAL_TIPS}<small>TIPs · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
-  $("robot").innerHTML =
-    `${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
+function robotBox(k: number) {
+  const st = session.teleops[k].status();
+  const head =
+    session.teleops.length > 1
+      ? `<b>${TEAM_NAMES[session.slots[k].team]}</b> <span class="dim">gamepad ${k + 1} · the ${session.ends[k]} end</span><br>`
+      : "";
+  return `<div class="robot-box">${head}${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
     Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
-    Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.preset.laneCapacity - st.lane))} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
-    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}`;
-  $("note").textContent = st.note;
-  const r = session.readout,
+    Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.presets[k].laneCapacity - st.lane))} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
+    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}</div>`;
+}
+
+function readoutBox(k: number) {
+  const r = session.readouts[k],
     p = r.pickUps.at(-1),
     c = r.cycles.at(-1),
     s = r.stats();
-  $("readout").innerHTML = [
+  const head =
+    session.teleops.length > 1
+      ? `<div><b>${TEAM_NAMES[session.slots[k].team]}</b></div>`
+      : "";
+  return `<div class="readout-box">${head}${[
     p
       ? `<div class="big ${p.full ? "ok" : "warn"}">PICK-UP ${f1(p.s)} s (${p.pieces} in)</div>`
       : "",
@@ -203,18 +270,55 @@ function hud() {
       ? `<div class="big ${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "ok" : ""}">CYCLE ${f1(c.cycleS)} s · ${c.balls} ball${c.balls === 1 ? "" : "s"}</div><div>to pieces ${f1(c.toPiecesS)} | pick ${f1(c.pickUpS)} | loaded ${f1(c.driveLoadedS)} | spin+aim ${f1(c.spinUpAimS)} | feed ${f1(c.feedS)}${c.emptyFeeds ? ` · +${c.emptyFeeds} empty feed${c.emptyFeeds === 1 ? "" : "s"}` : ""}${c.earlyPresses ? ` · ${c.earlyPresses} early press${c.earlyPresses === 1 ? "" : "es"}` : ""}</div>`
       : "",
     `<div class="dim">${r.cycles.length ? `cycle best ${f1(s.bestCycleS)} · median ${f1(s.medianCycleS)} s (${r.cycles.length})` : "PRACTICE: fire a volley to time a cycle"}${r.pickUps.length ? ` · pick-up best ${f1(s.bestPickUpS)} · median ${f1(s.medianPickUpS)}` : ""}</div>`,
-  ].join("");
+  ].join("")}</div>`;
+}
+
+function hud() {
+  $("clock").innerHTML =
+    `${clock(Math.ceil(session.remainingS))}<small>${session.finished ? "ended" : session.t > 0 ? "TeleOp" : "press Options to start"}</small>`;
+  $("tips").innerHTML =
+    `${session.tips.length} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
+  const all = session.teleops.map((_, k) => k);
+  $("robot").innerHTML = all.map(robotBox).join("");
+  $("note").textContent = session.teleops
+    .map((t, k) => {
+      const n = t.status().note;
+      return n && session.teleops.length > 1
+        ? `${session.slots[k].team}: ${n}`
+        : n;
+    })
+    .filter(Boolean)
+    .join(" · ");
+  $("readout").innerHTML = all.map(readoutBox).join("");
 }
 
 function padsLine(list: (Gamepad | null)[]) {
-  const two = modeSel.value === "two";
+  // In an alliance both pads are drivers: the operator's layout is not in play.
+  $("operator-section").hidden = alliance();
+  $("driver-pads").textContent = alliance()
+    ? "gamepad 1 and gamepad 2, a robot each"
+    : "gamepad 1";
   const names = [0, 1].map(
     (i) => list[i]?.id.replace(/\s*\(.*\)$/, "") ?? null,
   );
+  const pad = (i: number, role: string, missing: string) =>
+    `<div>Gamepad ${i + 1} (${role}): ${names[i] ? esc(names[i]!) : `<span style="color:var(--warn)">${missing}</span>`}</div>`;
+  if (alliance()) {
+    const [a, b] = teams();
+    $("pads").innerHTML =
+      pad(0, `drives ${TEAM_NAMES[a]}`, "not connected") +
+      pad(
+        1,
+        `drives ${TEAM_NAMES[b]}`,
+        "not connected: that robot sits still",
+      ) +
+      "<div>Each robot has a driver alone: its turret aims (AIM), nobody runs the operator's buttons.</div>";
+    return;
+  }
   $("pads").innerHTML =
-    `<div>Gamepad 1 (driver): ${names[0] ? esc(names[0]) : '<span style="color:var(--warn)">not connected</span>'}</div>` +
-    (two
-      ? `<div>Gamepad 2 (operator): ${names[1] ? esc(names[1]) : '<span style="color:var(--warn)">not connected: the operator\'s buttons do nothing</span>'}</div>`
+    pad(0, "driver", "not connected") +
+    (modeSel.value === "two"
+      ? pad(1, "operator", "not connected: the operator's buttons do nothing")
       : "<div>Driver only: the turret aims (AIM), nobody runs the operator's buttons.</div>");
 }
 
@@ -241,14 +345,26 @@ function frame(now: number) {
   const viewBtn = list.some((g) => g.buttons[8]?.pressed);
   if (viewBtn && !viewWas) cycleCamera();
   viewWas = viewBtn;
-  const driver = readPad(list[0] ?? null, file.triggerPressed);
-  const operator = readPad(list[1] ?? null, file.triggerPressed);
-  session.advance(dt, driver, operator);
+  const pad = (i: number) => readPad(list[i] ?? null, file.triggerPressed);
+  // Solo: gamepad 2 is the operator. Alliance: gamepad 2 drives the partner.
+  if (session.teleops.length > 1)
+    session.advanceAll(dt, [
+      { driver: pad(0), operator: pad(-1) },
+      { driver: pad(1), operator: pad(-1) },
+    ]);
+  else session.advance(dt, pad(0), pad(1));
   if (session.finished && !saved) {
     saved = true;
     showResults(session.result());
   }
-  view.sync(session.sim, session.teleop.turretDeg, true);
+  view.sync(
+    session.sim,
+    session.teleops.map((t, k) => ({
+      team: session.slots[k].team,
+      turretDeg: t.turretDeg,
+    })),
+    true,
+  );
   hud();
   requestAnimationFrame(frame);
 }
@@ -281,9 +397,10 @@ async function main() {
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
-  for (const sel of [teamSel, modeSel])
+  for (const sel of [teamSel, modeSel, tipSel])
     sel.onchange = () => {
       savePrefs();
+      padsKey = "";
       newSession();
     };
   camSel.onchange = () => {

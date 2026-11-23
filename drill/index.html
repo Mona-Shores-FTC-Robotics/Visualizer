@@ -128,6 +128,8 @@
         font-size: 13px;
         line-height: 1.5;
         min-width: 220px;
+        display: flex;
+        gap: 16px;
       }
       .tag {
         display: inline-block;
@@ -150,6 +152,10 @@
         font-size: 14px;
         line-height: 1.45;
         pointer-events: none;
+      }
+      #readout {
+        display: flex;
+        gap: 20px;
       }
       #readout .big {
         font-size: 20px;
@@ -299,12 +305,12 @@
   </head>
   <body>
     <header>
-      <h1>Driver Drill · 7 TIPs solo</h1>
+      <h1>Driver Drill · 7 TIPs</h1>
       <label
-        >Robot
+        >Robot (gamepad 1)
         <select id="team">
-          <option value="20245">20245 Ultraviolet</option>
-          <option value="19429">19429 Infrared</option>
+          <option value="20245">Ultraviolet (20245)</option>
+          <option value="19429">Infrared (19429)</option>
         </select></label
       >
       <label
@@ -312,8 +318,15 @@
         <select id="mode">
           <option value="two">Driver + operator (gamepad 1 + 2)</option>
           <option value="driver">Driver only (gamepad 1)</option>
+          <option value="alliance">
+            Alliance: both robots, a driver each (gamepad 1 + 2)
+          </option>
         </select></label
       >
+      <label
+        >HIVE
+        <select id="tip-timing"></select
+      ></label>
       <label
         >View
         <select id="camera">
@@ -347,10 +360,12 @@
       <div id="pads" class="dim">
         Connect a PlayStation controller and press any button.
       </div>
-      <h2>Driver <span class="dim">gamepad 1</span></h2>
+      <h2>Driver <span class="dim" id="driver-pads">gamepad 1</span></h2>
       <table id="driver-controls"></table>
-      <h2>Operator <span class="dim">gamepad 2</span></h2>
-      <table id="operator-controls"></table>
+      <div id="operator-section">
+        <h2>Operator <span class="dim">gamepad 2</span></h2>
+        <table id="operator-controls"></table>
+      </div>
       <p class="dim" id="controls-source"></p>
       <h2>Best runs</h2>
       <div id="history" class="dim">None yet.</div>

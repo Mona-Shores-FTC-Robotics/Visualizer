@@ -246,3 +246,53 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await page.reload();
   await expect(page.locator("#history")).toContainText("Best: 1 TIPs");
 });
+
+test("alliance: two controllers drive Ultraviolet and Infrared on one field", async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator("#mode").selectOption("alliance");
+  await expect(page.locator("#pads")).toContainText(
+    "drives Ultraviolet (20245)",
+  );
+  await expect(page.locator("#pads")).toContainText("drives Infrared (19429)");
+  await expect(page.locator("#robot")).toContainText("Infrared (19429)");
+  await setPad(page, 0, [BTN.OPTIONS]);
+  await waitSim(page, 0.2);
+  await setPad(page, 0);
+  const at = () =>
+    page.evaluate(() => {
+      const s = (
+        window as unknown as {
+          __drill: {
+            session: {
+              t: number;
+              sim: {
+                robots: { body: { translation(): { x: number; z: number } } }[];
+              };
+            };
+          };
+        }
+      ).__drill.session;
+      return { t: s.t, robots: s.sim.robots.map((r) => r.body.translation()) };
+    });
+  const before = await at();
+  expect(before.robots).toHaveLength(2);
+  // Gamepad 2 drives the partner, and only the partner.
+  await setPad(page, 1, [], [0, -1, 0, 0]);
+  await waitSim(page, before.t + 0.8);
+  await setPad(page, 1);
+  const after = await at();
+  expect(after.robots[1].x - before.robots[1].x).toBeGreaterThan(0.3);
+  expect(Math.abs(after.robots[0].x - before.robots[0].x)).toBeLessThan(0.02);
+
+  await page.evaluate(() =>
+    (window as unknown as { __drill: Drill }).__drill.session.advance(125),
+  );
+  await expect(page.locator("#results")).toBeVisible();
+  await expect(page.locator("#results-card")).toContainText(
+    "Alliance: Ultraviolet (20245) and Infrared (19429)",
+  );
+  await expect(page.locator("#results-card")).toContainText("the rear end");
+  await expect(page.locator("#results-card")).not.toContainText("Mona Shores");
+});

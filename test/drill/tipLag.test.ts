@@ -43,3 +43,22 @@ describe("TIP lag", () => {
     expect(median(l)).toBeLessThan(2.8);
   }, 120000);
 });
+
+test("NCSSM TIP timing: their rocker, no wait, swings well before ours", async () => {
+  const R = await rapier();
+  const run = async (timing: "uv-ir" | "ncssm") => {
+    const s = new DrillSession(R, CONTROLS, 20245, "driver", 3, timing);
+    s.start();
+    const b = s.sim.robot;
+    b.setTranslation({ x: -0.32, y: b.translation().y, z: 1.3 }, true);
+    s.sim.carried = ["pollen", "pollen", "pollen", "pollen"];
+    s.advance(2.7, pad(["CIRCLE"]));
+    for (let i = 0; i < 40 && !s.tips.length; i++) s.advance(0.25, pad());
+    expect(s.result().tipTiming).toBe(timing);
+    return s.tips[0].lagS;
+  };
+  const ours = await run("uv-ir"),
+    theirs = await run("ncssm");
+  expect(theirs).toBeLessThan(2.5);
+  expect(ours - theirs).toBeGreaterThan(1.0);
+}, 60000);
