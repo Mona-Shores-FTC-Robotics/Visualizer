@@ -86,8 +86,12 @@ export interface SimOptions {
   configFor?: (alliance: Alliance, slot: 0 | 1) => RobotConfig | undefined;
   /** Mona Shores: the TIP timing, 'uv-ir' (our films) or 'ncssm' (upstream's rocker alone). Default: 'uv-ir' (src/sim/tip-lag.ts). */
   tipTiming?: TipTiming;
-  /** Mona Shores (the driver drill): if false, pushing into a FLOWER takes nothing, and the program takes the pieces itself, at our logged pick time and yield. Default: true. */
-  flowerPullByPush?: boolean;
+  /**
+   * Mona Shores (the driver drill): if false, pushing into a FLOWER takes nothing, and the program takes the pieces
+   * itself, at our logged pick time and yield. A function sets it per robot: the drill turns it off for our robots only,
+   * since the planner (the drill's opponents) picks a FLOWER by pushing into it. Default: true.
+   */
+  flowerPullByPush?: boolean | ((alliance: Alliance, slot: 0 | 1) => boolean);
   /** Mona Shores: how a TIP's spill leaves the lowered CELL, 'films' (ours) or 'ncssm' (upstream's physics alone). Default: 'films' (src/sim/spill.ts). */
   spill?: SpillModel;
 }
@@ -545,7 +549,8 @@ export class Sim {
     }
     // POLLEN can also be removed from the bottom of a FLOWER (G418.B).
     // Pulling from a FLOWER needs driver intent: the robot must be pushing forward into it.
-    if (this.options.flowerPullByPush !== false && filter !== 'own_nectar' && this.carried.length < c.capacity && this.simTime >= this.flowerReadyAt && !this.placing && this.lastForward > 0.15) {
+    const pullOpt = this.options.flowerPullByPush, pull = typeof pullOpt === 'function' ? pullOpt(this.alliance, this.slot) : pullOpt !== false;
+    if (pull && filter !== 'own_nectar' && this.carried.length < c.capacity && this.simTime >= this.flowerReadyAt && !this.placing && this.lastForward > 0.15) {
       for (const f of this.flowers) {
         const r = this.toRobot(f.x, f.z);
         if (r.f < 0 || r.f > c.length / 2 + c.intake.flowerReach + FIELD.flowerHalfSize || Math.abs(r.l) > c.intake.width / 2 || f.stack[0] !== 'pollen') continue;

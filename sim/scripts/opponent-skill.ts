@@ -3,6 +3,8 @@
 // Prints the blue alliance's TIPs per match (AUTO and TELEOP) for each seed.
 // Run: npx tsx scripts/opponent-skill.ts SKILL [seeds=1-8] [full|teleop]   (TIP_TIMING=uv-ir by default)
 // `teleop` runs a 2:00 TELEOP alone, the robots starting at their starts, as the driver drill's default run does.
+// PULL=0 sets flowerPullByPush false for every robot, as the drill did before it turned it off for its own robots only:
+// the planner then can't pull POLLEN out of a FLOWER, and its TIPs fall by about half at the upper settings.
 import RAPIER from '@dimforge/rapier3d-compat';
 import { tipTiming } from '../src/sim/tip-lag';
 import { Coach } from '../src/auto/coach';
@@ -15,7 +17,7 @@ await RAPIER.init();
 const bots = [0, 1, 2, 3].map(i => sanitize({ ...defaultBot(i), ...(i >= 2 ? opponentSetup(skill) : {}) }, i));
 const tips: number[] = [];
 for (let seed = a; seed <= b; seed++) {
-  const sim = new Sim(RAPIER, undefined, mode, seed, { opponent: true, partners: true, tipTiming: tipTiming(process.env.TIP_TIMING), configFor: (al, slot) => robotConfig(bots[(al === 'red' ? 0 : 2) + slot]) }); sim.start();
+  const sim = new Sim(RAPIER, undefined, mode, seed, { opponent: true, partners: true, tipTiming: tipTiming(process.env.TIP_TIMING), flowerPullByPush: process.env.PULL !== '0', configFor: (al, slot) => robotConfig(bots[(al === 'red' ? 0 : 2) + slot]) }); sim.start();
   const coaches = sim.robots.map(() => { const c = new Coach(); c.autoRoutine = 'default'; return c; });
   while (sim.phase !== 'post') sim.step(coaches.map((c, k) => sim.robots[k].alliance === 'blue' ? c.update(sim.view(k), DT) : NO_INPUT), sim.robots.map(r => r.alliance === 'blue'));
   for (let i = 0; i < 3 / DT; i++) sim.step(NO_INPUT);

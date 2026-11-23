@@ -26,7 +26,7 @@ describe('drill switches', () => {
     expect(s.simNow).toBeCloseTo(0.25, 2);
   });
   it('flowerPullByPush: false takes nothing from a FLOWER the robot pushes into; the default does', () => {
-    const pushIntoRedFlower = (opts: { flowerPullByPush?: boolean }) => {
+    const pushIntoRedFlower = (opts: { flowerPullByPush?: boolean | ((a: 'red' | 'blue', slot: 0 | 1) => boolean) }) => {
       const s = new Sim(RAPIER, undefined, 'practice', 1, opts);
       atRot(s, -1.35, 0.5942, Math.PI); // facing the red wall's FLOWER (-1.7282, 0.5942)
       s.carried.length = 0; // practice starts with a load
@@ -35,5 +35,8 @@ describe('drill switches', () => {
     };
     expect(pushIntoRedFlower({ flowerPullByPush: false })).toBe(0);
     expect(pushIntoRedFlower({})).toBeGreaterThan(0);
+    // Per robot: off for red only (the drill's robots), on for the others (the planner's opponents).
+    expect(pushIntoRedFlower({ flowerPullByPush: a => a !== 'red' })).toBe(0);
+    expect(pushIntoRedFlower({ flowerPullByPush: a => a === 'red' })).toBeGreaterThan(0);
   });
 });
