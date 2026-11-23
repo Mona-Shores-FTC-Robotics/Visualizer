@@ -357,21 +357,47 @@ export class Sim {
   }
 
   /**
-   * Mona Shores (the drill's Full Match mode): sets each HIVE to where an AUTO trace ended, before TELEOP. `up` is the
-   * raised CELL and `tips` the AUTO TIPs, which also count as the AUTO TIPs in the score. `cellPollen` drops that many
-   * POLLEN at random spots in the raised CELL (drawn from `seed`, its own stream) and lets them settle 1 s with the
-   * clock stopped. A trace doesn't carry a CELL's contents; after a TIP the newly raised CELL starts empty and holds
-   * only what was scored into it since, so 0 is the honest default. Removes nothing already in a CELL.
+   * Mona Shores (the drill's Full Match mode): sets the FIELD to where an AUTO trace ended, before TELEOP.
+   *
+   * Per alliance: `up` is the raised CELL and `tips` the AUTO TIPs, which also count as the AUTO TIPs in the score.
+   * `cellPollen` drops that many POLLEN at random spots in the raised CELL (drawn from `seed`, its own stream). A trace
+   * doesn't carry a CELL's contents; after a TIP the newly raised CELL starts empty and holds only what was scored into
+   * it since, so 0 is the honest default. Nothing already in a CELL is removed.
+   *
+   * `field.pieces`, if given, replaces every loose piece: each enabled ball inside the walls and in neither CELL of
+   * either HIVE is removed (a robot's lane, a FLOWER's stack, a CELL's contents and the HUMAN PLAYERS' stock stay), and
+   * these are spawned at rest, in meters on the simulator's axes, `y` the ball's center (raised to its radius if lower).
+   * `field.flowers` sets FLOWER stacks by id: a list of kinds bottom first, or a count of POLLEN.
+   *
+   * Anything placed or dropped then settles 1 s with the clock stopped.
    */
-  handoff(state: Partial<Record<Alliance, { up: CellSide; tips: number; cellPollen?: number }>>, seed = 1) {
-    const rng = new Rng(seed * 11 + 5); let dropped = false;
+  handoff(state: Partial<Record<Alliance, { up: CellSide; tips: number; cellPollen?: number }>>, seed = 1,
+    field: { pieces?: { kind: BallKind; x: number; y: number; z: number }[]; flowers?: Record<string, BallKind[] | number> } = {}) {
+    const rng = new Rng(seed * 11 + 5); let moved = false;
     for (const a of ['red', 'blue'] as Alliance[]) {
       const st = state[a]; if (!st) continue;
       this.hives[a].setState(st.up, st.tips); this.autoTips[a] = this.hives[a].tips;
-      const n = Math.max(0, Math.min(12, Math.floor(st.cellPollen ?? 0)));
-      if (n) { this.dropInCell(this.hives[a], 'pollen', n, rng); dropped = true; }
     }
-    if (dropped) this.settle(1);
+    if (field.pieces) {
+      for (const b of [...this.balls.values()]) {
+        if (!b.body.isEnabled()) continue;
+        const p = this.ballPos(b);
+        if (Math.abs(p.x) > FIELD.half || Math.abs(p.z) > FIELD.half) continue;
+        const inCell = (['red', 'blue'] as Alliance[]).some(a => this.hives[a].containsInCell(p, b.radius, 'rear') || this.hives[a].containsInCell(p, b.radius, 'audience'));
+        if (!inCell) this.remove(b);
+      }
+      for (const q of field.pieces) this.spawn(q.kind, q.x, Math.max(q.y, radiusOf(q.kind) + 0.001), q.z);
+      moved = moved || field.pieces.length > 0;
+    }
+    for (const [id, v] of Object.entries(field.flowers ?? {})) {
+      const f = this.flowers.find(o => o.id === id); if (!f) continue;
+      f.stack = typeof v === 'number' ? Array<BallKind>(Math.max(0, Math.floor(v))).fill('pollen') : [...v];
+    }
+    for (const a of ['red', 'blue'] as Alliance[]) {
+      const n = Math.max(0, Math.min(12, Math.floor(state[a]?.cellPollen ?? 0)));
+      if (n) { this.dropInCell(this.hives[a], 'pollen', n, rng); moved = true; }
+    }
+    if (moved) this.settle(1);
   }
 
   /** Seconds remaining in the MATCH as shown on the FIELD timer (TELEOP counts from 2:00). */
