@@ -19,7 +19,8 @@ const ownNectar = (a: Alliance): BallKind => (a === 'red' ? 'nectar_red' : 'nect
 export const FILL_TARGET = 4;
 /** Executor tuning. `standoff` picks the launch distance within the scoring range: 0 is the closest spot, 1 the farthest. */
 /** `tipByMotion`: if true, a TIP counts as under way only when the HIVE is past level or turning away from its stop. See `tipTarget`. */
-export const EXEC = { standoff: 0.4, tipByMotion: true };
+/** `tipStuckS` (Mona Shores): a raised CELL at or over its weight that hasn't tipped in this long needs one more piece. */
+export const EXEC = { standoff: 0.4, tipByMotion: true, tipStuckS: 2.5 };
 
 /**
  * How alliance partners divide the FIELD. With `sides`, the robot that starts on the left of its drivers (the second
@@ -105,7 +106,11 @@ export function tipTarget(sim: Sim, mateLoad = 0, own: 'rear' | 'audience' | nul
   // it rock it. Reading that as a TIP sent both robots to the other end, where they waited with a load that would have
   // tipped the raised CELL. `EXEC.tipByMotion` false restores the old test, for comparisons.
   const off = Math.abs(Math.abs(hive.phi) - HIVE.tiltLimit), w = hive.omega, away = Math.sign(w) !== Math.sign(hive.phi) && Math.abs(w) > 0.25;
-  const swinging = EXEC.tipByMotion ? (hive.phi > 0) !== (up === 'rear') || (off > 0.03 && away) : off > 0.03, load = sim.cellLoad(sim.alliance) + inflight + mateLoad;
+  const swinging = EXEC.tipByMotion ? (hive.phi > 0) !== (up === 'rear') || (off > 0.03 && away) : off > 0.03;
+  // Mona Shores: a CELL over its weight that sits still on its stop (pieces near the pivot) needs one more piece; without
+  // this, both robots waited for its TIP for the rest of the match (four robots, seed 6, UV/IR TIP timing).
+  const stuck = sim.tipStuckS(sim.alliance) > EXEC.tipStuckS;
+  const load = stuck ? Math.min(sim.cellLoad(sim.alliance), TIP_LOAD.threshold - TIP_LOAD.pollen) + inflight : sim.cellLoad(sim.alliance) + inflight + mateLoad;
   const full = Math.ceil(TIP_LOAD.threshold / TIP_LOAD.pollen);
   // Sides convention: the robot launches only into its own CELL. While that CELL is down, or about to go down, the
   // robot loads up for the next time it rises and waits at its own launch spot.

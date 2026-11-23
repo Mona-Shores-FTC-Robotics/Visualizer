@@ -112,8 +112,10 @@ export class Sim {
   private owed: Record<Alliance, { at: number }[]> = { red: [], blue: [] };
   private autoTips: Record<Alliance, number> = { red: 0, blue: 0 };
   // Counters live in an object so that a view, which inherits from the sim, updates the shared value.
-  private shared = { nextId: 1, epoch: 0 };
+  private shared = { nextId: 1, epoch: 0, overSince: { red: Number.NaN, blue: Number.NaN } as Record<Alliance, number>, overCount: { red: 0, blue: 0 } as Record<Alliance, number> };
   private simTime = 0; private views: Sim[] = [];
+  /** Mona Shores: seconds the alliance's raised CELL has sat at or over its tipping weight without tipping or being held; 0 if it hasn't. */
+  tipStuckS(a: Alliance): number { const t = this.shared.overSince[a]; return Number.isNaN(t) ? 0 : this.simTime - t; }
   /**
    * Ball positions and CELL tallies for the current epoch. The epoch changes after each world step and each time a ball
    * is added, removed, or moved by the sim, so between two steps, where all four planners run, Rapier is read once per
@@ -354,6 +356,12 @@ export class Sim {
     for (const h of Object.values(this.hives)) h.epoch!++;
     for (const a of ['red', 'blue'] as Alliance[]) {
       if (this.hives[a].pollTip()) { this.say(`${a.toUpperCase()} HIVE TIP (${this.hives[a].tips})`); this.owed[a].push({ at: this.simTime + 2 }); }
+      // Mona Shores: how long the raised CELL has sat at or over its tipping weight, on its stop and not held, without
+      // tipping (its pieces rest too near the pivot). The planner reads it so that it never waits forever for a TIP.
+      const h = this.hives[a], stuck = !h.held && HIVE.tiltLimit - Math.abs(h.phi) < 0.03 && this.cellLoad(a) >= TIP_LOAD.threshold;
+      // A new piece landing starts the count again: it may be the one that tips it.
+      const n = this.cellCount(a), fresh = n !== this.shared.overCount[a]; this.shared.overCount[a] = n;
+      this.shared.overSince[a] = stuck ? (Number.isNaN(this.shared.overSince[a]) || fresh ? this.simTime : this.shared.overSince[a]) : Number.NaN;
     }
     this.humanPlayers();
     for (const r of per) { r.v.aimTurret(); r.v.intake(r.inp.intake ?? 'all'); if (r.active) { r.v.shoot(r.inp); r.v.place(r.inp); } }
