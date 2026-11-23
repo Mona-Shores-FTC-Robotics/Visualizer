@@ -100,3 +100,26 @@ describe("alliance drill", () => {
     expect(r.balls).toBe(4);
   }, 60000);
 });
+
+describe("alliance with operators (4 controllers)", () => {
+  test("each robot's operator runs that robot's launcher, and only it", async () => {
+    const s = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      [
+        { team: 20245, driverOnly: false },
+        { team: 19429, driverOnly: false },
+      ],
+      "alliance-ops",
+      1,
+    );
+    s.start();
+    const idle = { driver: pad(), operator: pad() };
+    // Robot 2's operator presses Cross: its launcher spins up; robot 1's stays idle.
+    s.advanceAll(0.1, [idle, { driver: pad(), operator: pad(["CROSS"]) }]);
+    s.advanceAll(0.1, [idle, idle]);
+    expect(s.teleops[1].status().launcher).toBe("SPINNING UP");
+    expect(s.teleops[0].status().launcher).toBe("IDLE");
+    expect(s.result().mode).toBe("alliance-ops");
+  });
+});

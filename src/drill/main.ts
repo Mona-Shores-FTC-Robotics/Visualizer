@@ -51,6 +51,8 @@ const prefs = (() => {
       mode?: string;
       camera?: string;
       tipTiming?: string;
+      /** Per mode, per robot: the gamepad (0-3, -1 none) of its driver and of its operator. */
+      assign?: Record<string, [number, number][]>;
     };
   } catch {
     return {};
@@ -65,6 +67,7 @@ function savePrefs() {
         mode: modeSel.value,
         camera: camSel.value,
         tipTiming: tipSel.value,
+        assign: prefs.assign,
       }),
     );
   } catch {
@@ -97,7 +100,31 @@ function fatal(msg: string) {
     `<h2>The drill cannot start</h2><p>${esc(msg)}</p><p class="dim">The controls come from biobuzz (TeamCode/cheat-sheets/controls.json). Check the connection and reload.</p>`;
 }
 
-const alliance = () => modeSel.value === "alliance";
+const alliance = () => modeSel.value.startsWith("alliance");
+
+/** Who holds which gamepad, by default: solo as the Driver Station (1 driver, 2 operator). */
+const DEFAULT_ASSIGN: Record<string, [number, number][]> = {
+  two: [[0, 1]],
+  driver: [[0, -1]],
+  alliance: [
+    [0, -1],
+    [1, -1],
+  ],
+  "alliance-ops": [
+    [0, 1],
+    [2, 3],
+  ],
+};
+/** Each robot's [driver, operator] gamepad (0-3, -1 none) in this mode. */
+function assignment(): [number, number][] {
+  const mode = modeSel.value;
+  const a = prefs.assign?.[mode] ?? DEFAULT_ASSIGN[mode] ?? DEFAULT_ASSIGN.two;
+  // A mode without operators never takes one, whatever was saved.
+  return a.map(([d, o]) => [
+    d,
+    mode === "driver" || mode === "alliance" ? -1 : o,
+  ]);
+}
 /** Robot 1 is the team picked under Robot; in an alliance its partner is the other. */
 function teams(): TeamNumber[] {
   const first = Number(teamSel.value) as TeamNumber;
@@ -109,9 +136,10 @@ function newSession() {
   session = new DrillSession(
     RAPIER,
     file,
-    alliance()
-      ? teams().map((team) => ({ team, driverOnly: true }))
-      : (Number(teamSel.value) as TeamNumber),
+    teams().map((team, k) => ({
+      team,
+      driverOnly: (assignment()[k]?.[1] ?? -1) < 0,
+    })),
     mode,
     undefined,
     tipSel.value as TipTiming,
@@ -165,18 +193,24 @@ function numbersFor(team: TeamNumber) {
 }
 
 const modeName = (m: string) =>
-  m === "two" ? "two players" : m === "driver" ? "driver only" : "alliance";
+  m === "two"
+    ? "two players"
+    : m === "driver"
+      ? "driver only"
+      : m === "alliance"
+        ? "alliance, drivers"
+        : "alliance, drivers and operators";
 
 function showHistory(list: StoredRun[] = loadHistory()) {
   const team = Number(teamSel.value);
   const ally = alliance();
   const mine = list
-    .filter((r) => r.team === team && (r.mode === "alliance") === ally)
+    .filter((r) => r.team === team && r.mode.startsWith("alliance") === ally)
     .slice(-8)
     .reverse();
   const timing = tipSel.value as TipTiming;
   const best = ally
-    ? bestRun(list, team, "alliance", timing)
+    ? bestRun(list, team, modeSel.value, timing)
     : bestRun(mine, team, undefined, timing);
   if (!mine.length) {
     $("history").textContent = ally
@@ -213,20 +247,18 @@ function showResults(r: RunResult) {
   showHistory(list);
   const best = bestRun(list, r.team, r.mode, r.tipTiming);
   const isBest = best && best.date === r.date;
-  const who =
-    r.mode === "alliance"
-      ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, a driver each`
-      : `${TEAM_NAMES[r.team]}, ${r.mode === "two" ? "driver + operator" : "driver only"}`;
+  const who = r.mode.startsWith("alliance")
+    ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, ${r.mode === "alliance" ? "a driver each" : "a driver and an operator each"}`
+    : `${TEAM_NAMES[r.team]}, ${r.mode === "two" ? "driver + operator" : "driver only"}`;
   const timingLabel = TIP_TIMINGS.find((t) => t.value === r.tipTiming)?.label;
-  const robots =
-    r.mode === "alliance"
-      ? r.robots
-          .map(
-            (x) =>
-              `<h3>${TEAM_NAMES[x.team]} <span class="dim">· the ${x.end} end · ${x.balls} balls · ${x.volleys} volleys, ${x.volleysOffEnd} off its end, ${x.volleysAtDown} at a down CELL</span></h3>${cycleTable(x)}`,
-          )
-          .join("")
-      : cycleTable(r.robots[0]);
+  const robots = r.mode.startsWith("alliance")
+    ? r.robots
+        .map(
+          (x) =>
+            `<h3>${TEAM_NAMES[x.team]} <span class="dim">· the ${x.end} end · ${x.balls} balls · ${x.volleys} volleys, ${x.volleysOffEnd} off its end, ${x.volleysAtDown} at a down CELL</span></h3>${cycleTable(x)}`,
+        )
+        .join("")
+    : cycleTable(r.robots[0]);
   $("results-card").innerHTML = `
     <h2>${r.tips >= GOAL_TIPS ? `<span class="goal">${r.tips} TIPs: goal!</span>` : `<span class="miss">${r.tips} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
@@ -292,34 +324,57 @@ function hud() {
   $("readout").innerHTML = all.map(readoutBox).join("");
 }
 
+/**
+ * The Controllers panel: each robot's driver and operator, each on a gamepad picked here (the start
+ * screen), with the connected controller's name. Kept per mode in this browser.
+ */
 function padsLine(list: (Gamepad | null)[]) {
-  // In an alliance both pads are drivers: the operator's layout is not in play.
-  $("operator-section").hidden = alliance();
-  $("driver-pads").textContent = alliance()
-    ? "gamepad 1 and gamepad 2, a robot each"
-    : "gamepad 1";
-  const names = [0, 1].map(
-    (i) => list[i]?.id.replace(/\s*\(.*\)$/, "") ?? null,
-  );
-  const pad = (i: number, role: string, missing: string) =>
-    `<div>Gamepad ${i + 1} (${role}): ${names[i] ? esc(names[i]!) : `<span style="color:var(--warn)">${missing}</span>`}</div>`;
-  if (alliance()) {
-    const [a, b] = teams();
-    $("pads").innerHTML =
-      pad(0, `drives ${TEAM_NAMES[a]}`, "not connected") +
-      pad(
-        1,
-        `drives ${TEAM_NAMES[b]}`,
-        "not connected: that robot sits still",
-      ) +
-      "<div>Each robot has a driver alone: its turret aims (AIM), nobody runs the operator's buttons.</div>";
-    return;
-  }
+  const ops = modeSel.value === "two" || modeSel.value === "alliance-ops";
+  // The operator's layout shows only when someone runs it.
+  $("operator-section").hidden = !ops;
+  $("driver-pads").textContent = alliance() ? "one per robot" : "";
+  const name = (i: number) =>
+    i < 0
+      ? ""
+      : list[i]
+        ? esc(list[i]!.id.replace(/\s*\(.*\)$/, ""))
+        : '<span style="color:var(--warn)">not connected</span>';
+  const pick = (k: number, role: 0 | 1, value: number) =>
+    `<select data-robot="${k}" data-role="${role}">${[-1, 0, 1, 2, 3]
+      .map(
+        (i) =>
+          `<option value="${i}"${i === value ? " selected" : ""}>${i < 0 ? "nobody" : `Gamepad ${i + 1}`}</option>`,
+      )
+      .join("")}</select>`;
+  const a = assignment();
   $("pads").innerHTML =
-    pad(0, "driver", "not connected") +
-    (modeSel.value === "two"
-      ? pad(1, "operator", "not connected: the operator's buttons do nothing")
-      : "<div>Driver only: the turret aims (AIM), nobody runs the operator's buttons.</div>");
+    `<table>${teams()
+      .map((team, k) => {
+        const who = alliance() ? `${TEAM_NAMES[team]} ` : "";
+        const rows = [
+          `<tr><td>${who}driver</td><td>${pick(k, 0, a[k][0])} ${name(a[k][0])}</td></tr>`,
+        ];
+        if (ops)
+          rows.push(
+            `<tr><td>${who}operator</td><td>${pick(k, 1, a[k][1])} ${name(a[k][1])}</td></tr>`,
+          );
+        return rows.join("");
+      })
+      .join("")}</table>` +
+    (ops
+      ? ""
+      : `<div>${alliance() ? "Each robot has a driver alone" : "Driver only"}: the turret aims (AIM), nobody runs the operator's buttons.</div>`);
+  for (const sel of $("pads").querySelectorAll("select"))
+    sel.onchange = () => {
+      const k = Number(sel.dataset.robot),
+        role = Number(sel.dataset.role);
+      const next = assignment().map((x) => [...x] as [number, number]);
+      next[k][role] = Number(sel.value);
+      prefs.assign = { ...prefs.assign, [modeSel.value]: next };
+      savePrefs();
+      padsKey = "";
+      newSession();
+    };
 }
 
 let lastFrame = performance.now();
@@ -346,13 +401,10 @@ function frame(now: number) {
   if (viewBtn && !viewWas) cycleCamera();
   viewWas = viewBtn;
   const pad = (i: number) => readPad(list[i] ?? null, file.triggerPressed);
-  // Solo: gamepad 2 is the operator. Alliance: gamepad 2 drives the partner.
-  if (session.teleops.length > 1)
-    session.advanceAll(dt, [
-      { driver: pad(0), operator: pad(-1) },
-      { driver: pad(1), operator: pad(-1) },
-    ]);
-  else session.advance(dt, pad(0), pad(1));
+  session.advanceAll(
+    dt,
+    assignment().map(([d, o]) => ({ driver: pad(d), operator: pad(o) })),
+  );
   if (session.finished && !saved) {
     saved = true;
     showResults(session.result());
