@@ -28,9 +28,9 @@ describe('TIP lag (Mona Shores override, biobuzz TeamCode/autos/timing-terms.md)
     const h = new TipLagHold(1, 'ncssm');
     expect(h.update(1, 4, TIP_LOAD.threshold + 1)).toBe(false);
   });
-  it('reads a timing from a request; anything else is the default (NCSSM, until upstream\'s planner waits for a TIP)', () => {
-    expect(DEFAULT_TIP_TIMING).toBe('ncssm');
-    expect(tipTiming('uv-ir')).toBe('uv-ir'); expect(tipTiming(undefined)).toBe('ncssm'); expect(tipTiming('x')).toBe('ncssm');
+  it('reads a timing from a request; anything else is the default (UV/IR, mentor 23 Nov 2026)', () => {
+    expect(DEFAULT_TIP_TIMING).toBe('uv-ir');
+    expect(tipTiming('ncssm')).toBe('ncssm'); expect(tipTiming(undefined)).toBe('uv-ir'); expect(tipTiming('x')).toBe('uv-ir');
   });
 });
 
