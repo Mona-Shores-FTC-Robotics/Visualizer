@@ -61,7 +61,7 @@ export const OPPONENT_SKILL = { 1: 0, 3: 0.37, 5: 0.58, 7: 0.68 } as const;
 /**
  * The same for a 2:00 TELEOP alone, the robots starting at their starts (the driver drill's default run): `mode`
  * teleop in scripts/opponent-skill.ts, 12 seeds each (23 Nov 2026): 0 gave 0.92 TIPs, 0.37 gave 3.17, 0.58 gave 4.83,
- * 0.73 gave 7.00 (0.68 to 0.70 gave about 6.7). Only the 7 differs from the full MATCH's dial.
+ * 0.73 gave 7.00 (0.70 gave 6.67 over 6 seeds). Only the 7 differs from the full MATCH's dial.
  */
 export const OPPONENT_SKILL_TELEOP = { 1: 0, 3: 0.37, 5: 0.58, 7: 0.73 } as const;
 /** The robot that the HUD, the chase camera, the shot preview, and the robot camera follow: the first robot with a human driver, or R0. */
