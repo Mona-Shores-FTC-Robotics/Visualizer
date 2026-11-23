@@ -4,6 +4,7 @@ import { BALL, DEFAULT_ROBOT, FIELD, HIVE, MATCH, POINTS, RP, TIP_LOAD, type Lau
 import { mecanumForces, type DriveCommand } from './drivetrain';
 import { GROUP, Hive, groups, type Alliance } from './hive';
 import { Rng } from './rng';
+import { TipLagHold } from './tip-lag';
 
 type R = typeof RAPIER_NS;
 export type BallKind = 'pollen' | 'nectar_red' | 'nectar_blue';
@@ -145,9 +146,12 @@ export class Sim {
   partner() { return this.otherRobots().find(o => o.alliance === this.alliance) ?? null; }
   get slot() { return this.robots[this.me].slot; }
   rng: Rng;
+  /** Mona Shores: the TIP lag hold, one per HIVE (src/sim/tip-lag.ts). */
+  tipLag: Record<Alliance, TipLagHold>;
 
   constructor(private rapier: R, cfg: RobotConfig = structuredClone(DEFAULT_ROBOT), public mode: MatchMode = 'teleop', seed = 1, public options: SimOptions = {}) {
     this.rng = new Rng(seed);
+    this.tipLag = { red: new TipLagHold(seed * 2 + 1), blue: new TipLagHold(seed * 2 + 2) };
     this.world = new rapier.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = DT; this.world.numSolverIterations = 8;
     this.buildField();
@@ -235,7 +239,8 @@ export class Sim {
   /** Runs the physics for `sec` with no robot input and the clock stopped, as before a MATCH. */
   private settle(sec: number) {
     for (let i = 0; i < sec / DT; i++) {
-      for (const h of Object.values(this.hives)) h.applyTorques();
+      for (const a of ['red', 'blue'] as Alliance[]) this.hives[a].held = this.tipLag[a].update(this.simTime, this.cellCount(a), this.cellLoad(a));
+    for (const h of Object.values(this.hives)) h.applyTorques();
       this.world.step(); this.touch();
       for (const h of Object.values(this.hives)) h.epoch!++;
     }
