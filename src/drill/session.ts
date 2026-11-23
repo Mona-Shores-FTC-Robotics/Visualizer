@@ -11,6 +11,14 @@ import { TIP_TIMINGS, type TipTiming } from "../../sim/src/sim/tip-lag";
 import { CycleReadout, type CycleResult, type PickUpResult } from "./readout";
 import { IN, PRESETS, type RobotPreset, type TeamNumber } from "./presets";
 import { TeleOp } from "./teleop";
+import {
+  HUMAN_PLAYERS,
+  PlaybookHumanPlayer,
+  zoneEnd,
+  type HumanPlayerKind,
+} from "./nectar";
+
+export { HUMAN_PLAYERS, type HumanPlayerKind };
 
 export const GOAL_TIPS = 7;
 export const TELEOP_S = 120;
@@ -54,6 +62,9 @@ export interface RobotRunResult {
   volleys: number;
   volleysOffEnd: number;
   volleysAtDown: number;
+  /** Our NECTAR it launched, and wrong NECTAR it rejected at the lane entrance. */
+  nectarLaunched: number;
+  rejects: number;
 }
 
 export interface RunResult {
@@ -61,6 +72,9 @@ export interface RunResult {
   team: TeamNumber;
   mode: DrillMode;
   tipTiming: TipTiming;
+  humanPlayer: HumanPlayerKind;
+  /** NECTAR our human player entered. */
+  nectarEntered: number;
   date: string;
   tips: number;
   goal: number;
@@ -119,6 +133,7 @@ export class DrillSession {
     public mode: DrillMode,
     seed = Date.now() & 0xffff,
     public tipTiming: TipTiming = "uv-ir",
+    public humanPlayer: HumanPlayerKind = "playbook",
   ) {
     this.slots = Array.isArray(team)
       ? team
@@ -160,7 +175,26 @@ export class DrillSession {
       this.teleops[i].nearCell = this.ends[i];
       this.lastCarried.push(0);
     });
+    this.simStashAtStart = this.sim.stash[this.sim.alliance];
+    if (humanPlayer === "playbook")
+      this.hp = new PlaybookHumanPlayer(this.sim, this.sim.alliance);
   }
+
+  /** NECTAR our human player has entered so far. */
+  get nectarEntered(): number {
+    return this.hp
+      ? this.hp.entered
+      : this.simStashAtStart - this.sim.stash[this.sim.alliance];
+  }
+
+  /** Our human player by the playbook, or null when the simulator's own enters our NECTAR. */
+  readonly hp: PlaybookHumanPlayer | null = null;
+  /** The robot the human player feeds: the one owning the LOADING ZONE's end (or the only one). */
+  get fedRobot(): number {
+    const k = this.ends.indexOf(zoneEnd(this.sim.alliance));
+    return this.teleops.length > 1 && k >= 0 ? k : 0;
+  }
+  private simStashAtStart = 0;
 
   /** Robot 1 (gamepad 1). */
   get teleop(): TeleOp {
@@ -244,6 +278,16 @@ export class DrillSession {
             );
           tele.firePress = false;
         });
+        if (this.hp && !this.finished) {
+          const fed = this.teleops[this.fedRobot];
+          this.hp.update(
+            this.tips.length,
+            this.remainingS,
+            !fed.gateOpen &&
+              this.sim.robots[this.fedRobot].carried.length <
+                this.presets[this.fedRobot].laneCapacity,
+          );
+        }
       }
       if (this.started && !this.finished && this.sim.phase === "post")
         this.finished = true;
@@ -268,11 +312,15 @@ export class DrillSession {
       volleys: tele.volleys.length,
       volleysOffEnd: tele.volleys.filter((v) => v.cell !== this.ends[k]).length,
       volleysAtDown: tele.volleys.filter((v) => !v.up).length,
+      nectarLaunched: tele.nectarLaunched,
+      rejects: tele.rejects,
     }));
     return {
       team: this.team,
       mode: this.mode,
       tipTiming: this.tipTiming,
+      humanPlayer: this.humanPlayer,
+      nectarEntered: this.nectarEntered,
       date,
       tips: this.tips.length,
       goal: GOAL_TIPS,

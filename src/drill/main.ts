@@ -26,6 +26,8 @@ import {
   GOAL_TIPS,
   TEAM_NAMES,
   TIP_TIMINGS,
+  HUMAN_PLAYERS,
+  type HumanPlayerKind,
   type TipTiming,
   type DrillMode,
   type RobotRunResult,
@@ -51,6 +53,7 @@ const prefs = (() => {
       mode?: string;
       camera?: string;
       tipTiming?: string;
+      humanPlayer?: string;
       /** Per mode, per robot: the gamepad (0-3, -1 none) of its driver and of its operator. */
       assign?: Record<string, [number, number][]>;
     };
@@ -67,6 +70,7 @@ function savePrefs() {
         mode: modeSel.value,
         camera: camSel.value,
         tipTiming: tipSel.value,
+        humanPlayer: hpSel.value,
         assign: prefs.assign,
       }),
     );
@@ -83,6 +87,11 @@ tipSel.innerHTML = TIP_TIMINGS.map(
   (t) => `<option value="${t.value}">${t.label}</option>`,
 ).join("");
 if (prefs.tipTiming) tipSel.value = prefs.tipTiming;
+const hpSel = $<HTMLSelectElement>("human-player");
+hpSel.innerHTML = HUMAN_PLAYERS.map(
+  (t) => `<option value="${t.value}">${t.label}</option>`,
+).join("");
+if (prefs.humanPlayer) hpSel.value = prefs.humanPlayer;
 if (prefs.team) teamSel.value = prefs.team;
 if (prefs.mode) modeSel.value = prefs.mode;
 if (prefs.camera) camSel.value = prefs.camera;
@@ -143,6 +152,7 @@ function newSession() {
     mode,
     undefined,
     tipSel.value as TipTiming,
+    hpSel.value as HumanPlayerKind,
   );
   saved = false;
   $("results").hidden = true;
@@ -251,11 +261,14 @@ function showResults(r: RunResult) {
     ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, ${r.mode === "alliance" ? "a driver each" : "a driver and an operator each"}`
     : `${TEAM_NAMES[r.team]}, ${r.mode === "two" ? "driver + operator" : "driver only"}`;
   const timingLabel = TIP_TIMINGS.find((t) => t.value === r.tipTiming)?.label;
+  const hpLabel = HUMAN_PLAYERS.find((t) => t.value === r.humanPlayer)?.label;
+  const rejects = r.robots.reduce((a, x) => a + x.rejects, 0);
+  const nectarLine = `<p>NECTAR (${hpLabel}): ${r.nectarEntered} of 5 entered, ${r.robots.reduce((a, x) => a + x.nectarLaunched, 0)} fired${rejects ? `; ${rejects} of the other alliance's rejected at the lane` : ""}.</p>`;
   const robots = r.mode.startsWith("alliance")
     ? r.robots
         .map(
           (x) =>
-            `<h3>${TEAM_NAMES[x.team]} <span class="dim">· the ${x.end} end · ${x.balls} balls · ${x.volleys} volleys, ${x.volleysOffEnd} off its end, ${x.volleysAtDown} at a down CELL</span></h3>${cycleTable(x)}`,
+            `<h3>${TEAM_NAMES[x.team]} <span class="dim">· the ${x.end} end · ${x.balls} balls · ${x.volleys} volleys, ${x.volleysOffEnd} off its end, ${x.volleysAtDown} at a down CELL · ${x.nectarLaunched} NECTAR fired</span></h3>${cycleTable(x)}`,
         )
         .join("")
     : cycleTable(r.robots[0]);
@@ -263,6 +276,7 @@ function showResults(r: RunResult) {
     <h2>${r.tips >= GOAL_TIPS ? `<span class="goal">${r.tips} TIPs: goal!</span>` : `<span class="miss">${r.tips} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
+    ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
     <p><button class="primary" id="again">Run again (Options)</button></p>`;
@@ -282,7 +296,7 @@ function robotBox(k: number) {
   return `<div class="robot-box">${head}${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
     Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
     Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.presets[k].laneCapacity - st.lane))} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
-    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}</div>`;
+    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}${st.nectarGate ? `<br><span style="color:var(--warn)">${st.nectarGate}</span>` : ""}</div>`;
 }
 
 function readoutBox(k: number) {
@@ -305,6 +319,17 @@ function readoutBox(k: number) {
   ].join("")}</div>`;
 }
 
+/** The human player: NECTAR left, and what they wait for, in the playbook's words. */
+function humanPlayerBox() {
+  const hp = session.hp;
+  if (!hp) {
+    const left = session.sim.stash[session.sim.alliance];
+    return `<div class="readout-box"><div><b>Human player</b> <span class="dim">NCSSM's</span></div><div>NECTAR ${"●".repeat(left)}${"○".repeat(Math.max(0, 5 - left))}</div></div>`;
+  }
+  const v = hp.view(session.remainingS, session.tips.length);
+  return `<div class="readout-box"><div><b>Human player</b> <span class="dim">our playbook</span></div><div>NECTAR ${"●".repeat(v.left)}${"○".repeat(Math.max(0, 5 - v.left))}${v.owed ? ` · ${v.owed} may go in` : ""}</div><div class="dim">${esc(v.waiting) || "&nbsp;"}</div></div>`;
+}
+
 function hud() {
   $("clock").innerHTML =
     `${clock(Math.ceil(session.remainingS))}<small>${session.finished ? "ended" : session.t > 0 ? "TeleOp" : "press Options to start"}</small>`;
@@ -321,7 +346,7 @@ function hud() {
     })
     .filter(Boolean)
     .join(" · ");
-  $("readout").innerHTML = all.map(readoutBox).join("");
+  $("readout").innerHTML = all.map(readoutBox).join("") + humanPlayerBox();
 }
 
 /**
@@ -449,7 +474,7 @@ async function main() {
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
-  for (const sel of [teamSel, modeSel, tipSel])
+  for (const sel of [teamSel, modeSel, tipSel, hpSel])
     sel.onchange = () => {
       savePrefs();
       padsKey = "";
