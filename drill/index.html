@@ -194,6 +194,14 @@
         padding: 10px 14px;
         font-size: 13px;
       }
+      .pad-debug {
+        margin: 6px 0;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .pad-debug code {
+        white-space: pre;
+      }
       aside h2 {
         font-size: 13px;
         text-transform: uppercase;
@@ -367,6 +375,15 @@
       <div id="pads" class="dim">
         Connect a PlayStation controller and press any button.
       </div>
+      <details id="pad-check">
+        <summary>Controller check (live)</summary>
+        <p class="dim">
+          Raw axes and buttons, and what the drill reads. At rest, drive and
+          turn read 0.00. If not, let go of the sticks and
+          <button id="rezero" type="button">Re-zero sticks</button>
+        </p>
+        <div id="pad-debug"></div>
+      </details>
       <h2>Driver <span class="dim" id="driver-pads">gamepad 1</span></h2>
       <table id="driver-controls"></table>
       <div id="operator-section">

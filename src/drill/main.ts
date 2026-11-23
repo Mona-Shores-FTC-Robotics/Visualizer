@@ -8,7 +8,6 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import {
   Controls,
   loadControls,
-  readPad,
   type ControlsFile,
   type Pad,
 } from "./controls";
@@ -34,6 +33,7 @@ import {
   type RunResult,
 } from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
+import { PadDecoder, connectedPads, type DecodedPad } from "./gamepads";
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -404,28 +404,61 @@ function padsLine(list: (Gamepad | null)[]) {
 
 let lastFrame = performance.now();
 let padsKey = "";
+let decoder: PadDecoder;
+let debugAt = 0;
+
+/**
+ * The live readout under Controllers: each pad's mapping, raw axes and buttons, and what the
+ * drill reads from them (drive, turn, L2, R2), so a pad that drives on its own shows why.
+ */
+function padDebug(list: Gamepad[], read: DecodedPad[]) {
+  if (!list.length) {
+    $("pad-debug").innerHTML = "";
+    return;
+  }
+  const f = (v: number) => (v >= 0 ? " " : "") + v.toFixed(2);
+  $("pad-debug").innerHTML = list
+    .map((g, i) => {
+      const d = read[i];
+      const pressed = g.buttons
+        .map((b, k) => (b.pressed || b.value > 0.5 ? k : -1))
+        .filter((k) => k >= 0);
+      const warn = d.standard
+        ? ""
+        : `<div style="color:var(--warn)">Not the browser's standard mapping ("${esc(g.mapping || "none")}"). The drill read the sticks and triggers by where they rest (sticks: axes ${d.axisOf.lx}, ${d.axisOf.ly}, ${d.axisOf.rx}; L2 ${d.axisOf.l2}, R2 ${d.axisOf.r2}); its buttons may be off. Chrome or Edge, or a USB cable, gives the standard mapping.</div>`;
+      return `<div class="pad-debug"><b>Gamepad ${i + 1}</b> <span class="dim">${esc(g.id)} · mapping ${esc(g.mapping || "none")}</span>${warn}
+        <div><code>axes ${g.axes.map(f).join(" ")}</code></div>
+        <div><code>buttons ${pressed.join(" ") || "–"}</code></div>
+        <div><code>drill: drive ${f(d.lx)} ${f(d.ly)} turn ${f(d.rx)} L2 ${d.l2.toFixed(2)} R2 ${d.r2.toFixed(2)}</code></div></div>`;
+    })
+    .join("");
+}
 function frame(now: number) {
   const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
-  const list = [...(navigator.getGamepads?.() ?? [])].filter(
-    (g): g is Gamepad => !!g && g.connected,
-  );
+  // Controllers only, in the browser's order: a pad's motion sensors are not a pad.
+  const list = connectedPads([...(navigator.getGamepads?.() ?? [])]);
+  const read = list.map((g) => decoder.read(g));
   const key = list.map((g) => g.id).join("|") + modeSel.value;
   if (key !== padsKey) {
     padsKey = key;
     padsLine(list);
   }
   // Options on either pad starts (or restarts after the results), as Enter does.
-  const startBtn = list.some((g) => g.buttons[9]?.pressed);
+  const startBtn = read.some((d) => d.options);
   if (startBtn && !startWas) {
     if (session.finished) newSession();
     start();
   }
   startWas = startBtn;
-  const viewBtn = list.some((g) => g.buttons[8]?.pressed);
+  const viewBtn = read.some((d) => d.share);
   if (viewBtn && !viewWas) cycleCamera();
   viewWas = viewBtn;
-  const pad = (i: number) => readPad(list[i] ?? null, file.triggerPressed);
+  const pad = (i: number) => (i >= 0 && read[i] ? read[i] : decoder.read(null));
+  if (now - debugAt > 200) {
+    debugAt = now;
+    padDebug(list, read);
+  }
   session.advanceAll(
     dt,
     assignment().map(([d, o]) => ({ driver: pad(d), operator: pad(o) })),
@@ -465,6 +498,9 @@ async function main() {
     return;
   }
   showControls();
+  decoder = new PadDecoder(file.triggerPressed);
+  $("rezero").onclick = () =>
+    decoder.rezero(connectedPads([...(navigator.getGamepads?.() ?? [])]));
   view = new DrillView(
     $("canvas") as HTMLCanvasElement,
     (m) => ($("progress").textContent = m ?? ""),

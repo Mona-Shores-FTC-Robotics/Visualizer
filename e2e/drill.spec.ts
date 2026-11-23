@@ -26,18 +26,27 @@ const BTN = {
   OPTIONS: 9,
 };
 
-async function open(page: Page) {
+/** A pad as the browser gives it: standard mapping by default, or another, with its axes at rest. */
+interface PadShape {
+  mapping: string;
+  axes: number[];
+}
+
+async function open(
+  page: Page,
+  shape: PadShape = { mapping: "standard", axes: [0, 0, 0, 0] },
+) {
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.fulfill({ contentType: "application/json", body: CONTROLS }),
   );
-  await page.addInitScript(() => {
+  await page.addInitScript((shape) => {
     const make = (index: number) => ({
       id: `DualSense Wireless Controller (test ${index + 1})`,
       index,
       connected: true,
-      mapping: "standard",
+      mapping: shape.mapping,
       timestamp: 0,
-      axes: [0, 0, 0, 0],
+      axes: [...shape.axes],
       buttons: Array.from({ length: 17 }, () => ({
         pressed: false,
         touched: false,
@@ -50,7 +59,7 @@ async function open(page: Page) {
       value: () => pads,
       configurable: true,
     });
-  });
+  }, shape);
   await page.goto("drill/");
   await page.waitForFunction(
     () => !!(window as unknown as { __drill?: unknown }).__drill,
@@ -355,4 +364,47 @@ test("alliance with operators: four controllers, a driver and an operator per ro
       ).__drill.session.sim.robots[1].body.translation().x,
   );
   expect(x1 - x0).toBeGreaterThan(0.3);
+});
+
+test("a PlayStation pad without the standard mapping: the robot holds still at PLAY, and the check says why", async ({
+  page,
+}) => {
+  // Left X, left Y, L2, right X, right Y, R2: both triggers rest at -1, axis 2 is L2. Read as the
+  // standard mapping, axis 2 is the right stick held full over and the robot spins at PLAY.
+  await open(page, { mapping: "", axes: [0, 0, -1, 0, 0, -1] });
+  await page.locator("#pad-check summary").click();
+  await expect(page.locator("#pad-debug")).toContainText(
+    "Not the browser's standard mapping",
+  );
+  await expect(page.locator("#pad-debug")).toContainText(/turn\s+0\.00/);
+  await page.locator("#start").click();
+  const pose = () =>
+    page.evaluate(() => {
+      const s = (
+        window as unknown as {
+          __drill: {
+            session: {
+              t: number;
+              sim: {
+                heading: number;
+                robot: { translation(): { x: number; z: number } };
+              };
+            };
+          };
+        }
+      ).__drill.session;
+      const p = s.sim.robot.translation();
+      return { t: s.t, h: s.sim.heading, x: p.x, z: p.z };
+    });
+  const a = await pose();
+  await waitSim(page, a.t + 1.5);
+  const b = await pose();
+  expect(Math.abs(b.h - a.h)).toBeLessThan(1e-3);
+  expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeLessThan(1e-3);
+  // The right stick (axis 3) still turns it.
+  await setPad(page, 0, [], [0, 0, -1, 1, 0, -1]);
+  await waitSim(page, b.t + 0.8);
+  await setPad(page, 0, [], [0, 0, -1, 0, 0, -1]);
+  const c = await pose();
+  expect(Math.abs(c.h - b.h)).toBeGreaterThan(0.3);
 });
