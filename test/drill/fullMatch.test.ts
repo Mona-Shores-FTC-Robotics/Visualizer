@@ -8,7 +8,11 @@ import {
 } from "../../src/drill/fullMatch";
 import { FIELD } from "../../sim/src/sim/config";
 import { toPedro } from "../../src/drill/launchSpot";
-import { DrillSession } from "../../src/drill/session";
+import {
+  DrillSession,
+  ONE_TIP_CELL,
+  type OpeningKind,
+} from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
 
 // Full Match: one of our Autos replayed from its AutoSim trace, then TeleOp from where it ended.
@@ -72,7 +76,7 @@ describe("Full Match", () => {
   }, 60000);
 
   test("the field's pieces go where the Auto left them: each FLOWER's stack and the floor", async () => {
-    for (const auto of ["r-no-cross", "l-clockwise"]) {
+    for (const auto of ["r-no-cross", "l-clockwise", "r-solo"]) {
       const t = trace(auto);
       const s = await fullMatch(auto);
       const want = fieldAtHandoff(t, s.sim);
@@ -104,6 +108,25 @@ describe("Full Match", () => {
           0,
         );
       expect(pollen, auto).toBe(40);
+      // And each alliance's NECTAR inside the walls (floor, FLOWERs and CELLs) once each: a HIVE
+      // that tipped back onto its starting CELL no longer holds the NECTAR staged there.
+      for (const [kind, list] of [
+        ["nectar_red", t.handoff.pieces.nectarRed],
+        ["nectar_blue", t.handoff.pieces.nectarBlue],
+      ] as const) {
+        const want = list.filter(
+          ([x, , z]) => Math.abs(x) < FIELD.half && Math.abs(z) < FIELD.half,
+        ).length;
+        const have =
+          [...s.sim.balls.values()].filter(
+            (b) => b.kind === kind && b.body.isEnabled(),
+          ).length +
+          s.sim.flowers.reduce(
+            (a, f) => a + f.stack.filter((k) => k === kind).length,
+            0,
+          );
+        expect(have, `${auto} ${kind}`).toBe(want);
+      }
     }
   }, 60000);
 
@@ -155,6 +178,7 @@ describe("the 2:00 drill opens on our R-Solo's hand-off, in our LOADING ZONE", (
     const t = trace("r-solo");
     const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
     s.openingAuto = t;
+    s.openingKind = "two";
     s.opensAfterAuto = true; // the R-Solo opening takes its place
     s.start();
     const red = s.sim.hives.red;
@@ -192,4 +216,63 @@ describe("the 2:00 drill opens on our R-Solo's hand-off, in our LOADING ZONE", (
     expect(r.openingAuto).toBe("r-solo");
     expect(r.auto).toBeUndefined();
   }, 60000);
+});
+
+describe("R-Solo's two openings: 2 TIPs and the CELL empty, or 1 TIP and 6 POLLEN in it", () => {
+  const pollenInPlay = (s: DrillSession) =>
+    [...s.sim.balls.values()].filter((b) => b.kind === "pollen").length +
+    s.sim.flowers.reduce(
+      (a, f) => a + f.stack.filter((k) => k === "pollen").length,
+      0,
+    ) +
+    s.sim.robots.reduce(
+      (a, r) => a + r.carried.filter((k) => k === "pollen").length,
+      0,
+    );
+  const open = async (kind: OpeningKind, seed: number) => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", seed);
+    s.openingAuto = trace("r-solo");
+    s.openingKind = kind;
+    s.start();
+    return s;
+  };
+
+  test("2 TIPs: the audience CELL raised and empty, all 40 POLLEN in play", async () => {
+    const s = await open("two", 1);
+    expect(s.openingTips).toBe(2);
+    expect(s.openingCell).toBe(0);
+    expect(s.sim.hives.red.upCell).toBe("audience");
+    expect(s.sim.cellCount("red")).toBe(0);
+    expect(pollenInPlay(s)).toBe(40);
+  }, 60000);
+
+  test("1 TIP: the rear CELL raised with 6 POLLEN, which stays short of the TIP; all 40 in play", async () => {
+    for (const seed of [1, 2, 3]) {
+      const s = await open("one", seed);
+      expect(s.openingTips).toBe(1);
+      expect(s.openingCell).toBe(ONE_TIP_CELL);
+      expect(s.sim.hives.red.upCell).toBe("rear");
+      expect(s.sim.hives.red.tips).toBe(1);
+      expect(s.sim.cellCount("red")).toBe(s.openingCell);
+      expect(pollenInPlay(s)).toBe(40);
+      expect(s.sim.view(0).robotInLoadingZone()).toBe(true);
+      // TeleOp starts: nobody adds to the CELL, so it does not TIP on its own.
+      s.advance(12);
+      expect(s.sim.hives.red.tips).toBe(1);
+      expect(s.tips).toHaveLength(0);
+      expect(s.totalTips).toBe(1);
+      const r = s.result("2026-11-23T00:00:00Z");
+      expect(r.openingTips).toBe(1);
+      expect(r.openingCell).toBe(s.openingCell);
+    }
+  }, 120000);
+
+  test("varied draws the 1-TIP opening about 2 runs in 3", async () => {
+    let one = 0;
+    const n = 12;
+    for (let seed = 1; seed <= n; seed++)
+      if ((await open("varied", seed)).openingTips === 1) one++;
+    expect(one).toBeGreaterThanOrEqual(5);
+    expect(one).toBeLessThanOrEqual(11);
+  }, 240000);
 });

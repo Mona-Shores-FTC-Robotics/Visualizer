@@ -210,9 +210,31 @@ export class AutoPlayback {
     // simulator staged them, and counted in the trace's pieces): seed only the rest.
     const seed = (a: "red" | "blue") => {
       const st = h.hives[a];
-      const racked = st.up === START_UP[a] ? STAGED_NECTAR : 0;
+      const racked = st.up === START_UP[a] && st.tips === 0 ? STAGED_NECTAR : 0;
       return Math.max(0, Math.min(12, st.raisedCellPieces - racked));
     };
+    const field = fieldAtHandoff(this.trace, this.sim);
+    // A HIVE that tipped twice (or 4 times) has its starting CELL raised again, but its staged NECTAR
+    // spilled at the first TIP and are among the trace's pieces. The replay never ran the physics,
+    // so the simulator still has them racked: raise the other CELL first, and the hand-off clears
+    // them with the floor.
+    const stale = (["red", "blue"] as const).filter(
+      (a) => h.hives[a].tips > 0 && h.hives[a].up === START_UP[a],
+    );
+    if (stale.length)
+      this.sim.handoff(
+        Object.fromEntries(
+          stale.map((a) => [
+            a,
+            {
+              up: h.hives[a].up === "rear" ? "audience" : "rear",
+              tips: h.hives[a].tips,
+            },
+          ]),
+        ),
+        1,
+        field,
+      );
     this.sim.handoff(
       {
         red: {
@@ -227,7 +249,7 @@ export class AutoPlayback {
         },
       },
       1,
-      fieldAtHandoff(this.trace, this.sim),
+      field,
     );
     this.handedOver = true;
   }

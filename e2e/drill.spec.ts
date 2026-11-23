@@ -44,6 +44,18 @@ async function open(
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.fulfill({ contentType: "application/json", body: CONTROLS }),
   );
+  // The 2:00 drill's opening, fixed so a run's TIPs can be counted: R-Solo's 2-TIP outcome, the
+  // audience CELL raised and empty (the page draws it otherwise).
+  await page.addInitScript(() => {
+    try {
+      const k = "biobuzz-drill-prefs";
+      const p = JSON.parse(localStorage.getItem(k) ?? "{}");
+      if (!p.opening)
+        localStorage.setItem(k, JSON.stringify({ ...p, opening: "two" }));
+    } catch {
+      /* no storage */
+    }
+  });
   await page.addInitScript((shape) => {
     const make = (index: number) => ({
       id: `DualSense Wireless Controller (test ${index + 1})`,
@@ -286,8 +298,10 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await page.evaluate(() =>
     (window as unknown as { __drill: Drill }).__drill.session.advance(125),
   );
+  await expect(page.locator("#tips")).toContainText("AUTO: 2 TIPs");
   await expect(page.locator("#results")).toBeVisible();
   await expect(page.locator("#results-card")).toContainText("of 7 TIPs");
+  await expect(page.locator("#results-card")).toContainText("AUTO: 2 TIPs");
   await expect(page.locator("#results-card")).toContainText("spin-up and aim");
   await expect(page.locator("#results-card")).toContainText("new best");
   await expect(page.locator("#history")).toContainText("Best: 3 TIPs");

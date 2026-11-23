@@ -31,6 +31,7 @@ import {
   type DrillMode,
   type OpponentSkill,
   type Population,
+  type OpeningKind,
   type RobotRunResult,
   type RunResult,
 } from "./session";
@@ -64,6 +65,7 @@ const prefs = (() => {
       humanPlayer?: string;
       match?: string;
       population?: string;
+      opening?: string;
     };
   } catch {
     return {};
@@ -81,6 +83,7 @@ function savePrefs() {
         humanPlayer: hpSel.value,
         match: matchSel.value,
         population: popSel.value,
+        opening: openSel.value,
       }),
     );
   } catch {
@@ -109,6 +112,8 @@ function population(): Population {
     skill: v === "random" ? "random" : (Number(v) as OpponentSkill),
   };
 }
+/** The 2:00 drill's opening: R-Solo's 2-TIP or 1-TIP outcome, or either one by turns. */
+const openSel = $<HTMLSelectElement>("opening");
 const traces = new Map<string, AutoTrace>();
 hpSel.innerHTML = HUMAN_PLAYERS.map(
   (t) => `<option value="${t.value}">${t.label}</option>`,
@@ -117,6 +122,8 @@ if (prefs.humanPlayer) hpSel.value = prefs.humanPlayer;
 if (prefs.team) teamSel.value = prefs.team;
 if (prefs.mode) modeSel.value = prefs.mode;
 if (prefs.camera) camSel.value = prefs.camera;
+if (prefs.opening) openSel.value = prefs.opening;
+if (!openSel.value) openSel.value = "varied";
 
 let file: ControlsFile;
 let session: DrillSession;
@@ -197,8 +204,10 @@ function newSession() {
     // The 2:00 drill opens on the field as our R-Solo leaves it, our robot in our LOADING ZONE
     // (the mentor, 23 Nov 2026); should its trace not load, after a 1-TIP Auto.
     const opening = traces.get(OPENING_AUTO);
-    if (opening) session.openingAuto = opening;
-    else session.opensAfterAuto = true;
+    if (opening) {
+      session.openingAuto = opening;
+      session.openingKind = openSel.value as OpeningKind;
+    } else session.opensAfterAuto = true;
   }
   $("start").textContent = session.playback
     ? "Start the match (Options)"
@@ -325,7 +334,7 @@ function showResults(r: RunResult) {
   $("results-card").innerHTML = `
     <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
-    ${r.openingTips ? `<p>${r.openingAuto ? `Opened on the field as ${esc(r.openingAuto)} leaves it, our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
+    ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
@@ -383,6 +392,14 @@ function humanPlayerBox() {
   return `<div class="readout-box"><div><b>Human player</b> <span class="dim">our playbook</span></div><div>NECTAR ${"●".repeat(v.left)}${"○".repeat(Math.max(0, 5 - v.left))}${v.owed ? ` · ${v.owed} may go in` : ""}</div><div class="dim">${esc(v.waiting) || "&nbsp;"}</div></div>`;
 }
 
+/** Which opening this run had, once it has started: "AUTO: 1 TIP, 6 in CELL" or "AUTO: 2 TIPs". */
+function openingLabel(): string {
+  if (session.playback || !session.openingAuto || session.phase === "pre")
+    return "";
+  const n = session.openingTips;
+  return `AUTO: ${n} TIP${n === 1 ? "" : "s"}${session.openingCell ? `, ${session.openingCell} in CELL` : ""}`;
+}
+
 function hud() {
   $("clock").innerHTML =
     `${clock(Math.ceil(session.remainingS))}<small>${PHASE_LABEL[session.phase]}${session.playback && session.phase !== "teleop" && session.phase !== "ended" ? ` · ${esc(session.playback.trace.auto)}` : ""}</small>`;
@@ -390,7 +407,7 @@ function hud() {
     ? session.totalTips - session.tips.length
     : 0;
   $("tips").innerHTML =
-    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""} · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
+    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""} · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
   const all = session.teleops.map((_, k) => k);
   $("robot").innerHTML = all.map(robotBox).join("");
   $("note").textContent = session.teleops
@@ -586,7 +603,7 @@ async function main() {
   $("reset").onclick = () => newSession();
   if (prefs.population) popSel.value = prefs.population;
   if (!popSel.value) popSel.value = "empty";
-  for (const sel of [teamSel, modeSel, tipSel, hpSel, popSel])
+  for (const sel of [teamSel, modeSel, tipSel, hpSel, popSel, openSel])
     sel.onchange = () => {
       savePrefs();
       padsKey = "";
