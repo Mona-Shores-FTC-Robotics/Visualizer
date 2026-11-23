@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_ROBOT, FIELD, HIVE } from '../src/sim/config';
+import { DEFAULT_ROBOT, FIELD, HIVE, TIP_LOAD } from '../src/sim/config';
 import { mecanumForces } from '../src/sim/drivetrain';
 import { cameraSightings, seesRaisedCell } from '../src/sim/camera';
 import { DT, NO_INPUT, Sim } from '../src/sim/world';
@@ -57,7 +57,11 @@ describe('shooting and HIVE TIP', () => {
     expect(zOk).toBeGreaterThan(0);
     s.robot.setTranslation({ x: HIVE.pivotX.red, y, z: zOk + 0.15 }, true);
     let shots = 0;
-    while (s.hives.red.tips === 0 && shots < 16) {
+    let waits = 0;
+    while (s.hives.red.tips === 0 && shots < 16 && waits < 40) {
+      // Mona Shores: hold fire once the CELL is at its tipping weight, as a driver would, and wait for the TIP: under
+      // UV/IR TIP timing the HIVE sits a few seconds before it swings (src/sim/tip-lag.ts).
+      if (s.cellLoad('red') >= TIP_LOAD.threshold) { run(s, 0.5); waits++; continue; }
       s.carried = ['pollen']; run(s, 0.05, { ...NO_INPUT, shootPollen: true }); run(s, 1.2); shots++;
     }
     console.log('shots to tip', shots, 'tips', s.hives.red.tips);
@@ -79,7 +83,11 @@ describe('shooting and HIVE TIP', () => {
     expect(scores(f).filter(Boolean).length).toBe(1);
     // A real launch with the robot facing the HIVE, where a fixed rear shooter would launch away from it, tips the HIVE.
     face(t, Math.PI / 2); face(f, Math.PI / 2); expect(f.previewShot('pollen').scores).toBe(false); let shots = 0;
-    while (t.hives.red.tips === 0 && shots < 16) { t.carried = ['pollen']; run(t, 0.05, { ...NO_INPUT, shootPollen: true }); run(t, 1.2); shots++; }
+    let waits = 0;
+    while (t.hives.red.tips === 0 && shots < 16 && waits < 40) {
+      if (t.cellLoad('red') >= TIP_LOAD.threshold) { run(t, 0.5); waits++; continue; } // hold fire and wait for the TIP (UV/IR timing)
+      t.carried = ['pollen']; run(t, 0.05, { ...NO_INPUT, shootPollen: true }); run(t, 1.2); shots++;
+    }
     expect(t.hives.red.tips).toBe(1); expect(shots).toBeLessThanOrEqual(6);
   });
   it('turns a limited turret at its slew rate and stops it at the end of its range', () => {
