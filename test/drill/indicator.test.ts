@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { ArcLight, Indicator, choose, colour } from "../../src/drill/indicator";
+import { Controls } from "../../src/drill/controls";
+import {
+  ArcLight,
+  INDICATOR_DEFAULTS,
+  Indicator,
+  choose,
+  colour,
+} from "../../src/drill/indicator";
 import { DrillSession } from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
 
@@ -115,4 +122,23 @@ describe("in the drill", () => {
     expect(s.teleop.status().arcTurning).toBe(true);
     expect(s.teleop.light.signal).toBe("ARC_TURN");
   }, 60000);
+});
+
+describe("the numbers: the export's indicator block, else master's", () => {
+  test("a file without the block uses FLASH_MS 250, ARC_TURN_PULSE_MS 400, CLEAR_MS 300; a file with it, its own", () => {
+    expect(new Controls(CONTROLS).indicator).toEqual(INDICATOR_DEFAULTS);
+    expect(INDICATOR_DEFAULTS).toEqual({
+      flashMs: 250,
+      arcTurnPulseMs: 400,
+      arcLightClearMs: 300,
+    });
+    const file = {
+      ...CONTROLS,
+      indicator: { flashMs: 100, arcTurnPulseMs: 0, arcLightClearMs: 300 },
+    };
+    const i = new Indicator(new Controls(file).indicator);
+    // ARC_TURN_PULSE_MS 0: no pulse.
+    expect(i.update(0, true, true, true, true, true)).toBe("FULL");
+    expect(colour("FIRING_OUTSIDE_ARC", 150, i.numbers.flashMs)).toBeNull();
+  });
 });
