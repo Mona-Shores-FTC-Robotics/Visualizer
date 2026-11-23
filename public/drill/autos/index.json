@@ -1,14 +1,14 @@
 {
- "source": "biobuzz master 1a344e6 (TeamCode/autos) and its sim-results branch",
+ "source": "biobuzz master ee32a74 (TeamCode/autos) and its sim-results branch",
  "autos": [
   {
    "auto": "l-clockwise",
    "alliance": "RED",
-   "design": "real robot, turret locked forward",
+   "design": "real robot",
    "seed": 1,
    "autoTips": 1,
-   "finishedAt": "2026-11-18T19:42:26.019236+00:00",
-   "commit": "7621f167de7827658f9e6966b893ba261ed9fa20"
+   "finishedAt": "2026-11-23T19:49:47.574027+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "l-left-under-hive",
@@ -16,35 +16,35 @@
    "design": "real robot",
    "seed": 19,
    "autoTips": 0,
-   "finishedAt": "2026-11-20T16:07:02.140864+00:00",
-   "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824"
+   "finishedAt": "2026-11-23T19:53:41.840210+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "l-no-cross",
    "alliance": "RED",
-   "design": "real robot, turret locked forward, POLLEN only",
+   "design": "real robot",
    "seed": 1,
    "autoTips": 1,
-   "finishedAt": "2026-11-22T20:57:10.467565+00:00",
-   "commit": "284f008ea5ff831c39230e44efa18a45260a8999"
+   "finishedAt": "2026-11-23T19:56:48.899063+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "r-clockwise",
    "alliance": "RED",
-   "design": "real robot, turret locked forward",
+   "design": "real robot",
    "seed": 1,
    "autoTips": 1,
-   "finishedAt": "2026-11-18T20:07:17.253735+00:00",
-   "commit": "7621f167de7827658f9e6966b893ba261ed9fa20"
+   "finishedAt": "2026-11-23T20:01:56.647177+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "r-left-under-hive",
    "alliance": "RED",
-   "design": "real robot, turret locked forward",
+   "design": "real robot",
    "seed": 10,
    "autoTips": 1,
-   "finishedAt": "2026-11-20T16:12:05.093702+00:00",
-   "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824"
+   "finishedAt": "2026-11-23T20:06:14.491618+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "r-no-cross",
@@ -52,17 +52,17 @@
    "design": "real robot",
    "seed": 5,
    "autoTips": 1,
-   "finishedAt": "2026-11-22T21:04:30.752561+00:00",
-   "commit": "284f008ea5ff831c39230e44efa18a45260a8999"
+   "finishedAt": "2026-11-23T20:09:42.514428+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   },
   {
    "auto": "r-solo",
    "alliance": "RED",
-   "design": "real robot, turret locked forward, POLLEN only",
-   "seed": 5,
+   "design": "real robot",
+   "seed": 4,
    "autoTips": 2,
-   "finishedAt": "2026-11-03T08:25:44.654250+00:00",
-   "commit": "c6533c88e6452801ac79afba077f29e0d14b5fee"
+   "finishedAt": "2026-11-23T20:12:42.626010+00:00",
+   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
   }
  ]
 }
