@@ -35,15 +35,25 @@ export const TIP_LAG = {
   atWeightSkew: 2.6,                          // low end + width * u^skew: median 3.9 s, a slow tail (biobuzz FieldSim)
   wellPastS: [2.2, 2.5] as [number, number],  // nine or more pieces (films)
   atWeightUpToPollen: 2.0, wellPastFromPollen: 2.5, // biobuzz FieldSim.AT_WEIGHT_UP_TO_POLLEN / WELL_PAST_FROM_POLLEN
-  // The upstream rocker's own swing, release to settled: about 1.45 s at weight and 1.4 s well past, fitted by the
-  // drill's timed match test (Visualizer test/drill/tipLag.test.ts) once the hold ran in step(). Upstream's docs quote
-  // 1.7 / 1.2 s from the load crossing, a different start. The hold is the drawn lag minus this swing and the flight.
-  upstreamSwingAtWeightS: 1.45, upstreamSwingWellPastS: 1.4,
+  // The upstream rocker's own swing once the hold lets go, release to settled, by how far past its tipping weight
+  // the CELL is (POLLEN weights): measured in this sim, 3 to 9 POLLEN dropped on the raised CELL's 3 NECTAR, the same on
+  // every seed (scripts and test/tip-lag.test.ts). Released from the hold's spring it swings faster than from its stop.
+  // Upstream's docs quote 1.7 / 1.2 s from the load crossing, a different start. The hold is the drawn lag minus this
+  // swing and the flight.
+  swingByPast: [[0.55, 1.90], [1.55, 1.35], [2.55, 1.13], [3.55, 1.01], [4.55, 0.94], [5.55, 0.895], [6.55, 0.85]] as [number, number][],
   // The films' lag starts when the last ball leaves the robot; the hold starts when the last piece lands in the CELL,
   // a launch's flight later. Measured by the drill's match test the same way (the drill chat, 23 Nov 2026: with the
   // swing above and no flight term, last ball out to settled ran 0.45 s short of the films at both loads).
   flightS: 0.45,
 };
+
+/** The rocker's swing, release to settled, for a CELL `past` POLLEN weights over its threshold (TIP_LAG.swingByPast). */
+export function swingS(past: number): number {
+  const rows = TIP_LAG.swingByPast;
+  if (past <= rows[0][0]) return rows[0][1];
+  for (let i = 1; i < rows.length; i++) if (past <= rows[i][0]) { const [x0, y0] = rows[i - 1], [x1, y1] = rows[i]; return y0 + ((past - x0) / (x1 - x0)) * (y1 - y0); }
+  return rows[rows.length - 1][1];
+}
 
 /** Draws, per HIVE, how long its loaded CELL stays on its stop after the last piece lands. Its own random stream. */
 export class TipLagHold {
@@ -55,8 +65,7 @@ export class TipLagHold {
     const t = TIP_LAG, at = t.atWeightS[0] + (t.atWeightS[1] - t.atWeightS[0]) * Math.pow(this.rng.next(), t.atWeightSkew);
     const well = t.wellPastS[0] + (t.wellPastS[1] - t.wellPastS[0]) * this.rng.next();
     const f = Math.min(1, Math.max(0, (past - t.atWeightUpToPollen) / (t.wellPastFromPollen - t.atWeightUpToPollen)));
-    const swing = t.upstreamSwingAtWeightS + f * (t.upstreamSwingWellPastS - t.upstreamSwingAtWeightS);
-    return Math.max(0, at + f * (well - at) - swing - t.flightS);
+    return Math.max(0, at + f * (well - at) - swingS(past) - t.flightS);
   }
 
   /** Call once per step with the raised CELL's piece count and load; returns whether the HIVE is held this step. */
