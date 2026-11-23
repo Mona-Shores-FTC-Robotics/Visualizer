@@ -152,33 +152,66 @@ describe("turret and fire", () => {
   });
 });
 
-describe("FLOWER pick and GARDEN gather", () => {
-  test("Cross held squares up to the FLOWER and picks for the logged time", async () => {
-    const s = await session(20245, "two", 7);
-    const f = s.sim.flowers.find((q) => q.id === "red")!;
-    place(s, f.x + 0.5, f.z, Math.PI);
-    const before = f.stack.length;
-    let t = 0;
-    while (s.teleop.status().routine?.includes("squaring") !== false && t < 4) {
-      s.advance(0.1, pad(["CROSS"]));
-      t += 0.1;
-      if (s.teleop.status().routine?.includes("picking")) break;
-    }
-    expect(s.teleop.status().routine).toContain("picking");
+describe("FLOWER pick and GARDEN gather: master's routines, run by the simulator", () => {
+  const hold = (s: DrillSession, input: "CROSS" | "TRIANGLE", max = 10) => {
+    const phases: string[] = [];
     const start = s.t;
-    while (s.teleop.status().routine && s.t - start < 8)
-      s.advance(0.1, pad(["CROSS"]));
-    expect(s.t - start).toBeCloseTo(PRESETS[20245].flowerPick.seconds, 0);
-    expect(before - f.stack.length).toBe(s.sim.carried.length);
-  });
+    s.advance(0.05, pad([input]));
+    while (s.teleop.status().routine && s.t - start < max) {
+      const ph = s.teleop.status().routine!.split(": ")[1];
+      if (phases.at(-1) !== ph) phases.push(ph);
+      s.advance(0.05, pad([input]));
+    }
+    return { t: s.t - start, phases };
+  };
 
-  test("a stick moved after the press hands the robot back", async () => {
+  test("Cross held: stages square to the FLOWER, pushes in, pulls POLLEN, backs out", async () => {
+    for (const team of [20245, 19429] as const) {
+      const s = await session(team, "two", 7);
+      const f = s.sim.flowers.find((q) => q.id === "red")!;
+      place(s, f.x + 1.0, f.z + 0.3, 0);
+      s.sim.carried = [];
+      const r = hold(s, "CROSS");
+      // The stick phase is a few frames: sampled every 0.05 s it can fall between samples.
+      expect(r.phases.filter((p) => p !== "stick")).toEqual([
+        "lineup",
+        "push",
+        "dwell",
+        "back",
+      ]);
+      expect(r.t).toBeLessThan(8);
+      expect(s.sim.carried.length).toBeGreaterThan(0);
+      expect(s.sim.robots[s.sim.me].stickDown).toBe(false);
+    }
+  }, 60000);
+
+  test("Triangle held: the GARDEN gather lifts three of the four POLLEN", async () => {
+    const s = await session(20245, "two", 1);
+    place(s, -1.0, 0.6, Math.PI / 2);
+    s.sim.carried = [];
+    const r = hold(s, "TRIANGLE", 12);
+    expect(r.phases[0]).toBe("lineup");
+    expect(r.phases).toContain("dwell");
+    expect(s.sim.carried.length).toBe(3);
+  }, 60000);
+
+  test("a stick moved after the press hands the robot back, stick up", async () => {
     const s = await session();
     const f = s.sim.flowers.find((q) => q.id === "red")!;
-    place(s, f.x + 0.5, f.z, Math.PI);
+    place(s, f.x + 1.0, f.z + 0.3, 0);
     s.advance(0.3, pad(["CROSS"]));
     expect(s.teleop.status().routine).not.toBeNull();
     s.advance(0.1, pad(["CROSS"], { lx: 0.8 }));
+    expect(s.teleop.status().routine).toBeNull();
+    expect(s.sim.robots[s.sim.me].stickDown).toBe(false);
+  });
+
+  test("letting go of Cross stops the pick", async () => {
+    const s = await session();
+    const f = s.sim.flowers.find((q) => q.id === "red")!;
+    place(s, f.x + 1.0, f.z + 0.3, 0);
+    s.advance(0.3, pad(["CROSS"]));
+    s.advance(0.1);
     expect(s.teleop.status().routine).toBeNull();
   });
 });
