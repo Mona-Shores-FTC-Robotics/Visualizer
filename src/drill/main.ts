@@ -29,6 +29,8 @@ import {
   type HumanPlayerKind,
   type TipTiming,
   type DrillMode,
+  type OpponentSkill,
+  type Population,
   type RobotRunResult,
   type RunResult,
 } from "./session";
@@ -61,6 +63,7 @@ const prefs = (() => {
       tipTiming?: string;
       humanPlayer?: string;
       match?: string;
+      population?: string;
     };
   } catch {
     return {};
@@ -77,6 +80,7 @@ function savePrefs() {
         tipTiming: tipSel.value,
         humanPlayer: hpSel.value,
         match: matchSel.value,
+        population: popSel.value,
       }),
     );
   } catch {
@@ -95,6 +99,16 @@ if (prefs.tipTiming) tipSel.value = prefs.tipTiming;
 const hpSel = $<HTMLSelectElement>("human-player");
 /** Full Match: "" for the 2:00 drill, else the Auto to play first (public/drill/autos/). */
 const matchSel = $<HTMLSelectElement>("match");
+/** Who else is on the field: empty, or a match (dead partner, two planner opponents). */
+const popSel = $<HTMLSelectElement>("population");
+function population(): Population {
+  const v = popSel.value;
+  if (v === "empty") return { kind: "empty" };
+  return {
+    kind: "match",
+    skill: v === "random" ? "random" : (Number(v) as OpponentSkill),
+  };
+}
 const traces = new Map<string, AutoTrace>();
 hpSel.innerHTML = HUMAN_PLAYERS.map(
   (t) => `<option value="${t.value}">${t.label}</option>`,
@@ -172,6 +186,7 @@ function newSession() {
     undefined,
     tipSel.value as TipTiming,
     hpSel.value as HumanPlayerKind,
+    population(),
   );
   const trace = traces.get(matchSel.value);
   if (matchSel.value && trace) session.playAuto(trace);
@@ -302,6 +317,7 @@ function showResults(r: RunResult) {
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
+    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
     ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
@@ -507,10 +523,18 @@ function frame(now: number) {
   }
   view.sync(
     session.sim,
-    session.teleops.map((t, k) => ({
-      team: session.slots[k].team,
-      turretDeg: t.turretDeg,
-    })),
+    // Ours (driven), our dead partner (our other robot), and the opponents (team 0: a blue box).
+    session.sim.robots.map((r, k) => {
+      const t = session.teleops[k];
+      if (t) return { team: session.slots[k].team, turretDeg: t.turretDeg };
+      return r.alliance === session.sim.alliance
+        ? {
+            team: session.slots[0].team === 20245 ? 19429 : 20245,
+            turretDeg: 0,
+            aim: false,
+          }
+        : { team: 0, turretDeg: 0, aim: false };
+    }),
     true,
   );
   hud();
@@ -548,7 +572,9 @@ async function main() {
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
-  for (const sel of [teamSel, modeSel, tipSel, hpSel])
+  if (prefs.population) popSel.value = prefs.population;
+  if (!popSel.value) popSel.value = "empty";
+  for (const sel of [teamSel, modeSel, tipSel, hpSel, popSel])
     sel.onchange = () => {
       savePrefs();
       padsKey = "";
