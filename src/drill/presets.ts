@@ -4,9 +4,6 @@
  * biobuzz code, or our Fruitport and Belding logs (read_logs.py `cycles`, `steps`, `legs` and the
  * drive series). The drill drives the same robot the simulator calibrates.
  *
- * `NOT_YET_IN_MODEL` holds the few drill values the file does not carry yet, each with its source.
- * They move into the file as the sim chat adds them.
- *
  * Everything a button does comes from the robot's own controls export instead
  * (`TeamCode/cheat-sheets/controls.json`, see ./controls.ts).
  */
@@ -44,33 +41,6 @@ export interface RobotPreset {
 /** `DriveSubsystem.turnAccelPerSec`: the turn command's limiter, per second. */
 const TURN_ACCEL_PER_S = 8;
 
-/**
- * Drill values mona-shores.json does not carry yet. From the same logs (events/2026-11-fruitport
- * and -belding, 104 logs of 19429 and 95 of 20245).
- */
-const NOT_YET_IN_MODEL: Record<
-  TeamNumber,
-  {
-    gardenYield: number[];
-    gateToLastOfFourS: number;
-    gateOpenAfterLastS: number;
-  }
-> = {
-  // GardenGather cards (steps): 19429 8 gathers brought 0: 5, 1: 3; 20245 3 gathers brought 1, 2 and 3.
-  // Gate to the last of four (steps, four-ball volleys): 19429 2.04 s (n=14); 20245 2.08 s (n=36).
-  // Gate open after the last ball: the TeleOp four-ball feed (cycles) less that: 19429 3.00 s, 20245 2.50 s.
-  19429: {
-    gardenYield: [5, 3],
-    gateToLastOfFourS: 2.04,
-    gateOpenAfterLastS: 0.96,
-  },
-  20245: {
-    gardenYield: [0, 1, 1, 1],
-    gateToLastOfFourS: 2.08,
-    gateOpenAfterLastS: 0.42,
-  },
-};
-
 /** Counts by value from the file's `{ "0": n, "1": n, ... }`. */
 function counts(byValue: Record<string, number>): number[] {
   const out: number[] = [];
@@ -82,8 +52,7 @@ const mid = (r: number[]) => (r[0] + r[1]) / 2;
 
 function preset(team: TeamNumber): RobotPreset {
   const s = model.shared,
-    r = model.robots[String(team) as "19429" | "20245"],
-    extra = NOT_YET_IN_MODEL[team];
+    r = model.robots[String(team) as "19429" | "20245"];
   return {
     team,
     name: r.name,
@@ -100,13 +69,13 @@ function preset(team: TeamNumber): RobotPreset {
     },
     gardenGather: {
       seconds: r.gardenGather.cardS.value,
-      yield: extra.gardenYield,
+      yield: counts(r.gardenGather.piecesPerGather.value),
     },
     spinUpFromIdleS: r.firePressToGateS.value,
     spinUpWhenSpunS: r.autoGateWaitS.value,
     gateToFirstBallS: mid(s.launch.gateToFirstBallS.value),
-    gateToLastOfFourS: extra.gateToLastOfFourS,
-    gateOpenAfterLastS: extra.gateOpenAfterLastS,
+    gateToLastOfFourS: r.gateToFourthBallS.value,
+    gateOpenAfterLastS: r.teleopGateOpenAfterLastBallS.value,
     enforceFiringArc: r.enforceFiringArcTeleOp.value,
     sources: [
       "sim/src/sim/robots/mona-shores.json (each value's source is in the file)",
