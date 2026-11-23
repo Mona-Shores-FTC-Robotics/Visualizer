@@ -6,8 +6,13 @@ import {
   fieldAtHandoff,
   type AutoTrace,
 } from "../../src/drill/fullMatch";
+import { FIELD, TIP_LOAD } from "../../sim/src/sim/config";
 import { toPedro } from "../../src/drill/launchSpot";
-import { DrillSession } from "../../src/drill/session";
+import {
+  DrillSession,
+  ONE_TIP_CELL,
+  type OpeningKind,
+} from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
 
 // Full Match: one of our Autos replayed from its AutoSim trace, then TeleOp from where it ended.
@@ -71,7 +76,7 @@ describe("Full Match", () => {
   }, 60000);
 
   test("the field's pieces go where the Auto left them: each FLOWER's stack and the floor", async () => {
-    for (const auto of ["r-no-cross", "l-clockwise"]) {
+    for (const auto of ["r-no-cross", "l-clockwise", "r-solo"]) {
       const t = trace(auto);
       const s = await fullMatch(auto);
       const want = fieldAtHandoff(t, s.sim);
@@ -103,6 +108,25 @@ describe("Full Match", () => {
           0,
         );
       expect(pollen, auto).toBe(40);
+      // And each alliance's NECTAR inside the walls (floor, FLOWERs and CELLs) once each: a HIVE
+      // that tipped back onto its starting CELL no longer holds the NECTAR staged there.
+      for (const [kind, list] of [
+        ["nectar_red", t.handoff.pieces.nectarRed],
+        ["nectar_blue", t.handoff.pieces.nectarBlue],
+      ] as const) {
+        const want = list.filter(
+          ([x, , z]) => Math.abs(x) < FIELD.half && Math.abs(z) < FIELD.half,
+        ).length;
+        const have =
+          [...s.sim.balls.values()].filter(
+            (b) => b.kind === kind && b.body.isEnabled(),
+          ).length +
+          s.sim.flowers.reduce(
+            (a, f) => a + f.stack.filter((k) => k === kind).length,
+            0,
+          );
+        expect(have, `${auto} ${kind}`).toBe(want);
+      }
     }
   }, 60000);
 
@@ -146,5 +170,181 @@ describe("the 2:00 drill opens after a 1-TIP Auto", () => {
     const r = s.result("2026-11-23T00:00:00Z");
     expect(r.openingTips).toBe(1);
     expect(r.auto).toBeUndefined();
+  }, 60000);
+});
+
+describe("the 2:00 drill opens on our R-Solo's hand-off, in our LOADING ZONE", () => {
+  test("the field as R-Solo leaves it, its TIPs the AUTO's, and our robot wholly in the zone along the wall", async () => {
+    const t = trace("r-solo");
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    s.openingAuto = t;
+    s.openingKind = "two";
+    s.opensAfterAuto = true; // the R-Solo opening takes its place
+    s.start();
+    const red = s.sim.hives.red;
+    expect(s.openingTips).toBe(t.autoTips);
+    expect(red.tips).toBe(t.handoff.hives.red.tips);
+    expect(red.upCell).toBe(t.handoff.hives.red.up);
+    expect(s.sim.hives.blue.upCell).toBe(t.handoff.hives.blue.up);
+    expect(s.remainingS).toBe(120);
+    expect(s.tips).toHaveLength(0);
+    expect(s.totalTips).toBe(t.autoTips);
+    // In the LOADING ZONE (PARK's test), and the whole chassis inside it along the wall.
+    const v = s.sim.view(0);
+    expect(v.robotInLoadingZone()).toBe(true);
+    const [x0, x1, z0, z1] = FIELD.loadingZone.red;
+    const hl = v.cfg.length / 2,
+      hw = v.cfg.width / 2;
+    for (const [f, l] of [
+      [-hl, -hw],
+      [-hl, hw],
+    ] as const) {
+      const c = v.toWorld(f, l);
+      expect(c.x).toBeGreaterThanOrEqual(-FIELD.half);
+      expect(c.x).toBeLessThanOrEqual(x1);
+      expect(c.z).toBeGreaterThanOrEqual(z0);
+      expect(c.z).toBeLessThanOrEqual(z1);
+    }
+    expect(x0).toBe(-FIELD.half);
+    // Facing the field, and still there once TeleOp runs (nothing under it pushed it off).
+    s.advance(2);
+    expect(v.robotInLoadingZone()).toBe(true);
+    expect(Math.cos(v.heading)).toBeGreaterThan(0.99);
+    s.advance(120);
+    const r = s.result("2026-11-23T00:00:00Z");
+    expect(r.openingTips).toBe(t.autoTips);
+    expect(r.openingAuto).toBe("r-solo");
+    expect(r.auto).toBeUndefined();
+  }, 60000);
+});
+
+describe("R-Solo's two openings: 2 TIPs and the CELL empty, or 1 TIP and 6 POLLEN in it", () => {
+  const pollenInPlay = (s: DrillSession) =>
+    [...s.sim.balls.values()].filter((b) => b.kind === "pollen").length +
+    s.sim.flowers.reduce(
+      (a, f) => a + f.stack.filter((k) => k === "pollen").length,
+      0,
+    ) +
+    s.sim.robots.reduce(
+      (a, r) => a + r.carried.filter((k) => k === "pollen").length,
+      0,
+    );
+  const open = async (kind: OpeningKind, seed: number) => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", seed);
+    s.openingAuto = trace("r-solo");
+    s.openingKind = kind;
+    s.start();
+    return s;
+  };
+
+  test("2 TIPs: the audience CELL raised and empty, all 40 POLLEN in play", async () => {
+    const s = await open("two", 1);
+    expect(s.openingTips).toBe(2);
+    expect(s.openingCell).toBe(0);
+    expect(s.sim.hives.red.upCell).toBe("audience");
+    expect(s.sim.cellCount("red")).toBe(0);
+    expect(pollenInPlay(s)).toBe(40);
+  }, 60000);
+
+  test("1 TIP: the rear CELL raised with 6 POLLEN, which stays short of the TIP; all 40 in play", async () => {
+    for (const seed of [1, 2, 3]) {
+      const s = await open("one", seed);
+      expect(s.openingTips).toBe(1);
+      expect(s.openingCell).toBe(ONE_TIP_CELL);
+      expect(s.sim.hives.red.upCell).toBe("rear");
+      expect(s.sim.hives.red.tips).toBe(1);
+      expect(s.sim.cellCount("red")).toBe(s.openingCell);
+      expect(pollenInPlay(s)).toBe(40);
+      expect(s.sim.view(0).robotInLoadingZone()).toBe(true);
+      // TeleOp starts: nobody adds to the CELL, so it does not TIP on its own.
+      s.advance(12);
+      expect(s.sim.hives.red.tips).toBe(1);
+      expect(s.tips).toHaveLength(0);
+      expect(s.totalTips).toBe(1);
+      const r = s.result("2026-11-23T00:00:00Z");
+      expect(r.openingTips).toBe(1);
+      expect(r.openingCell).toBe(s.openingCell);
+    }
+  }, 120000);
+
+  test("varied draws the 1-TIP opening about 2 runs in 3", async () => {
+    let one = 0;
+    const n = 12;
+    for (let seed = 1; seed <= n; seed++)
+      if ((await open("varied", seed)).openingTips === 1) one++;
+    expect(one).toBeGreaterThanOrEqual(5);
+    expect(one).toBeLessThanOrEqual(11);
+  }, 240000);
+});
+
+describe("the AUTO replay shows the pieces: the volleys fly and fill our CELL", () => {
+  const autos = (
+    JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, "../../public/drill/autos/index.json"),
+        "utf8",
+      ),
+    ) as { autos: { auto: string }[] }
+  ).autos.map((a) => a.auto);
+
+  test.each(autos)(
+    "%s",
+    async (auto) => {
+      const t = trace(auto);
+      const s = await fullMatch(auto);
+      const hive = s.sim.hives.red.body.translation();
+      const inHive = (q: { x: number; y: number; z: number }) =>
+        q.y > 0.5 && Math.hypot(q.x - hive.x, q.z - hive.z) < 0.6;
+      const onFlower = (q: { x: number; z: number }) =>
+        s.sim.flowers.some((f) => Math.hypot(f.x - q.x, f.z - q.z) < 0.15);
+      let flying = 0,
+        mostInHive = 0;
+      const inHiveAt = new Map<number, number>();
+      const want = (t.tipsAt ?? []).map((x) => Math.round((x - 0.2) * 10) / 10);
+      expect(s.replayPieces?.length ?? 0, auto).toBeGreaterThan(30);
+      for (let k = 1; k <= HANDOFF_S * 10 - 1; k++) {
+        s.advance(0.1);
+        const ps = s.replayPieces!;
+        const pollen = ps.filter((q) => q.kind === "pollen");
+        const n = pollen.filter(inHive).length;
+        mostInHive = Math.max(mostInHive, n);
+        // The load the TIP weighs, in POLLEN equivalents (TIP_LOAD): our NECTAR counts 1.65 each.
+        const load =
+          n +
+          TIP_LOAD.nectar *
+            ps.filter((q) => q.kind === "nectar_red" && inHive(q)).length;
+        if (pollen.some((q) => q.y > 0.3 && !inHive(q) && !onFlower(q)))
+          flying++;
+        for (const w of want)
+          if (Math.abs(k / 10 - w) < 0.05) inHiveAt.set(w, load);
+      }
+      // A volley flies (some POLLEN up in the air, off the HIVE and the FLOWERs) and lands in our HIVE.
+      expect(flying, `${auto}: frames with POLLEN in flight`).toBeGreaterThan(
+        0,
+      );
+      expect(mostInHive, `${auto}: POLLEN in our HIVE`).toBeGreaterThanOrEqual(
+        t.scored ? 1 : 0,
+      );
+      // Just before each TIP, our HIVE holds the load that tips it: the TIP weight (7.4), less a
+      // POLLEN or so still on its way in.
+      for (const w of want)
+        expect(
+          inHiveAt.get(w),
+          `${auto}: load in our HIVE at ${w} s`,
+        ).toBeGreaterThanOrEqual(TIP_LOAD.threshold - 1.5);
+      // At 2:00 the replay's pieces give way to the simulator's.
+      s.advance(0.2);
+      expect(s.replayPieces).toBeNull();
+    },
+    60000,
+  );
+
+  test("a trace without the pieces draws none (the view falls back to the simulator's)", async () => {
+    const t = { ...trace("r-solo"), pieceFrames: undefined };
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    s.playAuto(t);
+    s.start();
+    s.advance(5);
+    expect(s.replayPieces).toEqual([]);
   }, 60000);
 });

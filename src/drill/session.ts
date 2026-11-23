@@ -19,7 +19,14 @@ import {
   robotConfig,
   sanitize,
 } from "../../sim/src/setup";
-import { AutoPlayback, type AutoTrace } from "./fullMatch";
+import {
+  AutoPlayback,
+  HANDOFF_S,
+  fieldAtHandoff,
+  loadingZonePose,
+  placeRobot,
+  type AutoTrace,
+} from "./fullMatch";
 import {
   HUMAN_PLAYERS,
   PlaybookHumanPlayer,
@@ -110,8 +117,12 @@ export interface RunResult {
   goalAtS: number | null;
   /** A match population: the opponents' skill this match, and their TIPs. */
   opponents?: { skill: OpponentSkill; tips: number };
-  /** The 2:00 drill opened after a 1-TIP Auto: the AUTO TIPs it started with (opensAfterAuto). */
+  /** The 2:00 drill opened after an Auto: the AUTO TIPs it started with (openingAuto, opensAfterAuto). */
   openingTips?: number;
+  /** The Auto whose hand-off the 2:00 drill opened on (openingAuto), absent for the generic opening. */
+  openingAuto?: string;
+  /** POLLEN in our raised CELL at the opening (the 1-TIP opening's ONE_TIP_CELL), with openingAuto. */
+  openingCell?: number;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
   auto?: { name: string; tips: number; design: string | null; seed: number };
   robots: RobotRunResult[];
@@ -134,6 +145,20 @@ export function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** R-Solo's opening: varied, or always its 2-TIP or its 1-TIP outcome (DrillSession.openingKind). */
+export type OpeningKind = "varied" | "two" | "one";
+/**
+ * How often the varied opening is the 1-TIP one: 2 to 1, as the mentor finds it on the field. The
+ * AutoSim's real-robot runs of R-Solo (sim-results, 23 Nov 2026) are more hopeful: 1 of 10 seeds.
+ */
+export const ONE_TIP_SHARE = 2 / 3;
+/**
+ * POLLEN in the raised CELL after the 1-TIP opening. The mentor finds 6 or 7 typical; in the
+ * simulator 7 tips the CELL within a second (the TIP weight of 7.4 is a median, and the HIVE's
+ * tip lag spreads around it), so 6: the most that waits for TeleOp's first volley.
+ */
+export const ONE_TIP_CELL = 6;
 
 export class DrillSession {
   readonly sim: Sim;
@@ -286,6 +311,13 @@ export class DrillSession {
     return this.started ? Math.max(0, this.sim.clock) : TELEOP_S;
   }
 
+  /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
+  get replayPieces(): ReturnType<AutoPlayback["pieces"]> | null {
+    return this.playback && !this.playback.handedOver
+      ? this.playback.pieces()
+      : null;
+  }
+
   /** Which part of the match is running: the AUTO and transition only in a full match. */
   get phase(): "pre" | "auto" | "transition" | "teleop" | "ended" {
     if (this.finished) return "ended";
@@ -319,6 +351,22 @@ export class DrillSession {
    * default; the page turns it on. Ignored in a full match, whose AUTO is the trace's.
    */
   opensAfterAuto = false;
+  /**
+   * The 2:00 drill opens on the field as this Auto's trace hands it over (the mentor, 23 Nov 2026:
+   * our R-Solo): both HIVEs with the AUTO's TIPs, the loose pieces and the FLOWERs, with no
+   * replay; then our robot moves into our LOADING ZONE to start TeleOp. The trace's TIPs count as
+   * AUTO TIPs. Takes the place of opensAfterAuto; ignored in a full match.
+   */
+  openingAuto: AutoTrace | null = null;
+  /**
+   * Which of R-Solo's outcomes the opening is (the mentor, 23 Nov 2026): "two" is its best case,
+   * 2 TIPs and the raised CELL empty; "one" is 1 TIP with ONE_TIP_CELL POLLEN in the raised CELL,
+   * short of the second, which the mentor finds typical on the field; "varied" draws one each run,
+   * "one" ONE_TIP_SHARE of the time.
+   */
+  openingKind: OpeningKind = "varied";
+  /** POLLEN in our raised CELL at the opening: 0 after the 2-TIP opening, ONE_TIP_CELL after the 1-TIP. */
+  openingCell = 0;
   /** The AUTO TIPs the 2:00 drill opened with (opensAfterAuto). */
   openingTips = 0;
 
@@ -326,9 +374,65 @@ export class DrillSession {
     if (this.started) return;
     this.started = true;
     if (this.playback) return; // TeleOp starts at the hand-off
-    if (this.opensAfterAuto) this.openAfterAuto();
+    if (this.openingAuto) this.openOnAuto(this.openingAuto);
+    else if (this.opensAfterAuto) this.openAfterAuto();
     this.sim.start();
     for (const r of this.readouts) r.start(0);
+  }
+
+  private openOnAuto(trace: AutoTrace) {
+    new AutoPlayback(trace, this.sim, 0).advance(HANDOFF_S);
+    const one =
+      this.openingKind === "one" ||
+      (this.openingKind === "varied" && this.rand() < ONE_TIP_SHARE);
+    if (one && this.sim.hives[this.sim.alliance].tips >= 1)
+      this.shortOfLastTip(trace, ONE_TIP_CELL);
+    placeRobot(
+      this.sim,
+      0,
+      loadingZonePose(this.sim.alliance, this.sim.view(0).cfg.length),
+    );
+    this.openingTips = this.sim.hives[this.sim.alliance].tips;
+  }
+
+  /**
+   * The 1-TIP opening from a trace's hand-off: its last TIP not reached. The HIVE goes back to the
+   * CELL it had raised before that TIP, with `n` POLLEN in it (under the TIP weight), and those `n`
+   * come off the floor: the ones nearest our HIVE, where that TIP spilled them. Every POLLEN stays
+   * accounted for.
+   */
+  private shortOfLastTip(trace: AutoTrace, n: number) {
+    const a = this.sim.alliance,
+      hive = this.sim.hives[a];
+    const field = fieldAtHandoff(trace, this.sim);
+    const c = hive.body.translation();
+    const taken = new Set(
+      field.pieces
+        .map((q, i) => ({ q, i }))
+        .filter((o) => o.q.kind === "pollen")
+        .sort(
+          (x, y) =>
+            Math.hypot(x.q.x - c.x, x.q.z - c.z) -
+            Math.hypot(y.q.x - c.x, y.q.z - c.z),
+        )
+        .slice(0, n)
+        .map((o) => o.i),
+    );
+    this.sim.handoff(
+      {
+        [a]: {
+          up: hive.upCell === "audience" ? "rear" : "audience",
+          tips: hive.tips - 1,
+          cellPollen: taken.size,
+        },
+      },
+      1,
+      {
+        pieces: field.pieces.filter((_, i) => !taken.has(i)),
+        flowers: field.flowers,
+      },
+    );
+    this.openingCell = taken.size;
   }
 
   private openAfterAuto() {
@@ -479,6 +583,9 @@ export class DrillSession {
         : {}),
       ...(!this.playback && this.openingTips
         ? { openingTips: this.openingTips }
+        : {}),
+      ...(!this.playback && this.openingAuto
+        ? { openingAuto: this.openingAuto.auto, openingCell: this.openingCell }
         : {}),
       ...(this.playback
         ? {

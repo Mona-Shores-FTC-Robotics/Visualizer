@@ -43,6 +43,12 @@ export interface AutoTrace {
   /** t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips. */
   columns: string[];
   frames: number[][];
+  /**
+   * Every game piece on the field each frame (not those in a robot), so the replay shows the
+   * volleys and the CELLs filling: per kind, per frame, X, height, Z flattened, in centimetres in
+   * the simulator's frame. Older traces have none.
+   */
+  pieceFrames?: Record<"pollen" | "nectarRed" | "nectarBlue", number[][]>;
   handoff: {
     pose: { x: number; y: number; headingDeg: number };
     held: number;
@@ -86,6 +92,41 @@ export async function loadAutoTrace(
 const rad = (d: number) => (d * Math.PI) / 180;
 
 /**
+ * Where TeleOp starts the robot in its alliance's LOADING ZONE: the zone from the field CAD's
+ * gaffer-tape box (FIELD.loadingZone, sim/src/sim/config.ts), centred along it, the robot's back
+ * 2 cm off our wall and facing the field. PARK needs only part of the robot in the zone (section
+ * 10.5.4); this puts the whole chassis inside it along the wall.
+ */
+export function loadingZonePose(
+  alliance: "red" | "blue",
+  robotLength: number,
+): { x: number; z: number; h: number } {
+  const [, , z0, z1] = FIELD.loadingZone[alliance];
+  const s = alliance === "red" ? -1 : 1;
+  return {
+    x: s * (FIELD.half - robotLength / 2 - 0.02),
+    z: (z0 + z1) / 2,
+    h: alliance === "red" ? 0 : Math.PI,
+  };
+}
+
+/** Puts robot `k` at `p` (sim X, Z, heading), at rest. */
+export function placeRobot(
+  sim: Sim,
+  k: number,
+  p: { x: number; z: number; h: number },
+): void {
+  const b = sim.view(k).robot;
+  b.setTranslation({ x: p.x, y: b.translation().y, z: p.z }, true);
+  b.setRotation(
+    { x: 0, y: Math.sin(p.h / 2), z: 0, w: Math.cos(p.h / 2) },
+    true,
+  );
+  b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  b.setAngvel({ x: 0, y: 0, z: 0 }, true);
+}
+
+/**
  * Replays an AUTO trace onto robot `k` of the simulator, and hands over at 38 s. The physics does not
  * step during the replay: the robot and the HIVEs are posed from the trace each frame.
  */
@@ -114,6 +155,38 @@ export class AutoPlayback {
   /** Our HIVE's TIPs so far in the replay. */
   get tipsSoFar(): number {
     return this.frame(this.t)[6] ?? 0;
+  }
+
+  /**
+   * The trace's pieces at the replay's time, for the view to draw in place of the simulator's
+   * (which stand still until the hand-off): between two frames with the same pieces, part way.
+   */
+  pieces(): { kind: BallKind; x: number; y: number; z: number }[] {
+    const pf = this.trace.pieceFrames;
+    if (!pf) return [];
+    const n = this.trace.frames.length;
+    const u = Math.max(0, Math.min(n - 1, this.t * 10));
+    const i = Math.min(n - 1, Math.floor(u + 1e-6)),
+      j = Math.min(n - 1, i + 1),
+      w = u - i;
+    const out: { kind: BallKind; x: number; y: number; z: number }[] = [];
+    for (const [key, kind] of [
+      ["pollen", "pollen"],
+      ["nectarRed", "nectar_red"],
+      ["nectarBlue", "nectar_blue"],
+    ] as const) {
+      const a = pf[key][i] ?? [],
+        b = pf[key][j] ?? [];
+      const mix = a.length === b.length ? w : 0;
+      for (let k = 0; k + 2 < a.length; k += 3)
+        out.push({
+          kind,
+          x: (a[k] + (b[k] - a[k]) * mix) / 100,
+          y: (a[k + 1] + (b[k + 1] - a[k + 1]) * mix) / 100,
+          z: (a[k + 2] + (b[k + 2] - a[k + 2]) * mix) / 100,
+        });
+    }
+    return out;
   }
 
   /** Advances the replay; true once it has handed over. */
@@ -175,9 +248,31 @@ export class AutoPlayback {
     // simulator staged them, and counted in the trace's pieces): seed only the rest.
     const seed = (a: "red" | "blue") => {
       const st = h.hives[a];
-      const racked = st.up === START_UP[a] ? STAGED_NECTAR : 0;
+      const racked = st.up === START_UP[a] && st.tips === 0 ? STAGED_NECTAR : 0;
       return Math.max(0, Math.min(12, st.raisedCellPieces - racked));
     };
+    const field = fieldAtHandoff(this.trace, this.sim);
+    // A HIVE that tipped twice (or 4 times) has its starting CELL raised again, but its staged NECTAR
+    // spilled at the first TIP and are among the trace's pieces. The replay never ran the physics,
+    // so the simulator still has them racked: raise the other CELL first, and the hand-off clears
+    // them with the floor.
+    const stale = (["red", "blue"] as const).filter(
+      (a) => h.hives[a].tips > 0 && h.hives[a].up === START_UP[a],
+    );
+    if (stale.length)
+      this.sim.handoff(
+        Object.fromEntries(
+          stale.map((a) => [
+            a,
+            {
+              up: h.hives[a].up === "rear" ? "audience" : "rear",
+              tips: h.hives[a].tips,
+            },
+          ]),
+        ),
+        1,
+        field,
+      );
     this.sim.handoff(
       {
         red: {
@@ -192,7 +287,7 @@ export class AutoPlayback {
         },
       },
       1,
-      fieldAtHandoff(this.trace, this.sim),
+      field,
     );
     this.handedOver = true;
   }
