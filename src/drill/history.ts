@@ -2,7 +2,7 @@
  * Past runs, kept in this browser's localStorage: each driver's laptop keeps its own. Every read
  * and write is guarded, so a private window or blocked storage only loses the history.
  */
-import type { DrillMode, RunResult } from "./session";
+import type { DrillMode, RunResult, TipTiming } from "./session";
 
 export const HISTORY_KEY = "biobuzz-drill-history-v1";
 const KEEP = 200;
@@ -12,6 +12,8 @@ export interface StoredRun {
   team: number;
   teams?: number[];
   mode: DrillMode;
+  /** Missing on runs from before the switch: those ran our timing. */
+  tipTiming?: TipTiming;
   date: string;
   tips: number;
   goalAtS: number | null;
@@ -29,6 +31,7 @@ export function summarize(r: RunResult): StoredRun {
     team: r.team,
     teams: r.robots.map((x) => x.team),
     mode: r.mode,
+    tipTiming: r.tipTiming,
     date: r.date,
     tips: r.tips,
     goalAtS: r.goalAtS,
@@ -78,9 +81,13 @@ export function bestRun(
   list: StoredRun[],
   team: number,
   mode?: string,
+  tipTiming?: TipTiming,
 ): StoredRun | null {
   const mine = list.filter(
-    (r) => r.team === team && (!mode || r.mode === mode),
+    (r) =>
+      r.team === team &&
+      (!mode || r.mode === mode) &&
+      (!tipTiming || (r.tipTiming ?? "uv-ir") === tipTiming),
   );
   return mine.length ? [...mine].sort(compareRuns)[0] : null;
 }

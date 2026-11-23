@@ -30,6 +30,18 @@ export interface TipRecord {
 
 export type DrillMode = "two" | "driver" | "alliance";
 
+/**
+ * Which TIP timing the HIVE runs (mentor, 23 Nov 2026: ours is not assumed right, so theirs stays
+ * selectable). "uv-ir": our films and logs, a CELL over its weight dwells before it swings
+ * (presets.TIP_DWELL). "ncssm": the simulator's own rocker, which swings with no wait. The
+ * labels are sim/src/sim/tip-lag.ts's `TIP_TIMINGS`.
+ */
+export type TipTiming = "uv-ir" | "ncssm";
+export const TIP_TIMINGS: { value: TipTiming; label: string }[] = [
+  { value: "uv-ir", label: "UV/IR TIP timing" },
+  { value: "ncssm", label: "NCSSM TIP timing" },
+];
+
 /** One robot in a drill: whose numbers it runs, and whether it has an operator. */
 export interface RobotSlot {
   team: TeamNumber;
@@ -54,6 +66,7 @@ export interface RunResult {
   /** Robot 1's team (gamepad 1); in an alliance drill every robot is in `robots`. */
   team: TeamNumber;
   mode: DrillMode;
+  tipTiming: TipTiming;
   date: string;
   tips: number;
   goal: number;
@@ -114,6 +127,7 @@ export class DrillSession {
     team: TeamNumber | RobotSlot[],
     public mode: DrillMode,
     seed = Date.now() & 0xffff,
+    public tipTiming: TipTiming = "uv-ir",
   ) {
     this.slots = Array.isArray(team)
       ? team
@@ -255,8 +269,9 @@ export class DrillSession {
       this.dwellFrom = this.sim.simTime;
     this.dwellCount = count;
     hive.held =
+      this.tipTiming === "uv-ir" &&
       this.sim.simTime - this.dwellFrom <
-      tipDwellS(pastTippingPollen(this.sim), this.dwellDraw);
+        tipDwellS(pastTippingPollen(this.sim), this.dwellDraw);
   }
 
   private onTip(): void {
@@ -284,6 +299,7 @@ export class DrillSession {
     return {
       team: this.team,
       mode: this.mode,
+      tipTiming: this.tipTiming,
       date,
       tips: this.tips.length,
       goal: GOAL_TIPS,

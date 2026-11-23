@@ -25,6 +25,8 @@ import {
   DrillSession,
   GOAL_TIPS,
   TEAM_NAMES,
+  TIP_TIMINGS,
+  type TipTiming,
   type DrillMode,
   type RobotRunResult,
   type RunResult,
@@ -48,6 +50,7 @@ const prefs = (() => {
       team?: string;
       mode?: string;
       camera?: string;
+      tipTiming?: string;
     };
   } catch {
     return {};
@@ -61,6 +64,7 @@ function savePrefs() {
         team: teamSel.value,
         mode: modeSel.value,
         camera: camSel.value,
+        tipTiming: tipSel.value,
       }),
     );
   } catch {
@@ -71,6 +75,11 @@ function savePrefs() {
 const teamSel = $<HTMLSelectElement>("team");
 const modeSel = $<HTMLSelectElement>("mode");
 const camSel = $<HTMLSelectElement>("camera");
+const tipSel = $<HTMLSelectElement>("tip-timing");
+tipSel.innerHTML = TIP_TIMINGS.map(
+  (t) => `<option value="${t.value}">${t.label}</option>`,
+).join("");
+if (prefs.tipTiming) tipSel.value = prefs.tipTiming;
 if (prefs.team) teamSel.value = prefs.team;
 if (prefs.mode) modeSel.value = prefs.mode;
 if (prefs.camera) camSel.value = prefs.camera;
@@ -104,6 +113,8 @@ function newSession() {
       ? teams().map((team) => ({ team, driverOnly: true }))
       : (Number(teamSel.value) as TeamNumber),
     mode,
+    undefined,
+    tipSel.value as TipTiming,
   );
   saved = false;
   $("results").hidden = true;
@@ -163,7 +174,10 @@ function showHistory(list: StoredRun[] = loadHistory()) {
     .filter((r) => r.team === team && (r.mode === "alliance") === ally)
     .slice(-8)
     .reverse();
-  const best = ally ? bestRun(list, team, "alliance") : bestRun(mine, team);
+  const timing = tipSel.value as TipTiming;
+  const best = ally
+    ? bestRun(list, team, "alliance", timing)
+    : bestRun(mine, team, undefined, timing);
   if (!mine.length) {
     $("history").textContent = ally
       ? "No alliance runs on this laptop yet."
@@ -172,7 +186,7 @@ function showHistory(list: StoredRun[] = loadHistory()) {
   }
   $("history").innerHTML =
     (best
-      ? `<p>Best: <b>${best.tips} TIPs</b>${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s (${modeName(best.mode)}, ${best.date.slice(0, 10)})</p>`
+      ? `<p>Best: <b>${best.tips} TIPs</b>${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s (${modeName(best.mode)}, ${TIP_TIMINGS.find((t) => t.value === timing)?.label}, ${best.date.slice(0, 10)})</p>`
       : "") +
     `<table>${mine.map((r) => `<tr><td>${r.date.slice(5, 16).replace("T", " ")}</td><td>${r.tips} TIPs · ${r.cycles} cycles · med ${f1(r.medianCycleS ?? NaN)} s</td></tr>`).join("")}</table>`;
 }
@@ -197,12 +211,13 @@ function cycleTable(x: RobotRunResult) {
 function showResults(r: RunResult) {
   const list = saveRun(summarize(r));
   showHistory(list);
-  const best = bestRun(list, r.team, r.mode);
+  const best = bestRun(list, r.team, r.mode, r.tipTiming);
   const isBest = best && best.date === r.date;
   const who =
     r.mode === "alliance"
       ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, a driver each`
       : `${TEAM_NAMES[r.team]}, ${r.mode === "two" ? "driver + operator" : "driver only"}`;
+  const timingLabel = TIP_TIMINGS.find((t) => t.value === r.tipTiming)?.label;
   const robots =
     r.mode === "alliance"
       ? r.robots
@@ -214,7 +229,7 @@ function showResults(r: RunResult) {
       : cycleTable(r.robots[0]);
   $("results-card").innerHTML = `
     <h2>${r.tips >= GOAL_TIPS ? `<span class="goal">${r.tips} TIPs: goal!</span>` : `<span class="miss">${r.tips} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
-    <p>${who}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
+    <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
@@ -382,7 +397,7 @@ async function main() {
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
-  for (const sel of [teamSel, modeSel])
+  for (const sel of [teamSel, modeSel, tipSel])
     sel.onchange = () => {
       savePrefs();
       padsKey = "";
