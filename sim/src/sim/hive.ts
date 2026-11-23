@@ -114,11 +114,14 @@ export class Hive {
   }
 
   /** Checks whether a world-space point is inside the raised CELL. */
-  containsInUpCell(p: { x: number; y: number; z: number }, radius: number): boolean {
+  containsInUpCell(p: { x: number; y: number; z: number }, radius: number): boolean { return this.containsInCell(p, radius, this.upCell); }
+
+  /** Checks whether a world-space point is inside one CELL, raised or not. */
+  containsInCell(p: { x: number; y: number; z: number }, radius: number, side: CellSide): boolean {
     const t = this.read(), phi = t.phi, c = Math.cos(-phi), s = Math.sin(-phi);
     const y0 = p.y - t.y, z0 = p.z - t.z;
     const lx = p.x - t.x, ly = y0 * c - z0 * s, lz = y0 * s + z0 * c;
-    const along = this.lastStable > 0 ? -lz : lz;
+    const along = side === 'rear' ? -lz : lz;
     return Math.abs(lx) < HIVE.cellHalfWidth && ly > HIVE.cellFloorY && ly < HIVE.cellPeakY &&
       along > HIVE.cellBack && along < HIVE.cellMouth + radius;
   }

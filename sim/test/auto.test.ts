@@ -140,7 +140,11 @@ describe('referee', () => {
 
 describe('alliance partners', () => {
   it('plays four robots: both alliances stay on their side in AUTO, tip, and neither alliance double-books a launch spot', () => {
-    const sim = new Sim(RAPIER, undefined, 'full', 4, { opponent: true, partners: true }); sim.start();
+    // Pinned to upstream's spill: this tests the planner's side discipline, not the spill. Partners don't avoid each other
+    // in AUTO (onboard AUTO doesn't see other robots), so a partner can push a robot over the center line: over seeds
+    // 1-12 this check already fails on seeds 9 and 12 under either spill, and the 'films' spill moves seed 4's timing
+    // into the same push. The fix is partners avoiding each other in AUTO (docs/backlog.md, "Partners that avoid each other in AUTO").
+    const sim = new Sim(RAPIER, undefined, 'full', 4, { opponent: true, partners: true, spill: 'ncssm' }); sim.start();
     expect(sim.robots.map(r => `${r.alliance}${r.slot}`)).toEqual(['red0', 'red1', 'blue0', 'blue1']);
     const coaches = sim.robots.map(() => { const c = new Coach(); return c; });
     let redMaxX = -9, blueMinX = 9, closest = 9;

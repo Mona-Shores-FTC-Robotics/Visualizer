@@ -4,6 +4,7 @@ import { BALL, DEFAULT_ROBOT, FIELD, HIVE, MATCH, POINTS, RP, TIP_LOAD, type Lau
 import { mecanumForces, type DriveCommand } from './drivetrain';
 import { GROUP, Hive, groups, type Alliance, type CellSide } from './hive';
 import { Rng } from './rng';
+import { SPILL_FILMS, SPILL_SWING_RAD_PER_S, SPILL_WATCH_S, spillModel, type SpillModel } from './spill';
 import { TipLagHold, tipTiming, type TipTiming } from './tip-lag';
 
 type R = typeof RAPIER_NS;
@@ -87,6 +88,8 @@ export interface SimOptions {
   tipTiming?: TipTiming;
   /** Mona Shores (the driver drill): if false, pushing into a FLOWER takes nothing, and the program takes the pieces itself, at our logged pick time and yield. Default: true. */
   flowerPullByPush?: boolean;
+  /** Mona Shores: how a TIP's spill leaves the lowered CELL, 'films' (ours) or 'ncssm' (upstream's physics alone). Default: 'films' (src/sim/spill.ts). */
+  spill?: SpillModel;
 }
 
 /** Switches for experiments on the pre-MATCH setup. */
@@ -166,10 +169,17 @@ export class Sim {
   rng: Rng;
   /** Mona Shores: the TIP lag hold, one per HIVE (src/sim/tip-lag.ts). */
   tipLag: Record<Alliance, TipLagHold>;
+  /** Mona Shores: the spill model (src/sim/spill.ts), and the pieces in each lowering CELL on the last step. */
+  readonly spill: SpillModel;
+  private spilling: Record<Alliance, { side: CellSide | null; until: number; inside: Set<number>; out: Map<number, number> }> = {
+    red: { side: null, until: 0, inside: new Set(), out: new Map() }, blue: { side: null, until: 0, inside: new Set(), out: new Map() } };
+  /** The spill's own random stream, so that it doesn't shift the MATCH's other draws. */
+  private spillRng: Rng;
 
   constructor(private rapier: R, cfg: RobotConfig = structuredClone(DEFAULT_ROBOT), public mode: MatchMode = 'teleop', seed = 1, public options: SimOptions = {}) {
     this.rng = new Rng(seed);
     const timing = tipTiming(options.tipTiming);
+    this.spill = spillModel(options.spill); this.spillRng = new Rng(seed * 7 + 3);
     this.tipLag = { red: new TipLagHold(seed * 2 + 1, timing), blue: new TipLagHold(seed * 2 + 2, timing) };
     this.world = new rapier.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = DT; this.world.numSolverIterations = 8;
@@ -217,6 +227,37 @@ export class Sim {
     for (const f of FIELD.flowers) {
       this.fixed(FIELD.flowerHalfSize, FIELD.flowerTop / 2, FIELD.flowerHalfSize, f.x, FIELD.flowerTop / 2, f.z);
       this.flowers.push({ ...f, stack: ['pollen', 'pollen', 'pollen', 'pollen'] });
+    }
+  }
+
+  /**
+   * Mona Shores, the 'films' spill (src/sim/spill.ts): from the moment a rocker starts to swing down, for SPILL_WATCH_S, a
+   * piece that was in the lowering CELL on the last step and is out of it now keeps SPILL_FILMS.exitScale of its velocity, once.
+   */
+  private spillExit() {
+    for (const a of ['red', 'blue'] as Alliance[]) {
+      const h = this.hives[a], st = this.spilling[a], up = h.upCell === 'rear' ? 1 : -1;
+      // A swing down starts the watch on the CELL that was raised; it runs SPILL_WATCH_S, past the stop.
+      if (st.side === null && -up * h.omega > SPILL_SWING_RAD_PER_S) { st.side = h.upCell; st.until = this.simTime + SPILL_WATCH_S; st.inside.clear(); st.out.clear(); }
+      if (st.side === null) continue;
+      if (this.simTime > st.until) { st.side = null; st.inside.clear(); st.out.clear(); continue; }
+      for (const [id, b] of this.balls) {
+        if (!b.body.isEnabled()) continue;
+        if (h.containsInCell(this.ballPos(b), b.radius, st.side)) { st.inside.add(id); continue; }
+        if (st.inside.delete(id)) {
+          const v = b.body.linvel(), k = SPILL_FILMS.exitScale; b.body.setLinvel({ x: v.x * k, y: v.y * k, z: v.z * k }, true);
+          st.out.set(id, 0); continue;
+        }
+        // A spilled piece's first hard landing on the tiles: part of the landing speed goes along its throw.
+        const vy = st.out.get(id); if (vy === undefined) continue;
+        const v = b.body.linvel(), y = b.body.translation().y;
+        if (y > b.radius + 0.012) { st.out.set(id, v.y); continue; }
+        st.out.delete(id);
+        const impact = -vy; if (impact < SPILL_FILMS.scatterMinMps || SPILL_FILMS.scatter <= 0) continue;
+        const r = this.spillRng, a = Math.hypot(v.x, v.z) < 0.05 ? 2 * Math.PI * r.next() : Math.atan2(v.z, v.x) + (2 * r.next() - 1) * SPILL_FILMS.scatterSpreadRad;
+        const k = SPILL_FILMS.scatter * impact * (0.5 + r.next());
+        b.body.setLinvel({ x: v.x + k * Math.cos(a), y: v.y, z: v.z + k * Math.sin(a) }, true);
+      }
     }
   }
 
@@ -386,6 +427,7 @@ export class Sim {
     this.aero();
     this.world.step(); this.touch();
     for (const h of Object.values(this.hives)) h.epoch!++;
+    if (this.spill === 'films') this.spillExit();
     for (const a of ['red', 'blue'] as Alliance[]) {
       if (this.hives[a].pollTip()) { this.say(`${a.toUpperCase()} HIVE TIP (${this.hives[a].tips})`); this.owed[a].push({ at: this.simTime + 2 }); }
       // Mona Shores: how long the raised CELL has sat at or over its tipping weight, on its stop and not held, without
