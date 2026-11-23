@@ -1,0 +1,38 @@
+{
+  "about": "Mona Shores' two robots, 19429 (Infrared) and 20245 (Ultraviolet), for the match and drill simulator. Data only: src/sim/robots/mona-shores.ts maps it onto upstream's RobotConfig. Every number has a source: a biobuzz file (master), a measured log or film, or 'upstream' where neither team has data. null means not measured yet, so upstream's value stays.",
+  "shared": {
+    "frameIn": { "value": 16.2, "source": "biobuzz RobotDesign.REAL_FRAME_IN = 2 * ResetPositions.WALL_TO_CENTRE_IN (8.1 in, tape)" },
+    "laneCapacity": { "value": 4, "source": "biobuzz LaneTracker.SLOTS = 4 (G407)" },
+    "turret": {
+      "arcLeftDeg": { "value": 90, "source": "biobuzz TurretSubsystem.arcLeftDeg" },
+      "arcRightDeg": { "value": 90, "source": "biobuzz TurretSubsystem.arcRightDeg" },
+      "aimOffsetDeg": { "value": 5, "source": "biobuzz RobotDifferences, both robots (18-20 Nov 2026)" },
+      "slewDegPerSec": { "value": null, "source": "not measured; floor is 10-13 deg/s (RobotDifferences 19429, 20 Nov), top rate unlogged" },
+      "circleTurnsIntoArc": { "value": true, "source": "biobuzz TeleOpConfig.circleTurnsIntoArc" }
+    },
+    "launch": {
+      "speedTable": { "rangeIn": [35, 37, 39, 42, 45, 48, 51, 55], "ticksPerSecond": [1495, 1495, 1495, 1495, 1500, 1505, 1520, 1550], "source": "biobuzz LaunchSpeedTable rows 1-8" },
+      "inRateByRangeIn": { "rangeIn": [36.0, 42.4, 53.9], "fraction": [0.70, 0.95, 0.90], "source": "biobuzz BeldingCalibration.STAY_IN (Belding Qualifier, 17 Auto logs)" },
+      "release": { "value": "one at a time", "source": "the feeder sends the lane through the throat in order" },
+      "betweenBallsS": { "value": 0.45, "source": "biobuzz timing-terms.md, Belding: about 0.45 s between balls" },
+      "gateToFirstBallS": { "value": [0.6, 0.95], "source": "biobuzz timing-terms.md, Belding" },
+      "spinUpWaitS": { "value": [0.05, 0.8], "source": "biobuzz timing-terms.md, Belding, launcher already running" }
+    },
+    "drive": {
+      "topSpeedInPerS": { "value": 77, "source": "biobuzz AutoSim: 77 in/s peak, real-robot logs" },
+      "accelInPerS2": { "value": [63, 71], "source": "biobuzz AutoSim: 63-71 in/s^2 from rest; braking 48-76" }
+    }
+  },
+  "robots": {
+    "19429": {
+      "name": "Infrared",
+      "flowerStick": { "value": "active", "source": "biobuzz RobotDifferences: roller on its end, a CR servo (17 Nov 2026)" },
+      "enforceFiringArcTeleOp": { "value": true, "source": "biobuzz TeleOpConfig.enforceFiringArc (no RobotDifferences line)" }
+    },
+    "20245": {
+      "name": "Ultraviolet",
+      "flowerStick": { "value": "passive", "source": "biobuzz FlowerStickSubsystem: no roller; held out" },
+      "enforceFiringArcTeleOp": { "value": false, "source": "biobuzz RobotDifferences 20245 (mentor, 20 Nov 2026)" }
+    }
+  }
+}
