@@ -78,6 +78,16 @@ What the fork adds:
     (`scouting/<season>/<event>.json`, and `scouting/<season>/partners.json` for each team's
     known Autos, which a plan's named partner Autos join): anyone can read them; saving takes
     the GitHub token Save to GitHub uses. A quick look, not the Java simulator.
+- **Driver Drill** (`drill/`, <https://mona-shores-ftc-robotics.github.io/Visualizer/drill/>). Driver
+  practice on a laptop with a PlayStation controller: a 2:00 TeleOp, solo, toward 7 TIPs, with the
+  robot's practice readout (each pick-up, each cycle and its split, as on the Driver Station) and the
+  best runs kept in the browser. Gamepad 1 is the driver, gamepad 2 the operator (or driver only).
+  The buttons are the robot's: read from biobuzz's controls export
+  (`TeamCode/cheat-sheets/controls.json`, written by `CheatSheetTest`), never typed in here. The
+  robot numbers per team (speed, acceleration, FLOWER and GARDEN times, volley, TIP lag) are from
+  the Fruitport and Belding logs (`src/drill/presets.ts` says which). The physics, field and HIVE are
+  [ftc-biobuzz-sim](https://github.com/teddytennant/ftc-biobuzz-sim)'s (MIT, by Carl Ryden and NCSSM
+  FTC), vendored in `src/drill/vendor/biobuzz-sim/` with its licence.
 - **Drafts in Team Autos.** `TeamCode/autos/drafts/` (Autos of ours the robot does not run yet) is
   listed too, and a link may name one: `#team=master/drafts/r-solo-push.pp,partners/partner-push-start.pp`.
   A draft opens and saves like any Auto: Save to GitHub suggests its own `drafts/` path, and Save to
