@@ -23,7 +23,11 @@ export interface TipRecord {
   lagS: number;
 }
 
-export type DrillMode = "two" | "driver" | "alliance";
+/**
+ * Solo with an operator, solo driver only, alliance with a driver each (2 controllers), and
+ * alliance with a driver and an operator each (4 controllers).
+ */
+export type DrillMode = "two" | "driver" | "alliance" | "alliance-ops";
 
 /**
  * Which TIP timing the HIVE runs (mentor, 23 Nov 2026: neither is assumed right, so both stay

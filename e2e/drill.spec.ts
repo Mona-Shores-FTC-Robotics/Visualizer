@@ -44,7 +44,7 @@ async function open(page: Page) {
         value: 0,
       })),
     });
-    const pads = [make(0), make(1)];
+    const pads = [make(0), make(1), make(2), make(3)];
     (window as unknown as { __pads: unknown }).__pads = pads;
     Object.defineProperty(navigator, "getGamepads", {
       value: () => pads,
@@ -253,9 +253,9 @@ test("alliance: two controllers drive Ultraviolet and Infrared on one field", as
   await open(page);
   await page.locator("#mode").selectOption("alliance");
   await expect(page.locator("#pads")).toContainText(
-    "drives Ultraviolet (20245)",
+    "Ultraviolet (20245) driver",
   );
-  await expect(page.locator("#pads")).toContainText("drives Infrared (19429)");
+  await expect(page.locator("#pads")).toContainText("Infrared (19429) driver");
   await expect(page.locator("#robot")).toContainText("Infrared (19429)");
   await setPad(page, 0, [BTN.OPTIONS]);
   await waitSim(page, 0.2);
@@ -295,4 +295,64 @@ test("alliance: two controllers drive Ultraviolet and Infrared on one field", as
   );
   await expect(page.locator("#results-card")).toContainText("the rear end");
   await expect(page.locator("#results-card")).not.toContainText("Mona Shores");
+});
+
+test("alliance with operators: four controllers, a driver and an operator per robot", async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator("#mode").selectOption("alliance-ops");
+  // The start screen: each role on a gamepad, with the connected controller's name.
+  await expect(page.locator("#pads select")).toHaveCount(4);
+  await expect(page.locator("#pads")).toContainText(
+    "Infrared (19429) operator",
+  );
+  await expect(page.locator("#operator-section")).toBeVisible();
+  await setPad(page, 0, [BTN.OPTIONS]);
+  await waitSim(page, 0.2);
+  await setPad(page, 0);
+  // Gamepad 4, Infrared's operator: Cross spins up Infrared's launcher only.
+  await setPad(page, 3, [BTN.CROSS]);
+  await expect(page.locator("#robot")).toContainText("SPINNING UP");
+  await setPad(page, 3);
+  const launchers = await page.evaluate(() =>
+    (
+      window as unknown as {
+        __drill: { session: { teleops: { status(): { launcher: string } }[] } };
+      }
+    ).__drill.session.teleops.map((t) => t.status().launcher),
+  );
+  expect(launchers).toEqual(["IDLE", "SPINNING UP"]);
+  // Gamepad 3 drives Infrared.
+  const x0 = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __drill: {
+            session: {
+              sim: { robots: { body: { translation(): { x: number } } }[] };
+            };
+          };
+        }
+      ).__drill.session.sim.robots[1].body.translation().x,
+  );
+  const t0 = await page.evaluate(
+    () => (window as unknown as { __drill: Drill }).__drill.session.t,
+  );
+  await setPad(page, 2, [], [0, -1, 0, 0]);
+  await waitSim(page, t0 + 0.8);
+  await setPad(page, 2);
+  const x1 = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __drill: {
+            session: {
+              sim: { robots: { body: { translation(): { x: number } } }[] };
+            };
+          };
+        }
+      ).__drill.session.sim.robots[1].body.translation().x,
+  );
+  expect(x1 - x0).toBeGreaterThan(0.3);
 });
