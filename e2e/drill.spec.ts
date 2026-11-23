@@ -145,7 +145,10 @@ type Drill = {
     };
     teleop: { turretMode: string; launched: number };
     readout: { cycles: { cycleS: number; feedS: number; balls: number }[] };
-    advance(s: number): void;
+    advance(
+      s: number,
+      driver?: { lx: number; ly: number; rx: number; held(i: string): boolean },
+    ): void;
   };
 };
 const drill = (page: Page) =>
@@ -258,23 +261,19 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await setPad(page, 0);
   // The drill opened after a 1-TIP Auto, so our rear CELL is up and empty: three volleys of four in
   // front of it (12 POLLEN; the TIP weight is 7.4, so a miss or two still TIPs it) are one more
-  // TIP. Then run the clock out.
-  for (const after of [4, 8, 12]) {
-    await page.evaluate(() => {
-      const s = (window as unknown as { __drill: Drill }).__drill.session;
+  // TIP. Fired on the session's own clock with Circle held (the readout still times each cycle),
+  // so a slow CI machine does not run out the test's time.
+  await page.evaluate(() => {
+    const s = (window as unknown as { __drill: Drill }).__drill.session;
+    const circle = { lx: 0, ly: 0, rx: 0, held: (i: string) => i === "CIRCLE" };
+    for (const n of [4, 8, 12]) {
       s.sim.robot.setTranslation({ x: -0.32, y: 0.17, z: -1.3 }, true);
       s.sim.carried = ["pollen", "pollen", "pollen", "pollen"];
-    });
-    await setPad(page, 0, [BTN.CIRCLE]);
-    await page.waitForFunction(
-      (n) =>
-        (window as unknown as { __drill: Drill }).__drill.session.teleop
-          .launched >= n,
-      after,
-      { timeout: 60000 },
-    );
-    await setPad(page, 0);
-  }
+      for (let t = 0; t < 10 && s.teleop.launched < n; t += 0.1)
+        s.advance(0.1, circle);
+      s.advance(0.1);
+    }
+  });
   // The TIP settles seconds of simulated time after the volley (at weight, a median of 3.9 s
   // and up to 6.5): stepped on the session's own clock, not waited for in real time, so a slow
   // CI machine cannot run out the wait.
