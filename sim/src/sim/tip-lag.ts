@@ -35,11 +35,14 @@ export const TIP_LAG = {
   atWeightSkew: 2.6,                          // low end + width * u^skew: median 3.9 s, a slow tail (biobuzz FieldSim)
   wellPastS: [2.2, 2.5] as [number, number],  // nine or more pieces (films)
   atWeightUpToPollen: 2.0, wellPastFromPollen: 2.5, // biobuzz FieldSim.AT_WEIGHT_UP_TO_POLLEN / WELL_PAST_FROM_POLLEN
-  // The upstream rocker's own swing, release to settled. Measured by the drill's timed match test (Visualizer
-  // test/drill/tipLag.test.ts, PR #150: FieldSim's dwell minus 0.45 s gave last ball to settled median 3.95 s at weight
-  // and 2.42 to 2.56 s well past, so the rocker itself takes about 1.9 s and 1.8 s). Upstream's docs quote 1.7 / 1.2 s
-  // from the load crossing, which is not the same start. The hold is the drawn lag minus this.
-  upstreamSwingAtWeightS: 1.9, upstreamSwingWellPastS: 1.8,
+  // The upstream rocker's own swing, release to settled: about 1.45 s at weight and 1.4 s well past, fitted by the
+  // drill's timed match test (Visualizer test/drill/tipLag.test.ts) once the hold ran in step(). Upstream's docs quote
+  // 1.7 / 1.2 s from the load crossing, a different start. The hold is the drawn lag minus this swing and the flight.
+  upstreamSwingAtWeightS: 1.45, upstreamSwingWellPastS: 1.4,
+  // The films' lag starts when the last ball leaves the robot; the hold starts when the last piece lands in the CELL,
+  // a launch's flight later. Measured by the drill's match test the same way (the drill chat, 23 Nov 2026: with the
+  // swing above and no flight term, last ball out to settled ran 0.45 s short of the films at both loads).
+  flightS: 0.45,
 };
 
 /** Draws, per HIVE, how long its loaded CELL stays on its stop after the last piece lands. Its own random stream. */
@@ -53,7 +56,7 @@ export class TipLagHold {
     const well = t.wellPastS[0] + (t.wellPastS[1] - t.wellPastS[0]) * this.rng.next();
     const f = Math.min(1, Math.max(0, (past - t.atWeightUpToPollen) / (t.wellPastFromPollen - t.atWeightUpToPollen)));
     const swing = t.upstreamSwingAtWeightS + f * (t.upstreamSwingWellPastS - t.upstreamSwingAtWeightS);
-    return Math.max(0, at + f * (well - at) - swing);
+    return Math.max(0, at + f * (well - at) - swing - t.flightS);
   }
 
   /** Call once per step with the raised CELL's piece count and load; returns whether the HIVE is held this step. */
