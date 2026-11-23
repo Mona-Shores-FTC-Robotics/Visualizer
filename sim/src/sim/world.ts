@@ -64,6 +64,12 @@ export interface RobotState {
   shotReadyAt: { nectar: number; pollen: number }; flowerReadyAt: number; lastForward: number; autoLeave: boolean; autoPark: boolean;
   /** A limited turret's angle from the shooter's mount direction, in radians, or NaN before its first step. */
   turretAngle: number;
+  /**
+   * Mona Shores (the driver drill): when set, the robot moves at this velocity (world X and Z in m/s, and turns at `w`
+   * rad/s counter-clockwise seen from above) in place of the motor model, so a drill can drive at our robots' measured
+   * speed, acceleration and turn rate (src/sim/robots/mona-shores.json). Default: unset, the motor model.
+   */
+  velDrive?: { vx: number; vz: number; w: number } | null;
   /** The drive command of the last step, for the referee: what the robot was trying to do. */
   lastCmd: DriveCommand;
 }
@@ -75,6 +81,8 @@ export interface SimOptions {
   configFor?: (alliance: Alliance, slot: 0 | 1) => RobotConfig | undefined;
   /** Mona Shores: the TIP timing, 'uv-ir' (our films) or 'ncssm' (upstream's rocker alone). Default: 'uv-ir' (src/sim/tip-lag.ts). */
   tipTiming?: TipTiming;
+  /** Mona Shores (the driver drill): if false, pushing into a FLOWER takes nothing, and the program takes the pieces itself, at our logged pick time and yield. Default: true. */
+  flowerPullByPush?: boolean;
 }
 
 /** Switches for experiments on the pre-MATCH setup. */
@@ -114,6 +122,8 @@ export class Sim {
   // Counters live in an object so that a view, which inherits from the sim, updates the shared value.
   private shared = { nextId: 1, epoch: 0 };
   private simTime = 0; private views: Sim[] = [];
+  /** Mona Shores: the physics clock (seconds of steps since construction), for code outside that sets `Ball.retryAt` as `launch()` does. */
+  get simNow(): number { return this.simTime; }
   /**
    * Ball positions and CELL tallies for the current epoch. The epoch changes after each world step and each time a ball
    * is added, removed, or moved by the sim, so between two steps, where all four planners run, Rapier is read once per
@@ -360,6 +370,14 @@ export class Sim {
   }
 
   private driveRobot(inp: Inputs) {
+    const vd = this.robots[this.me].velDrive;
+    if (vd) { // Mona Shores: the drill's velocity drive, in place of the motor model.
+      this.lastForward = inp.forward; this.robots[this.me].lastCmd = { forward: inp.forward, strafeRight: inp.strafeRight, turnRight: inp.turnRight };
+      this.robot.resetForces(true); this.robot.resetTorques(true);
+      this.robot.setLinvel({ x: vd.vx, y: this.robot.linvel().y, z: vd.vz }, true); this.robot.setAngvel({ x: 0, y: vd.w, z: 0 }, true);
+      this.telemetry = { busVoltage: this.cfg.battery.openCircuitV, speed: Math.hypot(vd.vx, vd.vz) };
+      return;
+    }
     const v = this.robot.linvel(), a = this.axes();
     const vel = { vf: v.x * a.fwd.x + v.z * a.fwd.z, vl: v.x * a.left.x + v.z * a.left.z, w: this.robot.angvel().y };
     const out = mecanumForces(this.cfg, inp, vel); this.lastForward = inp.forward;
@@ -422,7 +440,7 @@ export class Sim {
     }
     // POLLEN can also be removed from the bottom of a FLOWER (G418.B).
     // Pulling from a FLOWER needs driver intent: the robot must be pushing forward into it.
-    if (filter !== 'own_nectar' && this.carried.length < c.capacity && this.simTime >= this.flowerReadyAt && !this.placing && this.lastForward > 0.15) {
+    if (this.options.flowerPullByPush !== false && filter !== 'own_nectar' && this.carried.length < c.capacity && this.simTime >= this.flowerReadyAt && !this.placing && this.lastForward > 0.15) {
       for (const f of this.flowers) {
         const r = this.toRobot(f.x, f.z);
         if (r.f < 0 || r.f > c.length / 2 + c.intake.flowerReach + FIELD.flowerHalfSize || Math.abs(r.l) > c.intake.width / 2 || f.stack[0] !== 'pollen') continue;
