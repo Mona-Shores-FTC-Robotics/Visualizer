@@ -11,7 +11,7 @@
 import model from './mona-shores.json';
 import { FIELD, IN } from '../config';
 import type { Sim } from '../world';
-import type { Team } from './mona-shores';
+import { driveEnvelope, limitDrive, type Team } from './mona-shores';
 
 const C_IN = 70.75;
 type Pose = { x: number; z: number; h: number };
@@ -24,29 +24,24 @@ const R = model.routines;
 export type Drive = { vx: number; vz: number; w: number };
 export interface RoutineStep { drive: Drive; stickDown: boolean; intake: boolean; phase: string; done: boolean; note: string }
 
-/** Drives toward a pose with our robot's measured top speed, acceleration and turn rate (mona-shores.json). */
+/** Drives toward a pose within our robot's measured envelope (robot-axis top speed and acceleration, turn rate). */
 class Mover {
-  private v = { x: 0, z: 0 };
-  constructor(private top: number, private accel: number, private turn: number) {}
-  /** One step toward `to` at `frac` of top speed; `lane` keeps sideways error small (a straight push). */
+  constructor(private team: Team) {}
+  /** One step toward `to` at `frac` of the top speed in that direction, braking to arrive. */
   step(sim: Sim, to: Pose, frac: number, dt: number): Drive {
-    const p = sim.robot.translation(), dx = to.x - p.x, dz = to.z - p.z, d = Math.hypot(dx, dz);
-    const vmax = Math.min(frac * this.top, Math.sqrt(2 * this.accel * d)); // brakes to arrive
-    const want = d > 1e-4 ? { x: (dx / d) * vmax, z: (dz / d) * vmax } : { x: 0, z: 0 };
-    const ex = want.x - this.v.x, ez = want.z - this.v.z, e = Math.hypot(ex, ez), dv = this.accel * dt;
-    if (e > dv) { this.v.x += (ex / e) * dv; this.v.z += (ez / e) * dv; } else this.v = want;
-    const herr = wrap(to.h - sim.heading);
-    const w = Math.max(-this.turn, Math.min(this.turn, 5 * herr));
-    return { vx: this.v.x, vz: this.v.z, w };
+    const p = sim.robot.translation(), dx = to.x - p.x, dz = to.z - p.z, d = Math.hypot(dx, dz), h = sim.heading;
+    // The direction of travel in robot axes sets the envelope (forward (cos h, -sin h), left (-sin h, -cos h)).
+    const f = dx * Math.cos(h) - dz * Math.sin(h), l = -dx * Math.sin(h) - dz * Math.cos(h);
+    const env = driveEnvelope(this.team, Math.atan2(l, f));
+    const vmax = Math.min(frac * env.top, Math.sqrt(2 * env.accel * d));
+    const want = { vx: d > 1e-4 ? (dx / d) * vmax : 0, vz: d > 1e-4 ? (dz / d) * vmax : 0, w: 5 * wrap(to.h - h) };
+    const v = sim.robot.linvel();
+    return limitDrive(this.team, h, { vx: v.x, vz: v.z }, want, dt);
   }
-  stop(): Drive { this.v = { x: 0, z: 0 }; return { vx: 0, vz: 0, w: 0 }; }
-  speed() { return Math.hypot(this.v.x, this.v.z); }
+  stop(): Drive { return { vx: 0, vz: 0, w: 0 }; }
 }
 
-function mover(team: Team): Mover {
-  const r = model.robots[team].drive;
-  return new Mover(r.topSpeedInPerS.value * IN, r.accelInPerS2.value * IN, (r.turnDegPerS.value * Math.PI) / 180);
-}
+function mover(team: Team): Mover { return new Mover(team); }
 
 const near = (sim: Sim, to: Pose, posM: number, deg: number) => {
   const p = sim.robot.translation();
