@@ -11,6 +11,8 @@
  */
 import type { Sim } from "../../sim/src/sim/world";
 import type { CellSide } from "../../sim/src/sim/hive";
+import { FIELD } from "../../sim/src/sim/config";
+import type { BallKind } from "../../sim/src/sim/world";
 import { fromPedro } from "./launchSpot";
 
 export const AUTO_S = 30;
@@ -161,25 +163,96 @@ export class AutoPlayback {
   /**
    * The hand-off at 38 s: the robot where the AUTO left it, its lane, and each HIVE at rest on its
    * raised CELL with the AUTO's TIPs (Sim.handoff, which counts them as AUTO TIPs). Our raised
-   * CELL gets the pieces the AutoSim had in it (at most 12, as POLLEN).
+   * CELL gets the pieces the AutoSim had in it (at most 12, as POLLEN). The field's pieces go where
+   * the Auto left them: each FLOWER's stack, and every piece on the floor (`fieldAtHandoff`).
    */
   private handOver() {
     const h = this.trace.handoff;
     this.pose(HANDOFF_S);
     const v = this.sim.view(this.k);
     v.carried = Array.from({ length: h.held }, () => "pollen" as const);
-    this.sim.handoff({
-      red: {
-        up: h.hives.red.up,
-        tips: h.hives.red.tips,
-        cellPollen: Math.min(12, h.hives.red.raisedCellPieces),
+    // A HIVE that has not tipped still has its own 3 NECTAR racked in the raised CELL (as the
+    // simulator staged them, and counted in the trace's pieces): seed only the rest.
+    const seed = (a: "red" | "blue") => {
+      const st = h.hives[a];
+      const racked = st.up === START_UP[a] ? STAGED_NECTAR : 0;
+      return Math.max(0, Math.min(12, st.raisedCellPieces - racked));
+    };
+    this.sim.handoff(
+      {
+        red: {
+          up: h.hives.red.up,
+          tips: h.hives.red.tips,
+          cellPollen: seed("red"),
+        },
+        blue: {
+          up: h.hives.blue.up,
+          tips: h.hives.blue.tips,
+          cellPollen: seed("blue"),
+        },
       },
-      blue: {
-        up: h.hives.blue.up,
-        tips: h.hives.blue.tips,
-        cellPollen: Math.min(12, h.hives.blue.raisedCellPieces),
-      },
-    });
+      1,
+      fieldAtHandoff(this.trace, this.sim),
+    );
     this.handedOver = true;
   }
+}
+
+/** Each HIVE's raised CELL at the start, and the NECTAR staged in it (Competition Manual 10.3.1). */
+const START_UP = { red: "audience", blue: "rear" } as const;
+const STAGED_NECTAR = 3;
+
+/** A piece within this of a FLOWER's centre, horizontally, is in its stack (metres). */
+const FLOWER_RADIUS_M = 0.08;
+/** A piece lower than this (its centre, metres) is on the floor. */
+const FLOOR_M = 0.15;
+/** A floor piece this far past a wall (metres) is the AutoSim's stock for an absent robot. */
+const PAST_WALL_M = 0.12;
+
+/**
+ * The trace's pieces at the hand-off, for `Sim.handoff`'s field: each FLOWER's stack (the pieces
+ * standing on its site, bottom first) and every piece on the floor. The AutoSim keeps the absent
+ * robots' preloads in rows just past the walls, where the simulator keeps them just inside: those are
+ * brought in to touch the wall, so all 40 POLLEN stay in play. Pieces up in a CELL are the HIVE's
+ * (`cellPollen`); the NECTAR stash stays the simulator's own count.
+ */
+export function fieldAtHandoff(
+  trace: AutoTrace,
+  sim: Pick<Sim, "flowers">,
+): {
+  pieces: { kind: BallKind; x: number; y: number; z: number }[];
+  flowers: Record<string, BallKind[]>;
+} {
+  const all: { kind: BallKind; x: number; y: number; z: number }[] = [];
+  const add = (list: number[][], kind: BallKind) => {
+    for (const [x, y, z] of list) all.push({ kind, x, y, z });
+  };
+  add(trace.handoff.pieces.pollen, "pollen");
+  add(trace.handoff.pieces.nectarRed, "nectar_red");
+  add(trace.handoff.pieces.nectarBlue, "nectar_blue");
+  const onFlower = (q: { x: number; z: number }) =>
+    sim.flowers.find((o) => Math.hypot(o.x - q.x, o.z - q.z) < FLOWER_RADIUS_M);
+  const inside = (v: number, r: number) =>
+    Math.max(-FIELD.half + r, Math.min(FIELD.half - r, v));
+  const pieces = all
+    .filter(
+      (q) =>
+        !onFlower(q) &&
+        q.y < FLOOR_M &&
+        (q.kind === "pollen"
+          ? Math.abs(q.x) < FIELD.half + PAST_WALL_M &&
+            Math.abs(q.z) < FIELD.half + PAST_WALL_M
+          : Math.abs(q.x) < FIELD.half && Math.abs(q.z) < FIELD.half),
+    )
+    .map((q) => {
+      const r = q.kind === "pollen" ? FIELD.pollenRadius : FIELD.nectarRadius;
+      return { ...q, x: inside(q.x, r + 0.002), z: inside(q.z, r + 0.002) };
+    });
+  const flowers: Record<string, BallKind[]> = {};
+  for (const f of sim.flowers)
+    flowers[f.id] = all
+      .filter((q) => onFlower(q)?.id === f.id)
+      .sort((a, b) => a.y - b.y)
+      .map((q) => q.kind);
+  return { pieces, flowers };
 }
