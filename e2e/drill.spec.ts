@@ -464,6 +464,7 @@ test("another device in the browser's list never drives: the role binds to the c
   await expect(page.locator("#pads")).toContainText("(index 2)");
   await page.locator("#pad-check summary").click();
   await expect(page.locator("#pad-debug")).toContainText("not bound: ignored");
+  await expect(page.locator("#pad-debug")).toContainText("pose x");
   await page.locator("#start").click();
   const pose = () =>
     page.evaluate(() => {

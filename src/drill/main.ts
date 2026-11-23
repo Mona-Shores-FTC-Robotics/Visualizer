@@ -392,27 +392,38 @@ let debugAt = 0;
  * drill reads from them (drive, turn, L2, R2), so a pad that drives on its own shows why.
  */
 function padDebug(list: Gamepad[], read: DecodedPad[]) {
+  // Each robot's pose, so a creep with the sticks let go shows here as well as on the field.
+  const poses = session.teleops
+    .map((_, k) => {
+      const v = session.sim.view(k),
+        p = v.robot.translation();
+      const who = session.teleops.length > 1 ? `${session.slots[k].team} ` : "";
+      return `<div><code>${who}pose x ${(p.x / IN).toFixed(1)} in, y ${(-p.z / IN).toFixed(1)} in, heading ${((v.heading * 180) / Math.PI).toFixed(1)}°</code></div>`;
+    })
+    .join("");
   if (!list.length) {
-    $("pad-debug").innerHTML = "";
+    $("pad-debug").innerHTML = poses;
     return;
   }
   const f = (v: number) => (v >= 0 ? " " : "") + v.toFixed(2);
-  $("pad-debug").innerHTML = list
-    .map((g, i) => {
-      const d = read[i];
-      const pressed = g.buttons
-        .map((b, k) => (b.pressed || b.value > 0.5 ? k : -1))
-        .filter((k) => k >= 0);
-      const warn = d.standard
-        ? ""
-        : `<div style="color:var(--warn)">Not the browser's standard mapping ("${esc(g.mapping || "none")}"). The drill read the sticks and triggers by where they rest (sticks: axes ${d.axisOf.lx}, ${d.axisOf.ly}, ${d.axisOf.rx}; L2 ${d.axisOf.l2}, R2 ${d.axisOf.r2}); its buttons may be off. Chrome or Edge, or a USB cable, gives the standard mapping.</div>`;
-      const role = binder.roleOf(g);
-      return `<div class="pad-debug"><b>Index ${g.index}</b> · ${role ? `<b>${roleName(role)}</b>` : '<span class="dim">not bound: ignored</span>'} <span class="dim">${esc(g.id)} · mapping ${esc(g.mapping || "none")}</span>${warn}
+  $("pad-debug").innerHTML =
+    poses +
+    list
+      .map((g, i) => {
+        const d = read[i];
+        const pressed = g.buttons
+          .map((b, k) => (b.pressed || b.value > 0.5 ? k : -1))
+          .filter((k) => k >= 0);
+        const warn = d.standard
+          ? ""
+          : `<div style="color:var(--warn)">Not the browser's standard mapping ("${esc(g.mapping || "none")}"). The drill read the sticks and triggers by where they rest (sticks: axes ${d.axisOf.lx}, ${d.axisOf.ly}, ${d.axisOf.rx}; L2 ${d.axisOf.l2}, R2 ${d.axisOf.r2}); its buttons may be off. Chrome or Edge, or a USB cable, gives the standard mapping.</div>`;
+        const role = binder.roleOf(g);
+        return `<div class="pad-debug"><b>Index ${g.index}</b> · ${role ? `<b>${roleName(role)}</b>` : '<span class="dim">not bound: ignored</span>'} <span class="dim">${esc(g.id)} · mapping ${esc(g.mapping || "none")}</span>${warn}
         <div><code>axes ${g.axes.map(f).join(" ")}</code></div>
         <div><code>buttons ${pressed.join(" ") || "–"}</code></div>
         <div><code>drill: drive ${f(d.lx)} ${f(d.ly)} turn ${f(d.rx)} L2 ${d.l2.toFixed(2)} R2 ${d.r2.toFixed(2)}</code></div></div>`;
-    })
-    .join("");
+      })
+      .join("");
 }
 function frame(now: number) {
   const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));

@@ -160,3 +160,53 @@ describe("binding controllers by Cross (A)", () => {
     expect(s.teleop.status().launcher).toBe("IDLE");
   }, 60000);
 });
+
+describe("at rest for a whole minute", () => {
+  test("an Xbox-like pad at all zeros: the robot holds its pose for 60 s from PLAY", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      g = pad(
+        [0, 0, 0, 0],
+        "standard",
+        [],
+        "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
+        1,
+      );
+    s.start();
+    const p0 = s.sim.robot.translation(),
+      h0 = s.sim.heading;
+    let worst = 0;
+    for (let t = 5; t <= 60; t += 5) {
+      s.advance(5, d.read(g));
+      const p = s.sim.robot.translation();
+      worst = Math.max(
+        worst,
+        Math.hypot(p.x - p0.x, p.z - p0.z),
+        Math.abs(s.sim.heading - h0),
+      );
+    }
+    expect(worst).toBeLessThan(1e-4);
+  }, 120000);
+
+  test("a stick resting off centre after use (an old Xbox 360 stick, 0.1) creeps; Re-zero stops it", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    const d = new PadDecoder(0.3),
+      xbox = (axes: number[]) =>
+        pad(axes, "standard", [], "Xbox 360 Controller", 1);
+    d.read(xbox([0, 0, 0, 0])); // plugged in: centred
+    s.start();
+    // Pushed and let go: it comes back to 0.1, past the robot's 0.05 deadband.
+    const drifting = xbox([0, -0.1, 0, 0]);
+    const p0 = s.sim.robot.translation();
+    s.advance(2, d.read(drifting));
+    const p1 = s.sim.robot.translation();
+    expect(p1.x - p0.x).toBeGreaterThan(0.05);
+    // Re-zero (hands off): the resting 0.1 is the new centre.
+    d.rezero([drifting]);
+    s.advance(0.5, d.read(drifting)); // the robot coasts to a stop
+    const p2 = s.sim.robot.translation();
+    s.advance(5, d.read(drifting));
+    const p3 = s.sim.robot.translation();
+    expect(Math.hypot(p3.x - p2.x, p3.z - p2.z)).toBeLessThan(1e-4);
+  }, 60000);
+});
