@@ -16,12 +16,15 @@
  * - The operator: Cross spins the launcher up or idles it, L1/R1 trim its speed, the D-pad trims
  *   the aim (Circle held for fine steps), R2/L2 intake and unjam, Square the FLOWER stick.
  */
-import { BALL, FIELD, TIP_LOAD } from "./vendor/biobuzz-sim/config";
+import { BALL, FIELD, HIVE, TIP_LOAD } from "./vendor/biobuzz-sim/config";
+import type { Alliance, CellSide } from "./vendor/biobuzz-sim/hive";
 import type { Sim } from "./vendor/biobuzz-sim/world";
 import { Controls, type PadRead } from "./controls";
 import { IN, drawCount, type RobotPreset } from "./presets";
 
 const STICK_DEADBAND = 0.05;
+/** `TurretAimer.SWITCH_BAND_IN`: the band about the HIVE's axle line, inches. */
+const SWITCH_BAND_IN = 19.75;
 const CANCEL_STICK = 0.2;
 /** `TurretSubsystem.turretForwardIn`, `turretLeftIn`: where the turret sits on the robot. */
 const TURRET_FORWARD_IN = -3.33;
@@ -71,6 +74,9 @@ export interface TeleOpStatus {
   turretDeg: number;
   aimDeg: number;
   insideArc: boolean;
+  /** Our CELL at the robot's end, which the turret aims at, and whether it is the raised one. */
+  nearCell: CellSide;
+  nearCellUp: boolean;
   launcher: "IDLE" | "SPINNING UP" | "AT SPEED";
   gateOpen: boolean;
   lane: number;
@@ -395,7 +401,19 @@ export class TeleOp {
     return Math.sign(errDeg) * Math.min(max, Math.max(min, t));
   }
 
-  /** The turret's spot on the field and the aim, from the robot's forward, at our raised CELL. */
+  /**
+   * Which of our CELLs the turret aims at: the one at the robot's end of the field, up or down,
+   * with a band about the HIVE's axle line so it does not flick between them (`TurretAimer`,
+   * `TurretAim.nearEndCell`, `SWITCH_BAND_IN`). Whether it is up is the drive team's call.
+   */
+  nearCell: CellSide = "audience";
+
+  /** Our CELL at the robot's end is the raised one. */
+  get nearCellUp(): boolean {
+    return this.sim.hives[this.sim.alliance].upCell === this.nearCell;
+  }
+
+  /** The turret's spot on the field and the aim, from the robot's forward, at our CELL at this end. */
   private aimNow(): {
     deg: number;
     ox: number;
@@ -409,7 +427,10 @@ export class TeleOp {
       l = TURRET_LEFT_IN * IN;
     const ox = p.x + Math.cos(th) * f - Math.sin(th) * l;
     const oz = p.z - Math.sin(th) * f - Math.cos(th) * l;
-    const mouth = sim.hives[sim.alliance].mouthCenter();
+    const band = SWITCH_BAND_IN * IN;
+    if (p.z > band) this.nearCell = "audience";
+    else if (p.z < -band) this.nearCell = "rear";
+    const mouth = raisedMouth(sim.alliance, this.nearCell);
     const dx = mouth.x - ox,
       dz = mouth.z - oz;
     const fwd = dx * Math.cos(th) - dz * Math.sin(th);
@@ -668,6 +689,8 @@ export class TeleOp {
     const rel = wrap180(this.lastAimDeg - this.aimTrimDeg);
     const now = this.readyAt;
     return {
+      nearCell: this.nearCell,
+      nearCellUp: this.nearCellUp,
       turretMode: this.turretMode,
       turretDeg: this.turretDeg,
       aimDeg: this.lastAimDeg,
@@ -743,4 +766,25 @@ export function solveSpeed(
 /** The load in our raised CELL past its tipping weight, in POLLEN. */
 export function pastTippingPollen(sim: Sim): number {
   return Math.max(0, sim.cellLoad(sim.alliance) - TIP_LOAD.threshold);
+}
+
+/**
+ * The mouth of our CELL at `side` as it sits when raised: where the robot aims whether that CELL is
+ * up or down (`TurretAimer` aims at the raised point; the two differ by about an inch and a half).
+ * As the simulator's `Hive.mouthCenter`, for a given side.
+ */
+export function raisedMouth(
+  alliance: Alliance,
+  side: CellSide,
+): { x: number; y: number; z: number } {
+  const phi = side === "rear" ? HIVE.tiltLimit : -HIVE.tiltLimit;
+  const c = Math.cos(phi),
+    s = Math.sin(phi);
+  const ly = (HIVE.cellFloorY + HIVE.cellPeakY) / 2 - 0.03;
+  const lz = side === "rear" ? -HIVE.cellMouth : HIVE.cellMouth;
+  return {
+    x: HIVE.pivotX[alliance],
+    y: HIVE.pivotY + ly * c - lz * s,
+    z: ly * s + lz * c,
+  };
 }

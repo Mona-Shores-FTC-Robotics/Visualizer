@@ -17,6 +17,8 @@ export const groups = (member: number, filter: number) => (member << 16) | filte
 export class Hive {
   body: RAPIER_NS.RigidBody;
   tips = 0;
+  /** Mona Shores: while true, the raised CELL is held on its stop (the TIP lag, src/sim/tip-lag.ts). */
+  held = false;
   private lastStable: 1 | -1;
 
   constructor(private rapier: R, world: RAPIER_NS.World, public alliance: Alliance, initialUp: CellSide, dyn = HIVE_DYN) {
@@ -84,6 +86,8 @@ export class Hive {
     if (Math.abs(w) > 1e-3) tq -= Math.sign(w) * dyn.pivotFriction;
     const closing = Math.sign(w) === Math.sign(phi) && HIVE.tiltLimit - Math.abs(phi) < dyn.damperZone;
     if (closing) tq -= dyn.damperCoeff * w;
+    // The TIP lag hold: a stiff spring to the raised side's stop. 60 N m/rad beats a full CELL's ~1 N m.
+    if (this.held) tq += -60 * (phi - this.lastStable * HIVE.tiltLimit) - 3 * w;
     this.body.resetTorques(true);
     this.body.addTorque({ x: tq, y: 0, z: 0 }, true);
   }

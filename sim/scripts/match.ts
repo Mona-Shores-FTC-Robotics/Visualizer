@@ -4,6 +4,7 @@
 // order, for example BOTS='[{"shooter":"fifo","driveRpm":500,"sizeIn":15}]'. A setup's flowerStartSec wins over the arguments.
 // Run: npx tsx scripts/match.ts [full|teleop] [auto routine] [seed=11] [opponent|none] [partners|solo] [blueFlowerStart=0] [partnerFlowerStart=0] [ownFlowerStart=0]
 import RAPIER from '@dimforge/rapier3d-compat';
+import { tipTiming } from '../src/sim/tip-lag';
 import { Coach } from '../src/auto/coach';
 import { Referee } from '../src/ref/referee';
 import { DT, NO_INPUT, Sim, code } from '../src/sim/world';
@@ -12,7 +13,7 @@ import { defaultBot, robotConfig, sanitize, type BotSetup } from '../src/setup';
 const [mode = 'full', routine = 'solo-two-tip-sweep', seedArg = '11', oppArg = 'opponent', partnerArg = 'partners', blueStart = '0', partnerStart = '0', ownStart = '0'] = process.argv.slice(2);
 await RAPIER.init();
 const given: Partial<BotSetup>[] = JSON.parse(process.env.BOTS ?? '[]'), bots = [0, 1, 2, 3].map(i => sanitize({ ...defaultBot(i), ...(given[i] ?? {}) }, i));
-const sim = new Sim(RAPIER, undefined, mode === 'teleop' ? 'teleop' : 'full', Number(seedArg), { opponent: oppArg !== 'none', partners: partnerArg !== 'solo', configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) }); sim.start();
+const sim = new Sim(RAPIER, undefined, mode === 'teleop' ? 'teleop' : 'full', Number(seedArg), { opponent: oppArg !== 'none', partners: partnerArg !== 'solo', tipTiming: tipTiming(process.env.TIP_TIMING), configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) }); sim.start();
 const coaches = sim.robots.map((r, i) => { const c = new Coach(); c.autoRoutine = routine; const k = (r.alliance === 'red' ? 0 : 2) + r.slot; c.flowerStartSec = given[k]?.flowerStartSec ?? Number(i === 0 ? ownStart : r.alliance === 'red' ? partnerStart : blueStart); return c; });
 const referee = new Referee(), ex = coaches[0].executor; let t = 0, nextLog = 0, lastKey = '', lastStall = -1; const stalls = coaches.map(() => 0), stallAt = coaches.map(() => -1);
 const log = (note: string) => { const p = sim.robot.translation();

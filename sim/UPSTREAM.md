@@ -12,3 +12,8 @@ our measured models replace its models where we have data, each change citing it
 - Upstream's Cloudflare parts (`functions/`, `server/`, `migrations/`, `wrangler.toml`, the match counter) are
   unused by us and left as they came, so a diff against upstream stays clean.
 - `.github/workflows/ci.yml`'s `sim` job runs its type check and tests on every push.
+
+**Overrides stay switchable** (mentor, 23 Nov 2026). Where we replace one of upstream's models and aren't sure
+ours is better, upstream's stays as a choice in the sim's setup and in a script's options. The first is TIP
+timing: `UV/IR` (our films, `src/sim/tip-lag.ts`, the default) or `NCSSM` (upstream's rocker alone); in a
+script, `TIP_TIMING=ncssm` or `uv-ir`; in code, `SimOptions.tipTiming`.
