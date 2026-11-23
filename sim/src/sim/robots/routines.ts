@@ -193,3 +193,216 @@ export class GardenGather {
     return { drive, stickDown: stick, intake: stick, phase: this.phase, done: this.phase === 'done', note: `GARDEN gather: ${this.phase}` };
   }
 }
+
+// ---------------------------------------------------------------------------------------------------- corner gather
+
+/** A pose in Pedro's frame: inches, heading in degrees. */
+type PedroPose = { x: number; y: number; h: number };
+const FIELD_IN = 141.5;
+const turnedP = (p: PedroPose): PedroPose => ({ x: FIELD_IN - p.x, y: FIELD_IN - p.y, h: p.h + 180 });
+/** Reflected across x = y, red's corner's diagonal: 270° becomes 180° (GardenFieldPoints.diagonal). */
+const diagonalP = (p: PedroPose): PedroPose => ({ x: p.y, y: p.x, h: 90 - p.h });
+/** Mirrored across the centre line x = 70.75 (GardenFieldPoints.mirrored). */
+const mirroredP = (p: PedroPose): PedroPose => ({ x: FIELD_IN - p.x, y: p.y, h: 180 - p.h });
+const rad = (d: number) => (d * Math.PI) / 180;
+
+/** One way into a corner (GardenFieldPoints.Garden): the gather pose, the line-up, and which side the wall run along is. */
+export interface CornerWayIn { name: string; gather: PedroPose; lineUp: PedroPose; wallOnRight: boolean }
+
+/**
+ * GardenFieldPoints.CORNERS: red's GARDEN gather pose and line-up moved to each of the four corners, facing each of its two
+ * walls, in corner order (a pair is entries 2k, 2k + 1): red's GARDEN corner, blue's, the audience wall's blue-side corner,
+ * the far wall's red-side corner.
+ */
+export function cornerWaysIn(): CornerWayIn[] {
+  const G = R.gardenGather, g = G.gatherPose.value, l = G.lineUpPose.value;
+  const red = { gather: { x: g[0], y: g[1], h: g[2] }, lineUp: { x: l[0], y: l[1], h: l[2] } };
+  const along = { gather: diagonalP(red.gather), lineUp: diagonalP(red.lineUp) };
+  const w = (name: string, f: (p: PedroPose) => PedroPose, base: typeof red, wallOnRight: boolean): CornerWayIn =>
+    ({ name, gather: f(base.gather), lineUp: f(base.lineUp), wallOnRight });
+  const id = (p: PedroPose) => p;
+  return [
+    w('red GARDEN corner, facing the audience wall', id, red, true),
+    w('red GARDEN corner, facing the side wall', id, along, false),
+    w('blue GARDEN corner, facing the far wall', turnedP, red, true),
+    w('blue GARDEN corner, facing the side wall', turnedP, along, false),
+    w('audience blue-side corner, facing the audience wall', mirroredP, red, false),
+    w('audience blue-side corner, facing the side wall', mirroredP, along, true),
+    w('far red-side corner, facing the far wall', (p) => turnedP(mirroredP(p)), red, false),
+    w('far red-side corner, facing the side wall', (p) => turnedP(mirroredP(p)), along, true),
+  ];
+}
+
+/**
+ * GardenFieldPoints.nearestCorner: of the corner whose ways in are nearest (x, y) (Pedro inches) within `maxRangeIn`, the
+ * way in whose heading is closest to `hDeg`, so the line-up turns at most 45°. Null with no corner in range.
+ */
+export function nearestCorner(x: number, y: number, hDeg: number, maxRangeIn: number): CornerWayIn | null {
+  const ways = cornerWaysIn();
+  let pair = -1, best = maxRangeIn;
+  ways.forEach((w, i) => { const r = Math.hypot(w.gather.x - x, w.gather.y - y); if (r <= best) { pair = Math.floor(i / 2); best = r; } });
+  if (pair < 0) return null;
+  const a = ways[2 * pair], b = ways[2 * pair + 1];
+  const turn = (w: CornerWayIn) => Math.abs(wrap(rad(w.gather.h - hDeg)));
+  return turn(a) <= turn(b) ? a : b;
+}
+
+const toPedroPose = (p: { x: number; z: number }, h: number): PedroPose => ({ x: p.x / IN + C_IN, y: C_IN - p.z / IN, h: (h * 180) / Math.PI });
+const simPose = (p: PedroPose): Pose => fromPedro(p.x, p.y, p.h);
+
+/**
+ * The TeleOp's corner gather: the driver's GARDEN gather button (GardenGather.java run by BasicDriveTeleOp, with
+ * Button.anyCorner, on GrabRoutine). It gathers in the nearest field corner within `maxRangeIn`, facing whichever of the
+ * corner's two walls the robot already faces more nearly, so it works in any corner, not only at our GARDEN:
+ * - **line-up**: to the way in's line-up pose `lineUpBackIn` back and `lineUpOutIn` out from the wall run along (negative:
+ *   into it, so the robot presses onto the real wall); a stall within `stallWithinIn` ends it there. The stick goes down
+ *   and the intake starts once within `lowerWithinIn`, facing to `lowerWithinDeg`, and turning slower than
+ *   `lowerMaxTurnDegPerSec`.
+ * - **prep**: the stick `stickDownMs` on its way down, and the robot slower than `settledInPerSec` (each wait capped at
+ *   `settleMaxMs`).
+ * - **in**: to the gather pose `extraDepthIn` deeper (negative: short of it), along the line the line-up stopped on
+ *   (`followWallLine`, moved at most `maxWallLineShiftIn`), the heading `intoCornerDeg` toward the wall run along, at
+ *   `inSpeed`; ends at the pose, on a stall (`stallProgressIn` in `stallMs`) or after `inTimeoutMs`.
+ * - **dwell**: `dwellMs`, or until the lane is full, pushing forward at `dwellPushPower`, steered onto the line.
+ * - **back**: to where the line-up ended at `backSpeed`, ending there, on a `backStallMs` stall or after `backTimeoutMs`;
+ *   the stick up `raiseAfterStopMs` after.
+ * The stick on the wall ahead stops the robot `stickStopIn` out (the logged stop), as the GARDEN gather's does. Not
+ * modelled: the drive in's curve to the wall (the line-up already presses onto it, so it runs along the wall) and the
+ * two-step drive in.
+ */
+export class CornerGather {
+  phase: 'refused' | 'lineup' | 'prep' | 'in' | 'dwell' | 'back' | 'raise' | 'done' = 'lineup';
+  readonly way: CornerWayIn | null;
+  private m: Mover; private t = 0; private phaseAt = 0; private stickAt = NaN;
+  private best = Infinity; private bestAt = 0;
+  private lineUp: Pose = { x: 0, z: 0, h: 0 }; private inPose: Pose = { x: 0, z: 0, h: 0 }; private home: Pose = { x: 0, z: 0, h: 0 };
+  private wallDir = { x: 0, z: 0 };
+  private turnRate: number; private envFwd: number; private envSide: number;
+  private refusal = '';
+
+  constructor(private sim: Sim, private team: Team) {
+    this.m = mover(team);
+    const G = R.gardenGather;
+    const p = sim.robot.translation();
+    const here = toPedroPose(p, sim.heading);
+    this.way = nearestCorner(here.x, here.y, here.h, G.maxRangeIn.value);
+    this.turnRate = rad(model.robots[team].drive.envelope.turnDegPerS.value);
+    this.envFwd = driveEnvelope(team, 0).top; this.envSide = driveEnvelope(team, Math.PI / 2).top;
+    if (!this.way) {
+      this.phase = 'refused';
+      this.refusal = `no field corner within ${G.maxRangeIn.value.toFixed(0)} in`;
+      return;
+    }
+    // GardenGather.lineUpPose: back against the heading, out away from the wall run along (negative: into it).
+    const l = this.way.lineUp, h = rad(l.h), side = this.way.wallOnRight ? 1 : -1;
+    const back = G.lineUpBackIn.value, out = G.lineUpOutIn.value * side;
+    this.lineUp = simPose({ x: l.x - back * Math.cos(h) - out * Math.sin(h), y: l.y - back * Math.sin(h) + out * Math.cos(h), h: l.h });
+    // The wall ahead: the gather heading is square to one wall (sim forward is (cos h, -sin h)).
+    const gh = rad(this.way.gather.h);
+    this.wallDir = { x: Math.round(Math.cos(gh)), z: Math.round(-Math.sin(gh)) };
+  }
+
+  /** The way in, or why there is none. */
+  get note(): string { return this.way ? this.way.name : this.refusal; }
+
+  /** GardenGather.inPose: the gather pose deeper by extraDepthIn, toward the wall along the line-up's line, angled into the corner. */
+  private planIn(from: Pose): Pose {
+    const G = R.gardenGather, w = this.way!, g = w.gather, h = rad(g.h), side = w.wallOnRight ? 1 : -1;
+    const deeper = this.team === '19429' ? G.extraDepthIn19429.value : G.extraDepthIn.value;
+    let wall = side * G.laneTowardWallIn.value;
+    if (G.followWallLine.value && G.lineUpOutIn.value < 0) {
+      // GardenGather.wallLineShiftIn: how far the line-up's end is off the pose's line toward the wall, held to the shift.
+      const f = toPedroPose(from, from.h);
+      const toward = side * ((f.x - g.x) * Math.sin(h) - (f.y - g.y) * Math.cos(h));
+      const mx = Math.max(0, G.maxWallLineShiftIn.value);
+      wall = side * Math.max(-mx, Math.min(mx, toward));
+    }
+    const corner = side * Math.max(-15, Math.min(15, G.intoCornerDeg.value));
+    return simPose({ x: g.x + deeper * Math.cos(h) + wall * Math.sin(h), y: g.y + deeper * Math.sin(h) - wall * Math.cos(h), h: g.h - corner });
+  }
+
+  /** From the robot's centre to the wall it gathers against, metres. */
+  private toWallAhead(): number {
+    const p = this.sim.robot.translation();
+    return FIELD.half - (p.x * this.wallDir.x + p.z * this.wallDir.z);
+  }
+
+  /** GrabRoutine.steer: robot-centric powers (forward, strafe onto the line, turn onto its heading) as a world velocity. */
+  private steer(forward: number, dt: number): Drive {
+    const G = R.gardenGather, s = this.sim, p = s.robot.translation(), h = s.heading, to = this.inPose;
+    // Left of the line along the in heading, inches (GrabRoutine.lateralIn), in Pedro terms: sim left is (-sin h, -cos h).
+    const lateral = ((p.x - to.x) * -Math.sin(to.h) + (p.z - to.z) * -Math.cos(to.h)) / IN;
+    const mc = G.maxCorrection.value, clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+    let f = clamp(forward, 1);
+    if (this.toWallAhead() <= R.gardenGather.stickStopIn.value * IN) f = Math.min(f, 0); // the stick on the wall
+    const strafeLeft = clamp(-G.lateralKp.value * lateral, mc), turn = clamp(G.headingKp.value * wrap(to.h - h), mc);
+    const fw = { x: Math.cos(h), z: -Math.sin(h) }, lf = { x: -Math.sin(h), z: -Math.cos(h) };
+    const want = { vx: fw.x * f * this.envFwd + lf.x * strafeLeft * this.envSide, vz: fw.z * f * this.envFwd + lf.z * strafeLeft * this.envSide, w: turn * this.turnRate };
+    const v = s.robot.linvel();
+    return limitDrive(this.team, h, { vx: v.x, vz: v.z }, want, dt);
+  }
+
+  private go(ph: CornerGather['phase']) { this.phase = ph; this.phaseAt = this.t; this.best = Infinity; this.bestAt = this.t; }
+
+  step(dt: number): RoutineStep {
+    const s = this.sim, G = R.gardenGather; this.t += dt;
+    let drive: Drive = this.m.stop();
+    if (this.phase === 'refused') return { drive, stickDown: false, intake: false, phase: 'refused', done: true, note: `GARDEN gather refused: ${this.refusal}` };
+    const p = s.robot.translation(), v = s.robot.linvel();
+    const speedIn = Math.hypot(v.x, v.z) / IN, turnDeg = Math.abs((s.robot.angvel().y * 180) / Math.PI);
+    const since = (t: number) => (this.t - t) * 1000;
+    const progress = (d: number) => { if (d < this.best - G.stallProgressIn.value * IN) { this.best = d; this.bestAt = this.t; } };
+    const stalled = () => since(this.phaseAt) > 2 * G.stallMs.value && since(this.bestAt) > G.stallMs.value;
+    switch (this.phase) {
+      case 'lineup': {
+        const d = Math.hypot(this.lineUp.x - p.x, this.lineUp.z - p.z);
+        const facing = Math.abs(wrap(this.lineUp.h - s.heading)) <= rad(G.lowerWithinDeg.value);
+        if (Number.isNaN(this.stickAt) && d <= G.lowerWithinIn.value * IN && facing && turnDeg <= G.lowerMaxTurnDegPerSec.value) this.stickAt = this.t;
+        drive = this.m.step(s, this.lineUp, 1, dt);
+        progress(d);
+        const atPose = d < 0.5 * IN && Math.abs(wrap(this.lineUp.h - s.heading)) <= rad(G.atLineUpDeg.value);
+        // Pressed onto the wall short of the pose: a stall close to it ends the line-up where it stopped.
+        const pressed = d <= G.stallWithinIn.value * IN && stalled() && Math.abs(wrap(this.lineUp.h - s.heading)) <= rad(G.atLineUpDeg.value);
+        if (atPose || pressed) {
+          this.home = { x: p.x, z: p.z, h: s.heading };
+          this.inPose = this.planIn(this.home);
+          if (Number.isNaN(this.stickAt) && turnDeg <= G.lowerMaxTurnDegPerSec.value) this.stickAt = this.t;
+          this.go('prep');
+        } else if (since(this.phaseAt) > G.lineUpTimeoutMs.value) {
+          this.phase = 'done';
+          return { drive: this.m.stop(), stickDown: false, intake: false, phase: 'done', done: true, note: 'GARDEN gather: line-up timed out' };
+        }
+        break;
+      }
+      case 'prep':
+        if (Number.isNaN(this.stickAt) && (turnDeg <= G.lowerMaxTurnDegPerSec.value || since(this.phaseAt) >= G.settleMaxMs.value)) this.stickAt = this.t;
+        if (!Number.isNaN(this.stickAt) && since(this.stickAt) >= G.stickDownMs.value
+            && (speedIn < G.settledInPerSec.value || since(this.phaseAt) >= G.settleMaxMs.value)) this.go('in');
+        break;
+      case 'in': {
+        const d = Math.hypot(this.inPose.x - p.x, this.inPose.z - p.z);
+        progress(d);
+        drive = this.m.step(s, this.inPose, G.inSpeed.value, dt);
+        if (this.toWallAhead() <= G.stickStopIn.value * IN) drive = this.steer(0, dt); // the stick on the wall: no further
+        if (d <= 0.5 * IN || stalled() || since(this.phaseAt) > G.inTimeoutMs.value) this.go('dwell');
+        break;
+      }
+      case 'dwell':
+        drive = this.steer(G.dwellPushPower.value, dt);
+        if ((G.dwellEndsOnFull.value && s.carried.length >= s.cfg.capacity) || since(this.phaseAt) >= G.dwellMs.value) this.go('back');
+        break;
+      case 'back': {
+        const d = Math.hypot(this.home.x - p.x, this.home.z - p.z);
+        progress(d);
+        drive = this.m.step(s, this.home, G.backSpeed.value, dt);
+        if (d < 0.5 * IN || since(this.phaseAt) > G.backTimeoutMs.value || (since(this.phaseAt) > G.backStallMs.value && since(this.bestAt) > G.backStallMs.value)) this.go('raise');
+        break;
+      }
+      case 'raise':
+        if (since(this.phaseAt) >= G.raiseAfterStopMs.value) this.phase = 'done';
+        break;
+    }
+    const stick = !Number.isNaN(this.stickAt) && this.phase !== 'done';
+    return { drive, stickDown: stick, intake: stick, phase: this.phase, done: this.phase === 'done', note: `GARDEN gather (${this.way!.name}): ${this.phase}` };
+  }
+}

@@ -482,6 +482,78 @@
       "raiseAfterStopMs": {
         "value": 250,
         "source": "biobuzz opmodes/GardenGather.java Stick.raiseAfterStopMs"
+      },
+      "anyCorner": {
+        "value": true,
+        "source": "biobuzz opmodes/GardenGather.java Button.anyCorner: the TeleOp button gathers in the nearest of all four field corners (localization/GardenFieldPoints.nearestCorner), facing whichever of its two walls is nearer the heading; an Auto card never does"
+      },
+      "maxRangeIn": {
+        "value": 45.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.maxRangeIn: only a corner whose gather pose is this close is gathered from"
+      },
+      "followWallLine": {
+        "value": true,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.followWallLine: with lineUpOutIn into the wall, the drive in runs along the line the line-up stopped on"
+      },
+      "maxWallLineShiftIn": {
+        "value": 4.0,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.maxWallLineShiftIn"
+      },
+      "stallWithinIn": {
+        "value": 8.0,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.stallWithinIn: a line-up pressed onto the wall ends once it stalls this close to its pose"
+      },
+      "lineUpTimeoutMs": {
+        "value": 4000,
+        "source": "biobuzz opmodes/GardenGather.java LineUp.lineUpTimeoutMs"
+      },
+      "lowerMaxTurnDegPerSec": {
+        "value": 30.0,
+        "source": "biobuzz opmodes/GardenGather.java Stick.lowerMaxTurnDegPerSec: the stick comes down only while turning slower than this"
+      },
+      "retractAfterBackIn": {
+        "value": 10.0,
+        "source": "biobuzz opmodes/GardenGather.java Stick.retractAfterBackIn: a gather stopped before its drive back lifts the stick this far from the gather pose"
+      },
+      "settledInPerSec": {
+        "value": 20.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.settledInPerSec: the drive in starts once the robot is slower than this"
+      },
+      "laneTowardWallIn": {
+        "value": 5.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.laneTowardWallIn (the curve to the wall)"
+      },
+      "intoCornerDeg": {
+        "value": 4.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.intoCornerDeg: the drive in, push and dwell turn the intake this far toward the wall run along"
+      },
+      "dwellPushPower": {
+        "value": 0.25,
+        "source": "biobuzz opmodes/GardenGather.java Dwell.dwellPushPower: forward power during the dwell"
+      },
+      "headingKp": {
+        "value": 1.0,
+        "source": "biobuzz opmodes/GardenGather.java Steering.headingKp: turn power per radian, while dwelling"
+      },
+      "lateralKp": {
+        "value": 0.05,
+        "source": "biobuzz opmodes/GardenGather.java Steering.lateralKp: strafe power per inch off the line, while dwelling"
+      },
+      "maxCorrection": {
+        "value": 0.25,
+        "source": "biobuzz opmodes/GardenGather.java Steering.maxCorrection"
+      },
+      "backTimeoutMs": {
+        "value": 4000,
+        "source": "biobuzz opmodes/GardenGather.java Back.backTimeoutMs"
+      },
+      "backStallMs": {
+        "value": 400,
+        "source": "biobuzz opmodes/GardenGather.java Back.backStallMs: the back out ends where it is after this long without getting closer"
+      },
+      "settleMaxMs": {
+        "value": 500,
+        "source": "biobuzz opmodes/GrabRoutine.java SETTLE_MAX_MS: the longest a grab waits to face the line-up heading, and to slow before the drive in"
       }
     }
   }
