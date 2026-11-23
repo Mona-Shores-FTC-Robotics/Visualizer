@@ -33,7 +33,12 @@ import {
   type RunResult,
 } from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
-import { PadDecoder, connectedPads, type DecodedPad } from "./gamepads";
+import {
+  PadBinder,
+  PadDecoder,
+  connectedPads,
+  type DecodedPad,
+} from "./gamepads";
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -54,8 +59,6 @@ const prefs = (() => {
       camera?: string;
       tipTiming?: string;
       humanPlayer?: string;
-      /** Per mode, per robot: the gamepad (0-3, -1 none) of its driver and of its operator. */
-      assign?: Record<string, [number, number][]>;
     };
   } catch {
     return {};
@@ -71,7 +74,6 @@ function savePrefs() {
         camera: camSel.value,
         tipTiming: tipSel.value,
         humanPlayer: hpSel.value,
-        assign: prefs.assign,
       }),
     );
   } catch {
@@ -111,29 +113,21 @@ function fatal(msg: string) {
 
 const alliance = () => modeSel.value.startsWith("alliance");
 
-/** Who holds which gamepad, by default: solo as the Driver Station (1 driver, 2 operator). */
-const DEFAULT_ASSIGN: Record<string, [number, number][]> = {
-  two: [[0, 1]],
-  driver: [[0, -1]],
-  alliance: [
-    [0, -1],
-    [1, -1],
-  ],
-  "alliance-ops": [
-    [0, 1],
-    [2, 3],
-  ],
-};
-/** Each robot's [driver, operator] gamepad (0-3, -1 none) in this mode. */
-function assignment(): [number, number][] {
+/** The roles this mode has, in the order controllers bind to them: "robot:role". */
+function roles(): string[] {
   const mode = modeSel.value;
-  const a = prefs.assign?.[mode] ?? DEFAULT_ASSIGN[mode] ?? DEFAULT_ASSIGN.two;
-  // A mode without operators never takes one, whatever was saved.
-  return a.map(([d, o]) => [
-    d,
-    mode === "driver" || mode === "alliance" ? -1 : o,
-  ]);
+  const ops = mode === "two" || mode === "alliance-ops";
+  return teams().flatMap((_, k) =>
+    ops ? [`${k}:driver`, `${k}:operator`] : [`${k}:driver`],
+  );
 }
+const hasOperator = (k: number) => roles().includes(`${k}:operator`);
+const roleName = (role: string) => {
+  const [k, r] = role.split(":");
+  const who = alliance() ? `${TEAM_NAMES[teams()[Number(k)]]} ` : "";
+  return `${who}${r}`;
+};
+
 /** Robot 1 is the team picked under Robot; in an alliance its partner is the other. */
 function teams(): TeamNumber[] {
   const first = Number(teamSel.value) as TeamNumber;
@@ -147,7 +141,7 @@ function newSession() {
     file,
     teams().map((team, k) => ({
       team,
-      driverOnly: (assignment()[k]?.[1] ?? -1) < 0,
+      driverOnly: !hasOperator(k),
     })),
     mode,
     undefined,
@@ -159,7 +153,7 @@ function newSession() {
   showNumbers();
   showHistory();
   Object.assign(window as unknown as Record<string, unknown>, {
-    __drill: { session, file },
+    __drill: { session, file, binder },
   });
 }
 
@@ -350,61 +344,47 @@ function hud() {
 }
 
 /**
- * The Controllers panel: each robot's driver and operator, each on a gamepad picked here (the start
- * screen), with the connected controller's name. Kept per mode in this browser.
+ * The Controllers panel, the start screen: each role binds to the controller that presses Cross
+ * (A on an Xbox pad) while it waits, in order. A controller that never presses is never used, so
+ * another device in the browser's list (a virtual pad, a wheel) cannot drive the robot.
  */
-function padsLine(list: (Gamepad | null)[]) {
-  const ops = modeSel.value === "two" || modeSel.value === "alliance-ops";
+function padsLine(list: Gamepad[]) {
+  const ops = roles().some((r) => r.endsWith(":operator"));
   // The operator's layout shows only when someone runs it.
   $("operator-section").hidden = !ops;
   $("driver-pads").textContent = alliance() ? "one per robot" : "";
-  const name = (i: number) =>
-    i < 0
-      ? ""
-      : list[i]
-        ? esc(list[i]!.id.replace(/\s*\(.*\)$/, ""))
-        : '<span style="color:var(--warn)">not connected</span>';
-  const pick = (k: number, role: 0 | 1, value: number) =>
-    `<select data-robot="${k}" data-role="${role}">${[-1, 0, 1, 2, 3]
-      .map(
-        (i) =>
-          `<option value="${i}"${i === value ? " selected" : ""}>${i < 0 ? "nobody" : `Gamepad ${i + 1}`}</option>`,
-      )
-      .join("")}</select>`;
-  const a = assignment();
+  const waiting = binder.waiting();
+  const rows = roles()
+    .map((role) => {
+      const g = binder.boundPad(role, list);
+      const cell = g
+        ? `${esc(g.id.replace(/\s*\(.*\)$/, ""))} <span class="dim">(index ${g.index})</span>`
+        : role === waiting
+          ? '<b style="color:var(--warn)">press Cross (A) on this controller</b>'
+          : '<span class="dim">waiting</span>';
+      return `<tr><td>${roleName(role)}</td><td>${cell}</td></tr>`;
+    })
+    .join("");
+  const idle = list.filter((g) => !binder.roleOf(g)).length;
   $("pads").innerHTML =
-    `<table>${teams()
-      .map((team, k) => {
-        const who = alliance() ? `${TEAM_NAMES[team]} ` : "";
-        const rows = [
-          `<tr><td>${who}driver</td><td>${pick(k, 0, a[k][0])} ${name(a[k][0])}</td></tr>`,
-        ];
-        if (ops)
-          rows.push(
-            `<tr><td>${who}operator</td><td>${pick(k, 1, a[k][1])} ${name(a[k][1])}</td></tr>`,
-          );
-        return rows.join("");
-      })
-      .join("")}</table>` +
+    `<table>${rows}</table>` +
+    (idle
+      ? `<div class="dim">${idle} other controller${idle === 1 ? "" : "s"} connected, not used until one presses Cross (A).</div>`
+      : "") +
     (ops
       ? ""
-      : `<div>${alliance() ? "Each robot has a driver alone" : "Driver only"}: the turret aims (AIM), nobody runs the operator's buttons.</div>`);
-  for (const sel of $("pads").querySelectorAll("select"))
-    sel.onchange = () => {
-      const k = Number(sel.dataset.robot),
-        role = Number(sel.dataset.role);
-      const next = assignment().map((x) => [...x] as [number, number]);
-      next[k][role] = Number(sel.value);
-      prefs.assign = { ...prefs.assign, [modeSel.value]: next };
-      savePrefs();
-      padsKey = "";
-      newSession();
-    };
+      : `<div>${alliance() ? "Each robot has a driver alone" : "Driver only"}: the turret aims (AIM), nobody runs the operator's buttons.</div>`) +
+    '<p><button id="rebind" type="button">Bind again</button></p>';
+  $("rebind").onclick = () => {
+    binder.clear();
+    padsKey = "";
+  };
 }
 
 let lastFrame = performance.now();
 let padsKey = "";
 let decoder: PadDecoder;
+const binder = new PadBinder();
 let debugAt = 0;
 
 /**
@@ -426,7 +406,8 @@ function padDebug(list: Gamepad[], read: DecodedPad[]) {
       const warn = d.standard
         ? ""
         : `<div style="color:var(--warn)">Not the browser's standard mapping ("${esc(g.mapping || "none")}"). The drill read the sticks and triggers by where they rest (sticks: axes ${d.axisOf.lx}, ${d.axisOf.ly}, ${d.axisOf.rx}; L2 ${d.axisOf.l2}, R2 ${d.axisOf.r2}); its buttons may be off. Chrome or Edge, or a USB cable, gives the standard mapping.</div>`;
-      return `<div class="pad-debug"><b>Gamepad ${i + 1}</b> <span class="dim">${esc(g.id)} · mapping ${esc(g.mapping || "none")}</span>${warn}
+      const role = binder.roleOf(g);
+      return `<div class="pad-debug"><b>Index ${g.index}</b> · ${role ? `<b>${roleName(role)}</b>` : '<span class="dim">not bound: ignored</span>'} <span class="dim">${esc(g.id)} · mapping ${esc(g.mapping || "none")}</span>${warn}
         <div><code>axes ${g.axes.map(f).join(" ")}</code></div>
         <div><code>buttons ${pressed.join(" ") || "–"}</code></div>
         <div><code>drill: drive ${f(d.lx)} ${f(d.ly)} turn ${f(d.rx)} L2 ${d.l2.toFixed(2)} R2 ${d.r2.toFixed(2)}</code></div></div>`;
@@ -438,30 +419,41 @@ function frame(now: number) {
   lastFrame = now;
   // Controllers only, in the browser's order: a pad's motion sensors are not a pad.
   const list = connectedPads([...(navigator.getGamepads?.() ?? [])]);
+  binder.setRoles(roles());
+  binder.update(list);
   const read = list.map((g) => decoder.read(g));
-  const key = list.map((g) => g.id).join("|") + modeSel.value;
+  const key =
+    list.map((g) => `${g.index}${g.id}${binder.roleOf(g) ?? ""}`).join("|") +
+    modeSel.value;
   if (key !== padsKey) {
     padsKey = key;
     padsLine(list);
   }
-  // Options on either pad starts (or restarts after the results), as Enter does.
-  const startBtn = read.some((d) => d.options);
+  // Options on a bound controller starts (or restarts after the results), as Enter does.
+  const bound = list.map((g) => !!binder.roleOf(g));
+  const startBtn = read.some((d, i) => bound[i] && d.options);
   if (startBtn && !startWas) {
     if (session.finished) newSession();
     start();
   }
   startWas = startBtn;
-  const viewBtn = read.some((d) => d.share);
+  const viewBtn = read.some((d, i) => bound[i] && d.share);
   if (viewBtn && !viewWas) cycleCamera();
   viewWas = viewBtn;
-  const pad = (i: number) => (i >= 0 && read[i] ? read[i] : decoder.read(null));
+  const padOf = (role: string) => {
+    const g = binder.padFor(role, list);
+    return g ? read[list.indexOf(g)] : decoder.read(null);
+  };
   if (now - debugAt > 200) {
     debugAt = now;
     padDebug(list, read);
   }
   session.advanceAll(
     dt,
-    assignment().map(([d, o]) => ({ driver: pad(d), operator: pad(o) })),
+    teams().map((_, k) => ({
+      driver: padOf(`${k}:driver`),
+      operator: padOf(`${k}:operator`),
+    })),
   );
   if (session.finished && !saved) {
     saved = true;
