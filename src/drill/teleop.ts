@@ -127,6 +127,8 @@ export class TeleOp {
   launched = 0;
   /** The time each ball left, s from PLAY. */
   readonly shots: number[] = [];
+  /** Each volley (the gate opening): the CELL aimed at, and whether it was up. */
+  readonly volleys: { atS: number; cell: CellSide; up: boolean }[] = [];
   /** This loop, for the readout. */
   firePress = false;
 
@@ -369,6 +371,11 @@ export class TeleOp {
         !this.routine
       ) {
         this.gate = true;
+        this.volleys.push({
+          atS: now,
+          cell: this.nearCell,
+          up: this.nearCellUp,
+        });
         this.nextShotAt = now + this.preset.gateToFirstBallS;
         this.emptySince = Infinity;
       }

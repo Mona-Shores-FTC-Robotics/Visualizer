@@ -34,15 +34,8 @@ export class DrillView {
   private staticBalls = new THREE.Group();
   private staticKey = "";
   private hiveNodes: { red?: THREE.Object3D; blue?: THREE.Object3D } = {};
-  private robot = new THREE.Group();
-  private turret = new THREE.Group();
-  private lane = new THREE.Group();
-  private laneKey = "";
-  private intakeMat = new THREE.MeshStandardMaterial({
-    color: 0x3ad17a,
-    emissive: 0x0c4022,
-  });
-  private aimLine: THREE.Line;
+  private robots: RobotMesh[] = [];
+  private frame: number;
   private chaseAngle: number | null = null;
 
   constructor(
@@ -64,20 +57,7 @@ export class DrillView {
       );
     this.buildFloor();
     this.scene.add(this.staticBalls);
-    this.buildRobot(frameM);
-    this.aimLine = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(),
-        new THREE.Vector3(),
-      ]),
-      new THREE.LineBasicMaterial({
-        color: 0x41e07f,
-        transparent: true,
-        opacity: 0.7,
-      }),
-    );
-    this.aimLine.frustumCulled = false;
-    this.scene.add(this.aimLine);
+    this.frame = frameM;
     this.loadField();
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -204,15 +184,23 @@ export class DrillView {
     });
   }
 
-  private buildRobot(frame: number) {
+  /** One robot: the chassis in its team's colours, the intake bar, the turret and the lane. */
+  private buildRobot(team: number): RobotMesh {
+    const frame = this.frame,
+      group = new THREE.Group(),
+      colors = TEAM_COLORS[team] ?? { deep: 0x9c231d, bright: 0xd8261c };
     const chassis = new THREE.Mesh(
       new THREE.BoxGeometry(frame, 0.12, frame - 0.06),
-      new THREE.MeshStandardMaterial({ color: 0x9c231d, roughness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: colors.deep, roughness: 0.6 }),
     );
     chassis.position.y = 0.09;
+    const intakeMat = new THREE.MeshStandardMaterial({
+      color: 0x3ad17a,
+      emissive: 0x0c4022,
+    });
     const intake = new THREE.Mesh(
       new THREE.BoxGeometry(0.03, 0.05, frame * 0.86),
-      this.intakeMat,
+      intakeMat,
     );
     intake.position.set(frame / 2 + 0.01, 0.06, 0);
     const arrow = new THREE.Mesh(
@@ -232,46 +220,77 @@ export class DrillView {
       const w = new THREE.Mesh(wheelGeo, wheelMat);
       w.rotation.x = Math.PI / 2;
       w.position.set(a * frame * 0.36, 0.052, b * frame * 0.45);
-      this.robot.add(w);
+      group.add(w);
     }
-    // The turret: a disc with the launcher's barrel, behind and left of centre (TurretSubsystem).
+    // The turret: a disc with the launcher's barrel, behind and right of centre (TurretSubsystem).
+    const turret = new THREE.Group();
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.09, 0.09, 0.04, 24),
       new THREE.MeshStandardMaterial({ color: 0x2b2f36 }),
     );
     const barrel = new THREE.Mesh(
       new THREE.BoxGeometry(0.16, 0.06, 0.07),
-      new THREE.MeshStandardMaterial({ color: 0xe0e3e8 }),
+      new THREE.MeshStandardMaterial({ color: colors.bright }),
     );
     barrel.position.set(0.08, 0.05, 0);
-    this.turret.add(disc, barrel);
-    this.turret.position.set(-3.33 * 0.0254, 0.18, 2.68 * 0.0254);
-    this.robot.add(chassis, intake, arrow, this.turret, this.lane);
-    this.scene.add(this.robot);
+    turret.add(disc, barrel);
+    turret.position.set(-3.33 * 0.0254, 0.18, 2.68 * 0.0254);
+    // The team number on top, so two robots tell apart from any camera.
+    const plate = document.createElement("canvas");
+    plate.width = 256;
+    plate.height = 96;
+    const g = plate.getContext("2d");
+    if (g) {
+      g.fillStyle = `#${colors.bright.toString(16).padStart(6, "0")}`;
+      g.fillRect(0, 0, 256, 96);
+      g.fillStyle = "#fff";
+      g.font = "800 72px ui-sans-serif, system-ui, sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText(String(team), 128, 52);
+    }
+    const label = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(plate) }),
+    );
+    label.scale.set(0.3, 0.11, 1);
+    label.position.set(0, 0.42, 0);
+    const lane = new THREE.Group();
+    group.add(chassis, intake, arrow, turret, lane, label);
+    this.scene.add(group);
+    const aimLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(),
+        new THREE.Vector3(),
+      ]),
+      new THREE.LineBasicMaterial({
+        color: 0x41e07f,
+        transparent: true,
+        opacity: 0.7,
+      }),
+    );
+    aimLine.frustumCulled = false;
+    this.scene.add(aimLine);
+    return { team, group, turret, lane, laneKey: "", intakeMat, aimLine };
   }
 
-  sync(sim: Sim, turretDeg: number, showAim: boolean) {
-    const p = sim.robot.translation(),
-      th = sim.heading;
-    this.robot.position.set(p.x, 0, p.z);
-    this.robot.rotation.y = th;
-    this.turret.rotation.y = (turretDeg * Math.PI) / 180;
-    this.intakeMat.color.set(
-      sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
-    );
-    const key = sim.carried.join();
-    if (key !== this.laneKey) {
-      this.laneKey = key;
-      this.lane.clear();
-      sim.carried.forEach((k, i) => {
-        const m = new THREE.Mesh(
-          k === "pollen" ? this.ballGeo.pollen : this.ballGeo.nectar,
-          this.ballMat.get(k),
-        );
-        m.position.set(0.12 - i * 0.075, 0.19, -0.05);
-        this.lane.add(m);
-      });
-    }
+  /**
+   * Draws the field. `robots` gives each of `sim.robots` its team and turret angle (deg, from the
+   * robot's forward, + left); the chase camera follows the first.
+   */
+  sync(
+    sim: Sim,
+    robots: { team: number; turretDeg: number }[],
+    showAim: boolean,
+  ) {
+    robots.forEach((r, i) => {
+      if (!this.robots[i] || this.robots[i].team !== r.team) {
+        if (this.robots[i])
+          this.scene.remove(this.robots[i].group, this.robots[i].aimLine);
+        this.robots[i] = this.buildRobot(r.team);
+      }
+      this.syncRobot(this.robots[i], sim.view(i), r.turretDeg, showAim);
+    });
+    const p = sim.robot.translation();
     const seen = new Set<number>();
     for (const b of sim.balls.values()) {
       let m = this.ballMeshes.get(b.id);
@@ -316,18 +335,6 @@ export class DrillView {
     if (this.hiveNodes.blue)
       this.hiveNodes.blue.rotation.x = sim.hives.blue.phi - HIVE.tiltLimit;
 
-    this.aimLine.visible = showAim;
-    if (showAim) {
-      const a = th + (turretDeg * Math.PI) / 180,
-        o = this.turret.getWorldPosition(new THREE.Vector3());
-      const pos = this.aimLine.geometry.getAttribute(
-        "position",
-      ) as THREE.BufferAttribute;
-      pos.setXYZ(0, o.x, 0.02, o.z);
-      pos.setXYZ(1, o.x + Math.cos(a) * 1.2, 0.02, o.z - Math.sin(a) * 1.2);
-      pos.needsUpdate = true;
-    }
-
     const side = sim.alliance === "red" ? -1 : 1;
     this.camera.up.set(0, 1, 0);
     if (this.mode === "driver") {
@@ -361,4 +368,60 @@ export class DrillView {
     this.camera.updateProjectionMatrix();
     this.renderer.render(this.scene, this.camera);
   }
+
+  private syncRobot(
+    r: RobotMesh,
+    sim: Sim,
+    turretDeg: number,
+    showAim: boolean,
+  ) {
+    const p = sim.robot.translation(),
+      th = sim.heading;
+    r.group.position.set(p.x, 0, p.z);
+    r.group.rotation.y = th;
+    r.turret.rotation.y = (turretDeg * Math.PI) / 180;
+    r.intakeMat.color.set(
+      sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
+    );
+    const key = sim.carried.join();
+    if (key !== r.laneKey) {
+      r.laneKey = key;
+      r.lane.clear();
+      sim.carried.forEach((k, i) => {
+        const m = new THREE.Mesh(
+          k === "pollen" ? this.ballGeo.pollen : this.ballGeo.nectar,
+          this.ballMat.get(k),
+        );
+        m.position.set(0.12 - i * 0.075, 0.19, -0.05);
+        r.lane.add(m);
+      });
+    }
+    r.aimLine.visible = showAim;
+    if (showAim) {
+      const a = th + (turretDeg * Math.PI) / 180,
+        o = r.turret.getWorldPosition(new THREE.Vector3());
+      const pos = r.aimLine.geometry.getAttribute(
+        "position",
+      ) as THREE.BufferAttribute;
+      pos.setXYZ(0, o.x, 0.02, o.z);
+      pos.setXYZ(1, o.x + Math.cos(a) * 1.2, 0.02, o.z - Math.sin(a) * 1.2);
+      pos.needsUpdate = true;
+    }
+  }
 }
+
+interface RobotMesh {
+  team: number;
+  group: THREE.Group;
+  turret: THREE.Group;
+  lane: THREE.Group;
+  laneKey: string;
+  intakeMat: THREE.MeshStandardMaterial;
+  aimLine: THREE.Line;
+}
+
+/** The teams' colours, as their printed cheat sheets (biobuzz `CheatSheet.Team`). */
+const TEAM_COLORS: Record<number, { deep: number; bright: number }> = {
+  19429: { deep: 0xb0101e, bright: 0xff6a00 },
+  20245: { deep: 0x3a0ca3, bright: 0xb14eff },
+};

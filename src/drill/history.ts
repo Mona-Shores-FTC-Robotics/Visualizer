@@ -2,14 +2,16 @@
  * Past runs, kept in this browser's localStorage: each driver's laptop keeps its own. Every read
  * and write is guarded, so a private window or blocked storage only loses the history.
  */
-import type { RunResult } from "./session";
+import type { DrillMode, RunResult } from "./session";
 
 export const HISTORY_KEY = "biobuzz-drill-history-v1";
 const KEEP = 200;
 
 export interface StoredRun {
+  /** Robot 1's team; an alliance run lists both in `teams`. */
   team: number;
-  mode: "two" | "driver";
+  teams?: number[];
+  mode: DrillMode;
   date: string;
   tips: number;
   goalAtS: number | null;
@@ -25,6 +27,7 @@ export function summarize(r: RunResult): StoredRun {
   const p = r.pickUps.map((x) => x.s);
   return {
     team: r.team,
+    teams: r.robots.map((x) => x.team),
     mode: r.mode,
     date: r.date,
     tips: r.tips,
