@@ -1,0 +1,41 @@
+# Checks every push and pull request. Branch protection on main requires the "Build and test" job, so a change that
+# fails can't be merged. Cloudflare Pages builds and deploys main by its Git integration, and it builds a preview for
+# every pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test
+      # The Match Lab and the lessons page are generated and committed, so that the build needs no Python. This step
+      # fails if someone changed the post, the template, or the result files and didn't rebuild the pages.
+      - name: Check that the generated pages are fresh
+        run: |
+          python3 scripts/build-site.py
+          git diff --exit-code -- public/lab public/lessons docs/results.html
+      - name: Build the site
+        run: npx vite build

@@ -22,3 +22,22 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm test:e2e
+
+  # The match and drill simulator in sim/: NCSSM's ftc-biobuzz-sim (MIT), adopted as ours. Its own npm project and
+  # its own tests (the HIVE calibration rows, the drivetrain, the AUTO trees, the referee, scripted matches).
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sim/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npx tsc --noEmit
+      - run: npm test

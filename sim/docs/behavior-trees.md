@@ -1,0 +1,980 @@
+# Behavior-tree policies
+
+**Status: increments 1 to 8 are built; the rest is proposed.** The [plan](#plan) has two parts. Increments 1 to 5
+are done: the runtime in `src/bt/`, both periods as trees in `src/auto/trees/auto/` and `src/auto/trees/teleop/`, every
+TELEOP decision in the TELEOP tree, and a tree view on the simulator page, live and in review. The AUTO editor is the
+second part. Its first three increments are done: trees in FIELD x and y with a field editor that drags AUTO poses,
+AUTO leaves that command the robot's subsystems, and plans that you create, name, and edit. For how the simulator works, see [How the simulator works](simulator.md).
+
+This document proposes replacing the robot's decision code with behavior trees. A behavior tree is a tree of small
+nodes. The inner nodes decide what runs, and the leaves read the field and drive the robot. The same tree format
+covers both periods of a MATCH:
+
+- **AUTO trees** model the robot's own program. They see only what the robot's sensors report.
+- **TELEOP trees** model the drive team. They see the whole field, as a driver does.
+
+The end state has these parts:
+
+- The simulator shows the running tree next to the field, live and in review mode.
+- You edit a tree in the browser: its structure, its node parameters, and, in AUTO, its poses on the field.
+- You save a tree, share it by link, and load someone else's tree as a robot's policy.
+- You write your own leaf node in the browser, and it runs in a sandbox.
+
+## The code that this design replaces
+
+The planner code is in `src/auto/`. Before increments 2 and 3, three layers made its decisions:
+
+- **`Coach`** in `src/auto/coach.ts` picked the mode. In AUTO, it ran a script. In TELEOP, it asked the policy for a
+  tactic when the running tactic ended, and at least once per second.
+- **`scriptedTeleop`** in `src/auto/policy.ts` picked a tactic by trying a list of options in order.
+- **`Executor`** in `src/auto/executor.ts` runs one of six tactics. It also contains decisions that belong to the
+  policy: the endgame check that switches to PARK or a last launch, the opportunistic bump, and yielding to a partner.
+
+The coach now only hosts the two trees, and `scriptedTeleop` is gone. The executor's tactics run as TELEOP leaves, and
+increment 4 moved its three buried decisions into the tree.
+
+Before increment 2, `ScriptRunner` in `src/auto/script.ts` ran AUTO. An AUTO script was a list of steps with
+timeouts, plus a clock check that jumped to the last step, which is the PARK. `buildScripts` computed most poses from
+the robot's length and the side that its shooter faces. The AUTO trees replaced both.
+
+These layers already work like a behavior tree, but the priority order is spread across three files. Written out as
+one tree, TELEOP looks like this:
+
+```
+TELEOP, checked in priority order
+├─ [full defense] Defender
+├─ [time left ≤ PARK drive time] Endgame
+│   ├─ [a last launch is worth more than PARK, and SWARM doesn't need this PARK] Launch everything
+│   └─ PARK
+├─ [time left < FLOWER start time] FLOWER work
+│   ├─ [a filled FLOWER is exposed] Collect own NECTAR
+│   ├─ [the fill needs more POLLEN] Collect POLLEN
+│   ├─ Work the best FLOWER
+│   └─ Collect own NECTAR for the plug and the cap
+├─ [a TIP is possible] TIP: collect until the load is enough, then launch
+├─ [carrying something] Launch
+└─ PARK
+```
+
+## Environments
+
+A leaf gets one typed object, the *environment*, instead of a blackboard. The environment holds everything that a
+leaf can read and every action that it can take. There are two environment types, which share a common core:
+
+| Environment | Used by | What it adds to the core |
+| --- | --- | --- |
+| Driver | TELEOP trees | Every ball, every robot, the partner channel, and the robot's driver assists |
+| Onboard | AUTO trees | The camera's AprilTag sightings of the CELLS |
+
+A driver watches the whole field, so a TELEOP tree can read opponents' positions, their loads, and where they're
+heading. An AUTO tree can't. It reads only odometry, the hopper count, the robot's size, the clock, and the camera,
+as `ScriptRunner` did.
+
+The shape of the environment is as follows:
+
+```ts
+interface CoreEnv {
+  clock: { phase: 'auto' | 'transition' | 'teleop'; remaining: number; elapsed: number };
+  field: {
+    half: number;                                  // Meters from the center to the inner wall face.
+    flowers: Record<'own' | 'opponent' | 'rear' | 'audience', FlowerView>;
+    hives: { own: HiveView; opponent: HiveView };
+    zones: { loading: ZoneView };
+  };
+  bots: { me: MyBot };
+}
+
+interface MyBot {
+  startPose: Pose; pose: Pose; velocity: Twist;
+  hopper: { pollen: number; ownNectar: number; capacity: number; free: number };
+  dimensions: { length: number; width: number };
+  mass: number;
+  shooter: { type: 'catapult' | 'fifo' | 'dual'; facing: 'front' | 'rear' };
+  recentStalls: { target: string; reason: string; at: number }[];
+  // Subsystems. Only actions can use them.
+  drive: DriveSubsystem; intake: IntakeSubsystem; shooter: ShooterSubsystem; placer: PlacerSubsystem;
+}
+
+interface DriverEnv extends CoreEnv {
+  field: CoreEnv['field'] & { balls: BallView[] };
+  bots: { me: MyBot & { assists: DriverAssists }; partner: BotView | null; opponents: BotView[] };
+  team: TeamChannel;                               // What this robot's drivers tell their partner.
+}
+
+interface OnboardEnv extends CoreEnv {
+  sensors: { camera: { seesRaised(cell: 'rear' | 'audience'): boolean } };
+}
+```
+
+The following rules keep the environment from becoming a blackboard:
+
+- **No shared store.** No node can write a value that another node reads, except through a chain, which is
+  described later, and through the typed partner channel.
+- **Facts, not scratch space.** The environment holds observations and the robot's own history, such as its recent
+  stalls. Some fields are computed when a leaf reads them, for example the number of POLLEN that the raised CELL still
+  needs. They read like plain fields.
+- **Logging goes through the leaf's context.** A leaf gets the environment, its parameters, its input, and a `log`
+  function, which adds an event to the leaf's own span in the trace.
+- **Plain data at every boundary.** Observations, action arguments, and query results are plain data. A sandboxed
+  leaf needs this rule, because only plain data can cross into a sandbox.
+- **One schema.** A single schema defines the environment. It produces the TypeScript types, the expression checker,
+  and the editor's autocomplete. A tree that names a field that its environment doesn't have fails to load.
+- **The alliance's own view.** Every position is in the alliance frame, red's FIELD coordinates, and a blue robot runs
+  the tree rotated 180° about the FIELD center. FLOWERS and HIVES are named `own` and `opponent`. One tree then plays
+  both colors. See [Coordinates and alliances](#coordinates-and-alliances).
+
+**Driver assists** are the robot's own help to its drivers in TELEOP. The shot interlock is one: the robot fires only
+when a physics preview of the shot says that the ball enters the CELL. A driver can't make that prediction, but a
+robot with auto-aim can. To measure a drive team without assists, remove the assist from the environment. The tree
+doesn't change.
+
+### Coordinates and alliances
+
+Tree files use FIELD coordinates, the ones that the floor labels on the simulator page show:
+
+- The origin is the FIELD center, and the unit is the meter.
+- +x points to the blue wall, and -x to the red wall.
+- +y points to the rear wall, and -y to the audience wall.
+- A heading is in degrees, counterclockwise from +x, seen from above. A robot with heading 90 faces the rear wall.
+
+Every tree is written for the red alliance. A blue robot runs the same tree rotated 180° about the FIELD center: x
+becomes -x, y becomes -y, and the heading gets 180° added. A rotation, not a mirror, is the transform, because it keeps
+each drive team's view: the right start position is on the drivers' right for both alliances. The simulator assumes
+that the FIELD has this rotational symmetry, which isn't checked against the Competition Manual. So a tree's `rear`
+means red's rear, and a blue robot's rear CELL is where red's audience CELL is. The field editor edits in red's frame
+only.
+
+The simulator's code uses three.js axes, where y points up, so the floor is x and z, and z is the negative of FIELD
+y. Only the onboard environment converts: `simPoint` and `simHeading` in `src/auto/onboard.ts`. Before increment 6,
+tree files used the code's x and z. `e72-field-xy` checks that the change of axes moved no pose.
+
+### Subsystems
+
+A robot is a set of subsystems, as in FTC's command-based libraries such as FTCLib and NextFTC. Each subsystem has
+state, which expressions read, and commands, which leaves run. The AUTO leaves are named for the subsystem that they
+command:
+
+| Subsystem | State that expressions read | Commands |
+| --- | --- | --- |
+| Drive | `bots.me.drive.pose`, from odometry, and `bots.me.drive.speed` | `drive.driveTo`, `drive.followPath`, `drive.push` |
+| Intake | None | `intake.run(filter)` |
+| Transfer | `bots.me.transfer.count`, `capacity`, and `full` | None |
+| Shooter | `bots.me.shooter.facing` and `type` | `shooter.shoot` |
+| Vision | `bots.me.vision.seesRaised(cell)` | `vision.waitTip` |
+
+Two leaves belong to no subsystem: `wait`, for a time, and `waitUntil`, for a condition. A condition is an expression
+over the environment, such as `bots.me.transfer.full` or `clock.remaining <= 2.5`, so the tree needs no leaf for each
+kind of wait. `waitUntil` uses a *live* parameter, which the runtime evaluates each time that the leaf reads it, where
+other parameters are evaluated once, when the leaf starts.
+
+The runtime keeps command-based semantics, so the idioms carry over:
+
+| Command-based | In this runtime |
+| --- | --- |
+| A command | A leaf |
+| `end(interrupted)` | The leaf's cleanup, which runs when the leaf ends or is halted |
+| Requirements | The subsystems in a leaf's `uses`. The loader rejects a `parallel` node whose children command the same subsystem |
+| A sequential, parallel, or race group | A `sequence`, or a `parallel` node with the `all` or the `any` policy |
+| A deadline group | A `parallel` node with the `any` policy whose other children never end on their own |
+| A default command | What a subsystem does in a physics step that no leaf commands it: the drive and the shooter idle, and the intake stops |
+
+A behavior tree adds what command-based code lacks for TELEOP: a `fallback` that changes its mind, `guard` and `hold`
+conditions, and the reactive recheck.
+
+For example, a sweep runs the intake and a path together, and ends when the transfer is full or the path ends:
+
+```
+parallel(any: waitUntil(bots.me.transfer.full), intake.run(all), drive.followPath(waypoints))
+```
+
+`intake.run` never ends by itself, so the other two children decide when the node ends. When it ends, the intake goes
+back to its default command, which stops it. `waitUntil` comes first, so that in the step that the transfer fills, the
+node ends before the path follower sends another command.
+
+**The robot config picks each subsystem's implementation.** A tree commands the interface, and the config swaps the
+implementation: the drive's path follower, and the shooter's type. Aiming belongs to the shooter, not to the tree. The
+intended shooter interface is `if (shooter.canShoot) shooter.shoot`. `canShoot` decides whether the shooter can hit the
+target from where the robot is, with read-only access to the other subsystems' state, such as the drive's pose and the
+AprilTags that vision sees. A shooter that launches out of both ends is a turret with two set points and an instant
+slew: it launches out of the end that faces the robot's own HIVE (`src/sim/config.ts`). The simulator also has a
+turret with full range of motion and an instant slew, which aims each launch at the raised CELL whatever the robot's
+heading. It's an upper bound: a turret with a slew rate or a limited range would be one more implementation, and it
+can't do better. The TELEOP planner's launch spot has no heading for a turret, so the robot doesn't turn to launch.
+The AUTO trees' launch poses keep their headings. With the turret on all four robots, `e79-turret-all` is +39.4 ±
+13.6 combined points against `e77-wait-until`.
+
+`canShoot` is built for TELEOP, as `Shooter.canShoot` in `src/auto/shooter.ts`, and the planner asks it before each
+launch: the robot must be at its launch spot and still, and the mean shot preview must enter the CELL. Two turret
+experiments lost points and were removed:
+
+- **Fire on the way.** The turret fired as soon as the mean shot and the six shots one standard deviation off all
+  entered the CELL, on the move. `e82-turret-fire-en-route` is -58.1 ± 9.3 against e79: the robots launched 16% more
+  elements and made fewer TIPS. The shot preview is the reason. `scripts/shot-diagnostic.ts` compares it with what
+  launches do: 97% of still launches that it predicts enter the CELL, but only 59% of moving ones, even with no launch
+  error. With no launch error, a controlled test of 14 moving launches agreed with the preview in 9. The preview leaves
+  out the Magnus lift from backspin, which the simulator applies, and whose direction follows the element's velocity:
+  that is a likely cause, but it isn't confirmed.
+- **Point the intakes at balls.** A turret robot on its way to launch turned toward the most floor elements that it
+  collects. `e83-turret-intake-heading` is -13.0 ± 7.8 more.
+
+A turret can also have limits: `turretRangeDeg`, its range of motion around the shooter's facing, and
+`turretSlewDegPerSec`, its top turn rate. A limited turret tracks the raised CELL on every step, from the start of the
+MATCH, and launches where it points. TELEOP fire control waits until it's aimed, because the shot preview uses the
+turret's angle. In AUTO, `shooter.shoot` holds fire until `bots.me.shooter.aimed`. If the range can't reach the CELL
+from the robot's heading at the launch spot, the robot turns only as far as the range needs. With the turret on all
+four robots, against no turret (`e77-wait-until`):
+
+| Range and slew | Combined points | Run |
+| --- | --- | --- |
+| Full turn, instant | +39.4 ± 13.6 | `e79-turret-all` |
+| 270°, 360°/s | +26.6 ± 10.1 | `e91-turret-270deg-360dps-aimed` |
+| 180°, 180°/s | +33.9 ± 13.3 | `e92-turret-180deg-180dps-aimed` |
+| Full turn, 90°/s | -21.2 ± 10.0 | `e93-turret-360deg-90dps-aimed` |
+
+A turret at 180°/s or faster keeps most of the ideal turret's gain: its slew hides in the drive time. A 90°/s turret
+turns slower than the robot does, and the robot waits for it at the spot.
+
+In AUTO, `shooter.shoot` still launches open loop from where the robot stands, and its `cell` parameter holds fire
+until the camera sees that CELL raised.
+
+One problem is open: the loader checks a tree against its environment's schema, not against a robot's config. A
+command that only one implementation has, such as a turret's, would fail when it runs, not when the tree loads.
+
+### Navigation
+
+In AUTO, two drive commands move the robot. `drive.driveTo` drives to a pose on a path that the planner picks, and
+`drive.followPath` follows the tree's own waypoints. Neither runs the intake or ends on a full transfer: a tree runs
+them beside `intake.run` and races them against `waitUntil`, as [Subsystems](#subsystems) describes. Each command ends
+on arrival or on its timeout.
+
+The robot config, not the tree, chooses how the robot gets there:
+
+- **The path planner.** Today it's the visibility-graph planner in `src/auto/planner.ts`, which routes around the
+  field elements, and in AUTO also around the FIELD center line.
+- **The path follower.** Today it's pure pursuit with a trapezoidal speed profile, in `src/auto/follow.ts`.
+
+Other followers can come later, for example the Road Runner or Pedro Pathing libraries that many FTC teams use.
+Both follow a curve that the team defines and don't plan around obstacles. To keep a tree the same when the follower
+changes, a waypoint can carry optional curve hints, and a follower ignores the hints that it doesn't use. The path
+still changes with the follower, so the score can change.
+
+In TELEOP, `navigate` models the driver's steering plus any drive assists. Partner avoidance and stall recovery stay
+inside it, not in the tree.
+
+## Execution model
+
+Trees run on simulated time. Each node is a TypeScript generator. A `yield` waits for the next physics step, so a leaf
+reads as straight-line code. The following leaf, `teleop.tactic` in `src/auto/driver.ts`, runs one executor tactic
+until the executor reports it done or blocked:
+
+```ts
+*run(ctx) {
+  const e = ctx.env, ex = e.executor;
+  ex.setTactic(ctx.params.tactic, ctx.params.flower); e.runExecutor();
+  for (;;) { yield; if (ex.status !== 'in_progress') return ex.status; e.runExecutor(); }
+}
+```
+
+The rules are as follows:
+
+- **The simulation loop drives the trees.** On each physics step, the runtime resumes each robot's tree in slot
+  order. Each subsystem that an action commands contributes its part of the robot's inputs for that step.
+- **One clock.** Timeouts, cooldowns, and every other timer read the simulation clock. No code reads the wall clock.
+- **No randomness in trees.** All randomness comes from the simulator's seeded generator, so the same seed gives the
+  same match.
+- **A result is a value or a typed failure.** A node succeeds with a value, or it fails with a tag such as
+  `ConditionFalse`, `MatchFailed`, `TimedOut`, `Stalled`, or `Blocked`. There's no running status: a node that hasn't
+  returned is running. An exception that no tag covers is a bug. It stops the robot and shows in the trace.
+- **Halt runs cleanup.** When a parent interrupts a child, the runtime calls the child's generator `return` method,
+  which runs its `finally` blocks. Cleanup must finish within the same step.
+- **Node memory is the generator's local variables.** Halting a node discards its memory.
+- **No endless loop within one step.** If a loop finishes an iteration without using a physics step, the runtime makes
+  it wait for the next step.
+
+### How a step runs
+
+The runtime is a hybrid: nodes are written like asynchronous code, and they run on a conventional behavior tree's fixed
+tick. Each tree is a coroutine that advances in lockstep with the physics.
+
+- **Written like asynchronous code.** A node is a coroutine with its own local state. It returns a value or throws a
+  typed failure, and there's no running status. Halting a node runs its cleanup through the whole subtree, as
+  interrupting a fiber does.
+- **Driven like a ticked tree.** `TreeRunner.step()` in `src/bt/runner.ts` runs once per physics step, 240 times per
+  second, for each robot. Every timer counts steps, and nothing waits on real time or on a promise.
+- **Resumed, not re-traversed.** A conventional tree walks from the root on every tick and checks conditions along the
+  way. Here a step resumes only the paused chain from the root to the running leaf. The rest of the tree isn't visited,
+  so a step costs about 0.3 µs per robot.
+- **Reactive only where a tree says so.** A higher-priority branch interrupts a running one only inside a reactive
+  fallback, and only every `recheckSec` seconds. The default TELEOP tree checks its endgame, bump, and yield every step,
+  and its tactic choice once per second.
+- **No real concurrency.** A `parallel` node advances each running child once per step, in child order.
+
+The following table compares the runtime with the behavior trees in the [prior work](#prior-work):
+
+| Question | A conventional ticked tree | electric-mayhem | The private runtime | This runtime |
+| --- | --- | --- | --- | --- |
+| What drives it | A tick from the host | A change of any condition | The Effect scheduler | A tick per physics step |
+| What a step visits | The tree from the root | The tree from the root, after a restart | The fibers that are ready | The paused chain to the running leaf |
+| When a branch is interrupted | Whenever a reactive condition fails on a tick | On every condition change, by a restart | When a watched condition changes | Only in a reactive fallback, every `recheckSec` |
+| Time | Tick count or wall clock | Wall clock, and a virtual clock in tests | Wall clock | Simulated time only |
+| Concurrency | None | Coroutines | Fibers | Children advanced in order |
+| The same inputs give the same run | Depends on the host | No | No | Yes |
+
+Being deterministic and synchronous is what made the exact checks of increments 2 and 3 possible. Each conversion ran
+alongside the old code on the same state and gave the same inputs on every physics step.
+
+## Node types
+
+The node types follow a vocabulary that splits the traditional "decorator" into supervisors, which wrap one child,
+and chain operators, which transform a value.
+
+| Category | Node | What it does |
+| --- | --- | --- |
+| Flow | `sequence` | Runs its children in order. It fails with the first failure. |
+| Flow | `fallback` | Tries its children in order, and succeeds with the first success. It fails if every child fails. |
+| Flow | `parallel` | Runs its children at the same time, with the `all`, `any`, or `quorum` rule. It halts the children that are still running when the result is decided. |
+| Flow | `chain` | Runs its children in order, and passes each child's output to the next child as input. |
+| Supervisor | `guard` | Runs its child only if a condition passes. |
+| Supervisor | `timeout` | Halts its child and fails with `TimedOut` after a set time. |
+| Supervisor | `retry` | Runs its child again after a failure with a listed tag, up to a set count. |
+| Supervisor | `repeat` | Runs its child again each time it finishes. The TELEOP root uses it. |
+| Supervisor | `cooldown` | After its child fails, or with `from: "start"` after its child starts, fails at once for a set time. |
+| Supervisor | `hold` | Reuses its child's last result for a set time, so a decision can't flip every step. |
+| Supervisor | `ensure` | Runs a cleanup child after its child succeeds, fails, or halts. |
+| Supervisor | `recover` | Turns failures with listed tags into a success value, or into another child. |
+| Chain operator | `map` | Replaces the current value with an expression's value. |
+| Chain operator | `matches` | Fails with `MatchFailed` unless an expression over the current value is true. |
+| Chain operator | `bind` | Names the current value, so that later children of the chain can read it. |
+| Chain operator | `validate` | Fails unless the current value has a stated type. |
+| Leaf | `condition` | Checks an expression. It succeeds or fails in the same step and changes nothing. |
+| Leaf | `action` | Runs over one or more steps. Only actions can command a subsystem. |
+
+The following sections describe the parts that need more than one line.
+
+### Reactive fallback
+
+A `fallback` can be reactive. While a child runs, the fallback checks its higher-priority children every `recheckSec`
+seconds. If one can start, the fallback halts the running child and starts that one. If the running child is a guard
+and its own condition fails, the fallback halts it and starts the next child. The interval starts again whenever a
+child starts. The rules for "can start" are as follows:
+
+- **A guard can start** when its condition is true and its child is ready. A `cooldown` child isn't ready while it
+  cools down, so a fallback doesn't start a branch that would fail at once.
+- **A running guard keeps running** while its own condition is true. A cooldown that began when the branch started
+  doesn't stop it.
+- **A child without a guard can always start.** Such a child ranks above the running one only if it ran earlier and
+  failed, and then the fallback tries it again at the next check.
+
+A reactive fallback needs at least one guard child.
+A `recheckSec` of 0 checks every step. The endgame branch needs 0. The tactic choice uses 1 s, which matches the
+coach's review that it replaced.
+
+A reactive fallback interrupts only its own running child. It doesn't restart the whole tree, so a sequence elsewhere
+keeps its place.
+
+### Chains and dataflow
+
+A node can get data from four places, and from nowhere else:
+
+- **`params`:** fixed values or expressions from the tree file.
+- **`input`:** the one value that a chain passes from the previous child.
+- **Bound names:** values that a `bind` earlier in the same chain named. A `bind` must be a direct child of its chain.
+  Only later children of that chain can read
+  them.
+- **The environment.**
+
+A chain replaces the utility selector that ranks options by value. The first child returns a choice, and the next
+children act on it. For example, one chain picks the best FLOWER, drives to its stand pose, and places. Another
+computes the launch spot, binds it as `spot`, drives there, and fires. Each node declares its input type and output
+type, and the loader checks that each child's output matches the next child's input.
+
+### Parallel nodes and subsystems
+
+A leaf declares the subsystems that it commands in `uses`, for example `drive`, `intake`, or `shooter`. The loader
+rejects a `parallel` node whose children command the same subsystem. A subsystem command belongs to its node, so
+halting the node stops the command. For an example, see [Subsystems](#subsystems).
+
+## Expressions
+
+Conditions, `map`, `matches`, scores, and pose parameters use a small expression language over the environment.
+It has field paths, arithmetic, comparisons, `and`, `or`, `not`, `if(test, a, b)`, a few functions such as `min`,
+`max`, and `hypot`, a `pose(x, z, headingDeg)` constructor, and `offset(pose, dx, dz)`. Expressions can read the
+environment and bound names. They can't change anything.
+
+A tree can declare named *definitions* in `defs`. A definition is a read-only expression, for example the distance
+from a FLOWER at which the robot stands. It keeps a tree from repeating the same expression in every pose. No node can
+write a definition, so definitions can't collect leftover state.
+
+AUTO poses depend on the robot's size, so they're expressions. A pose that the user places by hand in the editor is a
+plain number instead. When you drag a pose that is an expression, the editor changes an offset and keeps the
+expression, so the pose still moves when the robot's length changes.
+
+## Tree files
+
+A tree file is JSON. It uses the shape `kind: "bt.tree"`, with a `root` that names its node type as a key. The top
+level also has these fields:
+
+- **`id`:** a stable slug, for example `wall-sweep-pair-right`. Robot setups and the catalog refer to a tree by it.
+- **`name`:** the name that people see, for example "Wall-sweep pair: right robot".
+- **`description`:** optional text for the AUTO list and the catalog.
+- **`meta`:** optional data for the host, which the loader doesn't check. AUTO trees give their start position, and a
+  plan that the editor made names its source in `clonedFrom`.
+
+A leaf is a `ref` to a registered leaf type, with `params`. Each parameter's schema says whether it takes an expression.
+An enum parameter, such as an intake mode, takes a plain value. Any node can carry a `note`, which keeps the reason for
+a step next to the step.
+
+The following file is `src/auto/trees/auto/lane-sweep-pair-right.json`, a right robot's AUTO, shortened to its first two
+steps, its first sweep, and its PARK. The PARK starts when all the other steps end, or when the clock shows 4.5 s,
+whichever comes first. The sweep and the PARK each run the intake beside the drive, in a `parallel` node that ends when
+the drive ends or the transfer is full:
+
+```json
+{
+  "kind": "bt.tree",
+  "id": "lane-sweep-pair-right",
+  "name": "Lane-sweep pair: right robot",
+  "env": "onboard",
+  "description": "The earlier default for the right start position, with lane sweeps: the first TIP from the ...",
+  "meta": { "start": "right" },
+  "defs": {
+    "full": "bots.me.transfer.full",
+    "len": "bots.me.dimensions.length",
+    "flip": "if(bots.me.shooter.facing == 'front', 180, 0)",
+    "stand": "len / 2 + field.flowerHalfSize + 0.02",
+    "launchAudience": "pose(field.hiveX, -1.32, -90 + flip)",
+    "ownFlower": "pose(-field.flowerFar + stand, -field.flowerNear, 180)",
+    "park": "pose(-(field.half - len / 2 - 0.09), 0.8954, 180)",
+    "parkRight": "pose(park.x, 0.8954 - 0.33, park.headingDeg)"
+  },
+  "root": { "sequence": { "children": [
+    { "id": "steps", "parallel": { "policy": "any", "children": [
+      { "id": "finish", "ref": "waitUntil", "params": { "condition": "clock.remaining <= 4.5" } },
+      { "sequence": { "children": [
+        { "id": "s1", "ref": "drive.driveTo", "params": { "pose": "launchAudience", "timeoutSec": 4 } },
+        { "id": "s2", "note": "The raised CELL starts with 3 NECTAR, so the third POLLEN tips the HIVE.",
+          "ref": "shooter.shoot", "params": { "count": 3, "timeoutSec": 2.5 } },
+        { "id": "collect-s9", "parallel": { "policy": "any", "children": [
+          { "ref": "waitUntil", "params": { "condition": "full" } },
+          { "ref": "intake.run", "params": { "filter": "all" } },
+          { "id": "s9", "ref": "drive.followPath", "params": { "tag": "sweep-right", "timeoutSec": 8.3,
+            "waypoints": [{ "x": -1.415, "y": -1.543, "headingDeg": null },
+                          { "x": -0.365, "y": -1.543, "headingDeg": -90 },
+                          { "x": -0.515, "y": -0.985, "headingDeg": null },
+                          { "x": -1.565, "y": -1.135, "headingDeg": null }] } }
+        ] } }
+      ] } }
+    ] } },
+    { "id": "collect-s15", "parallel": { "policy": "any", "children": [
+      { "ref": "intake.run", "params": { "filter": "all" } },
+      { "id": "s15", "ref": "drive.driveTo", "params": { "pose": "parkRight", "timeoutSec": 6 } }
+    ] } }
+  ] } }
+}
+```
+
+The loader limits a tree's node count, its depth, and the length of each expression, because shared trees come from
+other people.
+
+## Tracing and the tree view
+
+Each time a node runs, the runtime records a *span*: the node's path, its type, its start and end in simulation
+seconds, its result or failure tag, its input and output, and its log events. A match's spans form a timeline of the
+whole tree.
+
+The simulator page's tree view, **Tree view** in the options, draws a robot's tree as an outline in
+`src/render/tree-view.ts`. Each line shows a node's type or leaf, its id, its state, and its settings, and the node's
+note is its tooltip. The buttons at the top pick the robot. The view works in two ways:
+
+- **Live.** Each coach records its trees with a `Recorder`. The view highlights the running chain from the root to the
+  running leaf, and it marks every other node with its last result: done, a failure tag such as `ConditionFalse`,
+  halted, or error.
+- **In review mode.** The match trace stores, 10 times per second, each robot's tree id, its running nodes, its
+  running leaf's path, and the nodes that ended since the previous frame. Scrubbing to a moment rebuilds the tree's
+  state then from those frames, so the view shows the tree as it was at the cursor.
+
+A match note records the tree and the running leaf of every robot, for example `tree teleop-default at
+root/match/play/child/tip/child`, which makes a bug report precise. Recording doesn't change what a robot does, and a
+test checks that. The headless scripts don't record trees.
+
+Chain values aren't recorded yet: the page's recorders don't store node inputs and outputs, to keep traces small.
+
+## Editing AUTO poses
+
+The AUTO editor in `src/field-editor.ts` shows the red robots' AUTO plans on the FIELD before a MATCH, and edits the
+poses of plans that you created. To open it, click **Edit AUTO paths** in the right-hand panel, or in a red robot's
+config. The camera changes to **Overhead**, with the FIELD beside the tree view, and the buttons above the tree pick
+either red robot, and so does a click on the other robot. Only the selected robot's plan shows, so that a click on
+the FIELD can't pick the other plan where they overlap. Plans are written in red's frame, and a blue robot runs them
+rotated 180°, so the editor works on the red robots. A step with handles has a dot after its leaf name, and clicking a
+step or a handle selects the other.
+
+System plans, the tree files, are read-only. To change one, follow these steps:
+
+1. Click **Create new**, pick the plan to copy, and give the new plan a name and a description. The list holds the
+   plans for the robot's start position. The new plan becomes the robot's plan, and editing starts.
+2. Drag a pose, its heading knob, or a waypoint.
+3. Click **Done**.
+
+A see-through robot, sized from the robot's config, stands at the selected point, so that you see which end faces
+where and how close it comes to the FIELD elements. A second later, another one drives the planned path into the point
+and on toward the next one, fading in and out, again and again. It moves at 0.8 m/s along the planned path and turns
+evenly between poses, so it shows clearances, not the robot's real motion. A launch pose has a dashed orange circle.
+
+**Edit** starts editing a plan that you created earlier. **Undo** and **Redo**, or Cmd+Z and Shift+Cmd+Z (Ctrl on
+other systems), step through the edits since you opened the plan: a drag is one edit. A step that differs from the
+source plan has a green dot in the tree view, a node with such a step below it has a faint one, and the bar counts
+them. **Reset this step** moves a step's handles back to where the
+plan that this one was copied from has them, and **Delete plan** deletes it: a robot that ran it goes back to its source
+plan, or to **Default** when that's the robot's default. The bar warns about a plan for the other start position. A
+plan has no partner field: you pick each red robot's plan, and **Default** keeps its pairing in `autoFor`.
+
+A plan's id comes from its name, for example `rear-sweep-first`, and `meta.clonedFrom` names its source. Plans that an
+earlier version made with a drag have `meta.editedFrom` instead, and they load as your plans. The browser keeps your
+plans in local storage under `biobuzz.trees.v2`, and the page loads them before the robot setups. A plan lives in one
+browser only: sharing is increment 12.
+
+A drive step's `pose` is an expression, such as `launchAudience`, which is computed from the robot's size and shooter
+direction. A drag changes the expression by one rule, in `shiftPose` in `src/auto/auto-edit.ts`:
+
+- **The values that move are literals.** The drag edits them: `pose(-1.2, 0.6, 180)` becomes `pose(-1.1, 0.4, 180)`.
+- **The expression is already an offset.** The drag edits the offsets: `offset(ownFlower, 0.2, 0)` becomes
+  `offset(ownFlower, 0.25, 0.1)`.
+- **Otherwise,** the drag wraps the expression in `offset()`: `launchAudience` becomes `offset(launchAudience, 0.2,
+  -0.1)`. A turn adds a fourth value, in degrees.
+
+So a step keeps following the robot's size, and the other steps that use the same definition don't move. The bar names
+them, for example "also used by s6, s11". An offset that comes back to zero goes away, so a drag back to the start
+restores the step as it was written. Positions round to 1 mm and headings to 0.5°. A path's waypoints are numbers,
+which `scripts/plan-sweeps.ts` writes for the sweeps, so a drag changes a waypoint itself. `src/auto/auto-edit.ts` has
+no DOM, so `test/auto-edit.test.ts` runs it.
+
+### Reference points and snapping
+
+The definitions whose value is a pose, such as `launchAudience`, are *reference points*: small purple dots with their
+name on hover. In a plan that you're editing:
+
+- **Drag a reference point** to move its definition, by the rule in the list that follows. Every step that names it
+  moves, and so does every definition built on it: `parkRight` is built on `park.x`.
+- **Snap a step onto a reference point.** A dragged pose within 12 pixels of one snaps onto it, and keeps its own
+  reference. A turn snaps to the reference point's heading within 5°.
+- **Change a step's reference.** Hold a dragged pose on a reference point for 0.5 s, until the point gets a yellow
+  ring, and release: the pose becomes that point, or an offset from it that keeps the step's own heading.
+- **Make a step absolute.** Right-click the step, and choose **Make s3 absolute**, with the step's id. The pose becomes
+  `pose(x, y, heading)` with the numbers where it is, and it stops following the point and the robot's size. A step
+  that is an offset from a reference point also draws a dotted white line to it, when the step or the point is
+  selected. A click on the line where it shows between the two discs selects it, and **Delete** does the same.
+- **Add a reference point.** Right-click the FIELD floor, choose **Add reference point here**, and name it. The name is
+  letters, digits, and underscores, because expressions use it.
+- **Delete a reference point.** Right-click it and choose **Delete reference point**, or select it and press
+  **Delete**. The steps that name it become absolute where they are. While another definition or a step's expression
+  still uses the name, for example `parkRight`, which is `pose(park.x, …)`, the editor keeps the point and names the
+  user in the bar.
+- **Snap to the grid.** With **Snap** on, a drag snaps to a 1 in grid, drawn only around the dragged point, and a turn
+  to 5°. Holding Alt, or Option on a Mac, during a drag does the opposite of the checkbox. Control isn't used, because
+  a Control-click on a Mac is a right-click.
+
+What's selected wins a click: the selected step or reference point takes the press, so that a step that sits on its
+reference point can be dragged. Otherwise a reference point wins within 7 pixels of its center, and a step handle
+within 16. **Reset this step** also resets a selected reference point to the source plan's definition.
+
+### Settings, definitions, and problems
+
+The tree view lists the plan's definitions at the root, above the steps, because a tree file keeps them there. The
+panel on the right shows the plan's problems and then the selection: a step, a definition, or the form that adds a
+definition. For a system plan, it shows them read-only.
+
+- **Definitions.** The **definitions** group lists the reference points first, with a purple dot, and then the other
+  values, each with its value before the MATCH for the selected robot, such as `len = 0.305`. Click one to edit its
+  expression, see which steps and definitions use it, and delete it by the rule of
+  [Reference points and snapping](#reference-points-and-snapping). **+ add a definition** opens a form for a name and
+  an expression. The group opens and closes.
+- **Constants.** The **constants** group, closed at first, lists the environment's read-only FIELD values, such as
+  `field.hiveX = -0.3237`. A plan uses them in expressions, and it can't change them. They come from the CAD values in
+  `src/sim/config.ts`: `field.hiveX` is the own HIVE's pivot, and every FLOWER center is at
+  (±`field.flowerFar`, ±`field.flowerNear`) or (±`field.flowerNear`, ±`field.flowerFar`) in the alliance frame.
+- **Step settings.** Click a step in the tree or on the FIELD. The panel draws a field for each of the leaf's
+  parameters, from the leaf type's parameter specs in `src/auto/onboard.ts`: its type and unit, its limits, whether it
+  is required, its default, and its doc. A number field takes a number, or an expression such as `backOff * 10`. A
+  choice, such as a CELL, is a drop-down list. A path's waypoints show as a count, because you drag them on the FIELD.
+  An empty field removes the parameter, so the leaf gets its default. A field saves on Enter or when it loses focus,
+  and each save is one step of undo. Escape puts the field back.
+- **Problems.** Every edit loads the draft again with `checkTree` in `src/bt/load.ts`, which returns the tree and every
+  problem that the loader finds. Each problem shows under its field or definition, the row of the step or definition
+  gets a red bar, and the panel lists them all: click one to select it. A draft with problems saves, and it loads
+  again with its problems after a reload, but it doesn't run. A robot whose plan has problems stays still in AUTO, and
+  the robot config's plan list marks the plan.
+
+In a draft with problems, a node that didn't compile is a placeholder that fails if it runs, and an expression that
+didn't compile gives null. A step whose pose doesn't evaluate, for example because it uses a broken definition, has no
+handle on the FIELD until the problem is fixed. `src/auto/draft.ts` builds the form fields and sorts the problems, with
+no DOM, and `test/draft.test.ts` runs it.
+
+### Expression fields
+
+A number field, an expression field, and a definition's field are CodeMirror 6 fields, from `src/render/expr-cm.ts`:
+
+- **Highlighting.** Numbers, strings, the words of the language, function names, and field names each have a color.
+- **Completion.** Typing a name offers the environment's top-level fields, the plan's definitions, the functions, and
+  the words of the language. After a dot, as in `bots.me.`, it offers the fields of that path, with their types. A
+  definition or a constant shows its value before the MATCH, such as `hiveX number = -0.3237`. Enter or Tab accepts a
+  completion, and Escape closes the list.
+- **Problems as you type.** `checkExpr` in `src/bt/load.ts` checks the text as the loader would, with the type that the
+  parameter needs, and the field marks where the problem starts. A definition can use only the definitions before it,
+  as the loader compiles them, so its field offers only those, and a later one gets "'park' is defined later".
+- **Keys.** Enter or leaving the field saves the text, as one step of undo. Escape puts the text back. Inside a field,
+  Cmd+Z undoes typing, and the page's keys, such as Enter to start the MATCH, don't fire.
+
+`completeAt` in `src/bt/complete.ts` finds the completions, with no DOM, and `test/expr-edit.test.ts` runs it and the
+checker. CodeMirror is a separate file of the build, 340 kB, or 112 kB compressed, which the page loads the first time
+that the panel shows an expression field. If it doesn't load, for example offline, the fields stay plain text fields.
+
+### Structure editing
+
+While you edit a plan, the structure actions are in two places: a right-click on a tree row opens a menu, and the
+settings panel has a toolbar above the selected node. The actions are as follows:
+
+- **Add.** **+ Add** opens a palette in the settings panel. A node goes after the selected node, or at the end of a
+  selected container, such as a `sequence`. **Add after…** and **Add inside…** in the menu say which. The palette has
+  the leaves by subsystem, the control nodes, and three templates: **collect**, which drives to a pose with the intake on
+  until the transfer is full, **sweep**, which follows a path the same way, and **launch**, which drives to a pose and
+  launches. A search field filters the palette. A new drive step starts at the pose of the drive step before it, so it
+  shows on the FIELD, ready to drag. The new node is selected.
+- **Delete.** **Delete**, in the toolbar or the menu, or the Delete key, deletes the selected node and everything under
+  it.
+- **Move.** Drag a row: a line shows where it lands, before or after a row, and over the middle of a container's row, the
+  container lights up, and the node goes at its end. A node can't land inside itself. Alt+Up and Alt+Down, and ↑ and ↓
+  in the toolbar, move it one place among its siblings.
+- **Wrap.** **Wrap in…** puts the selected node inside a new `sequence`, `parallel`, `fallback`, `timeout`, or `guard`.
+- **Settings.** A control node's settings have fields, as a leaf's parameters do: a `parallel` node's `policy`, a
+  `timeout` node's `sec`, a `guard` node's `when`, and the rest. A number setting also takes an expression.
+
+Each action is one step of undo. A structure that the loader rejects, such as a container with no children, or two
+children of a `parallel` node that both command the drive, is a problem of the draft until it's fixed.
+
+A node's path names it by its id, or by `INDEX.LABEL` when it has none, so a node without an id would get a new path
+when a sibling before it moves. A plan that you make gets an id on every node in a list, such as `n3`, and a plan made
+earlier gets its ids the first time that the editor shows it. The ids come from the structure alone, in tree order, so
+the source plan gets the same ones, and the change marks still match. The tree view doesn't show an id of the form `n3`.
+`src/auto/structure.ts` holds the structure edits and `src/auto/palette.ts` the palette, with no DOM, and
+`test/structure.test.ts` runs them.
+
+## Code leaves in a sandbox
+
+A leaf that a user writes runs in QuickJS, a JavaScript engine that is compiled to WebAssembly. The page calls it
+synchronously, and it runs the same way in Node.js, so the headless scripts can run shared trees.
+
+The sandbox follows these rules:
+
+- **One context per leaf instance.** The host loads the leaf before the match and keeps its context for the whole
+  match, because a leaf runs across many steps.
+- **Only the fields that the leaf declares.** The host passes the leaf only the environment fields that its
+  manifest lists, not the whole environment. The measurements in the following table show why.
+- **A synchronous call.** The leaf gets its observations as plain data and returns or yields plain data. The host
+  runs a command through the same subsystems that built-in actions use.
+- **Deterministic limits.** The host sets a memory limit, and it limits run time by counting calls to QuickJS's
+  interrupt handler, not by reading the wall clock. A wall-clock limit would make a leaf's timeout depend on the
+  machine. The handler runs only about once per 75 calls of a small leaf, so the count stops a leaf that loops
+  forever, but it can't measure one call precisely.
+- **No randomness and no clock.** The host leaves `Math.random` and `Date` out of the leaf's globals.
+
+The WebAssembly component model can come later, for authors who want to write a leaf in another language, such as
+Rust. The environment maps to a WebAssembly Interface Types (WIT) interface. The cost is the toolchain: an author
+needs a compiler that targets components, and the browser needs `jco` to run them.
+
+A benchmark measured QuickJS 0.32 in Node.js 22 on an Apple silicon Mac. One persistent context called a small leaf
+37,920 times, which is one robot's MATCH at 240 steps per second. Each call passed the observation as a JSON string,
+and the leaf found the nearest of 40 balls. The times vary by a few microseconds between runs.
+
+| What each call did | Time per call |
+| --- | --- |
+| Nothing: an empty function | 14 µs |
+| Parsed a 2.3 KB observation | 56 µs |
+| Looped over 40 balls, with no parsing | 21 µs |
+| Parsed the observation and looped | 63 µs |
+| The same work in Node.js's own engine, for scale | 12 µs |
+
+At 63 µs a call, four robots each running one code leaf every step spend about 10 s per MATCH in QuickJS. A headless
+MATCH takes about 27 s today, so a code leaf that runs every step and reads the whole field makes a MATCH about 40%
+slower. Parsing the observation is most of that cost. So code leaves follow two rules:
+
+- **A code leaf decides, and built-in actions act.** A code leaf is a choice or a condition that runs when its node
+  starts, for example which FLOWER to work next. It passes its choice on through a chain, and a built-in action such
+  as `navigate` does the work of every step.
+- **A code leaf reads only what it declares.** Its manifest lists the environment fields that it reads, and the host
+  serializes only those fields.
+
+A code leaf that runs every step is still possible, but its cost counts against the MATCH, and the editor shows it.
+The benchmark isn't in the repository, because it needs `quickjs-emscripten` as a dependency.
+
+The runtime itself costs little by comparison. `scripts/bt-bench.ts` runs four trees shaped like the TELEOP policy
+for one MATCH, with no physics. On the same Mac, the median of 7 runs was 52 ms without a recorder and 59 ms with
+one.
+
+## Why the runtime doesn't use Effect
+
+Effect is a TypeScript library for typed errors, interruption, and structured concurrency, and another behavior-tree
+runtime by one of the mentors uses it. This design copies three of its ideas: typed failures, interruption with
+cleanup, and requirements in the type, which is what the subsystem declarations do. It doesn't use the library.
+
+A benchmark compared the two runtimes. Four robots each ran a fallback over a guarded leaf and a sequence of 50 legs,
+for 37,920 steps, which is a MATCH at 240 steps per second. Both versions produced the same checksum.
+
+| Runtime | Tree cost per MATCH, median of 5 runs |
+| --- | --- |
+| TypeScript generators | 10 ms |
+| Effect 3.22 fibers, stepped by hand with `ControlledScheduler` | 371 ms |
+| One headless match with `scripts/match.ts`, including startup, for scale | 27 s |
+
+Speed isn't the reason. The reason is that Effect doesn't keep a behavior in step with the physics. The first Effect
+version used `SyncScheduler`, which runs synchronously only until its first `flush` and then hands every task to the
+default scheduler, which runs asynchronously. That version returned a checksum of zero with no error. Any Effect
+feature that reaches the real scheduler or the real clock, such as `Effect.sleep`, can do the same unless the clock is
+replaced. A match would still run, but its per-seed scores would change. A generator can't run anything
+asynchronously, so it can't get out of step.
+
+The benchmark isn't in the repository, because it needs Effect as a dependency.
+
+## Plan
+
+Each increment is one pull request. An increment either leaves every seed's score unchanged, or its change is measured
+with `scripts/eval.ts` and `scripts/eval-compare.py` and logged in `experiments/policy-loop.md`.
+
+The planner uses no randomness, and the simulator's random numbers come from a seeded generator. So a refactor that
+makes the same decisions on the same physics steps gives the same score on every one of the 24 evaluation seeds. That
+exact match is the test for increments 2 and 3.
+
+1. **Build the runtime. Done.** `src/bt/` has no DOM dependency and no knowledge of BIOBUZZ. It holds the schema
+   types that describe an environment, the expression language, the loader, the node types, the runner, and the
+   trace recorder. `test/bt.test.ts` and `test/bt-expr.test.ts` cover each node type. QuickJS's cost per call is
+   measured. No match behavior changes.
+2. **Convert AUTO. Done.** `src/auto/onboard.ts` holds the onboard environment, the AUTO leaves, and `AutoProgram`,
+   which runs a tree for one robot. The eight scripts are tree files in `src/auto/trees/auto/`, and `src/auto/script.ts`
+   is gone. `scripts/plan-sweeps.ts` writes the sweep lanes into the trees. Results:
+   - **The inputs match on every step.** With the script runner driving and a tree running alongside, the two gave
+     identical inputs on every physics step of 45 AUTO periods: 324,045 steps, four robots each, for three robot
+     sizes, both shooter directions, partners and solo, and three seeds. A pose moved by 1 mm showed up at the drive's
+     first replan.
+   - **The scores match.** `e52-auto-trees` equals `e51-script-counts-steps` on every seed.
+   - **One measured change came first.** The script runner timed a step by adding the step length on every physics
+     step, and that sum drifts: 7 of the 16 timeout lengths ended one step early, including 2.5 s, 3 s, and 4 s.
+     `e51-script-counts-steps` made it count steps, at a cost of 18 ± 9.5 combined points. See
+     `experiments/policy-loop.md`.
+
+   Four details differ from the design, to match the script runner exactly:
+   - **Each step leaf owns its timeout,** as a `timeoutSec` parameter, and a timeout ends the step without a failure.
+     A `timeout` supervisor fails instead.
+   - **Each step ends with one idle physics step.** `AUTO_TUNING.idleAfterStep` switches it. Removing it is a measured
+     change.
+   - **The clock race is a parallel node.** An `auto.clockAtMost` leaf, since increment 7 a `waitUntil` on `clock.remaining`, races the steps with the `any` policy, and the
+     PARK follows the race.
+   - **Both alliances use red's HIVE pivot,** as the rotated scripts did. Blue's own pivot is 0.4 mm farther out.
+3. **Convert TELEOP. Done.** `src/auto/driver.ts` holds the driver environment, the TELEOP leaves, and `TeleopProgram`.
+   The coach's decision and `scriptedTeleop` are the tree `src/auto/trees/teleop/teleop-default.json`: a full-time
+   defender first, and otherwise a reactive fallback, rechecked once per second, over FLOWER work, a TIP, a launch of
+   what the robot carries, and PARK. Results:
+   - **The inputs match on every step.** With the coach's old code driving and the tree running alongside, the two
+     gave identical inputs on every physics step of 12 full matches: 455,076 steps, four robots each, over three
+     seeds. The matches cover the baseline and the meta build, TIPS only and FLOWER work, and both kinds of defense.
+     A recheck of 1.5 s instead of
+     1 s showed up at the FLOWER start time.
+   - **The scores match.** `e54-teleop-tree` equals `e53-coach-counts-steps` on every seed.
+   - **One measured change came first.** `e53-coach-counts-steps` made the coach's review count steps, with no
+     measurable effect: +0.5 ± 2.7 combined points.
+
+   Three details keep the tree equal to the coach:
+   - **A tactic leaf succeeds when the executor reports done or blocked,** on the next step, so the tree decides again
+     from the top, as the coach did. A failure would have sent the fallback on to the next branch instead.
+   - **`teleop.flowerWork` picks its FLOWER again once per second** on the fallback's schedule, because the coach's
+     review could change the FLOWER without changing the branch.
+   - **The endgame check stays in the executor.** It moved in increment 4.
+
+   The driver environment holds only what the default tree reads so far: the clock, the robot's config and hopper,
+   and which tactics can make progress. It grows as the buried decisions move into the tree.
+4. **Move the buried behaviors into the tree.** The endgame check, the opportunistic bump, and the partner yield become
+   branches. Writes to the shared plan go through the partner channel. The defender becomes a subtree. Decision
+   timing can shift here, so this increment is measured.
+   - **The endgame check. Done.** The TELEOP tree's `endgame` branch sits above the normal choice, in a fallback that
+     checks it every step. Once the time left is no more than the PARK needs, it runs a last launch if that is worth
+     more than PARK and SWARM doesn't need this robot's PARK, and PARK otherwise. The driver environment's `endgame`
+     fields hold the values, and `Executor.update` takes the decision as a mode. `e58-endgame-branch` equals
+     `e57-renamed-trees` on every seed, and nine more matches with FLOWER work, both kinds of defense, and the meta
+     build scored the same as before, in every score component.
+   - **The opportunistic bump. Done.** The tree's `bump` branch sits between the endgame and the normal choice, in the
+     fallback that checks every step. When the robot is in a TIP's launch phase and an opponent that is lined up to
+     launch stands within 1 m, it runs `teleop.bump` under a 0.8 s timeout, with a 6 s cooldown from the start of each
+     shove. This needed two runtime changes: `cooldown` can count from its child's start, and a reactive fallback
+     checks whether a branch is ready before it starts it. Results:
+     - **Standard setup:** `e60-bump-branch` equals `e58-endgame-branch` on every seed, because no robot bumps there.
+     - **All four robots bumping:** `e61-bump-branch-opportunistic` is -14.5 ± 8.7 combined points against
+       `e59-opportunistic-base`.
+     - **Red bumping, blue not:** red's margin is 3.3 ± 8.7 in `e63-red-bumps-branch`, where it was 7.3 ± 6.4 in
+       `e62-red-bumps-main`. The paired change is -4.0 ± 7.5, which is noise.
+
+     A bump now ends for good when the opponent leaves its spot. The old code could pause and resume a shove within
+     its 0.8 s. On three matches, the bumps ended for the same reasons in similar proportions on both versions.
+   - **The partner yield. Done.** The tree's `yield` branch sits below the bump, in the fallback that checks every
+     step. It runs `teleop.yield`, which holds still, while the robot is in a TIP's launch phase and
+     `partner.linesUpFirst` is true. The check reads the partner's load as the executor last judged it, without judging
+     it again, because judging it starts a 2 s hold. `e64-yield-branch` is +4.6 ± 5.2 combined points against
+     `e60-bump-branch`, which is noise. A robot that bumps doesn't yield in the same step any more, because the bump
+     ranks higher.
+   - **The partner channel. Done.** The executor writes its intent and plan through a `TeamChannel` that the TELEOP
+     program passes it, and the driver environment's `partner` fields show the partner's intent, phase, CELL, and
+     load to the tree. `e65-partner-channel` equals `e64-yield-branch` on every seed.
+   - **The defender. Done.** The tree's `defend` branch is a subtree, checked every step: PARK when the clock requires
+     it, wait near the center while both opponents rest, take the target's launch spot when this robot gets there at
+     least 0.2 m sooner, and otherwise drive into the target. `Defender.targetFor` picks the target without side
+     effects, and the defender keeps only its bookkeeping: the contact time, each opponent's rest, and the path.
+     `e67-defender-subtree` equals `e66-full-defense-base` on every seed and in every field.
+
+   Increment 4 is done. The executor makes no policy decisions: it runs the tactic, the mode, and the target that the
+   tree gives it.
+5. **Show the tree running. Done.** The simulator page's tree view shows a robot's tree live and at the review cursor,
+   and match notes name the running leaf. See [Tracing and the tree view](#tracing-and-the-tree-view).
+The AUTO editor is the second part of the plan: from dragging poses to building, running, and testing a whole AUTO
+tree in the page. Each increment is one pull request.
+
+6. **Coordinates and pose dragging. Done.** Tree files use FIELD x and y in red's frame, and a blue robot runs a tree
+   rotated 180°. See [Coordinates and alliances](#coordinates-and-alliances). The field editor drags a drive step's
+   pose and its heading, and a sweep's lane points, by the rule in [Editing AUTO poses](#editing-auto-poses).
+   `e72-field-xy` equals `e69-tree-view` on every seed, and the leaves' parameters match the old files' on every
+   value, for three robot sizes and both shooter directions.
+7. **Subsystem leaves. Done.** The AUTO leaves command the robot's subsystems, as in FTC's command-based style:
+   `drive.driveTo`, `drive.followPath`, `drive.push`, `intake.run`, `shooter.shoot`, and `vision.waitTip`, with `wait`
+   and `waitUntil` for time and conditions. See [Subsystems](#subsystems).
+   - `drive.driveTo(pose)`: the path planner picks a path around the FIELD elements, as `auto.drive` did.
+   - `drive.followPath(waypoints)`: the robot follows the author's path through the waypoints without stopping, with a
+     heading per waypoint or along the path, and no planner. It moves on to the next waypoint within 0.15 m of one or
+     past it.
+   - `intake.run(filter)` runs the intake while it runs. A subsystem's default command runs in a step that no leaf
+     commands it, and the intake's stops it.
+   - `waitUntil(condition)` waits for an expression. The runtime gained *live* parameters for it: the leaf gets a
+     function, which evaluates the expression on each step.
+
+   A step that collects runs `intake.run` beside the drive in a `parallel` node with the `any` policy. `auto.drive`,
+   `auto.sweep`, and the separate waits for the clock, the camera, and a full hopper are gone. The environment's state
+   has FTC's names: `bots.me.drive.pose`, `bots.me.transfer`, `bots.me.shooter`, and `bots.me.vision`. Results, in five
+   runs:
+   - **New leaves, old trees:** `e73-motion-leaves-plumbing` equals `e72-field-xy` on every seed.
+   - **The intake default:** the simulator runs an unset intake as `all`, so under the old leaves the intake ran in
+     every shoot, wait, and idle step. `e74-auto-intake-off` starts AUTO with the intake off: -10.0 ± 10.0 combined
+     points against e73, which is noise.
+   - **Composites:** `e75-motion-leaves`, the trees with separate drive, intake, and wait steps, is +20.8 ± 9.8
+     against e74.
+   - **Subsystem names and `intake.run`:** `e76-subsystem-leaves` equals e75 on every seed.
+   - **`waitUntil`:** `e77-wait-until` is -7.3 ± 11.2 against e76, which is noise. The camera and clock waits lost
+     their idle step. Against e73, before this increment, the total is +3.5 ± 8.4.
+
+8. **The editor flow. Done.** **Edit AUTO paths** in the right-hand panel opens the editor on the red robots, one at
+   a time. **Create new** copies a plan under a name and a description, **Edit** edits a
+   plan that you created, and system plans are read-only. `meta.partner` is gone. See
+   [Editing AUTO poses](#editing-auto-poses). The scores don't change: `e94-editor-flow` equals `e90-aimed-check` on
+   every seed. Two follow-ups extend the editor:
+   - **Pose visuals. Done.** A see-through robot at the selected point, a second one that drives the path through it,
+     undo and redo, and marks on the changed steps.
+   - **References and snapping. Done.** The definitions that are poses show as reference points, with their names, which you
+     can drag. An offset pose draws a dotted line to its reference point, and a drag snaps to reference points and, with
+     a checkbox, to a 1 in grid. Alt, or Option on a Mac, inverts the checkbox. A right-click adds a reference point.
+     Holding a dragged pose on a reference point makes it reference that point. A right-click on a step, or Delete on
+     its offset line, makes the pose absolute, and a right-click or Delete removes a reference point.
+9. **Forms, definitions, and validation.** Two pull requests:
+   - **Forms and problems. Done.** A leaf's parameter specs drive a form: types, units, limits, choices, and docs. The
+     tree view lists the definitions at the root, and the FIELD constants, such as `field.hiveX`, which moved out of
+     the plans into the environment. Every edit loads the draft again, and each problem that the loader reports shows
+     on its field and its row. A draft with problems saves but doesn't run. See
+     [Settings, definitions, and problems](#settings-definitions-and-problems). `e97-editor-forms` equals
+     `e96-placed-cell-nectar` on every seed.
+   - **Expression fields. Done.** An expression field uses CodeMirror 6, which loads only with the editor:
+     highlighting, completion from the environment schema, the tree's definitions, and the FIELD constants, and the
+     checker's problems as you type. See [Expression fields](#expression-fields). No match code changed.
+10. **Structure editing. Done.** A palette adds the AUTO leaves, the control nodes, and templates such as the sweep. A
+    node can be deleted with its subtree, moved by dragging its row or with Alt+Up and Alt+Down, and wrapped in a
+    sequence, a parallel, a fallback, a timeout, or a guard. The control nodes' settings, such as a `parallel` node's
+    policy, have forms. See [Structure editing](#structure-editing). No match code changed.
+11. **Run and scrub in the editor.** A quick run plays AUTO only, with all four robots, in a Web Worker, and records a
+    trace. The editor reuses the review scrubber and the tree view at the cursor. A timeline shows both red robots'
+    steps on one clock, because partners coordinate by the clock and the camera.
+
+The rest of the plan follows the editor:
+
+12. **Share.** Import and export tree files. Share first with a link that carries the tree in the URL fragment, which
+    needs no server, and then through a gallery in the D1 database, keyed by a hash of the tree. The gallery is the
+    first feature that needs accounts. See [Accounts](#accounts).
+13. **Edit TELEOP trees.** The same forms and structure editing, in the driver environment. Some robot config
+    settings, such as the FLOWER start time and the defense policy, become tree parameters.
+14. **Score a tree in the browser.** Web Workers play a tree against the default tree on fixed seeds.
+15. **Add code leaves** in the QuickJS sandbox.
+
+## The tree catalog
+
+Every tree has a row in the `trees` table of the site's D1 database, with its id, name, description, and file. The
+system trees, which ship with the site, are the files in `src/auto/trees/auto/` and `src/auto/trees/teleop/`. The
+deployment that is live writes their rows itself:
+
+1. The build writes the tree files, a SHA-256 of each, and one hash over the set into `trees/catalog.json`, in the same
+   deployment as the code that runs them.
+2. The first request to `/api/trees` after a deployment goes live finds that D1 holds a different set. It replaces the
+   system rows in one batch, which D1 runs as a transaction, and records the new hash.
+3. A rollback works the same way: the older deployment's first request writes its own rows back.
+
+No second pipeline can fall out of step with the deployment. A row that someone saves has `system` 0, and a sync never
+changes it. The schema is in `migrations/`, and a production build applies new migrations after the site builds: see
+the README's deployment section. Until the catalog tables exist, and in a preview, `/api/trees` serves the
+deployment's own files. The page itself runs the trees that it was built with, and doesn't read the catalog yet.
+
+## Accounts
+
+**Status: to be decided.** Nothing about accounts gets built until a feature needs them.
+
+Saving and sharing work without an account. The browser's storage keeps your own trees, as it keeps robot setups
+today, and a share link carries a tree in its URL fragment. Two features need accounts:
+
+- **Publishing to the gallery.** Each entry needs an owner, who is the only person who can change or remove it. Rate
+  limits and bans need a person to apply to.
+- **Trees on every device.** A tree saved to an account follows its owner to another computer. It can be a gallery
+  entry that isn't listed.
+
+The plan for when accounts are needed is as follows:
+
+- **GitHub first.** Almost every FTC student who would write a policy has a GitHub account, and the project's source
+  and bug reports are on GitHub. The OAuth app asks for no scopes, so it gets only public profile information. The site
+  keeps the numeric user ID, the login name, and the avatar URL. It discards the access token after it reads the user.
+- **Discord second.** Every FTC student has a Discord account, including drive-team members who don't write code.
+  Discord's `identify` scope gives the user ID, the username, and the avatar, without the email address.
+- **The minimum age.** GitHub and Discord both require users to be at least 13. FTC includes grades 7 through 12, so
+  some students can't have either account. Those students can still save and share by link.
+- **Cloudflare pieces.** Two Pages Functions handle sign-in: one redirects to the provider, and the other receives the
+  callback, reads the user, and sets a session cookie that is `HttpOnly`, `Secure`, and `SameSite=Lax`. Each client
+  secret is a Pages secret, never a file.
+- **No sign-in in previews.** An OAuth app has a fixed callback URL, so preview deployments can't use the production
+  app. Previews already get no database binding, and the same rule turns sign-in off, so a preview can't write to the
+  real gallery.
+- **No contact between users.** The gallery has no comments and no messages. FIRST's Youth Protection Program sets rules
+  for online contact between adults and students, and a gallery that users can't contact each other through stays
+  clear of that question. How the program's rules apply to this site isn't checked.
+- **Trees stay in D1.** Storing each tree as a GitHub Gist in its author's account was considered. It would need the
+  `gist` scope, which lets the site read and write every Gist that the user has. A site that only needs to know who
+  you are doesn't need that access.
+
+## Open questions
+
+- **Gallery moderation.** Decide whether the gallery accepts trees from anyone, or only after a review. Trees without
+  code are plain data, so they're low risk. Code leaves are where a review queue earns its cost, even with the sandbox.
+- **Curve hints.** Decide what a waypoint's curve hints mean when a Road Runner or Pedro Pathing follower is added.
+- **Human limits.** A driver environment could model a reaction delay, or a narrower view when the driver watches the
+  far end of the field. These limits belong in the environment, because they change what a tree observes, not how it
+  decides.
+- **Commitment.** Check in increment 3 that `hold` and a reactive fallback's `recheckSec` cover every place where the
+  planner holds a decision today. The known places are the 2 s hold on partner decisions, the 1 s tactic review, and
+  the 0.2 s delay before a tactic counts as done.
+
+## Prior work
+
+- **[electric-mayhem](https://github.com/caryden/electric-mayhem)** is an NCSSM behavior-tree library for FTC robots,
+  written in Kotlin with coroutines. It shows two things that this design avoids. It restarts the whole tree when any
+  condition changes, which loses a sequence's place. Its subsystem commands run in their own scope. A reading of the
+  code, not a test, suggests that a command can keep running after its node is cancelled.
+- **A private behavior-tree runtime** by one of the mentors supplies the node vocabulary: flow nodes, supervisors, and
+  chain operators, with typed values and typed failures instead of statuses. The `bt.tree` file shape and the span
+  trace come from it too. It runs on real time with Effect, and this design runs on simulated time with generators.

@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+cad/*.step
+traces/*.json
+!traces/*.annotations.json
+.wrangler
+*.log
