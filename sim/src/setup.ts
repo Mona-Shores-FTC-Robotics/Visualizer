@@ -41,6 +41,22 @@ export const DEFAULT_SETUP = { driveRpm: 600, sizeIn: 15, massLb: 22 };
 /** The reference launcher's errors, from `DEFAULT_ROBOT.shooter.pollen`. The 1x, 3x, and 5x chips in the robot config multiply them. */
 export const REF_ERR = { errElevDeg: DEFAULT_ROBOT.shooter.pollen.elevationDeg.std, errAzimDeg: DEFAULT_ROBOT.shooter.pollen.yawStdDeg, errSpeed: DEFAULT_ROBOT.shooter.pollen.speed.std };
 export const defaultBot = (i: number): BotSetup => ({ plate: BOT_IDS[i], driver: 'planner', stickFrame: 'field', shooter: 'dual', auto: 'default', flowerStartSec: 0, dualIntake: false, dualShooter: false, defense: 'none', ...REF_ERR, intakeP: DEFAULT_ROBOT.intake.successP, ...DEFAULT_SETUP });
+/**
+ * The opponent skill dial, from 0 (weakest) to 1 (the default planner robot): one number that slows the drive, widens
+ * the launch error and makes the intake miss more, together, so the drill can field opponents of a chosen strength.
+ * `OPPONENT_SKILL` holds the settings calibrated to a TIP count (scripts/opponent-skill.ts). Not a measured robot.
+ * At 1 it is the default robot: 600 rpm, the reference launch error, intake 0.95.
+ */
+export function opponentSetup(skill: number): Partial<BotSetup> {
+  const s = Math.min(1, Math.max(0, Number.isFinite(skill) ? skill : 1)), err = 1 + 9 * (1 - s);
+  return { driveRpm: 150 + 450 * s, errElevDeg: REF_ERR.errElevDeg * err, errAzimDeg: REF_ERR.errAzimDeg * err, errSpeed: REF_ERR.errSpeed * err, intakeP: 0.5 + 0.45 * s };
+}
+/**
+ * The dial's setting for a target number of TIPs a match by a two-robot opponent alliance, both on the planner, against
+ * an alliance that doesn't move, under UV/IR TIP timing. Measured over 12 seeds each with scripts/opponent-skill.ts
+ * (23 Nov 2026): 0 gave 1.08 TIPs a match, 0.37 gave 2.92, 0.57 gave 5.08, 0.68 gave 6.92. The default robot (1) gives about 14.
+ */
+export const OPPONENT_SKILL = { 1: 0, 3: 0.37, 5: 0.57, 7: 0.68 } as const;
 /** The robot that the HUD, the chase camera, the shot preview, and the robot camera follow: the first robot with a human driver, or R0. */
 export const focusRobot = (bots: BotSetup[]) => Math.max(0, bots.findIndex(b => b.driver !== 'planner'));
 
