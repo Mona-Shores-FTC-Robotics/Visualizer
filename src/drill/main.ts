@@ -186,7 +186,8 @@ function hud() {
   $("tips").innerHTML =
     `${session.tips.length} / ${GOAL_TIPS}<small>TIPs · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
   $("robot").innerHTML =
-    `Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
+    `${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
+    Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
     Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.preset.laneCapacity - st.lane))} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
     ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}`;
   $("note").textContent = st.note;

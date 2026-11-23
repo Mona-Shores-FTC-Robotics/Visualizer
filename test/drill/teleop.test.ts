@@ -198,3 +198,32 @@ describe("the drill", () => {
     expect(r.goalAtS).toBeNull();
   }, 60000);
 });
+
+describe("the aim is our CELL at the robot's end, up or down (TurretAimer)", () => {
+  test("past the band the near-end CELL is chosen; inside it the last one is kept", async () => {
+    const s = await session();
+    place(s, -1.2, 1.0, 0);
+    s.advance(0.1);
+    expect(s.teleop.status().nearCell).toBe("audience");
+    expect(s.teleop.status().nearCellUp).toBe(true); // red starts with its audience CELL up
+    place(s, -1.2, 0.2, 0); // inside the 19.75 in band: unchanged
+    s.advance(0.1);
+    expect(s.teleop.status().nearCell).toBe("audience");
+    place(s, -1.2, -1.0, 0);
+    s.advance(0.1);
+    expect(s.teleop.status().nearCell).toBe("rear");
+    expect(s.teleop.status().nearCellUp).toBe(false);
+  });
+
+  test("a volley at the down CELL does nothing toward a TIP", async () => {
+    const s = await session();
+    place(s, -0.32, -1.3, 0); // the rear end: our down CELL
+    s.advance(0.3);
+    s.sim.carried = ["pollen", "pollen", "pollen", "pollen"];
+    s.advance(3, pad(["CIRCLE"]));
+    s.advance(6);
+    expect(s.teleop.launched).toBe(4);
+    expect(s.sim.cellCount("red")).toBe(3);
+    expect(s.tips).toHaveLength(0);
+  });
+});
