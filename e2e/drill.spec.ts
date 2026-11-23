@@ -256,7 +256,7 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
     () => (window as unknown as { __drill: Drill }).__drill.session.t > 0.1,
   );
   await setPad(page, 0);
-  // Two volleys at weight from in front of the CELL: one TIP. Then run the clock out.
+  // A volley at weight from in front of the CELL: one TIP. Then run the clock out.
   await page.evaluate(() => {
     const s = (window as unknown as { __drill: Drill }).__drill.session;
     s.sim.robot.setTranslation({ x: -0.32, y: 0.17, z: 1.3 }, true);
@@ -265,12 +265,21 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await setPad(page, 0, [BTN.CIRCLE]);
   await page.waitForFunction(
     () =>
-      (window as unknown as { __drill: Drill }).__drill.session.tips.length >=
-      1,
+      (window as unknown as { __drill: Drill }).__drill.session.teleop
+        .launched >= 4,
     null,
-    { timeout: 90000 },
+    { timeout: 60000 },
   );
   await setPad(page, 0);
+  // The TIP settles seconds of simulated time after the volley (at weight, a median of 3.9 s
+  // and up to 6.5): stepped on the session's own clock, not waited for in real time, so a slow
+  // CI machine cannot run out the wait.
+  const tips = await page.evaluate(() => {
+    const s = (window as unknown as { __drill: Drill }).__drill.session;
+    s.advance(12);
+    return s.tips.length;
+  });
+  expect(tips).toBeGreaterThanOrEqual(1);
   await page.evaluate(() =>
     (window as unknown as { __drill: Drill }).__drill.session.advance(125),
   );
