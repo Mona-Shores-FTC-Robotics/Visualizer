@@ -43,6 +43,16 @@ const AIM_TRIM_STEP_DEG = 1.5;
 const AIM_TRIM_FINE_STEP_DEG = 0.5;
 const RESET_HOLD_S = 0.5;
 const UNJAM_EJECT_S = 0.4;
+/**
+ * The NECTAR gate (biobuzz `NectarReject`, `ColorSensorSubsystem`): a wrong NECTAR at the lane
+ * entrance is burst back out (`rejectBurstS`), the intake then stays stopped (`rejectHoldOffS`), and
+ * the feed gate stays shut while one may be in the lane, until the lane reads clean after it left
+ * (`wrongNectarClearS`) or an eject has run that long (`wrongNectarEjectClearS`).
+ */
+const REJECT_BURST_S = 0.5;
+const REJECT_HOLD_OFF_S = 0.3;
+const WRONG_NECTAR_CLEAR_S = 1.0;
+const WRONG_NECTAR_EJECT_CLEAR_S = 1.0;
 
 export type TurretMode = "AIM" | "LOCKED";
 type Routine =
@@ -87,6 +97,8 @@ export interface TeleOpStatus {
   launcherTrim: number;
   slow: boolean;
   note: string;
+  /** "" or what the NECTAR gate is doing: rejecting a wrong one, or holding the feed shut. */
+  nectarGate: string;
 }
 
 /** One gauss draw. */
@@ -123,6 +135,13 @@ export class TeleOp {
   private noteUntil = 0;
   private lastAimDeg = 0;
   private slow = false;
+  /** NECTAR launched (ours: the gate never feeds the other alliance's). */
+  nectarLaunched = 0;
+  private rejectUntil = -Infinity;
+  private holdOffUntil = -Infinity;
+  private suspectUntil = -Infinity;
+  /** Wrong NECTAR rejected at the lane entrance. */
+  rejects = 0;
   /** Launches so far: the launcher's shot count. */
   launched = 0;
   /** The time each ball left, s from PLAY. */
@@ -349,8 +368,14 @@ export class TeleOp {
         this.unjamSince = now;
       }
     } else this.unjamSince = Infinity;
+    // An eject run long enough clears a suspect lane.
+    if (unjam && now - this.unjamSince >= WRONG_NECTAR_EJECT_CLEAR_S)
+      this.suspectUntil = Math.min(this.suspectUntil, now);
+    this.nectarGate(now);
     this.intakeFilter =
-      unjam || this.routine?.phase === "work" ? "none" : "all";
+      unjam || this.routine?.phase === "work" || now < this.holdOffUntil
+        ? "none"
+        : "all";
 
     // --- the feed ---------------------------------------------------------------------------------
     const aimed = Math.abs(wrap180(aim.deg - this.turretDeg)) <= tol;
@@ -360,8 +385,11 @@ export class TeleOp {
       insideArc ||
       this.turretMode === "LOCKED";
     const arcTurnDone = !this.arcTurning;
+    const suspect = now < this.suspectUntil;
+    if (this.gate && suspect) this.gate = false;
     if (!this.gate) {
       if (
+        !suspect &&
         fireHeld &&
         now >= this.readyAt &&
         aimed &&
@@ -398,6 +426,42 @@ export class TeleOp {
   private arcTurningWas = false;
   /** What the simulator's intake takes this loop. */
   intakeFilter: "all" | "none" = "all";
+
+  /**
+   * The other alliance's NECTAR in front of the intake: burst it back out, stop the intake for the
+   * hold-off, and hold the feed shut until the lane reads clean. The simulator's intake never takes
+   * one in (G408); this is what our robot does about it.
+   */
+  private nectarGate(now: number): void {
+    const sim = this.sim,
+      c = sim.cfg;
+    if (now < this.rejectUntil || now < this.holdOffUntil) return;
+    const wrong = sim.alliance === "red" ? "nectar_blue" : "nectar_red";
+    for (const b of sim.balls.values()) {
+      if (b.kind !== wrong) continue;
+      const p = b.body.translation();
+      if (p.y > 0.13) continue;
+      const r = sim.toRobot(p.x, p.z);
+      if (
+        r.f < c.length / 2 - 0.01 ||
+        r.f > c.length / 2 + c.intake.reach + b.radius ||
+        Math.abs(r.l) > c.intake.width / 2
+      )
+        continue;
+      this.rejects++;
+      this.rejectUntil = now + REJECT_BURST_S;
+      this.holdOffUntil = now + REJECT_BURST_S + REJECT_HOLD_OFF_S;
+      this.suspectUntil = now + REJECT_BURST_S + WRONG_NECTAR_CLEAR_S;
+      // The burst runs the roller outward: the piece goes back out in front of the robot.
+      const th = sim.heading;
+      b.body.setLinvel(
+        { x: Math.cos(th) * 0.8, y: 0, z: -Math.sin(th) * 0.8 },
+        true,
+      );
+      this.say("Wrong NECTAR: rejected", now);
+      return;
+    }
+  }
 
   /** `ChassisAimTurn.power`: kP on the error in radians, between the min and max turn. */
   private aimTurnPower(errDeg: number, stopDeg: number): number {
@@ -452,6 +516,7 @@ export class TeleOp {
   ) {
     const sim = this.sim,
       kind = sim.carried.shift()!;
+    if (kind !== "pollen") this.nectarLaunched++;
     const th =
       sim.heading + rad(this.turretDeg) + rad(gauss(this.rand) * YAW_STD_DEG);
     const el = rad(ELEVATION_DEG + gauss(this.rand) * ELEVATION_STD_DEG);
@@ -720,6 +785,12 @@ export class TeleOp {
       launcherTrim: this.launcherTrim,
       slow: this.slow,
       note: this.note,
+      nectarGate:
+        this.sim.time < this.rejectUntil
+          ? "rejecting a wrong NECTAR"
+          : this.sim.time < this.suspectUntil
+            ? "feed held: a wrong NECTAR may be in"
+            : "",
     };
   }
 
