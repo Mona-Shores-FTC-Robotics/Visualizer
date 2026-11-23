@@ -252,8 +252,7 @@ export class Sim {
   /** Runs the physics for `sec` with no robot input and the clock stopped, as before a MATCH. */
   private settle(sec: number) {
     for (let i = 0; i < sec / DT; i++) {
-      for (const a of ['red', 'blue'] as Alliance[]) this.hives[a].held = this.tipLag[a].update(this.simTime, this.cellCount(a), this.cellLoad(a));
-    for (const h of Object.values(this.hives)) h.applyTorques();
+      for (const h of Object.values(this.hives)) h.applyTorques();
       this.world.step(); this.touch();
       for (const h of Object.values(this.hives)) h.epoch!++;
     }
@@ -357,6 +356,8 @@ export class Sim {
       return { v: this.view(i), active, inp: active ? inputs[i] ?? NO_INPUT : NO_INPUT };
     });
     for (const r of per) r.v.driveRobot(r.inp);
+    // Mona Shores: the TIP-lag hold (src/sim/tip-lag.ts), before the HIVE torques of every match step.
+    for (const a of ['red', 'blue'] as Alliance[]) this.hives[a].held = this.tipLag[a].update(this.simTime, this.cellCount(a), this.cellLoad(a));
     for (const h of Object.values(this.hives)) h.applyTorques();
     this.aero();
     this.world.step(); this.touch();

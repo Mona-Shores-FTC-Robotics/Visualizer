@@ -19,8 +19,14 @@ export const TIP_TIMINGS: { value: TipTiming; label: string }[] = [
   { value: 'uv-ir', label: 'UV/IR TIP timing (our films)' },
   { value: 'ncssm', label: 'NCSSM TIP timing (rocker only)' },
 ];
-/** The default: 'uv-ir', because it is the one measured on real fields (16 films and Fruitport M6). */
-export const DEFAULT_TIP_TIMING: TipTiming = 'uv-ir';
+/**
+ * The default: 'ncssm', upstream's. UV/IR is the one measured on real fields (16 films and Fruitport M6), but
+ * upstream's planner and AUTO trees assume a TIP with no wait: under UV/IR its shooting keeps firing into a CELL that
+ * is already over its weight (9 launches where its test expects a TIP by 6) and its four-robot AUTO falls behind its
+ * timeline. Until the planner waits for a TIP, matches it plays use upstream's timing; a drill or a request picks
+ * 'uv-ir' (mentor's decision pending, 23 Nov 2026).
+ */
+export const DEFAULT_TIP_TIMING: TipTiming = 'ncssm';
 /** Reads a timing from a request or a setting; anything else is the default. */
 export function tipTiming(v: unknown): TipTiming { return v === 'ncssm' || v === 'uv-ir' ? v : DEFAULT_TIP_TIMING; }
 
