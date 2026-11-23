@@ -75,7 +75,7 @@ async function fromNetwork(url, timeoutMs) {
   }
 }
 
-async function networkFirst(event, cacheKey) {
+async function networkFirst(event, cacheKey, fallbackKey = cacheKey) {
   const cache = await caches.open(CACHE_NAME);
   const network = fromNetwork(event.request.url, NETWORK_TIMEOUT_MS).then((response) => {
     if (response.ok) cache.put(cacheKey, response.clone());
@@ -84,7 +84,7 @@ async function networkFirst(event, cacheKey) {
   try {
     return await network;
   } catch {
-    const saved = await cache.match(cacheKey);
+    const saved = (await cache.match(cacheKey)) ?? (await cache.match(fallbackKey));
     if (saved) return saved;
     return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
   }
@@ -115,8 +115,12 @@ self.addEventListener("fetch", (event) => {
   if (/\.(mp4|webm)$/.test(url.pathname)) return;
 
   if (event.request.mode === "navigate") {
-    // A single page app: every page is index.html, saved as "./".
-    event.respondWith(networkFirst(event, new URL("./", self.location).href));
+    // The app is a single page: its navigations (any query or hash) are index.html, saved as "./".
+    // The site's other pages (partner.html, share.html, drill/) are saved under their own path, so
+    // opening one never replaces the app's offline copy; one never saved falls back to the app's.
+    const root = new URL("./", self.location).href;
+    const own = new URL(url.pathname, url.origin).href;
+    event.respondWith(networkFirst(event, own === root ? root : own, root));
   } else if (isAppCode(url)) {
     event.respondWith(networkFirst(event, event.request.url));
   } else {
