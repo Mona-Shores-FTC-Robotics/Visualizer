@@ -22,8 +22,10 @@ import type { Sim } from "../../sim/src/sim/world";
 import { Controls, type PadRead } from "./controls";
 import { IN, type RobotPreset } from "./presets";
 import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
+import robotModel from "../../sim/src/sim/robots/mona-shores.json";
 import { LaunchSpotDrive, type SpotStep } from "./launchSpot";
 import {
+  CornerGather,
   FlowerPick,
   GardenGather,
   type RoutineStep,
@@ -65,7 +67,9 @@ export type TurretMode = "AIM" | "LOCKED";
 /** A FLOWER pick or GARDEN gather in progress: master's routine, run by the simulator. */
 type Routine = {
   kind: "pick" | "gather";
-  r: FlowerPick | GardenGather;
+  r: FlowerPick | GardenGather | CornerGather;
+  /** Let go in the dwell or the back-out: it finishes on its own (GrabRoutine.releaseFinishes). */
+  finishing?: boolean;
   last: RoutineStep | null;
 };
 
@@ -607,10 +611,13 @@ export class TeleOp {
   // ---------------------------------------------------------------------- routines
 
   /**
-   * Cross held: a FLOWER pick; Triangle held: a GARDEN gather. Both are master's routines
-   * (`FlowerPicker`, `GardenGather`) as the simulator runs them (sim/src/sim/robots/routines.ts):
+   * Cross held: a FLOWER pick; Triangle held: the corner gather (the TeleOp's GARDEN gather button,
+   * `GardenGather` with `anyCorner`: the nearest field corner, facing the wall the robot nearly
+   * faces). Both are master's routines as the simulator runs them (sim/src/sim/robots/routines.ts):
    * they drive the robot, lower the FLOWER stick and run the intake, and the pieces come in
-   * physically. Letting go, or a stick moved after the press (FreshSticks), hands the robot back.
+   * physically. A stick moved after the press (FreshSticks) hands the robot back at once. Letting go
+   * hands it back too, but in the dwell or the back-out the grab finishes on its own first, as on
+   * the robot (GrabRoutine.releaseFinishes).
    */
   private updateRoutine(
     c: Controls,
@@ -626,9 +633,19 @@ export class TeleOp {
       const name = r.kind === "pick" ? "FLOWER pick" : "GARDEN gather";
       // FreshSticks: a stick still moving from the drive up to the press counts once it centres.
       if (!sticksMoved) this.routineSticks.armed = true;
-      if (!held || (sticksMoved && this.routineSticks.armed)) {
+      const moved = sticksMoved && this.routineSticks.armed;
+      const finishes =
+        r.last &&
+        (r.last.phase === "dwell" ||
+          r.last.phase === "back" ||
+          r.last.phase === "raise");
+      if (!held && !moved && finishes && !r.finishing) {
+        r.finishing = true;
+        this.say(`${name}: let go, backing out`, now);
+      }
+      if (moved || (!held && !r.finishing)) {
         this.say(
-          `${name} stopped (${held ? "sticks moved" : "released"})`,
+          `${name} stopped (${moved ? "sticks moved" : "released"})`,
           now,
         );
         this.endRoutine();
@@ -650,11 +667,18 @@ export class TeleOp {
         r:
           kind === "pick"
             ? new FlowerPick(this.sim, team)
-            : new GardenGather(this.sim, team),
+            : robotModel.routines.gardenGather.anyCorner.value
+              ? new CornerGather(this.sim, team)
+              : new GardenGather(this.sim, team),
         last: null,
       };
       this.routine.last = this.routine.r.step(dt);
       this.sim.robots[this.sim.me].stickDown = this.routine.last.stickDown;
+      if (this.routine.last.done) {
+        // Refused (no corner in range): the robot's own line, nothing moves.
+        this.say(this.routine.last.note, now, 4);
+        this.endRoutine();
+      }
     };
     if (this.spot?.active) return;
     if (c.on("FLOWER_PICK")) start("pick");
