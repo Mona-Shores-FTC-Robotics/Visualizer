@@ -125,8 +125,11 @@ describe("in the drill", () => {
 });
 
 describe("the numbers: the export's indicator block, else master's", () => {
-  test("a file without the block uses FLASH_MS 250, ARC_TURN_PULSE_MS 400, CLEAR_MS 300; a file with it, its own", () => {
-    expect(new Controls(CONTROLS).indicator).toEqual(INDICATOR_DEFAULTS);
+  test("the export's block (master: FLASH_MS 250, ARC_TURN_PULSE_MS 400, CLEAR_MS 300); a file without it, those; another, its own", () => {
+    // biobuzz master's export (5819d31, #739) has the block, at master's values.
+    expect(CONTROLS.indicator).toEqual(INDICATOR_DEFAULTS);
+    const { indicator: _, ...older } = CONTROLS;
+    expect(new Controls(older).indicator).toEqual(INDICATOR_DEFAULTS);
     expect(INDICATOR_DEFAULTS).toEqual({
       flashMs: 250,
       arcTurnPulseMs: 400,
