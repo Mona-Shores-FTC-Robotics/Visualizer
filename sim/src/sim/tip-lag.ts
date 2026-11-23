@@ -15,9 +15,11 @@ export const TIP_LAG = {
   atWeightSkew: 2.6,                          // low end + width * u^skew: median 3.9 s, a slow tail (biobuzz FieldSim)
   wellPastS: [2.2, 2.5] as [number, number],  // nine or more pieces (films)
   atWeightUpToPollen: 2.0, wellPastFromPollen: 2.5, // biobuzz FieldSim.AT_WEIGHT_UP_TO_POLLEN / WELL_PAST_FROM_POLLEN
-  // The upstream rocker's own swing, threshold to settled (docs/top-ten.md lesson 6). REFIT with test/tip-lag.test.ts
-  // once it runs here: the hold is the drawn lag minus this, so an error here shifts every TIP by the same amount.
-  upstreamSwingAtWeightS: 1.7, upstreamSwingWellPastS: 1.2,
+  // The upstream rocker's own swing, release to settled. Measured by the drill's timed match test (Visualizer
+  // test/drill/tipLag.test.ts, PR #150: FieldSim's dwell minus 0.45 s gave last ball to settled median 3.95 s at weight
+  // and 2.42 to 2.56 s well past, so the rocker itself takes about 1.9 s and 1.8 s). Upstream's docs quote 1.7 / 1.2 s
+  // from the load crossing, which is not the same start. The hold is the drawn lag minus this.
+  upstreamSwingAtWeightS: 1.9, upstreamSwingWellPastS: 1.8,
   enabled: true,
 };
 
