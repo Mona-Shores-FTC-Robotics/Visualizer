@@ -35,32 +35,42 @@ function samples(): Plugin {
 
 /**
  * Fork: the driver drill draws the field from the simulator's own models (sim/public/field.glb and
- * balls.gltf, FIRST's field CAD converted by ftc-biobuzz-sim), published at drill/ beside the page
- * and served the same way in dev, so the repository holds one copy.
+ * balls.gltf, FIRST's field CAD converted by ftc-biobuzz-sim) and our robot from its CAD
+ * (sim/public/robots/mona-shores/, the model AdvantageScope shows), published at drill/ beside the
+ * page and served the same way in dev, so the repository holds one copy.
  */
 function drillAssets(): Plugin {
   const dir = resolve(import.meta.dirname, "sim/public");
-  const files = ["field.glb", "balls.gltf"];
+  const files = [
+    "field.glb",
+    "balls.gltf",
+    "robots/mona-shores/components.json",
+    "robots/mona-shores/model.glb",
+    "robots/mona-shores/model_0.glb",
+    "robots/mona-shores/model_1.glb",
+  ];
+  const types: Record<string, string> = {
+    glb: "model/gltf-binary",
+    gltf: "model/gltf+json",
+    json: "application/json",
+  };
   return {
     name: "drill-assets",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const match = /\/drill\/(field\.glb|balls\.gltf)$/.exec(
-          (req.url ?? "").split("?")[0],
-        );
-        if (!match) return next();
-        res.setHeader(
-          "Content-Type",
-          match[1].endsWith(".glb") ? "model/gltf-binary" : "model/gltf+json",
-        );
-        res.end(readFileSync(resolve(dir, match[1])));
+        const url = (req.url ?? "").split("?")[0];
+        const name = files.find((f) => url.endsWith(`/drill/${f}`));
+        if (!name) return next();
+        res.setHeader("Content-Type", types[name.split(".").pop()!]);
+        res.end(readFileSync(resolve(dir, name)));
       });
     },
     writeBundle(options) {
       const out = resolve(options.dir ?? "dist", "drill");
-      mkdirSync(out, { recursive: true });
-      for (const name of files)
+      for (const name of files) {
+        mkdirSync(resolve(out, name, ".."), { recursive: true });
         copyFileSync(resolve(dir, name), resolve(out, name));
+      }
     },
   };
 }
