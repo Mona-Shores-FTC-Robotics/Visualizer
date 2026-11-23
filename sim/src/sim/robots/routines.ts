@@ -57,7 +57,7 @@ const near = (sim: Sim, to: Pose, posM: number, deg: number) => {
  * lateral correction (it drives the line exactly) and the short-push retry.
  */
 export class FlowerPick {
-  phase: 'lineup' | 'stick' | 'push' | 'dwell' | 'back' | 'done' = 'lineup';
+  phase: 'refused' | 'lineup' | 'stick' | 'push' | 'dwell' | 'back' | 'done' = 'lineup';
   private m: Mover; private t = 0; private stickAt = NaN; private pulled = 0; private lastPullAt = -Infinity; private lastProgress = { d: Infinity, at: 0 };
   readonly flower: { id: string; x: number; z: number; stack: string[] };
   private stage: Pose; private contact: Pose;
@@ -66,6 +66,8 @@ export class FlowerPick {
     const p = sim.robot.translation();
     const f = [...sim.flowers].sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
     this.flower = f as unknown as FlowerPick['flower'];
+    // FlowerPicker.nearest: only a FLOWER whose centre is within maxRangeIn; otherwise the button is refused.
+    if (Math.hypot(f.x - p.x, f.z - p.z) > R.flowerPick.maxRangeIn.value * IN) this.phase = 'refused';
     // The FLOWER stands on a wall; the robot faces it from the field side, along the wall's normal.
     const n = Math.abs(f.x) > Math.abs(f.z) ? { x: -Math.sign(f.x), z: 0 } : { x: 0, z: -Math.sign(f.z) };
     const h = Math.atan2(n.z, -n.x); // facing -n, toward the FLOWER: forward (cos h, -sin h) = -n
@@ -75,6 +77,7 @@ export class FlowerPick {
   }
   step(dt: number): RoutineStep {
     const s = this.sim, F = R.flowerPick; this.t += dt;
+    if (this.phase === 'refused') return { drive: { vx: 0, vz: 0, w: 0 }, stickDown: false, intake: false, phase: 'refused', done: true, note: `FLOWER pick refused: no FLOWER within ${F.maxRangeIn.value.toFixed(0)} in` };
     const p = s.robot.translation(), toStage = Math.hypot(this.stage.x - p.x, this.stage.z - p.z);
     let drive: Drive = { vx: 0, vz: 0, w: 0 }, stick = !Number.isNaN(this.stickAt);
     if (Number.isNaN(this.stickAt) && this.phase === 'lineup' && toStage < F.lowerWithinIn.value * IN) { this.stickAt = this.t; stick = true; }

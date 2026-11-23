@@ -396,6 +396,10 @@
       "flowerPullS": {
         "value": 0.5,
         "source": "PLACEHOLDER, RobotDesign.flowerPullS: time to drag one POLLEN out of a FLOWER; never timed per robot (19429 roller, 20245 passive)"
+      },
+      "maxRangeIn": {
+        "value": 60.0,
+        "source": "biobuzz opmodes/FlowerPicker.java LineUp.maxRangeIn: only a FLOWER whose centre is this close to the robot is picked, else refused (\"no FLOWER within 60 in\")"
       }
     },
     "gardenGather": {

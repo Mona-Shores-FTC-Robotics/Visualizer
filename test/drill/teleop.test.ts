@@ -207,6 +207,17 @@ describe("FLOWER pick and GARDEN gather: master's routines, run by the simulator
     expect(s.sim.carried.length).toBe(3);
   }, 60000);
 
+  test("no FLOWER within 60 in: refused with the robot's line, and nothing moves", async () => {
+    const s = await session();
+    place(s, 0, 0, 0); // the field's centre: every FLOWER is on a wall, about 70 in off
+    s.advance(0.5);
+    const a = s.sim.robot.translation();
+    s.advance(1, pad(["CROSS"]));
+    const b = s.sim.robot.translation();
+    expect(s.teleop.status().note).toMatch(/no FLOWER within 60 in/);
+    expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeLessThan(1e-3);
+  });
+
   test("a stick moved after the press hands the robot back, stick up", async () => {
     const s = await session();
     const f = s.sim.flowers.find((q) => q.id === "red")!;
