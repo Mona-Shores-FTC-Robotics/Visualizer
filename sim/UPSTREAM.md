@@ -8,6 +8,9 @@ our measured models replace its models where we have data, each change citing it
 
 - Physics and robot models (`src/sim/**`, the robot file): the biobuzz simulator chat.
 - Controls, drills and the multi-robot screen: the Visualizer drill chat.
+- The landing page (`index.html`) is ours: Ultraviolet and Infrared's Sim Lab, crediting NCSSM FTC, with
+  links to our Driver Drill and the Visualizer and without upstream's match counter. Its links and those of
+  `sim/index.html`, `public/lab/` and `public/lessons/` are relative, so they work under `/Visualizer/sim-lab/`.
 - `CLAUDE.md` in this folder is upstream's and still applies to work in here.
 - Upstream's Cloudflare parts (`functions/`, `server/`, `migrations/`, `wrangler.toml`, the match counter) are
   unused by us and left as they came, so a diff against upstream stays clean.
