@@ -22,6 +22,7 @@ import type { Sim } from "../../sim/src/sim/world";
 import { Controls, type PadRead } from "./controls";
 import { IN, type RobotPreset } from "./presets";
 import { limitDrive } from "../../sim/src/sim/robots/mona-shores";
+import { LaunchSpotDrive, type SpotStep } from "./launchSpot";
 import {
   FlowerPick,
   GardenGather,
@@ -120,6 +121,16 @@ export class TeleOp {
   private emptySince = Infinity;
   private routine: Routine | null = null;
   private routineSticks = { armed: false };
+  /** The driver's Square (LaunchSpotDrive); null with a controls file that has no launch spots. */
+  private spot: LaunchSpotDrive | null = null;
+  private spotStep: SpotStep = {
+    drive: null,
+    feed: false,
+    wantsLauncher: false,
+  };
+  private spotWas = false;
+  private spotStartS = Infinity;
+  private lastNow = 0;
   private arcTurning = false;
   private arcCancelled = false;
   private chassisAiming = false;
@@ -158,6 +169,13 @@ export class TeleOp {
     const t = controls.teleOp;
     this.turretMode = t.startTurretAiming === false ? "LOCKED" : "AIM";
     this.fieldForward = sim.alliance === "red" ? 0 : Math.PI;
+    const spots = controls.launchSpots;
+    if (spots)
+      this.spot = new LaunchSpotDrive(
+        spots,
+        String(preset.team) as "19429" | "20245",
+        t.goToSpotAlsoFires !== false,
+      );
     sim.robots[sim.me].velDrive = { vx: 0, vz: 0, w: 0 };
   }
 
@@ -181,6 +199,7 @@ export class TeleOp {
   /** One loop, before the physics step. `now` is seconds from PLAY, `dt` the loop. */
   update(driver: PadRead, operator: PadRead, now: number, dt: number): void {
     const sim = this.sim;
+    this.lastNow = now;
     if (this.driverOnly) operator = { lx: 0, ly: 0, rx: 0, held: () => false };
     this.controls.poll(driver, operator);
     const c = this.controls;
@@ -265,7 +284,8 @@ export class TeleOp {
     const insideArc = rel <= arcLeft && rel >= -arcRight;
 
     // --- fire (driver's Circle) -------------------------------------------------------------
-    const fireHeld = c.held("CHASSIS_AIM");
+    // A Square press that fires owns the shot: Circle feeds nothing until it ends (BasicDriveTeleOp.fire).
+    const fireHeld = c.held("CHASSIS_AIM") && !this.spotStep.wantsLauncher;
     this.firePress = fireHeld && !this.fireHeldWas;
     if (this.firePress) {
       const spun =
@@ -326,6 +346,9 @@ export class TeleOp {
     // --- routines: FLOWER pick, GARDEN gather ----------------------------------------------
     this.updateRoutine(c, now, leftStick || rightStick, dt);
 
+    // --- Square: go to launch spot ------------------------------------------------------------
+    this.updateSpot(c, now, dt, leftStick || rightStick);
+
     // --- drive --------------------------------------------------------------------------------
     // Full stick is the forward top speed; `limitDrive` caps it to the robot's envelope in the
     // direction of travel (a mecanum strafes slower than it drives forward), and the change to
@@ -333,6 +356,7 @@ export class TeleOp {
     const vmax = this.preset.topSpeedInPerS * IN;
     let target: { vx: number; vz: number; w: number };
     if (this.routine?.last) target = this.routine.last.drive;
+    else if (this.spotStep.drive) target = { ...this.spotStep.drive };
     else {
       const a = this.fieldForward;
       const F = { x: Math.cos(a), z: -Math.sin(a) },
@@ -391,14 +415,15 @@ export class TeleOp {
     const arcTurnDone = !this.arcTurning;
     const suspect = now < this.suspectUntil;
     if (this.gate && suspect) this.gate = false;
+    // Square's volley has waited for speed and settle itself (SpotVolley): only the firing arc
+    // (and the NECTAR hold) gates it, as on the robot.
+    const spotFeed = !fireHeld && this.spotStep.feed;
+    const circleOpen =
+      fireHeld && now >= this.readyAt && aimed && arcOk && arcTurnDone;
     if (!this.gate) {
       if (
         !suspect &&
-        fireHeld &&
-        now >= this.readyAt &&
-        aimed &&
-        arcOk &&
-        arcTurnDone &&
+        (circleOpen || (spotFeed && arcOk)) &&
         sim.carried.length > 0 &&
         !this.routine
       ) {
@@ -412,7 +437,9 @@ export class TeleOp {
         this.emptySince = Infinity;
       }
     } else {
-      if (!fireHeld) this.gate = false;
+      if (!fireHeld && !spotFeed) this.gate = false;
+      else if (spotFeed && !arcOk)
+        this.gate = false; // the arc also stops a feed already going
       else if (now >= this.nextShotAt && sim.carried.length > 0) {
         this.launch(aim, now);
         this.nextShotAt =
@@ -629,8 +656,47 @@ export class TeleOp {
       this.routine.last = this.routine.r.step(dt);
       this.sim.robots[this.sim.me].stickDown = this.routine.last.stickDown;
     };
+    if (this.spot?.active) return;
     if (c.on("FLOWER_PICK")) start("pick");
     else if (c.on("GARDEN_GATHER")) start("gather");
+  }
+
+  /**
+   * Square held (`LAUNCH_SPOT`): the launch-spot drive and its volley (./launchSpot.ts). Never with a
+   * FLOWER pick or GARDEN gather running, and neither starts while it drives. The press spins the
+   * launcher up as it starts (with `goToSpotAlsoFires`).
+   */
+  private updateSpot(
+    c: Controls,
+    now: number,
+    dt: number,
+    sticksMoved: boolean,
+  ) {
+    const none: SpotStep = { drive: null, feed: false, wantsLauncher: false };
+    if (!this.spot || !c.binding("LAUNCH_SPOT")) {
+      if (c.on("LAUNCH_SPOT"))
+        this.say(
+          "Square: this controls file has no launch spots (biobuzz's export is older than them)",
+          now,
+          4,
+        );
+      this.spotStep = none;
+      return;
+    }
+    const held = c.held("LAUNCH_SPOT") && !this.routine;
+    if (held && !this.spotWas) this.spotStartS = now;
+    if (!held) this.spotStartS = Infinity;
+    const spun =
+      (this.operatorSpin &&
+        now - this.spinSince >= this.preset.spinUpFromIdleS) ||
+      now - this.spotStartS >= this.preset.spinUpFromIdleS;
+    const wasActive = this.spot.active,
+      wasPhase = this.spot.phase;
+    this.spotStep = this.spot.step(this.sim, held, sticksMoved, spun, now, dt);
+    if (this.spot.phase === "REFUSED" && wasPhase !== "REFUSED")
+      this.say(this.spot.result, now, 4);
+    else if (wasActive && !this.spot.active) this.say(this.spot.result, now, 4);
+    this.spotWas = held;
   }
 
   private endRoutine() {
@@ -663,7 +729,9 @@ export class TeleOp {
       lane: this.sim.carried.length,
       routine: this.routine
         ? `${this.routine.kind === "pick" ? "FLOWER pick" : "GARDEN gather"}: ${this.routine.last?.phase ?? "starting"}`
-        : null,
+        : this.spot?.active
+          ? this.spot.line(this.sim, this.lastNow)
+          : null,
       arcTurning: this.arcTurning,
       chassisAiming: this.chassisAiming,
       aimTrimDeg: this.aimTrimDeg,

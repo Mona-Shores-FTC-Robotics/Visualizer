@@ -5,6 +5,8 @@
  * operator, as on the Driver Station.
  */
 
+import type { LaunchSpotFile } from "./launchSpot";
+
 export type Pad = "DRIVER" | "OPERATOR";
 
 export interface Binding {
@@ -21,6 +23,8 @@ export interface ControlsFile {
   inputs: { input: string; label: string; stick: boolean }[];
   layouts: { turretAiming: Binding[]; turretLocked: Binding[] };
   teleOp: Record<string, number | boolean>;
+  /** The driver's Square: the launch spots and the numbers its drive and volley use (biobuzz `LaunchSpotsExport`). Absent from a file older than it. */
+  launchSpots?: LaunchSpotFile;
   practiceReadout: {
     budgetS: number;
     budgetPieces: number;
@@ -192,5 +196,9 @@ export class Controls {
 
   get teleOp(): Record<string, number | boolean> {
     return this.file.teleOp;
+  }
+
+  get launchSpots(): LaunchSpotFile | undefined {
+    return this.file.launchSpots;
   }
 }
