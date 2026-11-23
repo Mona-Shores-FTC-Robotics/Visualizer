@@ -407,7 +407,7 @@ function hud() {
     ? session.totalTips - session.tips.length
     : 0;
   $("tips").innerHTML =
-    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""} · CELL ${session.sim.cellCount(session.sim.alliance)} in</small>`;
+    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""}${session.replayPieces ? "" : ` · CELL ${session.sim.cellCount(session.sim.alliance)} in`}</small>`;
   const all = session.teleops.map((_, k) => k);
   $("robot").innerHTML = all.map(robotBox).join("");
   $("note").textContent = session.teleops
@@ -564,6 +564,7 @@ function frame(now: number) {
         : { team: 0, turretDeg: 0, aim: false };
     }),
     true,
+    session.replayPieces,
   );
   hud();
   requestAnimationFrame(frame);

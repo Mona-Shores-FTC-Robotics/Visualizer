@@ -311,6 +311,13 @@ export class DrillSession {
     return this.started ? Math.max(0, this.sim.clock) : TELEOP_S;
   }
 
+  /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
+  get replayPieces(): ReturnType<AutoPlayback["pieces"]> | null {
+    return this.playback && !this.playback.handedOver
+      ? this.playback.pieces()
+      : null;
+  }
+
   /** Which part of the match is running: the AUTO and transition only in a full match. */
   get phase(): "pre" | "auto" | "transition" | "teleop" | "ended" {
     if (this.finished) return "ended";

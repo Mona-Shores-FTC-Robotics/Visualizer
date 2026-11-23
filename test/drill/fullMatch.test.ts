@@ -6,7 +6,7 @@ import {
   fieldAtHandoff,
   type AutoTrace,
 } from "../../src/drill/fullMatch";
-import { FIELD } from "../../sim/src/sim/config";
+import { FIELD, TIP_LOAD } from "../../sim/src/sim/config";
 import { toPedro } from "../../src/drill/launchSpot";
 import {
   DrillSession,
@@ -275,4 +275,76 @@ describe("R-Solo's two openings: 2 TIPs and the CELL empty, or 1 TIP and 6 POLLE
     expect(one).toBeGreaterThanOrEqual(5);
     expect(one).toBeLessThanOrEqual(11);
   }, 240000);
+});
+
+describe("the AUTO replay shows the pieces: the volleys fly and fill our CELL", () => {
+  const autos = (
+    JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, "../../public/drill/autos/index.json"),
+        "utf8",
+      ),
+    ) as { autos: { auto: string }[] }
+  ).autos.map((a) => a.auto);
+
+  test.each(autos)(
+    "%s",
+    async (auto) => {
+      const t = trace(auto);
+      const s = await fullMatch(auto);
+      const hive = s.sim.hives.red.body.translation();
+      const inHive = (q: { x: number; y: number; z: number }) =>
+        q.y > 0.5 && Math.hypot(q.x - hive.x, q.z - hive.z) < 0.6;
+      const onFlower = (q: { x: number; z: number }) =>
+        s.sim.flowers.some((f) => Math.hypot(f.x - q.x, f.z - q.z) < 0.15);
+      let flying = 0,
+        mostInHive = 0;
+      const inHiveAt = new Map<number, number>();
+      const want = (t.tipsAt ?? []).map((x) => Math.round((x - 0.2) * 10) / 10);
+      expect(s.replayPieces?.length ?? 0, auto).toBeGreaterThan(30);
+      for (let k = 1; k <= HANDOFF_S * 10 - 1; k++) {
+        s.advance(0.1);
+        const ps = s.replayPieces!;
+        const pollen = ps.filter((q) => q.kind === "pollen");
+        const n = pollen.filter(inHive).length;
+        mostInHive = Math.max(mostInHive, n);
+        // The load the TIP weighs, in POLLEN equivalents (TIP_LOAD): our NECTAR counts 1.65 each.
+        const load =
+          n +
+          TIP_LOAD.nectar *
+            ps.filter((q) => q.kind === "nectar_red" && inHive(q)).length;
+        if (pollen.some((q) => q.y > 0.3 && !inHive(q) && !onFlower(q)))
+          flying++;
+        for (const w of want)
+          if (Math.abs(k / 10 - w) < 0.05) inHiveAt.set(w, load);
+      }
+      // A volley flies (some POLLEN up in the air, off the HIVE and the FLOWERs) and lands in our HIVE.
+      expect(flying, `${auto}: frames with POLLEN in flight`).toBeGreaterThan(
+        0,
+      );
+      expect(mostInHive, `${auto}: POLLEN in our HIVE`).toBeGreaterThanOrEqual(
+        t.scored ? 1 : 0,
+      );
+      // Just before each TIP, our HIVE holds the load that tips it: the TIP weight (7.4), less a
+      // POLLEN or so still on its way in.
+      for (const w of want)
+        expect(
+          inHiveAt.get(w),
+          `${auto}: load in our HIVE at ${w} s`,
+        ).toBeGreaterThanOrEqual(TIP_LOAD.threshold - 1.5);
+      // At 2:00 the replay's pieces give way to the simulator's.
+      s.advance(0.2);
+      expect(s.replayPieces).toBeNull();
+    },
+    60000,
+  );
+
+  test("a trace without the pieces draws none (the view falls back to the simulator's)", async () => {
+    const t = { ...trace("r-solo"), pieceFrames: undefined };
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "two", 1);
+    s.playAuto(t);
+    s.start();
+    s.advance(5);
+    expect(s.replayPieces).toEqual([]);
+  }, 60000);
 });

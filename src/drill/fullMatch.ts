@@ -43,6 +43,12 @@ export interface AutoTrace {
   /** t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips. */
   columns: string[];
   frames: number[][];
+  /**
+   * Every game piece on the field each frame (not those in a robot), so the replay shows the
+   * volleys and the CELLs filling: per kind, per frame, X, height, Z flattened, in centimetres in
+   * the simulator's frame. Older traces have none.
+   */
+  pieceFrames?: Record<"pollen" | "nectarRed" | "nectarBlue", number[][]>;
   handoff: {
     pose: { x: number; y: number; headingDeg: number };
     held: number;
@@ -149,6 +155,38 @@ export class AutoPlayback {
   /** Our HIVE's TIPs so far in the replay. */
   get tipsSoFar(): number {
     return this.frame(this.t)[6] ?? 0;
+  }
+
+  /**
+   * The trace's pieces at the replay's time, for the view to draw in place of the simulator's
+   * (which stand still until the hand-off): between two frames with the same pieces, part way.
+   */
+  pieces(): { kind: BallKind; x: number; y: number; z: number }[] {
+    const pf = this.trace.pieceFrames;
+    if (!pf) return [];
+    const n = this.trace.frames.length;
+    const u = Math.max(0, Math.min(n - 1, this.t * 10));
+    const i = Math.min(n - 1, Math.floor(u + 1e-6)),
+      j = Math.min(n - 1, i + 1),
+      w = u - i;
+    const out: { kind: BallKind; x: number; y: number; z: number }[] = [];
+    for (const [key, kind] of [
+      ["pollen", "pollen"],
+      ["nectarRed", "nectar_red"],
+      ["nectarBlue", "nectar_blue"],
+    ] as const) {
+      const a = pf[key][i] ?? [],
+        b = pf[key][j] ?? [];
+      const mix = a.length === b.length ? w : 0;
+      for (let k = 0; k + 2 < a.length; k += 3)
+        out.push({
+          kind,
+          x: (a[k] + (b[k] - a[k]) * mix) / 100,
+          y: (a[k + 1] + (b[k + 1] - a[k + 1]) * mix) / 100,
+          z: (a[k + 2] + (b[k + 2] - a[k + 2]) * mix) / 100,
+        });
+    }
+    return out;
   }
 
   /** Advances the replay; true once it has handed over. */

@@ -128,11 +128,19 @@ def build(auto, design=None):
         return round(num(angle), 1), tips
 
     frames = []
+    # Every game piece on the field each frame (not those in a robot: its lane is `held`), so the
+    # replay shows the volleys fly and the CELLs fill: centimetres in the simulator's frame (X, height,
+    # Z), flattened, one list per frame and kind.
+    piece_keys = {'pollen': '/Sim/GamePieces/Pollen', 'nectarRed': '/Sim/GamePieces/RedNectar',
+                  'nectarBlue': '/Sim/GamePieces/BlueNectar'}
+    piece_frames = {k: [] for k in piece_keys}
     for k in range(int((AUTO_S + TRANSITION_S) * HZ) + 1):
         t = start + k / HZ
         r, b = hive('Red', t), hive('Blue', t)
         frames.append([round(k / HZ, 1), round(num(at(px, t)), 2), round(num(at(py, t)), 2), round(num(at(ph, t)), 1),
                        int(num(at(held, t, 0))), r[0], r[1], b[0], b[1]])
+        for name, key in piece_keys.items():
+            piece_frames[name].append([round(v * 100) for x, y, z in (at(log.get(key, []), t) or []) for v in (y, z, x)])
     t = start + AUTO_S + TRANSITION_S
 
     def pieces(key):
@@ -161,6 +169,7 @@ def build(auto, design=None):
         'scored': row.get('scored'),
         'columns': ['t', 'x', 'y', 'headingDeg', 'held', 'redAngleDeg', 'redTips', 'blueAngleDeg', 'blueTips'],
         'frames': frames,
+        'pieceFrames': piece_frames,
         'handoff': {
             'pose': {'x': last[1], 'y': last[2], 'headingDeg': last[3]},
             'held': last[4],

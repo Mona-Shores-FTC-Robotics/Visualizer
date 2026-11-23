@@ -316,6 +316,49 @@ test("a run ends at 2:00 with a results screen, and the best run is kept", async
   await expect(page.locator("#history")).toContainText("Best: 3 TIPs");
 });
 
+test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .locator("#match option[value='r-solo']")
+    .waitFor({ state: "attached" });
+  await page.locator("#match").selectOption("r-solo");
+  await bind(page, 0);
+  await expect(page.locator("#start")).toContainText("Start the match");
+  await setPad(page, 0, [BTN.OPTIONS]);
+  await expect(page.locator("#clock")).toContainText("AUTO");
+  await setPad(page, 0);
+  // Stepped to just before R-Solo's first TIP (7.3 s): its first volley is in our HIVE, and the
+  // page draws the trace's pieces rather than the simulator's (which wait for the hand-off).
+  const at = await page.evaluate(() => {
+    const s = (
+      window as unknown as {
+        __drill: {
+          session: {
+            playback: { t: number } | null;
+            advance(s: number): void;
+            replayPieces:
+              { kind: string; x: number; y: number; z: number }[] | null;
+          };
+        };
+      }
+    ).__drill.session;
+    s.advance(7.1 - (s.playback?.t ?? 0));
+    const ps = s.replayPieces ?? [];
+    return {
+      t: s.playback?.t ?? -1,
+      pieces: ps.length,
+      high: ps.filter((q) => q.kind === "pollen" && q.y > 0.5).length,
+    };
+  });
+  expect(at.pieces).toBeGreaterThan(30);
+  expect(at.high).toBeGreaterThanOrEqual(3);
+  await page.screenshot({
+    path: test.info().outputPath("full-match-r-solo-7s.png"),
+  });
+});
+
 test("alliance: two controllers drive Ultraviolet and Infrared on one field", async ({
   page,
 }) => {

@@ -33,6 +33,8 @@ export class DrillView {
   private ballMat = new Map<BallKind, THREE.Material>();
   private ballMeshes = new Map<number, THREE.Mesh>();
   private staticBalls = new THREE.Group();
+  /** The Auto replay's pieces (a full match before 2:00), drawn in place of the simulator's. */
+  private replayBalls = new THREE.Group();
   private staticKey = "";
   private hiveNodes: { red?: THREE.Object3D; blue?: THREE.Object3D } = {};
   private robots: RobotMesh[] = [];
@@ -58,6 +60,7 @@ export class DrillView {
       );
     this.buildFloor();
     this.scene.add(this.staticBalls);
+    this.scene.add(this.replayBalls);
     this.frame = frameM;
     this.loadField();
     new ResizeObserver(() => this.resize()).observe(canvas);
@@ -315,10 +318,37 @@ export class DrillView {
    * Draws the field. `robots` gives each of `sim.robots` its team and turret angle (deg, from the
    * robot's forward, + left); the chase camera follows the first.
    */
+  /** Shows the replay's pieces (one pooled mesh each), and hides the simulator's while it runs. */
+  private syncReplay(
+    replay: { kind: BallKind; x: number; y: number; z: number }[] | null,
+  ) {
+    const on = !!replay;
+    this.staticBalls.visible = !on;
+    for (const m of this.ballMeshes.values()) m.visible = !on;
+    this.replayBalls.visible = on;
+    if (!replay) return;
+    const pool = this.replayBalls.children as THREE.Mesh[];
+    replay.forEach((q, i) => {
+      let m = pool[i];
+      if (!m) {
+        m = new THREE.Mesh();
+        this.replayBalls.add(m);
+      }
+      m.geometry =
+        q.kind === "pollen" ? this.ballGeo.pollen : this.ballGeo.nectar;
+      m.material = this.ballMat.get(q.kind)!;
+      m.position.set(q.x, q.y, q.z);
+      m.visible = true;
+    });
+    for (let i = replay.length; i < pool.length; i++) pool[i].visible = false;
+  }
+
   sync(
     sim: Sim,
     robots: { team: number; turretDeg: number; aim?: boolean }[],
     showAim: boolean,
+    /** The Auto replay's pieces: drawn instead of the simulator's balls and FLOWER stacks. */
+    replay: { kind: BallKind; x: number; y: number; z: number }[] | null = null,
   ) {
     robots.forEach((r, i) => {
       if (!this.robots[i] || this.robots[i].team !== r.team) {
@@ -373,6 +403,7 @@ export class DrillView {
         });
       }
     }
+    this.syncReplay(replay);
     if (this.hiveNodes.red)
       this.hiveNodes.red.rotation.x = sim.hives.red.phi + HIVE.tiltLimit;
     if (this.hiveNodes.blue)
