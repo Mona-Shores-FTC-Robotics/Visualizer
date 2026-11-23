@@ -4,6 +4,7 @@
 // NECTAR at random spots instead of the CAD staging spots, as the runs from e49 to e94 did (see `STAGING`).
 // AUTO_INTAKE=all starts AUTO with the intake on, where it starts off (see `AUTO_TUNING.intakeDefault`).
 import RAPIER from '@dimforge/rapier3d-compat';
+import { tipTiming } from '../src/sim/tip-lag';
 import { Coach } from '../src/auto/coach';
 import { EXEC } from '../src/auto/executor';
 import { AUTO_TUNING } from '../src/auto/onboard';
@@ -16,7 +17,7 @@ if (process.env.OLD_TIP) EXEC.tipByMotion = false; // For comparisons with the o
 if (process.env.RANDOM_CELL) STAGING.randomCellNectar = true; // For comparisons with the random CELL layout.
 if (process.env.AUTO_INTAKE) AUTO_TUNING.intakeDefault = process.env.AUTO_INTAKE as typeof AUTO_TUNING.intakeDefault;
 const given: Partial<BotSetup>[] = JSON.parse(process.env.BOTS ?? '[]'), bots = [0, 1, 2, 3].map(i => sanitize({ ...defaultBot(i), ...(given[i] ?? {}) }, i));
-const sim = new Sim(RAPIER, undefined, 'full', seed, { opponent: process.env.OPPONENT !== 'none', partners: true, configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) }); sim.start();
+const sim = new Sim(RAPIER, undefined, 'full', seed, { opponent: process.env.OPPONENT !== 'none', partners: true, tipTiming: tipTiming(process.env.TIP_TIMING), configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) }); sim.start();
 const coaches = sim.robots.map((_, i) => { const c = new Coach(); c.flowerStartSec = bots[i].flowerStartSec; c.defense = bots[i].defense; c.autoOverride = bots[i].auto === 'default' || bots[i].auto === 'none' ? null : bots[i].auto; return c; });
 // TELEOP seconds per robot by what the robot is doing. `toLaunch` is travel to the launch spot, `settle` is the last 0.3 m
 // until the robot is on the spot and still, `waitCell` is on the spot while the target CELL isn't raised and at rest, `aim` is

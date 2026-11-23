@@ -4,6 +4,7 @@ import { BALL, DEFAULT_ROBOT, FIELD, HIVE, MATCH, POINTS, RP, TIP_LOAD, type Lau
 import { mecanumForces, type DriveCommand } from './drivetrain';
 import { GROUP, Hive, groups, type Alliance } from './hive';
 import { Rng } from './rng';
+import { TipLagHold, tipTiming, type TipTiming } from './tip-lag';
 
 type R = typeof RAPIER_NS;
 export type BallKind = 'pollen' | 'nectar_red' | 'nectar_blue';
@@ -72,6 +73,8 @@ export interface SimOptions {
   /** If true, the MATCH is a playoff MATCH: ranking points don't exist, so the planner maximizes points alone. Default: false. */ playoff?: boolean;
   /** Gets the configuration of one robot, for experiments that vary a design. Default: the constructor's `cfg` for all. */
   configFor?: (alliance: Alliance, slot: 0 | 1) => RobotConfig | undefined;
+  /** Mona Shores: the TIP timing, 'uv-ir' (our films) or 'ncssm' (upstream's rocker alone). Default: 'uv-ir' (src/sim/tip-lag.ts). */
+  tipTiming?: TipTiming;
 }
 
 /** Switches for experiments on the pre-MATCH setup. */
@@ -145,9 +148,13 @@ export class Sim {
   partner() { return this.otherRobots().find(o => o.alliance === this.alliance) ?? null; }
   get slot() { return this.robots[this.me].slot; }
   rng: Rng;
+  /** Mona Shores: the TIP lag hold, one per HIVE (src/sim/tip-lag.ts). */
+  tipLag: Record<Alliance, TipLagHold>;
 
   constructor(private rapier: R, cfg: RobotConfig = structuredClone(DEFAULT_ROBOT), public mode: MatchMode = 'teleop', seed = 1, public options: SimOptions = {}) {
     this.rng = new Rng(seed);
+    const timing = tipTiming(options.tipTiming);
+    this.tipLag = { red: new TipLagHold(seed * 2 + 1, timing), blue: new TipLagHold(seed * 2 + 2, timing) };
     this.world = new rapier.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = DT; this.world.numSolverIterations = 8;
     this.buildField();
@@ -235,7 +242,8 @@ export class Sim {
   /** Runs the physics for `sec` with no robot input and the clock stopped, as before a MATCH. */
   private settle(sec: number) {
     for (let i = 0; i < sec / DT; i++) {
-      for (const h of Object.values(this.hives)) h.applyTorques();
+      for (const a of ['red', 'blue'] as Alliance[]) this.hives[a].held = this.tipLag[a].update(this.simTime, this.cellCount(a), this.cellLoad(a));
+    for (const h of Object.values(this.hives)) h.applyTorques();
       this.world.step(); this.touch();
       for (const h of Object.values(this.hives)) h.epoch!++;
     }
