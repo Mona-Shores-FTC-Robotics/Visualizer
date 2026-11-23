@@ -10,6 +10,20 @@
 import { TIP_LOAD } from './config';
 import { Rng } from './rng';
 
+/**
+ * Which TIP timing a match uses (mentor, 23 Nov 2026: neither is assumed right, so both stay selectable).
+ * 'uv-ir': Mona Shores' films, the hold below. 'ncssm': upstream's rocker alone, no dwell.
+ */
+export type TipTiming = 'uv-ir' | 'ncssm';
+export const TIP_TIMINGS: { value: TipTiming; label: string }[] = [
+  { value: 'uv-ir', label: 'UV/IR TIP timing (our films)' },
+  { value: 'ncssm', label: 'NCSSM TIP timing (rocker only)' },
+];
+/** The default: 'uv-ir', because it is the one measured on real fields (16 films and Fruitport M6). */
+export const DEFAULT_TIP_TIMING: TipTiming = 'uv-ir';
+/** Reads a timing from a request or a setting; anything else is the default. */
+export function tipTiming(v: unknown): TipTiming { return v === 'ncssm' || v === 'uv-ir' ? v : DEFAULT_TIP_TIMING; }
+
 export const TIP_LAG = {
   atWeightS: [3.4, 6.5] as [number, number],  // last ball to settled, at the tipping weight (films)
   atWeightSkew: 2.6,                          // low end + width * u^skew: median 3.9 s, a slow tail (biobuzz FieldSim)
@@ -20,13 +34,12 @@ export const TIP_LAG = {
   // and 2.42 to 2.56 s well past, so the rocker itself takes about 1.9 s and 1.8 s). Upstream's docs quote 1.7 / 1.2 s
   // from the load crossing, which is not the same start. The hold is the drawn lag minus this.
   upstreamSwingAtWeightS: 1.9, upstreamSwingWellPastS: 1.8,
-  enabled: true,
 };
 
 /** Draws, per HIVE, how long its loaded CELL stays on its stop after the last piece lands. Its own random stream. */
 export class TipLagHold {
   private rng: Rng; private count = 0; private releaseAt = Infinity; private released = false;
-  constructor(seed: number) { this.rng = new Rng((seed ^ 0x71b1a6) >>> 0); }
+  constructor(seed: number, public timing: TipTiming = DEFAULT_TIP_TIMING) { this.rng = new Rng((seed ^ 0x71b1a6) >>> 0); }
 
   /** The lag for a CELL `past` POLLEN weights over its threshold, last piece to settled, seconds. */
   drawLag(past: number): number {
@@ -39,7 +52,7 @@ export class TipLagHold {
 
   /** Call once per step with the raised CELL's piece count and load; returns whether the HIVE is held this step. */
   update(now: number, count: number, load: number): boolean {
-    if (!TIP_LAG.enabled) return false;
+    if (this.timing === 'ncssm') return false;
     if (count > this.count) { // a piece landed: the wait starts again from it
       const past = load - TIP_LOAD.threshold;
       this.releaseAt = past > 0 ? now + this.drawLag(past) : Infinity; this.released = false;

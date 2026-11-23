@@ -9,6 +9,7 @@ import { Coach } from './auto/coach';
 import { Referee } from './ref/referee';
 import { Review, clockText, type SystemMark } from './review';
 import { TraceRecorder } from './trace';
+import { tipTiming } from './sim/tip-lag';
 import { Inspector } from './render/inspector';
 import { PALETTE } from './auto/palette';
 import { LiveTreeState, TreePanel, treeStateAt } from './render/tree-view';
@@ -25,7 +26,7 @@ const fmt = (s: number) => (Number.isFinite(s) ? `${Math.floor(Math.ceil(s) / 60
 await RAPIER.init();
 const banner = $('banner'); let loadMsg: string | null = null;
 const canvas = $<HTMLCanvasElement>('c'), view = new View(canvas, m => { loadMsg = m; });
-const stageSel = $<HTMLSelectElement>('stage'), modeSel = $<HTMLSelectElement>('mode'), camSel = $<HTMLSelectElement>('camera'), refSel = $<HTMLSelectElement>('referee');
+const tipSel = $<HTMLSelectElement>('tiptiming'), stageSel = $<HTMLSelectElement>('stage'), modeSel = $<HTMLSelectElement>('mode'), camSel = $<HTMLSelectElement>('camera'), refSel = $<HTMLSelectElement>('referee');
 const audio = new MatchAudio(), soundSel = $<HTMLSelectElement>('sound'); soundSel.onchange = () => { audio.enabled = soundSel.value === 'on'; soundSel.blur(); };
 // The tree view shows one robot's behavior tree. The setting is a convenience that this browser keeps.
 const treeSel = $<HTMLSelectElement>('treeview'), treePanel = new TreePanel($('treebody'), $('treehead')), liveTrees = [0, 1, 2, 3].map(() => new LiveTreeState());
@@ -70,7 +71,7 @@ const editor = new FieldEditor({ view, canvas, bots, sim: () => sim,
   setAuto: (k, id) => { bots[k].auto = id; saveBots(bots); if (coaches[k]) coaches[k].autoOverride = id === 'default' ? null : id; paintBots(); },
   changed: () => { camSel.value = view.mode; paintEditor(); paintTree(); } });
 const focus = () => focusRobot(bots);
-const settings = () => ({ match: modeSel.value, stage: stageSel.value, referee: refSel.value, ...Object.fromEntries(bots.map((b, i) => [BOT_IDS[i], `plate ${b.plate} · ${describe(b)}`])) });
+const settings = () => ({ match: modeSel.value, stage: stageSel.value, tipTiming: tipSel.value, referee: refSel.value, ...Object.fromEntries(bots.map((b, i) => [BOT_IDS[i], `plate ${b.plate} · ${describe(b)}`])) });
 /**
  * Saves the trace into the repository's traces/ folder through the dev server. A trace that hasn't grown since the last
  * save isn't sent again. The game setup's "This match" line shows the result.
@@ -99,7 +100,7 @@ function timeline(mode: MatchMode): { span: number; marks: SystemMark[] } {
 }
 function reset() {
   editor.close();
-  sim = new Sim(RAPIER, undefined, modeSel.value as MatchMode, seed++, { opponent: true, partners: true, playoff: stageSel.value === 'playoff', configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) });
+  sim = new Sim(RAPIER, undefined, modeSel.value as MatchMode, seed++, { opponent: true, partners: true, playoff: stageSel.value === 'playoff', tipTiming: tipTiming(tipSel.value), configFor: (a, slot) => robotConfig(bots[(a === 'red' ? 0 : 2) + slot]) });
   // Every robot has a Coach: it runs the robot's AUTO tree, and the planner in TELEOP unless a controller drives the robot.
   // Coaches record their trees, for the tree view and the match trace. Recording doesn't change what a robot does.
   coaches = sim.robots.map((_, i) => { const c = new Coach(), b = bots[i]; c.flowerStartSec = b.flowerStartSec; c.defense = b.defense; c.autoOverride = b.auto === 'default' || b.auto === 'none' ? null : b.auto; c.traceTrees = true; return c; });
@@ -198,7 +199,7 @@ for (const ev of ['keydown', 'keyup']) $('aerefinput').addEventListener(ev, e =>
 reset();
 // Entering the review saves the trace first, so that annotations always have their trace on disk.
 function openReview() { closeConfig(); closeModals(); editor.close(); void saveTrace(); review.enter(recorder.trace); }
-modeSel.onchange = reset; refSel.onchange = reset; stageSel.onchange = reset;
+modeSel.onchange = reset; refSel.onchange = reset; stageSel.onchange = reset; tipSel.onchange = reset;
 
 // ---------- control bar ----------
 /** True from the countdown to the end of TELEOP. */
@@ -269,7 +270,7 @@ function paintTransport() {
 }
 camSel.onchange = () => { view.mode = camSel.value as CameraMode; };
 $('resetcamera').onclick = () => { view.resetOrbitCamera(); view.mode = 'orbit'; camSel.value = view.mode; $('resetcamera').blur(); };
-for (const el of [modeSel, camSel, refSel, stageSel]) el.addEventListener('change', () => el.blur());
+for (const el of [modeSel, camSel, refSel, stageSel, tipSel]) el.addEventListener('change', () => el.blur());
 
 /** Rotates stick input from the driver's point of view into the frame of robot `i`. */
 function fieldCentric(inp: Inputs, i: number): Inputs {
