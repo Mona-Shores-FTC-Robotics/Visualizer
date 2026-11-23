@@ -190,6 +190,8 @@ function newSession() {
   );
   const trace = traces.get(matchSel.value);
   if (matchSel.value && trace) session.playAuto(trace);
+  // The 2:00 drill starts after a 1-TIP Auto: our preloads tip our CELL before the clock runs.
+  else session.opensAfterAuto = true;
   $("start").textContent = session.playback
     ? "Start the match (Options)"
     : "Start 2:00 (Options)";
@@ -295,7 +297,7 @@ function showResults(r: RunResult) {
   const list = saveRun(summarize(r));
   showHistory(list);
   const best = bestRun(list, r.team, r.mode, r.tipTiming, r.auto?.name ?? "");
-  const total = r.tips + (r.auto?.tips ?? 0);
+  const total = r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0);
   const isBest = best && best.date === r.date;
   const who = r.mode.startsWith("alliance")
     ? `Alliance: ${r.robots.map((x) => TEAM_NAMES[x.team]).join(" and ")}, ${r.mode === "alliance" ? "a driver each" : "a driver and an operator each"}`
@@ -315,6 +317,7 @@ function showResults(r: RunResult) {
   $("results-card").innerHTML = `
     <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
+    ${r.openingTips ? `<p>Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00): AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}

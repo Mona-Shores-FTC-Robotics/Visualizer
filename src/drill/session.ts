@@ -110,6 +110,8 @@ export interface RunResult {
   goalAtS: number | null;
   /** A match population: the opponents' skill this match, and their TIPs. */
   opponents?: { skill: OpponentSkill; tips: number };
+  /** The 2:00 drill opened after a 1-TIP Auto: the AUTO TIPs it started with (opensAfterAuto). */
+  openingTips?: number;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
   auto?: { name: string; tips: number; design: string | null; seed: number };
   robots: RobotRunResult[];
@@ -293,7 +295,7 @@ export class DrillSession {
       ? this.playback.handedOver
         ? this.playback.trace.autoTips
         : this.playback.tipsSoFar
-      : 0;
+      : this.openingTips;
     return auto + this.tips.length;
   }
 
@@ -306,12 +308,35 @@ export class DrillSession {
     this.playback = new AutoPlayback(trace, this.sim, 0);
   }
 
+  /**
+   * The 2:00 drill opens after a 1-TIP Auto (Hub, 23 Nov 2026): our robot's 4 preloads go into our
+   * raised CELL with its 3 NECTAR, over the TIP weight, and the field runs (clock stopped) until the
+   * TIP settles and spills, as most of our Autos leave it. That TIP counts as the AUTO's. Off by
+   * default; the page turns it on. Ignored in a full match, whose AUTO is the trace's.
+   */
+  opensAfterAuto = false;
+  /** The AUTO TIPs the 2:00 drill opened with (opensAfterAuto). */
+  openingTips = 0;
+
   start(): void {
     if (this.started) return;
     this.started = true;
     if (this.playback) return; // TeleOp starts at the hand-off
+    if (this.opensAfterAuto) this.openAfterAuto();
     this.sim.start();
     for (const r of this.readouts) r.start(0);
+  }
+
+  private openAfterAuto() {
+    const a = this.sim.alliance,
+      hive = this.sim.hives[a];
+    this.sim.handoff({ [a]: { up: hive.upCell, tips: 0, cellPollen: 4 } });
+    // Before PLAY the clock stands and nobody drives: only the HIVE and the pieces move.
+    for (let i = 0; i < 12 / DT && hive.tips === 0; i++)
+      this.sim.step(NO_INPUT);
+    for (let i = 0; i < 3 / DT; i++) this.sim.step(NO_INPUT); // the spill comes to rest
+    this.openingTips = hive.tips;
+    this.sim.handoff({ [a]: { up: hive.upCell, tips: hive.tips } });
   }
 
   /** Advances the drill by `seconds` of simulated time with robot 1's pads. */
@@ -448,6 +473,9 @@ export class DrillSession {
             },
           }
         : {}),
+      ...(!this.playback && this.openingTips
+        ? { openingTips: this.openingTips }
+        : {}),
       ...(this.playback
         ? {
             auto: {
@@ -463,7 +491,9 @@ export class DrillSession {
 
   /** When the 7th TIP settled, seconds from TeleOp's start (the AUTO's TIPs counted first), or null. */
   private goalAtS(): number | null {
-    const auto = this.playback ? this.playback.trace.autoTips : 0;
+    const auto = this.playback
+      ? this.playback.trace.autoTips
+      : this.openingTips;
     if (auto >= GOAL_TIPS) return 0;
     const k = GOAL_TIPS - auto;
     return this.tips.length >= k ? this.tips[k - 1].atS : null;

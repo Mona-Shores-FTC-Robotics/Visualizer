@@ -1,10 +1,13 @@
 import { describe, expect, test } from "vitest";
 import {
+  SpotStall,
   chooseSpot,
   fromPedro,
+  stallRefusal,
   toPedro,
   type PedroPose,
 } from "../../src/drill/launchSpot";
+import { GROUP, groups } from "../../sim/src/sim/hive";
 import { DrillSession } from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
 
@@ -183,5 +186,116 @@ describe("Square fires on arrival (goToSpotAlsoFires)", () => {
     s.advance(0.4, pad(["SQUARE"]));
     s.advance(2);
     expect(s.teleop.launched).toBe(0);
+  }, 60000);
+});
+
+describe("Square fires from where it stalls (biobuzz #734: SpotStall, LaunchSpotDrive.fireOnStall)", () => {
+  test("the export carries the stall numbers", () => {
+    expect(SPOTS).toMatchObject({
+      fireOnStall: true,
+      stallS: 0.6,
+      stallToleranceIn: 2,
+      stallSpeedInPerSec: 3,
+      stallTurnDegPerSec: 20,
+      stallProgressIn: 1,
+      stallRangeLowIn: 35,
+      stallRangeHighIn: 74,
+    });
+  });
+
+  test("SpotStall: slow, short of the spot and not closing in for 0.6 s; a slow creep still closing never stalls", () => {
+    const st = new SpotStall();
+    const step = (t: number, rem: number, v = 1, w = 0) =>
+      st.update(t, rem, v, w, 0.6, 2, 3, 20, 1);
+    expect(step(0, 10)).toBe(false);
+    expect(step(0.5, 10)).toBe(false);
+    expect(step(0.6, 10)).toBe(true);
+    const creep = new SpotStall();
+    let stalled = false;
+    for (let t = 0, rem = 20; t < 5; t += 0.1, rem -= 0.25)
+      stalled ||= creep.update(t, rem, 2.5, 0, 0.6, 2, 3, 20, 1);
+    expect(stalled).toBe(false);
+    const near = new SpotStall();
+    expect(near.update(0, 1.5, 0, 0, 0.6, 2, 3, 20, 1)).toBe(false);
+    expect(near.update(1, 1.5, 0, 0, 0.6, 2, 3, 20, 1)).toBe(false); // within the tolerance: finishing
+  });
+
+  test("SpotStall.refusal, in its order", () => {
+    expect(stallRefusal(false, -10, 50, true, true, true)).toBe(
+      "turret not aiming (AIM needed)",
+    );
+    expect(stallRefusal(true, 0, 50, true, true, true)).toBe(
+      "past the centre line",
+    );
+    expect(stallRefusal(true, -10, 13, false, true, true)).toBe(
+      "out of range (13 in)",
+    );
+    expect(stallRefusal(true, -10, 50, true, false, false)).toBe(
+      "aim outside the firing arc",
+    );
+    expect(stallRefusal(true, -10, 50, true, false, true)).toBeNull();
+  });
+
+  /** A wall across the way to the spot at Pedro y `wallY`: the press stalls on it. */
+  async function blocked(x: number, y: number, wallY: number) {
+    const R = await rapier();
+    const s = new DrillSession(R, CONTROLS, 20245, "two", 1);
+    s.start();
+    placePedro(s, [x, y, 270]);
+    const w = fromPedro([x, wallY, 0], SPOTS.fieldCentreIn);
+    s.sim.world.createCollider(
+      R.ColliderDesc.cuboid(0.6, 0.3, 0.02)
+        .setTranslation(w.x, 0.3, w.z)
+        .setCollisionGroups(groups(GROUP.struct, GROUP.robot | GROUP.ball)),
+    );
+    s.advance(0.2);
+    s.sim.carried = ["pollen", "pollen", "pollen", "pollen"];
+    return s;
+  }
+
+  test("blocked short of its spot, the press fires Circle's AIM shot from there: all four, no Circle", async () => {
+    const s = await blocked(40, 21, 7);
+    const t0 = s.t;
+    let stalledLine = "";
+    while (s.t - t0 < 9 && s.teleop.launched < 4) {
+      s.advance(0.05, pad(["SQUARE"]));
+      const r = s.teleop.status().routine ?? "";
+      if (!stalledLine && r.includes("STALLED")) stalledLine = r;
+    }
+    expect(stalledLine).toMatch(
+      /^Launch spot: STALLED \d+ in short of RIGHT_START · firing from \d+ in \(Circle's shot\)/,
+    );
+    expect(s.teleop.launched).toBe(4);
+    s.advance(0.05);
+    expect(s.teleop.status().note).toMatch(
+      /fired by Circle's AIM shot \(stalled\)/,
+    );
+  }, 60000);
+
+  test("too close to the CELL to have a measured row: the press ends, saying so", async () => {
+    const s = await blocked(60, 40, 27);
+    s.advance(3, pad(["SQUARE"]));
+    expect(s.teleop.status().note).toMatch(/stalled, out of range \(\d+ in\)/);
+    expect(s.teleop.launched).toBe(0);
+  }, 60000);
+
+  test("the turret LOCKED: a stall ends the press (AIM needed)", async () => {
+    const s = await blocked(40, 21, 7);
+    s.advance(0.05, pad(["R1"]));
+    s.advance(0.05);
+    expect(s.teleop.turretMode).toBe("LOCKED");
+    s.advance(3, pad(["SQUARE"]));
+    expect(s.teleop.status().note).toMatch(/turret not aiming \(AIM needed\)/);
+  }, 60000);
+
+  test("a stick ends the stall's shot at once", async () => {
+    const s = await blocked(40, 21, 7);
+    const t0 = s.t;
+    while (!s.teleop.status().routine?.includes("STALLED") && s.t - t0 < 6)
+      s.advance(0.05, pad(["SQUARE"]));
+    expect(s.teleop.status().routine).toMatch(/STALLED/);
+    s.advance(0.05, pad(["SQUARE"], { lx: 0.8 }));
+    expect(s.teleop.status().routine).toBeNull();
+    expect(s.teleop.status().note).toMatch(/sticks moved/);
   }, 60000);
 });
