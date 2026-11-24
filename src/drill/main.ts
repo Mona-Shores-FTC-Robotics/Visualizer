@@ -243,7 +243,11 @@ function newSession() {
     } else session.opensAfterAuto = true;
   }
   // A match field's dead partner stands at the start of the Auto it would run beside ours.
-  const partner = partnerAutoFor(matchSel.value || OPENING_AUTO);
+  // Beside R-Solo the partner keeps out of the way, in our alliance wall's left corner; beside
+  // another Auto it stands at its own Auto's start.
+  const ours = matchSel.value || OPENING_AUTO;
+  if (ours === "r-solo") session.placeDeadPartnerInCorner();
+  const partner = ours === "r-solo" ? null : partnerAutoFor(ours);
   const partnerTrace = partner ? traces.get(partner) : undefined;
   if (partnerTrace) session.placeDeadPartner(partnerTrace);
   $("start").textContent = session.playback
@@ -419,7 +423,7 @@ function showResults(r: RunResult) {
     ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}${r.cornerWheels ? ", corner wheels on" : ""}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
-    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. ${session.deadPartnerAuto ? ` Our partner stood dead at ${esc(session.deadPartnerAuto)}'s start.` : ""}</p>` : ""}
+    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. ${session.deadPartnerAt ? ` Our partner stood dead at ${esc(session.deadPartnerAt)}.` : ""}</p>` : ""}
     ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
@@ -650,6 +654,7 @@ function frame(now: number) {
                 : null
               : t.light.colour(session.t * 1000),
           cornerWheels: t.cornerWheels,
+          stickDeg: k === 0 ? session.replayStickDeg : null,
           cornerWheelsTurning: t.cornerWheelsRunning,
         };
       return r.alliance === session.sim.alliance

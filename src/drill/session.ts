@@ -26,6 +26,7 @@ import {
   loadingZonePose,
   placeRobot,
   startPose,
+  cornerPartnerPose,
   type AutoTrace,
 } from "./fullMatch";
 import {
@@ -342,16 +343,51 @@ export class DrillSession {
    * Returns false when there is no dead partner to place.
    */
   placeDeadPartner(partnerTrace: AutoTrace): boolean {
-    const k = this.sim.robots.findIndex(
+    return this.placeDeadPartnerAt(
+      startPose(partnerTrace),
+      `${partnerTrace.auto}'s start`,
+    );
+  }
+
+  /**
+   * Beside our R-Solo, the dead partner keeps out of the way in the left corner of our alliance
+   * wall (fullMatch.cornerPartnerPose), not at another Auto's start.
+   */
+  placeDeadPartnerInCorner(): boolean {
+    const k = this.deadPartnerIndex();
+    if (k < 0) return false;
+    const c = this.sim.robots[k].cfg;
+    return this.placeDeadPartnerAt(
+      cornerPartnerPose(this.sim.alliance, c),
+      "the left corner of our alliance wall",
+    );
+  }
+
+  private deadPartnerIndex(): number {
+    return this.sim.robots.findIndex(
       (r, i) => i >= this.teleops.length && r.alliance === this.sim.alliance,
     );
+  }
+
+  private placeDeadPartnerAt(
+    p: { x: number; z: number; h: number },
+    where: string,
+  ): boolean {
+    const k = this.deadPartnerIndex();
     if (k < 0) return false;
-    placeRobot(this.sim, k, startPose(partnerTrace));
-    this.deadPartnerAuto = partnerTrace.auto;
+    placeRobot(this.sim, k, p);
+    this.deadPartnerAt = where;
     return true;
   }
-  /** The Auto whose start our dead partner stands at, or null. */
-  deadPartnerAuto: string | null = null;
+  /** Where our dead partner stands ("l-no-cross's start", "the left corner of …"), or null. */
+  deadPartnerAt: string | null = null;
+
+  /** The FLOWER stick's swing for the view during the AUTO replay, degrees; null otherwise. */
+  get replayStickDeg(): number | null {
+    return this.playback && !this.playback.handedOver
+      ? this.playback.stickDeg
+      : null;
+  }
 
   /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
   get replayPieces(): ReturnType<AutoPlayback["pieces"]> | null {

@@ -17,6 +17,8 @@ import {
 } from "../../src/drill/session";
 import { CONTROLS, pad, rapier } from "./helpers";
 
+const wrapDeg = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
+
 // Full Match: one of our Autos replayed from its AutoSim trace, then TeleOp from where it ended.
 
 const trace = (auto: string) =>
@@ -378,7 +380,7 @@ describe("the AUTO replay swings the rockers as the trace does", () => {
 });
 
 describe("a match field's dead partner stands at its Auto's start", () => {
-  test("beside R-Solo, L-NoCross's start (LEFT_START, 62.3, 133.8, 270), and it stays there", async () => {
+  test("beside R-NoCross, L-NoCross's start (LEFT_START, 62.3, 133.8, 270), and it stays there", async () => {
     expect(partnerAutoFor("r-solo")).toBe("l-no-cross");
     expect(partnerAutoFor("r-clockwise")).toBe("l-clockwise");
     expect(partnerAutoFor("l-left-under-hive")).toBe("r-left-under-hive");
@@ -404,7 +406,7 @@ describe("a match field's dead partner stands at its Auto's start", () => {
     expect(Math.abs(p[0] - 62.3)).toBeLessThan(1);
     expect(Math.abs(p[1] - 133.8)).toBeLessThan(1);
     expect(((p[2] % 360) + 360) % 360).toBeCloseTo(270, 0);
-    expect(s.deadPartnerAuto).toBe("l-no-cross");
+    expect(s.deadPartnerAt).toBe("l-no-cross's start");
   }, 60000);
 
   test("no dead partner on an empty field, or with both our robots driven", async () => {
@@ -427,5 +429,62 @@ describe("a match field's dead partner stands at its Auto's start", () => {
       1,
     );
     expect(both.placeDeadPartner(trace("l-no-cross"))).toBe(false);
+  }, 60000);
+});
+
+describe("beside R-Solo, the partner keeps out of the way in our alliance wall's left corner", () => {
+  test("backed into the red-rear corner, facing the field, inside the walls, and it stays there", async () => {
+    const s = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      20245,
+      "driver",
+      1,
+      "uv-ir",
+      "playbook",
+      { kind: "match", skill: 1 },
+    );
+    expect(s.placeDeadPartnerInCorner()).toBe(true);
+    expect(s.deadPartnerAt).toBe("the left corner of our alliance wall");
+    s.start();
+    s.advance(5);
+    const v = s.sim.view(1),
+      c = v.cfg,
+      q = v.robot.translation(),
+      p = toPedro(q.x, q.z, v.heading);
+    // Pedro: x 0 is our (red) wall, y 141.5 the rear wall; its back and side within 1 cm of them.
+    expect(p[0] - c.length / 2 / 0.0254).toBeLessThan(0.5);
+    expect(p[0] - c.length / 2 / 0.0254).toBeGreaterThan(0);
+    expect(141.5 - c.width / 2 / 0.0254 - p[1]).toBeLessThan(0.5);
+    expect(141.5 - c.width / 2 / 0.0254 - p[1]).toBeGreaterThan(0);
+    expect(Math.abs(wrapDeg(p[2]))).toBeLessThan(2);
+    // Clear of our LOADING ZONE.
+    expect(v.robotInLoadingZone()).toBe(false);
+  }, 60000);
+});
+
+describe("the AUTO replay moves the FLOWER stick as the trace does", () => {
+  test("R-Solo lowers the stick for its FLOWER picks and raises it again", async () => {
+    const t = trace("r-solo");
+    expect(t.columns[9]).toBe("stickDeg");
+    const s = await fullMatch("r-solo");
+    let lowest = 0,
+      downAt: number | null = null,
+      upAfter = false;
+    for (let k = 1; k < AUTO_S * 10; k++) {
+      s.advance(0.1);
+      const d = s.replayStickDeg ?? 0;
+      expect(d, `at ${t.frames[k][0]} s`).toBeCloseTo(t.frames[k][9], 1);
+      if (d > lowest) lowest = d;
+      if (d > 150 && downAt === null) downAt = t.frames[k][0];
+      if (downAt !== null && d < 10) upAfter = true;
+    }
+    // Down to the tile (162 degrees out) for the first pick, about 4 s in, and stowed again after.
+    expect(lowest).toBeGreaterThan(150);
+    expect(downAt).toBeLessThan(8);
+    expect(upAfter).toBe(true);
+    // After the hand-off the simulator's own stick state is drawn again.
+    s.advance(HANDOFF_S);
+    expect(s.replayStickDeg).toBeNull();
   }, 60000);
 });

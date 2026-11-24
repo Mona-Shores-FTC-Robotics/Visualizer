@@ -404,6 +404,8 @@ export class DrillView {
       /** The corner wheels (the drill's experiment): fitted, and turning now. */
       cornerWheels?: boolean;
       cornerWheelsTurning?: boolean;
+      /** The FLOWER stick's swing, degrees, when something other than the simulator sets it (the AUTO replay). */
+      stickDeg?: number | null;
     }[],
     showAim: boolean,
     /** The Auto replay's pieces: drawn instead of the simulator's balls and FLOWER stacks. */
@@ -437,6 +439,7 @@ export class DrillView {
         sim.view(i),
         r.turretDeg,
         showAim && r.aim !== false,
+        r.stickDeg,
       );
       const rm = this.robots[i];
       rm.light.visible = r.light !== undefined;
@@ -532,6 +535,7 @@ export class DrillView {
     sim: Sim,
     turretDeg: number,
     showAim: boolean,
+    stickDeg: number | null = null,
   ) {
     const p = sim.robot.translation(),
       th = sim.heading;
@@ -539,7 +543,7 @@ export class DrillView {
     r.group.rotation.y = th;
     r.turret.rotation.y = (turretDeg * Math.PI) / 180;
     r.model?.setTurretDeg(turretDeg);
-    r.model?.setStickOut(!!sim.robots[sim.me].stickDown);
+    r.model?.setStickOut(stickDeg ?? !!sim.robots[sim.me].stickDown);
     r.intakeMat.color.set(
       sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
     );

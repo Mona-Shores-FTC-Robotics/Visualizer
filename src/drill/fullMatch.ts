@@ -40,7 +40,7 @@ export interface AutoTrace {
   tipsAt: number[] | null;
   launched: number | null;
   scored: number | null;
-  /** t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips. */
+  /** t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips, stickDeg (newer traces). */
   columns: string[];
   frames: number[][];
   /**
@@ -135,6 +135,26 @@ export function startPose(trace: AutoTrace): {
   return fromPedro([f[1], f[2], f[3]]);
 }
 
+/**
+ * Where R-Solo's partner waits: R-Solo is the Auto we run when the partner keeps out of the way
+ * (the mentor, 24 Nov 2026), so it stands in the left corner of our alliance wall, as its drivers
+ * see it (red: the rear corner, Pedro x 0, y 141.5), backed in: its back to our wall, its side to
+ * the rear wall, facing the field, 6 mm off each. biobuzz's spots.json has no corner spot. From
+ * the field's walls and the robot's size, not a typed pose; clear of the LOADING ZONE and of
+ * R-Solo's path and park.
+ */
+export function cornerPartnerPose(
+  alliance: "red" | "blue",
+  size: { length: number; width: number },
+): { x: number; z: number; h: number } {
+  const s = alliance === "red" ? -1 : 1;
+  return {
+    x: s * (FIELD.half - size.length / 2 - 0.006),
+    z: s * (FIELD.half - size.width / 2 - 0.006),
+    h: alliance === "red" ? 0 : Math.PI,
+  };
+}
+
 /** Puts robot `k` at `p` (sim X, Z, heading), at rest. */
 export function placeRobot(
   sim: Sim,
@@ -175,6 +195,15 @@ export class AutoPlayback {
   /** Seconds left on the field timer: the AUTO's 30 s, then the transition's 8. */
   get timer(): number {
     return this.t < AUTO_S ? AUTO_S - this.t : Math.max(0, HANDOFF_S - this.t);
+  }
+
+  /**
+   * The FLOWER stick's swing now, degrees (0 stowed, about 162 on the tile), as the AutoSim logged
+   * it (/Internals/FlowerStickDeg); null for a trace without it.
+   */
+  get stickDeg(): number | null {
+    const v = this.frame(this.t)[9];
+    return v === undefined ? null : v;
   }
 
   /** Our HIVE's TIPs so far in the replay. */
