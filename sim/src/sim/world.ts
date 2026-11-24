@@ -96,6 +96,11 @@ export interface SimOptions {
   spill?: SpillModel;
 }
 
+/** Mona Shores: how deep a piece may sink into a robot's frame before unpinch() puts it back out, meters (normal contacts sit well under this). */
+export const PINCH_TOL_M = 0.006;
+/** Mona Shores: how far the walls' colliders reach behind their inner faces, meters. Thick enough that no piece is pushed through. */
+export const WALL_COLLIDER_DEPTH_M = 0.3;
+
 /** Switches for experiments on the pre-MATCH setup. */
 export const STAGING = {
   /**
@@ -210,7 +215,10 @@ export class Sim {
   }
 
   private buildField() {
-    const h = FIELD.half, t = FIELD.wallThickness, wh = FIELD.wallHeight / 2;
+    // Mona Shores: the walls' colliders reach WALL_COLLIDER_DEPTH_M back from the inner face, not the drawn 3 cm. A piece
+    // pinned between a robot and a 3 cm wall was squeezed through it, and the return near its exit (housekeeping) put it
+    // under the robot, which then threw it out at the back (scripts/ball-pinch.ts).
+    const h = FIELD.half, t = Math.max(FIELD.wallThickness, WALL_COLLIDER_DEPTH_M), wh = FIELD.wallHeight / 2;
     this.fixed(h + 1, 0.05, h + 1, 0, -0.05, 0, GROUP.floor);
     for (const s of [-1, 1]) {
       this.fixed(t / 2, wh, h + t, s * (h + t / 2), wh, 0);
@@ -456,6 +464,7 @@ export class Sim {
     for (const h of Object.values(this.hives)) h.applyTorques();
     this.aero();
     this.world.step(); this.touch();
+    this.unpinch();
     for (const h of Object.values(this.hives)) h.epoch!++;
     if (this.spill === 'films') this.spillExit();
     for (const a of ['red', 'blue'] as Alliance[]) {
@@ -493,6 +502,68 @@ export class Sim {
     this.robot.resetForces(true); this.robot.resetTorques(true);
     this.robot.addForce({ x: fx, y: 0, z: fz }, true); this.robot.addTorque({ x: 0, y: out.torque - c * k * k * vel.w, z: 0 }, true);
     this.telemetry = { busVoltage: out.busVoltage, speed: sp };
+  }
+
+  /** Mona Shores: each robot's pieces' last frame-local positions, so a piece that got inside goes back out the face it came in by. */
+  private lastLocal = new Map<string, { f: number; l: number }>();
+  /**
+   * Mona Shores: a piece pinned between a wall and a robot pressing on it is about 400 times lighter than the robot, so
+   * the solver resolves their overlap almost all by moving the piece. It was pushed into the frame, a little more every
+   * step, and came out at the back or on top (scripts/ball-pinch.ts: 24 of 24 nose-in drives into a pinned POLLEN, with
+   * either intake mouth). A real piece there stays at the face and the robot stalls. So after each step, a piece deeper
+   * than PINCH_TOL_M inside a frame goes back out the face it came in by, moving with that face; if a wall leaves it no
+   * room there, the robot is moved back instead and stops pressing, as a stall.
+   */
+  private unpinch() {
+    for (let i = 0; i < this.robots.length; i++) {
+      const R = this.robots[i], c = R.cfg, body = R.body, t = body.translation(), q = body.rotation();
+      const h = 2 * Math.atan2(q.y, q.w), fw = { x: Math.cos(h), z: -Math.sin(h) }, lf = { x: -Math.sin(h), z: -Math.cos(h) };
+      const Lh = c.length / 2, Wh = c.width / 2, top = t.y + c.height / 2;
+      for (const [id, b] of this.balls) {
+        if (!b.body.isEnabled()) continue;
+        const p = b.body.translation(), r = b.radius, key = `${i}:${id}`, dx = p.x - t.x, dz = p.z - t.z;
+        if (Math.hypot(dx, dz) > Lh + Wh + r + 0.05 || p.y - r > top) { this.lastLocal.delete(key); continue; }
+        const f = dx * fw.x + dz * fw.z, l = dx * lf.x + dz * lf.z, prev = this.lastLocal.get(key);
+        const pen = { front: Lh + r - f, back: Lh + r + f, left: Wh + r - l, right: Wh + r + l };
+        if (Math.min(pen.front, pen.back, pen.left, pen.right) <= PINCH_TOL_M) {
+          this.lastLocal.set(key, { f, l });
+          // Touching the frame and pressed into a wall: the piece back to the wall's face, the robot back as far.
+          if (Math.min(pen.front, pen.back, pen.left, pen.right) > -PINCH_TOL_M) this.unwall(b, body);
+          continue;
+        }
+        // The face it came in by: where it was last step, else the shallowest.
+        let face: keyof typeof pen = (Object.keys(pen) as (keyof typeof pen)[]).reduce((a, k) => (pen[k] < pen[a] ? k : a), 'front');
+        if (prev) face = prev.f >= Lh ? 'front' : prev.f <= -Lh ? 'back' : prev.l >= Wh ? 'left' : prev.l <= -Wh ? 'right' : face;
+        const n = face === 'front' ? fw : face === 'back' ? { x: -fw.x, z: -fw.z } : face === 'left' ? lf : { x: -lf.x, z: -lf.z };
+        const d = pen[face] + 0.001, to = { x: p.x + n.x * d, z: p.z + n.z * d }, room = FIELD.half - r - 0.001;
+        const rv = body.linvel(), vn = rv.x * n.x + rv.z * n.z;
+        if (Math.abs(to.x) <= room && Math.abs(to.z) <= room) {
+          b.body.setTranslation({ x: to.x, y: p.y, z: to.z }, true);
+          const bv = b.body.linvel(), bn = bv.x * n.x + bv.z * n.z;
+          b.body.setLinvel({ x: bv.x + (vn - bn) * n.x, y: bv.y, z: bv.z + (vn - bn) * n.z }, true);
+          this.lastLocal.set(key, { f: f + (face === 'front' ? d : face === 'back' ? -d : 0), l: l + (face === 'left' ? d : face === 'right' ? -d : 0) });
+        } else {
+          body.setTranslation({ x: t.x - n.x * d, y: t.y, z: t.z - n.z * d }, true);
+          if (vn > 0) body.setLinvel({ x: rv.x - vn * n.x, y: rv.y, z: rv.z - vn * n.z }, true);
+          this.lastLocal.set(key, { f, l });
+        }
+      }
+    }
+  }
+
+  /** Mona Shores (unpinch): a piece a robot is pressing into a wall goes back to the wall's face, and the robot moves back as far and stops pressing. */
+  private unwall(b: Ball, body: RAPIER_NS.RigidBody) {
+    const p = b.body.translation(), room = FIELD.half - b.radius;
+    const dx = Math.abs(p.x) > room ? Math.sign(p.x) * (room - Math.abs(p.x)) : 0, dz = Math.abs(p.z) > room ? Math.sign(p.z) * (room - Math.abs(p.z)) : 0;
+    // Only a robot pressing it there: moving into that wall, the piece past a resting contact's depth. A piece that only
+    // rests on a wall beside a robot moves nothing.
+    const t = body.translation(), v = body.linvel(), d = Math.hypot(dx, dz);
+    if (d <= 0.002 || -(v.x * dx + v.z * dz) / d < 0.05) return;
+    b.body.setTranslation({ x: p.x + dx, y: p.y, z: p.z + dz }, true);
+    const bv = b.body.linvel(); b.body.setLinvel({ x: dx ? 0 : bv.x, y: bv.y, z: dz ? 0 : bv.z }, true);
+    // The robot back as far, and no speed into the wall: a stall, which the intake's speed check reads as still.
+    body.setTranslation({ x: t.x + dx, y: t.y, z: t.z + dz }, true);
+    body.setLinvel({ x: dx && Math.sign(v.x) === -Math.sign(dx) ? 0 : v.x, y: v.y, z: dz && Math.sign(v.z) === -Math.sign(dz) ? 0 : v.z }, true);
   }
 
   /** Applies quadratic drag and Magnus lift to airborne balls. */
