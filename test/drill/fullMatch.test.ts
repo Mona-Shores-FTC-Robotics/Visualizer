@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  AUTO_S,
   HANDOFF_S,
   fieldAtHandoff,
+  partnerAutoFor,
   type AutoTrace,
 } from "../../src/drill/fullMatch";
 import { FIELD, TIP_LOAD } from "../../sim/src/sim/config";
@@ -346,5 +348,84 @@ describe("the AUTO replay shows the pieces: the volleys fly and fill our CELL", 
     s.start();
     s.advance(5);
     expect(s.replayPieces).toEqual([]);
+  }, 60000);
+});
+
+describe("the AUTO replay swings the rockers as the trace does", () => {
+  test("R-Solo: our rocker follows the trace's tilt, and flips at each TIP", async () => {
+    const t = trace("r-solo");
+    const s = await fullMatch("r-solo");
+    const deg = (rad: number) => (rad * 180) / Math.PI;
+    const signs: number[] = [];
+    for (let k = 1; k < AUTO_S * 10; k++) {
+      s.advance(0.1);
+      const fr = t.frames[k];
+      expect(deg(s.sim.hives.red.phi), `red at ${fr[0]} s`).toBeCloseTo(
+        fr[5],
+        0,
+      );
+      expect(deg(s.sim.hives.blue.phi), `blue at ${fr[0]} s`).toBeCloseTo(
+        fr[7],
+        0,
+      );
+      const sign = Math.sign(s.sim.hives.red.phi);
+      if (sign && sign !== signs.at(-1)) signs.push(sign);
+    }
+    // Audience CELL up at the start, rear after the 1st TIP, audience again after the 2nd.
+    expect(t.autoTips).toBe(2);
+    expect(signs).toEqual([-1, 1, -1]);
+  }, 60000);
+});
+
+describe("a match field's dead partner stands at its Auto's start", () => {
+  test("beside R-Solo, L-NoCross's start (LEFT_START, 62.3, 133.8, 270), and it stays there", async () => {
+    expect(partnerAutoFor("r-solo")).toBe("l-no-cross");
+    expect(partnerAutoFor("r-clockwise")).toBe("l-clockwise");
+    expect(partnerAutoFor("l-left-under-hive")).toBe("r-left-under-hive");
+    const s = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      20245,
+      "driver",
+      1,
+      "uv-ir",
+      "playbook",
+      { kind: "match", skill: 1 },
+    );
+    expect(s.placeDeadPartner(trace("l-no-cross"))).toBe(true);
+    s.start();
+    s.advance(5);
+    const v = s.sim.view(1);
+    const q = v.robot.translation(),
+      p = toPedro(q.x, q.z, v.heading);
+    expect(v.alliance).toBe("red");
+    // Within an inch: the simulator's frame is 16.2 in (the robot's 15.4), so at LEFT_START its back
+    // would sit 0.4 in into the rear wall, and the wall nudges it out.
+    expect(Math.abs(p[0] - 62.3)).toBeLessThan(1);
+    expect(Math.abs(p[1] - 133.8)).toBeLessThan(1);
+    expect(((p[2] % 360) + 360) % 360).toBeCloseTo(270, 0);
+    expect(s.deadPartnerAuto).toBe("l-no-cross");
+  }, 60000);
+
+  test("no dead partner on an empty field, or with both our robots driven", async () => {
+    const empty = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      20245,
+      "driver",
+      1,
+    );
+    expect(empty.placeDeadPartner(trace("l-no-cross"))).toBe(false);
+    const both = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      [
+        { team: 20245, driverOnly: true },
+        { team: 19429, driverOnly: true },
+      ],
+      "alliance",
+      1,
+    );
+    expect(both.placeDeadPartner(trace("l-no-cross"))).toBe(false);
   }, 60000);
 });
