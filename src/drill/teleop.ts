@@ -58,18 +58,24 @@ const UNJAM_EJECT_S = 0.4;
  */
 const REJECT_BURST_S = 0.5;
 /**
- * Corner wheels (an experiment, Hub 24 Nov 2026): a wheel at each front corner of the intake,
- * vertical axle, spinning inward, in the strip between the mouth and the frame's edge. A CR servo
- * at about 60 rpm (REV Smart Robot Servo about 70, goBILDA Torque about 50) on a 2.5 in wheel: an
- * edge speed of 2.5 pi in/s, 7.85 in/s (0.20 m/s).
+ * Corner wheels (an experiment, Hub 24 Nov 2026): a 2.5 in wheel at each front corner, vertical
+ * axle, spinning inward, where biobuzz's study puts them (doc/corner-wheels.md, from the 31 Oct
+ * CAD): ahead of the front drive wheels, axles at X 8.94 in with the drive wheels' fronts at
+ * X 7.57 (so 1.37 in ahead of the robot's front), |Y| 6.85 (left) and 6.95 (right). The mouth is
+ * the rails' inner faces at |Y| 4.87 (the simulator's 9.7 in). A CR servo at about 60 rpm (REV Smart
+ * Robot Servo about 70, goBILDA Torque about 50): an edge speed of 2.5 pi in/s, 7.85 in/s (0.20 m/s).
  */
 export const CORNER_WHEEL_RPM = 60;
 export const CORNER_WHEEL_DIAMETER_IN = 2.5;
 const CORNER_WHEEL_EDGE_MPS =
   (CORNER_WHEEL_RPM / 60) * Math.PI * CORNER_WHEEL_DIAMETER_IN * 0.0254;
-/** The zone: the outer 1 in of the front face, and 0.5 in past the corner. */
-const CORNER_ZONE_IN_IN = 1;
-const CORNER_ZONE_OUT_IN = 0.5;
+/** Each axle: inches ahead of the robot's front, and out from its centre line (+ left). */
+export const CORNER_WHEEL_AXLES_IN: readonly (readonly [number, number])[] = [
+  [8.94 - 7.57, 6.85],
+  [8.94 - 7.57, -6.95],
+];
+/** A POLLEN this far past touching the rim still counts as in contact (the wheel's flaps). */
+const CORNER_WHEEL_SLACK_IN = 0.1;
 const REJECT_HOLD_OFF_S = 0.3;
 const WRONG_NECTAR_CLEAR_S = 1.0;
 const WRONG_NECTAR_EJECT_CLEAR_S = 1.0;
@@ -577,10 +583,9 @@ export class TeleOp {
    */
   rejectAllNectar = false;
   /**
-   * Corner wheels (an experiment; off is the robot as it is): with the intake running, a POLLEN
-   * touching either front corner zone (the outer 1 in of the front face and 0.5 in past the corner)
-   * is pulled sideways into the mouth at the wheels' edge speed. A POLLEN pinned against a wall
-   * there counts: the wheel drives it along the wall.
+   * Corner wheels (an experiment; off is the robot as it is): with the intake taking in, a POLLEN
+   * touching either corner wheel (CORNER_WHEEL_AXLES_IN) is swept in toward the mouth at the rim's
+   * speed. A POLLEN pinned against a wall there counts: the wheel drives it along the wall.
    */
   cornerWheels = false;
   /** The robot's indicator light (biobuzz `IndicatorSubsystem`, ./indicator.ts). */
@@ -631,9 +636,13 @@ export class TeleOp {
   }
 
   /**
-   * The corner wheels (cornerWheels): each POLLEN in a front corner zone gets the wheel's sideways
-   * speed toward the mouth, relative to the robot; its speed along the robot's nose is kept. Only
-   * the zone is modelled, not the wheel's shape (a CAD check is separate).
+   * The corner wheels (cornerWheels): a POLLEN touching either wheel's rim moves, relative to the
+   * robot, at the rim's speed where they touch. The wheels spin inward: across the front toward the
+   * centre line, and back toward the robot along their inner sides, which lie inside the mouth. So a
+   * piece met by the front of a wheel is swept in and back to the intake. They run only with the
+   * intake taking in and fewer than 4 held (G407), and not during a FLOWER pick or GARDEN gather or
+   * with the stick down (G418, and the stick's arm then lies between the wheels and the mouth): the
+   * study's rules. The wheels have no collider: only their rake is modelled.
    */
   private rakeCorners(): void {
     const sim = this.sim,
@@ -641,40 +650,48 @@ export class TeleOp {
     if (
       !this.cornerWheels ||
       this.intakeFilter === "none" ||
+      this.routine ||
+      sim.robots[sim.me].stickDown ||
       sim.carried.length >= this.preset.laneCapacity
     )
       return;
     const hl = c.length / 2,
-      hw = c.width / 2,
       th = sim.heading,
       fwd = { x: Math.cos(th), z: -Math.sin(th) },
       left = { x: -Math.sin(th), z: -Math.cos(th) },
-      rv = sim.robot.linvel();
+      rv = sim.robot.linvel(),
+      rim = (CORNER_WHEEL_DIAMETER_IN / 2) * IN;
     for (const b of sim.balls.values()) {
       if (b.kind !== "pollen" || !b.body.isEnabled()) continue;
       const p = b.body.translation();
       if (p.y > 0.13) continue;
-      const r = sim.toRobot(p.x, p.z),
-        al = Math.abs(r.l);
-      // Touching the front face's outer inch, or the wheel's half inch past the corner.
-      if (r.f < hl - b.radius || r.f > hl + b.radius + 0.25 * IN) continue;
-      if (
-        al < hw - CORNER_ZONE_IN_IN * IN ||
-        al > hw + CORNER_ZONE_OUT_IN * IN + b.radius
-      )
-        continue;
-      const bv = b.body.linvel(),
-        relF = (bv.x - rv.x) * fwd.x + (bv.z - rv.z) * fwd.z,
-        side = -Math.sign(r.l) * CORNER_WHEEL_EDGE_MPS;
-      b.body.setLinvel(
-        {
-          x: rv.x + fwd.x * relF + left.x * side,
-          y: bv.y,
-          z: rv.z + fwd.z * relF + left.z * side,
-        },
-        true,
-      );
-      this.cornerRakes++;
+      const r = sim.toRobot(p.x, p.z);
+      for (const [aheadIn, outIn] of CORNER_WHEEL_AXLES_IN) {
+        const df = r.f - (hl + aheadIn * IN),
+          dl = r.l - outIn * IN,
+          d = Math.hypot(df, dl);
+        if (d > rim + b.radius + CORNER_WHEEL_SLACK_IN * IN || d < 1e-6)
+          continue;
+        // The rim's direction where it meets the piece: the left wheel turns so its front moves
+        // right (inward), the right wheel the mirror.
+        const cf = df / d,
+          cl = dl / d,
+          s = outIn > 0 ? 1 : -1,
+          tf = s * cl,
+          tl = -s * cf;
+        const v = CORNER_WHEEL_EDGE_MPS,
+          bv = b.body.linvel();
+        b.body.setLinvel(
+          {
+            x: rv.x + (fwd.x * tf + left.x * tl) * v,
+            y: bv.y,
+            z: rv.z + (fwd.z * tf + left.z * tl) * v,
+          },
+          true,
+        );
+        this.cornerRakes++;
+        break;
+      }
     }
   }
   /** Loops in which a corner wheel was raking a POLLEN. */
