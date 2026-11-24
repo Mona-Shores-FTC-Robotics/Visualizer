@@ -24,9 +24,15 @@ export interface StoredRun {
   bestCycleS: number | null;
   medianCycleS: number | null;
   bestPickUpS: number | null;
+  /** Who drove (and operated), as typed on the page; missing on runs from before names were asked. */
+  driver?: string;
+  operator?: string;
 }
 
-export function summarize(r: RunResult): StoredRun {
+export function summarize(
+  r: RunResult,
+  who: { driver?: string; operator?: string } = {},
+): StoredRun {
   const c = r.cycles.map((x) => x.cycleS).sort((a, b) => a - b);
   const p = r.pickUps.map((x) => x.s);
   return {
@@ -43,6 +49,8 @@ export function summarize(r: RunResult): StoredRun {
     bestCycleS: c.length ? c[0] : null,
     medianCycleS: c.length ? c[Math.floor(c.length / 2)] : null,
     bestPickUpS: p.length ? Math.min(...p) : null,
+    ...(who.driver ? { driver: who.driver } : {}),
+    ...(who.operator ? { operator: who.operator } : {}),
   };
 }
 
