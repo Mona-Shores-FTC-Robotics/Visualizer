@@ -18,6 +18,14 @@ import {
   summarize,
   type StoredRun,
 } from "./history";
+import {
+  loadPeople,
+  rowFromRun,
+  rowFromStored,
+  savePeople,
+  sendRows,
+  sheetUrl,
+} from "./stats";
 import { PRESETS, IN, type TeamNumber } from "./presets";
 import { BUDGET_PIECES, BUDGET_S } from "./readout";
 import {
@@ -324,8 +332,53 @@ function cycleTable(x: RobotRunResult) {
     <p class="dim">Pick-ups: ${picks || "–"}</p>`;
 }
 
+/** Who is playing, as typed on this laptop (kept for next time). */
+const driverIn = $<HTMLInputElement>("driver");
+const operatorIn = $<HTMLInputElement>("operator");
+function people() {
+  return { driver: driverIn.value.trim(), operator: operatorIn.value.trim() };
+}
+function showPeople() {
+  const p = loadPeople();
+  if (!driverIn.value) driverIn.value = p.driver;
+  if (!operatorIn.value) operatorIn.value = p.operator;
+  $("people").innerHTML = p.names
+    .map((n) => `<option value="${esc(n)}"></option>`)
+    .join("");
+}
+for (const el of [driverIn, operatorIn])
+  el.onchange = () => {
+    savePeople(driverIn.value, operatorIn.value);
+    showPeople();
+  };
+
+/** The team sheet's line: where runs go, and what is waiting to. */
+function sheetStatus(
+  res?: { sent: number; waiting: number; url: string },
+  target = "sheet-status",
+) {
+  const el = document.getElementById(target);
+  if (!el) return;
+  const url = res?.url ?? sheetUrl();
+  if (!url) {
+    el.textContent = `No team sheet set up on this laptop yet: runs are kept here${res?.waiting ? ` (${res.waiting} waiting)` : ""} and go once it is (docs/drill-stats.md).`;
+    return;
+  }
+  el.textContent = res
+    ? res.waiting
+      ? `Couldn't reach the team sheet: ${res.waiting} run${res.waiting === 1 ? "" : "s"} waiting, sent with the next run.`
+      : res.sent
+        ? `Sent to the team sheet (${res.sent} run${res.sent === 1 ? "" : "s"}).`
+        : "Nothing new to send to the team sheet."
+    : "Runs go to the team sheet when they finish.";
+}
+
 function showResults(r: RunResult) {
-  const list = saveRun(summarize(r));
+  const list = saveRun(summarize(r, people()));
+  void sendRows([rowFromRun(r, people())]).then((res) => {
+    sheetStatus(res, "results-sheet");
+    sheetStatus(res);
+  });
   showHistory(list);
   const best = bestRun(list, r.team, r.mode, r.tipTiming, r.auto?.name ?? "");
   const total = r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0);
@@ -355,6 +408,7 @@ function showResults(r: RunResult) {
     ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
+    <p class="dim">${esc(people().driver || "No driver named")}${people().operator ? ` with ${esc(people().operator)} operating` : ""} · <span id="results-sheet">Sending to the team sheet…</span></p>
     <p><button class="primary" id="again">Run again (Options)</button></p>`;
   $("results").hidden = false;
   $("again").onclick = () => {
@@ -604,6 +658,15 @@ function cycleCamera() {
 }
 
 async function main() {
+  showPeople();
+  // Anything that could not go last time goes now.
+  void sendRows([]).then((res) => sheetStatus(res));
+  $("send-saved").onclick = () => {
+    $("sheet-status").textContent = "Sending this laptop's saved runs…";
+    void sendRows(loadHistory().map((x) => rowFromStored(x))).then((res) =>
+      sheetStatus(res),
+    );
+  };
   try {
     await RAPIER.init();
     const loaded = await loadControls();

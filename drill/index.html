@@ -63,6 +63,7 @@
         align-items: center;
       }
       select,
+      input,
       button {
         font: inherit;
         font-size: 13px;
@@ -322,6 +323,25 @@
         </select></label
       >
       <label
+        >Driver
+        <input
+          id="driver"
+          list="people"
+          placeholder="name"
+          size="10"
+          autocomplete="off"
+      /></label>
+      <label
+        >Operator
+        <input
+          id="operator"
+          list="people"
+          placeholder="name"
+          size="10"
+          autocomplete="off"
+      /></label>
+      <datalist id="people"></datalist>
+      <label
         >Players
         <select id="mode">
           <option value="two">Driver + operator (gamepad 1 + 2)</option>
@@ -440,6 +460,11 @@
       <p class="dim" id="controls-source"></p>
       <h2>Best runs</h2>
       <div id="history" class="dim">None yet.</div>
+      <h2>Team sheet</h2>
+      <p class="dim" id="sheet-status">…</p>
+      <p>
+        <button id="send-saved">Send saved runs to the team sheet</button>
+      </p>
       <h2>Robot numbers</h2>
       <div id="numbers" class="dim"></div>
       <footer>
