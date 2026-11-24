@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FIELD } from '../src/sim/config';
-import { monaShoresConfig } from '../src/sim/robots/mona-shores';
+import { MONA_SHORES, monaShoresConfig } from '../src/sim/robots/mona-shores';
 import { FlowerPick, GardenGather } from '../src/sim/robots/routines';
 import { DT, NO_INPUT, Sim } from '../src/sim/world';
 
@@ -42,5 +42,22 @@ describe('our robot, master\'s grab routines', () => {
       expect(r.phases.map(p => p.split('@')[0])).toEqual(['lineup', 'stick', 'push', 'dwell', 'back', 'done']);
       expect(r.got).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('our intake mouth', () => {
+  // Drives straight at 0.6 m/s, stick up, past one loose POLLEN `offIn` to the side of the robot's center line.
+  const takes = (mouth: 'cad' | 'frame', offIn: number) => {
+    const s = new Sim(RAPIER, monaShoresConfig('20245', { mouth }), 'practice', 1, { flowerPullByPush: false });
+    at(s, -1.25, 0.35, 0);
+    s.handoff({}, 1, { pieces: [{ kind: 'pollen', x: -0.75, y: 0, z: 0.35 - offIn * 0.0254 }] }); s.carried.length = 0;
+    const me = s.robots[0];
+    for (let t = 0; t < 2; t += DT) { me.velDrive = { vx: 0.6, vz: 0, w: 0 }; me.stickDown = false; s.step({ ...NO_INPUT, intake: 'all' }); }
+    return s.carried.length;
+  };
+  it('takes a loose POLLEN through the real 9.7 in mouth by default, and through the old 14.58 in with mouth "frame"', () => {
+    expect(MONA_SHORES.shared.intake.widthIn.value).toBe(9.7);
+    expect(takes('cad', 4)).toBe(1); expect(takes('cad', 6)).toBe(0);
+    expect(takes('frame', 4)).toBe(1); expect(takes('frame', 6)).toBe(1);
   });
 });

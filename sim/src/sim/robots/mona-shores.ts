@@ -5,9 +5,15 @@ import { DEFAULT_ROBOT, IN, setSquareSize, type RobotConfig } from '../config';
 
 export type Team = '19429' | '20245';
 export const MONA_SHORES = model;
+/**
+ * The intake mouth the sim takes pieces through. 'cad' (the default): the real mouth, 9.7 in (shared.intake.widthIn,
+ * biobuzz doc/corner-wheels.md). 'frame': the old 14.58 in, 0.9 x the frame (shared.intake.widthFrameIn), kept
+ * switchable. A script or the drill sets it before it builds a robot; monaShoresConfig's `mouth` overrides it.
+ */
+export const INTAKE_MOUTH: { model: 'cad' | 'frame' } = { model: 'cad' };
 
 /** The robot config for one of our robots. */
-export function monaShoresConfig(team: Team): RobotConfig {
+export function monaShoresConfig(team: Team, opts: { mouth?: 'cad' | 'frame' } = {}): RobotConfig {
   const c: RobotConfig = structuredClone(DEFAULT_ROBOT), s = model.shared;
   setSquareSize(c, s.frameIn.value * IN);
   c.capacity = s.laneCapacity.value;
@@ -16,11 +22,11 @@ export function monaShoresConfig(team: Team): RobotConfig {
   c.shooter.turret = true;
   c.shooter.turretRangeDeg = s.turret.arcLeftDeg.value + s.turret.arcRightDeg.value;
   if (s.turret.slewDegPerSec.value !== null) c.shooter.turretSlewDegPerSec = s.turret.slewDegPerSec.value;
-  // Our intake (shared.intake): contact-only between the front wheels, and the FLOWER stick as the ramp in front.
+  // Our intake (shared.intake): contact-only through the mouth between the side rails, and the FLOWER stick as the ramp in front.
   const i = s.intake;
-  c.intake.width = i.widthIn.value * IN; c.intake.reach = i.contactSlackIn.value * IN;
+  c.intake.width = ((opts.mouth ?? INTAKE_MOUTH.model) === 'frame' ? i.widthFrameIn.value : i.widthIn.value) * IN; c.intake.reach = i.contactSlackIn.value * IN;
   c.intake.successP = i.grabChance.value; c.intake.intervalSec = i.intervalS.value; c.intake.maxRelSpeed = i.maxRelSpeedInPerS.value * IN;
-  c.intake.stick = { reach: i.stickReachIn.value * IN, width: i.stickWidthIn.value * IN };
+  c.intake.stick = { reach: i.stickReachIn.value * IN, width: i.stickWidthIn.value * IN, guide: i.stickGuidePlaceholderIn.value * IN }; // the guide is a PLACEHOLDER
   c.intake.flowerPeriodSec = model.routines.flowerPick.flowerPullS.value;
   void team; // the two robots' sticks (19429 roller, 20245 passive) pull at the same placeholder rate until timed
   return c;
