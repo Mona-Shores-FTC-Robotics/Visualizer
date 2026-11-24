@@ -298,8 +298,10 @@ export class DrillView {
     light.visible = false;
     group.add(chassis, intake, arrow, turret, lane, label, light);
     this.scene.add(group);
-    // Ours as the CAD (the box stays until it is in); an opponent stays a box.
-    const box = [chassis, arrow, turret, ...wheels];
+    // Ours as the CAD (the box stays until it is in); an opponent stays a box. Once the CAD is in,
+    // nothing is drawn over it: no bumper strip (ours have none) and no intake bar (the intake is
+    // the simulator's mouth, not this box); the label names the robot.
+    const box = [chassis, arrow, turret, intake, ...wheels];
     const model =
       team > 0 ? new MonaShoresRobotModel("robots/mona-shores/") : null;
     model?.ready
@@ -309,15 +311,6 @@ export class DrillView {
         // The team's label clear above the body (the Limelight is its top).
         const top = new THREE.Box3().setFromObject(model!.group);
         if (Number.isFinite(top.max.y)) label.position.y = top.max.y + 0.12;
-        const strip = new THREE.Mesh(
-          new THREE.BoxGeometry(frame + 0.012, 0.035, frame + 0.012),
-          new THREE.MeshStandardMaterial({
-            color: colors.bright,
-            roughness: 0.5,
-          }),
-        );
-        strip.position.y = 0.045;
-        group.add(strip);
       })
       .catch(() => {
         /* the box stays */
