@@ -44,7 +44,12 @@ import {
   type RunResult,
 } from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
-import { loadAutoIndex, loadAutoTrace, type AutoTrace } from "./fullMatch";
+import {
+  loadAutoIndex,
+  loadAutoTrace,
+  partnerAutoFor,
+  type AutoTrace,
+} from "./fullMatch";
 import {
   PadBinder,
   PadDecoder,
@@ -231,6 +236,10 @@ function newSession() {
       session.openingKind = openSel.value as OpeningKind;
     } else session.opensAfterAuto = true;
   }
+  // A match field's dead partner stands at the start of the Auto it would run beside ours.
+  const partner = partnerAutoFor(matchSel.value || OPENING_AUTO);
+  const partnerTrace = partner ? traces.get(partner) : undefined;
+  if (partnerTrace) session.placeDeadPartner(partnerTrace);
   $("start").textContent = session.playback
     ? "Start the match (Options)"
     : "Start 2:00 (Options)";
@@ -404,7 +413,7 @@ function showResults(r: RunResult) {
     ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}${r.cornerWheels ? ", corner wheels on" : ""}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
-    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
+    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. ${session.deadPartnerAuto ? ` Our partner stood dead at ${esc(session.deadPartnerAuto)}'s start.` : ""}</p>` : ""}
     ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
@@ -688,6 +697,7 @@ async function main() {
   );
   view.mode = (camSel.value as CameraMode) || "driver";
   await ensureTrace(OPENING_AUTO);
+  await ensureTrace(partnerAutoFor(OPENING_AUTO) ?? "");
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
@@ -711,6 +721,7 @@ async function main() {
   matchSel.onchange = async () => {
     savePrefs();
     await ensureTrace(matchSel.value);
+    await ensureTrace(partnerAutoFor(matchSel.value) ?? "");
     newSession();
   };
   // The Autos for Full Match, from public/drill/autos/index.json (scripts/drill-auto-traces.py).
@@ -726,6 +737,7 @@ async function main() {
       if (want && autos.some((a) => a.auto === want)) {
         matchSel.value = want;
         await ensureTrace(want);
+        await ensureTrace(partnerAutoFor(want) ?? "");
         newSession();
       }
     })
