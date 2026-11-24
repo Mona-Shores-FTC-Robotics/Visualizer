@@ -81,6 +81,7 @@ const prefs = (() => {
       opening?: string;
       nectar?: string;
       cornerWheels?: string;
+      look?: string;
     };
   } catch {
     return {};
@@ -101,6 +102,7 @@ function savePrefs() {
         opening: openSel.value,
         nectar: nectarSel.value,
         cornerWheels: wheelSel.value,
+        look: lookSel.value,
       }),
     );
   } catch {
@@ -149,6 +151,10 @@ if (prefs.nectar) nectarSel.value = prefs.nectar;
 if (!nectarSel.value) nectarSel.value = "pollen";
 if (prefs.cornerWheels) wheelSel.value = prefs.cornerWheels;
 if (!wheelSel.value) wheelSel.value = "off";
+/** How our robots are drawn: the toy (as they look in match video) or the team's CAD. */
+const lookSel = $<HTMLSelectElement>("robot-look");
+if (prefs.look) lookSel.value = prefs.look;
+if (!lookSel.value) lookSel.value = "toy";
 
 let file: ControlsFile;
 let session: DrillSession;
@@ -643,6 +649,8 @@ function frame(now: number) {
                 ? "green"
                 : null
               : t.light.colour(session.t * 1000),
+          cornerWheels: t.cornerWheels,
+          cornerWheelsTurning: t.cornerWheelsRunning,
         };
       return r.alliance === session.sim.alliance
         ? {
@@ -696,6 +704,7 @@ async function main() {
     PRESETS[20245].frameIn * IN,
   );
   view.mode = (camSel.value as CameraMode) || "driver";
+  view.look = lookSel.value === "cad" ? "cad" : "toy";
   await ensureTrace(OPENING_AUTO);
   await ensureTrace(partnerAutoFor(OPENING_AUTO) ?? "");
   newSession();
@@ -746,6 +755,10 @@ async function main() {
     });
   camSel.onchange = () => {
     view.mode = camSel.value as CameraMode;
+    savePrefs();
+  };
+  lookSel.onchange = () => {
+    view.look = lookSel.value === "cad" ? "cad" : "toy";
     savePrefs();
   };
   addEventListener("keydown", (e) => {
