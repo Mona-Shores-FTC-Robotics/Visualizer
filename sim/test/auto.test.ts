@@ -9,11 +9,22 @@ import { DT, Sim, flowerHeights } from '../src/sim/world';
 
 beforeAll(async () => { await RAPIER.init(); });
 
+/**
+ * Gives the event loop a turn about every half second of wall time. This file's tests are all synchronous: without
+ * this the whole file, about 54 s here and longer on CI, ran with no event-loop turn, so the worker couldn't read the
+ * reply to a vitest RPC call (onTaskUpdate) sent just before, and vitest's 60 s RPC timeout fired ("Timeout calling
+ * onTaskUpdate", CI run 45286359961). With it the longest stretch is about 5 s. Awaiting it changes no result.
+ */
+function yielder(everyMs = 500) {
+  let last = Date.now();
+  return async () => { if (Date.now() - last < everyMs) return; await new Promise(r => setTimeout(r, 0)); last = Date.now(); };
+}
+
 /** Runs a one-robot match: a pure AUTO script, then the scripted TELEOP baseline. */
-export function runScripted(mode: 'full' | 'teleop', routine = 'solo-two-tip-sweep', seed = 3) {
-  const sim = new Sim(RAPIER, undefined, mode, seed), coach = new Coach();
+export async function runScripted(mode: 'full' | 'teleop', routine = 'solo-two-tip-sweep', seed = 3) {
+  const sim = new Sim(RAPIER, undefined, mode, seed), coach = new Coach(), pause = yielder();
   coach.flowerStartSec = 66; coach.autoRoutine = routine; sim.start(); // This test covers FLOWER work.
-  while (sim.phase !== 'post') sim.step(coach.update(sim, DT), true);
+  while (sim.phase !== 'post') { sim.step(coach.update(sim, DT), true); await pause(); }
   return sim;
 }
 
@@ -54,8 +65,8 @@ describe('FLOWER model', () => {
 });
 
 describe('scripted match', () => {
-  it('plays AUTO and TELEOP: leaves, tips in AUTO, works FLOWERS, and parks', () => {
-    const sim = runScripted('full'), s = sim.score('red');
+  it('plays AUTO and TELEOP: leaves, tips in AUTO, works FLOWERS, and parks', async () => {
+    const sim = await runScripted('full'), s = sim.score('red');
     console.log('scripted full match', JSON.stringify(s), 'flowers', sim.flowers.map(f => f.stack.map(k => (k === 'pollen' ? 'P' : k === 'nectar_red' ? 'RN' : 'BN')).join('')).join(' | '));
     expect(s.leave).toBe(3); expect(s.autoPark).toBe(5); expect(s.autoTips).toBeGreaterThanOrEqual(20);
     expect(s.teleopTips).toBeGreaterThanOrEqual(40); expect(s.flower + s.bottomNectar).toBeGreaterThan(10); expect(s.park).toBe(5);
@@ -67,12 +78,12 @@ describe('scripted match', () => {
 });
 
 describe('opponent robot', () => {
-  it('plays a full scripted MATCH on both alliances, and each robot leaves opponent NECTAR alone', () => {
+  it('plays a full scripted MATCH on both alliances, and each robot leaves opponent NECTAR alone', async () => {
     const sim = new Sim(RAPIER, undefined, 'full', 3, { opponent: true }); sim.start();
     const coaches = [new Coach(), new Coach()]; coaches.forEach(c => { });
-    let wrongNectar = 0;
+    let wrongNectar = 0; const pause = yielder();
     while (sim.phase !== 'post') {
-      sim.step(coaches.map((c, i) => c.update(sim.view(i), DT)), [true, true]);
+      sim.step(coaches.map((c, i) => c.update(sim.view(i), DT)), [true, true]); await pause();
       if (sim.robots[0].carried.includes('nectar_blue') || sim.robots[1].carried.includes('nectar_red')) wrongNectar++; // G408
     }
     const red = sim.score('red'), blue = sim.score('blue');
@@ -139,7 +150,7 @@ describe('referee', () => {
 });
 
 describe('alliance partners', () => {
-  it('plays four robots: both alliances stay on their side in AUTO, tip, and neither alliance double-books a launch spot', () => {
+  it('plays four robots: both alliances stay on their side in AUTO, tip, and neither alliance double-books a launch spot', async () => {
     // Pinned to upstream's spill: this tests the planner's side discipline, not the spill. Partners don't avoid each other
     // in AUTO (onboard AUTO doesn't see other robots), so a partner can push a robot over the center line: over seeds
     // 1-12 this check already fails on seeds 9 and 12 under either spill, and the 'films' spill moves seed 4's timing
@@ -147,9 +158,9 @@ describe('alliance partners', () => {
     const sim = new Sim(RAPIER, undefined, 'full', 4, { opponent: true, partners: true, spill: 'ncssm' }); sim.start();
     expect(sim.robots.map(r => `${r.alliance}${r.slot}`)).toEqual(['red0', 'red1', 'blue0', 'blue1']);
     const coaches = sim.robots.map(() => { const c = new Coach(); return c; });
-    let redMaxX = -9, blueMinX = 9, closest = 9;
+    let redMaxX = -9, blueMinX = 9, closest = 9; const pause = yielder();
     while (sim.phase !== 'post') {
-      sim.step(coaches.map((c, i) => c.update(sim.view(i), DT)), coaches.map(() => true));
+      sim.step(coaches.map((c, i) => c.update(sim.view(i), DT)), coaches.map(() => true)); await pause();
       if (sim.phase === 'auto') sim.robots.forEach(r => { const x = r.body.translation().x; if (r.alliance === 'red') redMaxX = Math.max(redMaxX, x); else blueMinX = Math.min(blueMinX, x); });
       const a = sim.robots[0].body.translation(), b = sim.robots[1].body.translation(); closest = Math.min(closest, Math.hypot(a.x - b.x, a.z - b.z));
     }
