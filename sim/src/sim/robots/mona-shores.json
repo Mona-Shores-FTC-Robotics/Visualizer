@@ -104,8 +104,12 @@
     },
     "intake": {
       "widthIn": {
+        "value": 9.7,
+        "source": "biobuzz doc/corner-wheels.md (#740), the 31 Oct 2026 CAD (cad/advantagescope): the intake side rails' inner faces at Y +-4.87 in, at ball height. A slice of the same model here found the nearest parts at Y +-4.26 to 4.6 in (8.5 to 9.2 in), so 9.7 is the widest reading; the roller is 7.6 in"
+      },
+      "widthFrameIn": {
         "value": 14.58,
-        "source": "RobotDesign.real: 0.9 x the 16.2 in frame (the intake between the front wheels)"
+        "source": "the old mouth, kept switchable (INTAKE_MOUTH.model 'frame'): RobotDesign.real's 0.9 x the 16.2 in frame, not a measurement; 13.8 in is across the front drive wheels' outer faces"
       },
       "contactSlackIn": {
         "value": 0.25,
