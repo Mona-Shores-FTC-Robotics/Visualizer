@@ -57,6 +57,19 @@ const UNJAM_EJECT_S = 0.4;
  * (`wrongNectarClearS`) or an eject has run that long (`wrongNectarEjectClearS`).
  */
 const REJECT_BURST_S = 0.5;
+/**
+ * Corner wheels (an experiment, Hub 24 Nov 2026): a wheel at each front corner of the intake,
+ * vertical axle, spinning inward, in the strip between the mouth and the frame's edge. A CR servo
+ * at about 60 rpm (REV Smart Robot Servo about 70, goBILDA Torque about 50) on a 2.5 in wheel: an
+ * edge speed of 2.5 pi in/s, 7.85 in/s (0.20 m/s).
+ */
+export const CORNER_WHEEL_RPM = 60;
+export const CORNER_WHEEL_DIAMETER_IN = 2.5;
+const CORNER_WHEEL_EDGE_MPS =
+  (CORNER_WHEEL_RPM / 60) * Math.PI * CORNER_WHEEL_DIAMETER_IN * 0.0254;
+/** The zone: the outer 1 in of the front face, and 0.5 in past the corner. */
+const CORNER_ZONE_IN_IN = 1;
+const CORNER_ZONE_OUT_IN = 0.5;
 const REJECT_HOLD_OFF_S = 0.3;
 const WRONG_NECTAR_CLEAR_S = 1.0;
 const WRONG_NECTAR_EJECT_CLEAR_S = 1.0;
@@ -488,6 +501,8 @@ export class TeleOp {
           ? "pollen"
           : "all";
 
+    this.rakeCorners();
+
     // --- the feed ---------------------------------------------------------------------------------
     const aimed = Math.abs(wrap180(aim.deg - this.turretDeg)) <= tol;
     const arcOk =
@@ -561,6 +576,13 @@ export class TeleOp {
    * and the lane only ever holds POLLEN. Off: only the other alliance's NECTAR is wrong.
    */
   rejectAllNectar = false;
+  /**
+   * Corner wheels (an experiment; off is the robot as it is): with the intake running, a POLLEN
+   * touching either front corner zone (the outer 1 in of the front face and 0.5 in past the corner)
+   * is pulled sideways into the mouth at the wheels' edge speed. A POLLEN pinned against a wall
+   * there counts: the wheel drives it along the wall.
+   */
+  cornerWheels = false;
   /** The robot's indicator light (biobuzz `IndicatorSubsystem`, ./indicator.ts). */
   readonly light: Indicator;
 
@@ -607,6 +629,56 @@ export class TeleOp {
       return;
     }
   }
+
+  /**
+   * The corner wheels (cornerWheels): each POLLEN in a front corner zone gets the wheel's sideways
+   * speed toward the mouth, relative to the robot; its speed along the robot's nose is kept. Only
+   * the zone is modelled, not the wheel's shape (a CAD check is separate).
+   */
+  private rakeCorners(): void {
+    const sim = this.sim,
+      c = sim.cfg;
+    if (
+      !this.cornerWheels ||
+      this.intakeFilter === "none" ||
+      sim.carried.length >= this.preset.laneCapacity
+    )
+      return;
+    const hl = c.length / 2,
+      hw = c.width / 2,
+      th = sim.heading,
+      fwd = { x: Math.cos(th), z: -Math.sin(th) },
+      left = { x: -Math.sin(th), z: -Math.cos(th) },
+      rv = sim.robot.linvel();
+    for (const b of sim.balls.values()) {
+      if (b.kind !== "pollen" || !b.body.isEnabled()) continue;
+      const p = b.body.translation();
+      if (p.y > 0.13) continue;
+      const r = sim.toRobot(p.x, p.z),
+        al = Math.abs(r.l);
+      // Touching the front face's outer inch, or the wheel's half inch past the corner.
+      if (r.f < hl - b.radius || r.f > hl + b.radius + 0.25 * IN) continue;
+      if (
+        al < hw - CORNER_ZONE_IN_IN * IN ||
+        al > hw + CORNER_ZONE_OUT_IN * IN + b.radius
+      )
+        continue;
+      const bv = b.body.linvel(),
+        relF = (bv.x - rv.x) * fwd.x + (bv.z - rv.z) * fwd.z,
+        side = -Math.sign(r.l) * CORNER_WHEEL_EDGE_MPS;
+      b.body.setLinvel(
+        {
+          x: rv.x + fwd.x * relF + left.x * side,
+          y: bv.y,
+          z: rv.z + fwd.z * relF + left.z * side,
+        },
+        true,
+      );
+      this.cornerRakes++;
+    }
+  }
+  /** Loops in which a corner wheel was raking a POLLEN. */
+  cornerRakes = 0;
 
   /** `ChassisAimTurn.power`: kP on the error in radians, between the min and max turn. */
   private aimTurnPower(errDeg: number, stopDeg: number): number {

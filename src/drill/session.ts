@@ -123,6 +123,8 @@ export interface RunResult {
   openingAuto?: string;
   /** Our robots rejected every NECTAR (POLLEN only, DrillSession.pollenOnly). */
   pollenOnly?: boolean;
+  /** Our robots had the corner wheels (an experiment, DrillSession.cornerWheels). */
+  cornerWheels?: boolean;
   /** POLLEN in our raised CELL at the opening (the 1-TIP opening's ONE_TIP_CELL), with openingAuto. */
   openingCell?: number;
   /** A full match: the Auto played before TeleOp and its TIPs; absent for the 2:00 drill. */
@@ -323,6 +325,14 @@ export class DrillSession {
   }
   set pollenOnly(on: boolean) {
     for (const t of this.teleops) t.rejectAllNectar = on;
+  }
+
+  /** Corner wheels on our robots' intakes (an experiment: TeleOp.cornerWheels). Off by default. */
+  get cornerWheels(): boolean {
+    return this.teleops.some((t) => t.cornerWheels);
+  }
+  set cornerWheels(on: boolean) {
+    for (const t of this.teleops) t.cornerWheels = on;
   }
 
   /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
@@ -599,6 +609,7 @@ export class DrillSession {
         ? { openingTips: this.openingTips }
         : {}),
       ...(this.pollenOnly ? { pollenOnly: true } : {}),
+      ...(this.cornerWheels ? { cornerWheels: true } : {}),
       ...(!this.playback && this.openingAuto
         ? { openingAuto: this.openingAuto.auto, openingCell: this.openingCell }
         : {}),
