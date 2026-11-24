@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { MonaShoresRobotModel } from "../../sim/src/render/mona-shores-robot";
 import type { LightColour } from "./indicator";
+import { ToyRobotModel } from "./toy-robot";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FIELD, HIVE } from "../../sim/src/sim/config";
 import {
@@ -21,12 +22,17 @@ const COLOR: Record<BallKind, number> = {
 };
 export const CAMERAS = ["driver", "overhead", "chase"] as const;
 export type CameraMode = (typeof CAMERAS)[number];
+/** How our robots are drawn: the toy (./toy-robot.ts, the default) or the team's CAD. */
+export type RobotLook = "toy" | "cad";
 
 export class DrillView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(52, 1, 0.05, 40);
   mode: CameraMode = "driver";
+  /** How our robots are drawn; a change rebuilds them on the next sync. */
+  look: RobotLook = "toy";
+  private lastSyncMs: number | null = null;
   private ballGeo = {
     pollen: new THREE.SphereGeometry(FIELD.pollenRadius, 16, 12),
     nectar: new THREE.SphereGeometry(FIELD.nectarRadius, 16, 12),
@@ -190,12 +196,12 @@ export class DrillView {
   }
 
   /**
-   * One robot: our robot's CAD (sim/src/render/mona-shores-robot.ts, the model AdvantageScope
-   * shows), its turret and FLOWER stick moving, with a bumper strip in its team's colours (the CAD
-   * is the same grey for both robots), the team number and the lane. Until the meshes load, and if
-   * they never do, a box in the team's colours stands in.
+   * One robot: ours as the toy (./toy-robot.ts, `look` "toy") or the CAD
+   * (sim/src/render/mona-shores-robot.ts, the model AdvantageScope shows, `look` "cad"), its
+   * turret and FLOWER stick moving, the team number and the lane. Until the CAD's meshes load, and
+   * if they never do, a box in the team's colours stands in; an opponent is always the box.
    */
-  private buildRobot(team: number): RobotMesh {
+  private buildRobot(team: number, alliance: "red" | "blue"): RobotMesh {
     const frame = this.frame,
       group = new THREE.Group(),
       colors = TEAM_COLORS[team] ?? { deep: 0x9c231d, bright: 0xd8261c };
@@ -302,8 +308,20 @@ export class DrillView {
     // nothing is drawn over it: no bumper strip (ours have none) and no intake bar (the intake is
     // the simulator's mouth, not this box); the label names the robot.
     const box = [chassis, arrow, turret, intake, ...wheels];
+    const look = this.look;
+    const toy =
+      team > 0 && look === "toy"
+        ? new ToyRobotModel(team, alliance, frame)
+        : null;
+    if (toy) {
+      group.add(toy.group);
+      for (const o of box) o.visible = false;
+      // The turret group stays as the aim line's origin; only its drawing is hidden.
+      const top = new THREE.Box3().setFromObject(toy.group);
+      if (Number.isFinite(top.max.y)) label.position.y = top.max.y + 0.12;
+    }
     const model =
-      team > 0 ? new MonaShoresRobotModel("robots/mona-shores/") : null;
+      team > 0 && !toy ? new MonaShoresRobotModel("robots/mona-shores/") : null;
     model?.ready
       .then(() => {
         group.add(model!.group);
@@ -330,13 +348,16 @@ export class DrillView {
     this.scene.add(aimLine);
     return {
       team,
+      look,
+      alliance,
       group,
       turret,
       lane,
       laneKey: "",
       intakeMat,
       aimLine,
-      model,
+      model: toy ?? model,
+      toy,
       light,
       lightMat,
       haloMat,
@@ -380,17 +401,37 @@ export class DrillView {
       aim?: boolean;
       /** The indicator light's colour now; null off, undefined: no light (not ours). */
       light?: LightColour | null;
+      /** The corner wheels (the drill's experiment): fitted, and turning now. */
+      cornerWheels?: boolean;
+      cornerWheelsTurning?: boolean;
     }[],
     showAim: boolean,
     /** The Auto replay's pieces: drawn instead of the simulator's balls and FLOWER stacks. */
     replay: { kind: BallKind; x: number; y: number; z: number }[] | null = null,
   ) {
+    const now = performance.now(),
+      dt =
+        this.lastSyncMs === null
+          ? 0
+          : Math.min(0.1, (now - this.lastSyncMs) / 1000);
+    this.lastSyncMs = now;
     robots.forEach((r, i) => {
-      if (!this.robots[i] || this.robots[i].team !== r.team) {
-        if (this.robots[i])
-          this.scene.remove(this.robots[i].group, this.robots[i].aimLine);
-        this.robots[i] = this.buildRobot(r.team);
+      const alliance = sim.robots[i]?.alliance === "blue" ? "blue" : "red";
+      const have = this.robots[i];
+      if (
+        !have ||
+        have.team !== r.team ||
+        have.look !== this.look ||
+        have.alliance !== alliance
+      ) {
+        if (have) this.scene.remove(have.group, have.aimLine);
+        this.robots[i] = this.buildRobot(r.team, alliance);
       }
+      this.robots[i].toy?.setCornerWheels(
+        !!r.cornerWheels,
+        !!r.cornerWheelsTurning,
+        dt,
+      );
       this.syncRobot(
         this.robots[i],
         sim.view(i),
@@ -502,6 +543,7 @@ export class DrillView {
     r.intakeMat.color.set(
       sim.carried.length >= sim.cfg.capacity ? 0xd1833a : 0x3ad17a,
     );
+    r.toy?.rollerMat.color.copy(r.intakeMat.color);
     const key = sim.carried.join();
     if (key !== r.laneKey) {
       r.laneKey = key;
@@ -531,6 +573,9 @@ export class DrillView {
 
 interface RobotMesh {
   team: number;
+  /** The look it was built with, and its alliance (the toy's number plates): a change rebuilds it. */
+  look: RobotLook;
+  alliance: "red" | "blue";
   group: THREE.Group;
   turret: THREE.Group;
   lane: THREE.Group;
@@ -538,7 +583,9 @@ interface RobotMesh {
   intakeMat: THREE.MeshStandardMaterial;
   aimLine: THREE.Line;
   /** Ours only: an opponent is drawn as a box. */
-  model: MonaShoresRobotModel | null;
+  model: MonaShoresRobotModel | ToyRobotModel | null;
+  /** The toy, when ours is drawn as one (its corner wheels and roller follow the drill). */
+  toy: ToyRobotModel | null;
   /** Both indicator lights, which always show the same colour. */
   light: THREE.Group;
   lightMat: THREE.MeshBasicMaterial;

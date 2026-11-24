@@ -647,14 +647,7 @@ export class TeleOp {
   private rakeCorners(): void {
     const sim = this.sim,
       c = sim.cfg;
-    if (
-      !this.cornerWheels ||
-      this.intakeFilter === "none" ||
-      this.routine ||
-      sim.robots[sim.me].stickDown ||
-      sim.carried.length >= this.preset.laneCapacity
-    )
-      return;
+    if (!this.cornerWheelsRunning) return;
     const hl = c.length / 2,
       th = sim.heading,
       fwd = { x: Math.cos(th), z: -Math.sin(th) },
@@ -693,6 +686,21 @@ export class TeleOp {
         break;
       }
     }
+  }
+  /**
+   * Whether the corner wheels turn now (rakeCorners' rules): fitted, the intake taking in, fewer
+   * than 4 held, no FLOWER pick or GARDEN gather running and the stick up. The drill draws them
+   * turning while this holds.
+   */
+  get cornerWheelsRunning(): boolean {
+    const sim = this.sim;
+    return (
+      this.cornerWheels &&
+      this.intakeFilter !== "none" &&
+      !this.routine &&
+      !sim.robots[sim.me].stickDown &&
+      sim.carried.length < this.preset.laneCapacity
+    );
   }
   /** Loops in which a corner wheel was raking a POLLEN. */
   cornerRakes = 0;
