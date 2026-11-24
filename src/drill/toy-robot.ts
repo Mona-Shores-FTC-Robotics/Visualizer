@@ -5,8 +5,9 @@
  *
  * What the video shows (Fruitport playoffs M-3 and M-10, 20245): a boxy silver aluminium frame
  * with see-through side panels, the number plates in the alliance's colour on its sides, a taller
- * tower at the back carrying the turret with its red-orange launcher on top, the Limelight on a
- * post at the front, and the indicator light glowing green through the panels. The places and sizes
+ * tower at the back carrying the turret with its red launcher drum on top (and the team's photos,
+ * Fruitport 21 Nov 2026), the Limelight on a post at the front, and the indicator light glowing
+ * green through the panels. The places and sizes
  * come from the same numbers the CAD gives (sim/public/robots/mona-shores/components.json: the
  * turret's and the FLOWER stick's axes) and from the drill's own (LIGHT_SPOTS, the corner wheels'
  * axles); the rest is drawn to look right, not measured.
@@ -32,8 +33,8 @@ const C = {
   deck: 0x2a2e35,
   wheel: 0x1c1f24,
   hub: 0xf2c230,
-  launcher: 0xf0552a,
-  flywheel: 0x30343b,
+  launcher: 0xe0332b,
+  flywheel: 0x6b7078,
   limelight: 0x16181c,
   lens: 0x58e1ff,
   stick: 0xffd21f,
@@ -299,45 +300,42 @@ export class ToyRobotModel {
       ),
     );
 
-    // The turret: a ring and the launcher on it, red-orange as on the robot, its barrel along the
-    // turret's forward (its zero is the nose).
+    // The turret, as the team's photos show it (Fruitport, 21 Nov 2026): a red drum on a silver
+    // plate, the launcher's big grey wheel showing under the plate, and a dark exit at the drum's
+    // front, along the turret's forward (its zero is the nose), so its aim reads from above.
     this.turret.position.set(TURRET_AT.x, towerTop, TURRET_AT.z);
     this.turret.add(
       inked(
-        new THREE.CylinderGeometry(3.4 * IN, 3.4 * IN, 0.8 * IN, 28),
-        toon(C.aluminiumDark),
+        new THREE.CylinderGeometry(3.6 * IN, 3.6 * IN, 0.5 * IN, 28),
+        silver,
         50,
       ),
     );
-    const hood = box(
-      6.2 * IN,
-      3.4 * IN,
-      4.4 * IN,
+    const drum = inked(
+      new THREE.CylinderGeometry(3.1 * IN, 3.1 * IN, 3.8 * IN, 28),
       toon(C.launcher),
-      0.4 * IN,
-      2.1 * IN,
-      0,
+      50,
     );
-    this.turret.add(hood);
+    drum.position.set(0, 2.15 * IN, 0);
+    this.turret.add(drum);
     const fly = inked(
-      new THREE.CylinderGeometry(1.9 * IN, 1.9 * IN, 3.0 * IN, 20),
+      new THREE.CylinderGeometry(2.0 * IN, 2.0 * IN, 1.4 * IN, 22),
       toon(C.flywheel),
       50,
     );
     fly.rotation.x = Math.PI / 2;
-    fly.position.set(-0.8 * IN, 2.2 * IN, 0);
+    fly.position.set(1.4 * IN, -1.6 * IN, 0);
     this.turret.add(fly);
-    const barrel = box(
-      3.0 * IN,
+    const exit = box(
       1.6 * IN,
-      2.4 * IN,
-      toon(C.launcher),
-      4.6 * IN,
-      3.0 * IN,
+      1.2 * IN,
+      1.8 * IN,
+      toon(C.limelight),
+      3.2 * IN,
+      3.2 * IN,
       0,
     );
-    barrel.rotation.z = 0.35;
-    this.turret.add(barrel);
+    this.turret.add(exit);
     g.add(this.turret);
 
     // The Limelight on its post at the front, centred (CAD: X 0.068 to 0.112 m, 0.355 to 0.399 m up),
