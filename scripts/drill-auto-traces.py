@@ -118,6 +118,8 @@ def build(auto, design=None):
     row = next((r for r in meta.get('runs', []) if r.get('seed') == seed), {})
     px, py, ph = (log[k] for k in ('/Odometry/PedroInches/X', '/Odometry/PedroInches/Y', '/Odometry/PedroInches/HeadingDeg'))
     held = log.get('/Sim/Robot/Held', [])
+    # The FLOWER stick's swing, degrees out from stowed (0) to on the tile (about 162): AutoSim logs it.
+    stick = log.get('/Internals/FlowerStickDeg', [])
 
     def hive(a, t):
         angle = at(log.get(f'/Sim/Hive/{a}/AngleDeg', []), t)
@@ -138,7 +140,7 @@ def build(auto, design=None):
         t = start + k / HZ
         r, b = hive('Red', t), hive('Blue', t)
         frames.append([round(k / HZ, 1), round(num(at(px, t)), 2), round(num(at(py, t)), 2), round(num(at(ph, t)), 1),
-                       int(num(at(held, t, 0))), r[0], r[1], b[0], b[1]])
+                       int(num(at(held, t, 0))), r[0], r[1], b[0], b[1], round(num(at(stick, t, 0)), 1)])
         for name, key in piece_keys.items():
             piece_frames[name].append([round(v * 100) for x, y, z in (at(log.get(key, []), t) or []) for v in (y, z, x)])
     t = start + AUTO_S + TRANSITION_S
@@ -167,7 +169,8 @@ def build(auto, design=None):
         'tipsAt': row.get('tipsAt'),
         'launched': row.get('launched'),
         'scored': row.get('scored'),
-        'columns': ['t', 'x', 'y', 'headingDeg', 'held', 'redAngleDeg', 'redTips', 'blueAngleDeg', 'blueTips'],
+        'columns': ['t', 'x', 'y', 'headingDeg', 'held', 'redAngleDeg', 'redTips', 'blueAngleDeg', 'blueTips',
+                    'stickDeg'],
         'frames': frames,
         'pieceFrames': piece_frames,
         'handoff': {
