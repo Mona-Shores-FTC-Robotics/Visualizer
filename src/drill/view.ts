@@ -267,15 +267,15 @@ export class DrillView {
     label.scale.set(0.3, 0.11, 1);
     label.position.set(0, 0.42, 0);
     const lane = new THREE.Group();
-    // The indicator light (biobuzz IndicatorSubsystem): a glowing ball and a halo, big enough to read
-    // at the drill's zoom. On top of the body: the CAD has no light in it, and biobuzz records only
-    // "where the drive team can see it from the field" (doc/robot-session-4.md). It moves up to the
-    // top of the CAD body once that is in.
+    // The indicator lights (biobuzz IndicatorSubsystem): two goBILDA lights Y-cabled to the one
+    // "indicator" servo port (DeviceNames.INDICATOR), so both show the same colour (the mentor,
+    // 24 Nov 2026). One on the Limelight's post facing forward, one at the rear of the frame,
+    // centred, facing back. Each a glowing lens with a halo, big enough to read at the drill's zoom.
+    // In the CAD's robot frame (biobuzz cad/advantagescope, +X forward, +Z up) the Limelight 3A
+    // spans X 0.068 to 0.112 m and Z 0.355 to 0.399 m, centred: the forward light sits on the post
+    // just under it, at its front face. The rear light is at the CAD body's rear edge (X -0.192 m);
+    // its height is not in the CAD, so mid-height, 0.20 m. Model (x, y, z) is local (x, z, -y).
     const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const light = new THREE.Mesh(
-      new THREE.SphereGeometry(0.035, 16, 12),
-      lightMat,
-    );
     const haloMat = new THREE.SpriteMaterial({
       map: haloTexture(),
       color: 0xffffff,
@@ -283,10 +283,18 @@ export class DrillView {
       opacity: 0.45,
       depthWrite: false,
     });
-    const halo = new THREE.Sprite(haloMat);
-    halo.scale.set(0.2, 0.2, 1);
-    light.add(halo);
-    light.position.set(-0.05, 0.36, 0);
+    const light = new THREE.Group();
+    for (const [x, y] of LIGHT_SPOTS) {
+      const lamp = new THREE.Mesh(
+        new THREE.SphereGeometry(0.028, 16, 12),
+        lightMat,
+      );
+      const halo = new THREE.Sprite(haloMat);
+      halo.scale.set(0.17, 0.17, 1);
+      lamp.add(halo);
+      lamp.position.set(x, y, 0);
+      light.add(lamp);
+    }
     light.visible = false;
     group.add(chassis, intake, arrow, turret, lane, label, light);
     this.scene.add(group);
@@ -298,13 +306,9 @@ export class DrillView {
       .then(() => {
         group.add(model!.group);
         for (const o of box) o.visible = false;
-        // The light on the body's top, toward the back (the turret turns over the front).
+        // The team's label clear above the body (the Limelight is its top).
         const top = new THREE.Box3().setFromObject(model!.group);
-        if (Number.isFinite(top.max.y)) {
-          light.position.y = top.max.y + 0.03;
-          // The team's label above the light, so neither covers the other.
-          label.position.y = light.position.y + 0.14;
-        }
+        if (Number.isFinite(top.max.y)) label.position.y = top.max.y + 0.12;
         const strip = new THREE.Mesh(
           new THREE.BoxGeometry(frame + 0.012, 0.035, frame + 0.012),
           new THREE.MeshStandardMaterial({
@@ -542,10 +546,20 @@ interface RobotMesh {
   aimLine: THREE.Line;
   /** Ours only: an opponent is drawn as a box. */
   model: MonaShoresRobotModel | null;
-  light: THREE.Mesh;
+  /** Both indicator lights, which always show the same colour. */
+  light: THREE.Group;
   lightMat: THREE.MeshBasicMaterial;
   haloMat: THREE.SpriteMaterial;
 }
+
+/**
+ * Where the two indicator lights sit, in the robot group's frame (local X forward, Y up), metres:
+ * on the Limelight's post facing forward, and at the rear of the frame, centred, facing back.
+ */
+export const LIGHT_SPOTS: readonly (readonly [number, number])[] = [
+  [0.112 + 0.012, 0.355 - 0.03],
+  [-0.192 - 0.012, 0.2],
+];
 
 /** A round, soft glow for the indicator light's halo (one texture, shared). */
 let halo: THREE.Texture | null = null;
