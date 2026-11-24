@@ -39,6 +39,18 @@ function startFor(w: CornerWayIn): [number, number, number] {
     w.gather.h + 20,
   ];
 }
+/**
+ * Takes the loose pieces within 30 in of a way in's gather pose off the field, so the drive-in is measured alone: a
+ * piece pinned between the nose and a wall now holds the robot off (sim #198), as on the real field.
+ */
+function clearCorner(s: DrillSession, w: CornerWayIn) {
+  const keep = [...s.sim.balls.values()]
+    .filter((b) => b.body.isEnabled())
+    .map((b) => ({ kind: b.kind, ...b.body.translation() }))
+    .filter((p) => Math.abs(p.x) < 1.79 && Math.abs(p.z) < 1.79 && p.y < 0.2)
+    .filter((p) => Math.hypot(p.x / IN + C - w.gather.x, C - p.z / IN - w.gather.y) > 30);
+  s.sim.handoff({}, 1, { pieces: keep });
+}
 /** Holds Triangle until the gather ends; the closest the robot came to the gather pose, inches. */
 function holdGather(s: DrillSession, w: CornerWayIn, max = 12) {
   const t0 = s.t;
@@ -93,6 +105,7 @@ describe("Triangle held: the corner gather", () => {
     test(`${w.name}: lines up, drives in to the corner, dwells and backs out`, async () => {
       const s = await session();
       placePedro(s, ...startFor(w));
+      clearCorner(s, w); // the drive-in alone; a pinned piece's hold is tested in sim/test/ball-pinch.test.ts
       s.advance(0.3);
       s.sim.carried = [];
       const r = holdGather(s, w);

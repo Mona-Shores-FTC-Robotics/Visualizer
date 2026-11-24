@@ -27,7 +27,8 @@ function pressInto(scene: 'corner' | 'wall', laneFull: boolean, drive: 'vel' | '
     deepest = Math.max(deepest, Math.min(c.length / 2 + r - q.f, c.length / 2 + r + q.f, c.width / 2 + r - q.l, c.width / 2 + r + q.l));
   }
   const p = s.balls.has(ball.id) ? ball.body.translation() : null, q = p ? s.toRobot(p.x, p.z) : null;
-  return { taken: !p, front: !!q && q.f > c.length / 2, deepest };
+  const gap = FIELD.half - (s.robot.translation().x + c.length / 2); // nose to the wall it pressed
+  return { taken: !p, front: !!q && q.f > c.length / 2, deepest, gap, r };
 }
 
 describe('a POLLEN pinned between our robot and a wall', () => {
@@ -38,6 +39,16 @@ describe('a POLLEN pinned between our robot and a wall', () => {
       expect(r.deepest).toBeLessThan(PINCH_TOL_M + 0.003); // a contact's depth, never inside the frame
     });
   }
+  it('holds the robot off the wall by the pinned ball, with the ball outside the frame', () => {
+    for (const drive of ['vel', 'motor'] as const) {
+      const p = pressInto('wall', true, drive);
+      expect(p.front).toBe(true);
+      // The ball's diameter (2.8 in), less what unpinch lets a contact sink: PINCH_TOL_M into the frame, 2 mm into the
+      // wall, and the solver's millimetre or two.
+      const slop = PINCH_TOL_M + 0.002 + 0.002;
+      expect(p.gap).toBeGreaterThan(2 * p.r - slop); expect(p.gap).toBeLessThan(2 * p.r + 0.003);
+    }
+  });
   it('with room in the lane, the intake takes it on a wall; in a corner it sits beside the 9.7 in mouth and stays at the front', () => {
     expect(pressInto('wall', false, 'vel').taken).toBe(true);
     const corner = pressInto('corner', false, 'vel'); // 6.7 in off centre with the robot on the side wall
