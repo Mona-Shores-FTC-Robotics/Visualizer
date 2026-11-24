@@ -32,6 +32,11 @@ export class DrillView {
   mode: CameraMode = "driver";
   /** How our robots are drawn; a change rebuilds them on the next sync. */
   look: RobotLook = "toy";
+  /**
+   * The team-number label floating over each robot. Off by default (the mentor: the toy's number
+   * plates already tell the robots apart); the CAD look has no plates, so a coach may want it there.
+   */
+  labels = false;
   private lastSyncMs: number | null = null;
   private ballGeo = {
     pollen: new THREE.SphereGeometry(FIELD.pollenRadius, 16, 12),
@@ -346,9 +351,11 @@ export class DrillView {
     );
     aimLine.frustumCulled = false;
     this.scene.add(aimLine);
+    label.visible = this.labels;
     return {
       team,
       look,
+      label,
       alliance,
       group,
       turret,
@@ -442,6 +449,7 @@ export class DrillView {
         r.stickDeg,
       );
       const rm = this.robots[i];
+      rm.label.visible = this.labels;
       rm.light.visible = r.light !== undefined;
       if (r.light !== undefined) {
         // Off reads as a dark lens, not as nothing.
@@ -579,6 +587,8 @@ interface RobotMesh {
   team: number;
   /** The look it was built with, and its alliance (the toy's number plates): a change rebuilds it. */
   look: RobotLook;
+  /** The floating team-number label (DrillView.labels). */
+  label: THREE.Sprite;
   alliance: "red" | "blue";
   group: THREE.Group;
   turret: THREE.Group;

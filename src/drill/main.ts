@@ -82,6 +82,7 @@ const prefs = (() => {
       nectar?: string;
       cornerWheels?: string;
       look?: string;
+      labels?: string;
     };
   } catch {
     return {};
@@ -103,6 +104,7 @@ function savePrefs() {
         nectar: nectarSel.value,
         cornerWheels: wheelSel.value,
         look: lookSel.value,
+        labels: labelSel.value,
       }),
     );
   } catch {
@@ -153,8 +155,12 @@ if (prefs.cornerWheels) wheelSel.value = prefs.cornerWheels;
 if (!wheelSel.value) wheelSel.value = "off";
 /** How our robots are drawn: the toy (as they look in match video) or the team's CAD. */
 const lookSel = $<HTMLSelectElement>("robot-look");
+/** The floating team-number labels: off by default (the toy's number plates name the robots). */
+const labelSel = $<HTMLSelectElement>("labels");
 if (prefs.look) lookSel.value = prefs.look;
 if (!lookSel.value) lookSel.value = "toy";
+if (prefs.labels) labelSel.value = prefs.labels;
+if (!labelSel.value) labelSel.value = "off";
 
 let file: ControlsFile;
 let session: DrillSession;
@@ -710,6 +716,7 @@ async function main() {
   );
   view.mode = (camSel.value as CameraMode) || "driver";
   view.look = lookSel.value === "cad" ? "cad" : "toy";
+  view.labels = labelSel.value === "on";
   await ensureTrace(OPENING_AUTO);
   await ensureTrace(partnerAutoFor(OPENING_AUTO) ?? "");
   newSession();
@@ -764,6 +771,10 @@ async function main() {
   };
   lookSel.onchange = () => {
     view.look = lookSel.value === "cad" ? "cad" : "toy";
+    savePrefs();
+  };
+  labelSel.onchange = () => {
+    view.labels = labelSel.value === "on";
     savePrefs();
   };
   addEventListener("keydown", (e) => {
