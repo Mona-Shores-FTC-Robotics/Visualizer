@@ -110,6 +110,31 @@ export function loadingZonePose(
   };
 }
 
+/**
+ * The Auto our partner runs beside ours, whose start a dead partner stands at: the other side's half
+ * of a pair (r-clockwise with l-clockwise, and so on), and L-NoCross beside R-Solo (the Hub,
+ * 24 Nov 2026). Null for an Auto with no partner Auto.
+ */
+export function partnerAutoFor(auto: string): string | null {
+  if (auto === "r-solo") return "l-no-cross";
+  if (auto.startsWith("r-")) return `l-${auto.slice(2)}`;
+  if (auto.startsWith("l-")) return `r-${auto.slice(2)}`;
+  return null;
+}
+
+/**
+ * Where an Auto starts, in the simulator's frame: its trace's first pose, which is the start its
+ * .pp file and biobuzz's TeamCode/autos/spots.json give (L-NoCross: LEFT_START, 62.3, 133.8, 270).
+ */
+export function startPose(trace: AutoTrace): {
+  x: number;
+  z: number;
+  h: number;
+} {
+  const f = trace.frames[0];
+  return fromPedro([f[1], f[2], f[3]]);
+}
+
 /** Puts robot `k` at `p` (sim X, Z, heading), at rest. */
 export function placeRobot(
   sim: Sim,
@@ -224,12 +249,16 @@ export class AutoPlayback {
       ["blue", 7],
     ] as const) {
       const phi = rad(fr[i]);
-      const h = this.sim.hives[a].body;
+      const hive = this.sim.hives[a],
+        h = hive.body;
       h.setRotation(
         { x: Math.sin(phi / 2), y: 0, z: 0, w: Math.cos(phi / 2) },
         true,
       );
       h.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      // The HIVE caches its tilt until the next world step (Hive.epoch), and the replay never steps:
+      // a new epoch, so the rocker's tilt (and the view drawing it) follows the trace.
+      if (hive.epoch !== null) hive.epoch++;
     }
   }
 

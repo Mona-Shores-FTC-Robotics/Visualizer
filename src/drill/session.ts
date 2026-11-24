@@ -25,6 +25,7 @@ import {
   fieldAtHandoff,
   loadingZonePose,
   placeRobot,
+  startPose,
   type AutoTrace,
 } from "./fullMatch";
 import {
@@ -334,6 +335,23 @@ export class DrillSession {
   set cornerWheels(on: boolean) {
     for (const t of this.teleops) t.cornerWheels = on;
   }
+
+  /**
+   * Stands our dead partner (a match field with one of our robots driven) at the start of its Auto
+   * (fullMatch.partnerAutoFor): dead from the beginning, it never leaves it. Call before start().
+   * Returns false when there is no dead partner to place.
+   */
+  placeDeadPartner(partnerTrace: AutoTrace): boolean {
+    const k = this.sim.robots.findIndex(
+      (r, i) => i >= this.teleops.length && r.alliance === this.sim.alliance,
+    );
+    if (k < 0) return false;
+    placeRobot(this.sim, k, startPose(partnerTrace));
+    this.deadPartnerAuto = partnerTrace.auto;
+    return true;
+  }
+  /** The Auto whose start our dead partner stands at, or null. */
+  deadPartnerAuto: string | null = null;
 
   /** The Auto replay's pieces for the view to draw (a full match before 2:00), else null. */
   get replayPieces(): ReturnType<AutoPlayback["pieces"]> | null {

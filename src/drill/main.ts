@@ -18,6 +18,14 @@ import {
   summarize,
   type StoredRun,
 } from "./history";
+import {
+  loadPeople,
+  rowFromRun,
+  rowFromStored,
+  savePeople,
+  sendRows,
+  sheetUrl,
+} from "./stats";
 import { PRESETS, IN, type TeamNumber } from "./presets";
 import { BUDGET_PIECES, BUDGET_S } from "./readout";
 import {
@@ -36,7 +44,12 @@ import {
   type RunResult,
 } from "./session";
 import { DrillView, CAMERAS, type CameraMode } from "./view";
-import { loadAutoIndex, loadAutoTrace, type AutoTrace } from "./fullMatch";
+import {
+  loadAutoIndex,
+  loadAutoTrace,
+  partnerAutoFor,
+  type AutoTrace,
+} from "./fullMatch";
 import {
   PadBinder,
   PadDecoder,
@@ -223,6 +236,10 @@ function newSession() {
       session.openingKind = openSel.value as OpeningKind;
     } else session.opensAfterAuto = true;
   }
+  // A match field's dead partner stands at the start of the Auto it would run beside ours.
+  const partner = partnerAutoFor(matchSel.value || OPENING_AUTO);
+  const partnerTrace = partner ? traces.get(partner) : undefined;
+  if (partnerTrace) session.placeDeadPartner(partnerTrace);
   $("start").textContent = session.playback
     ? "Start the match (Options)"
     : "Start 2:00 (Options)";
@@ -324,8 +341,53 @@ function cycleTable(x: RobotRunResult) {
     <p class="dim">Pick-ups: ${picks || "–"}</p>`;
 }
 
+/** Who is playing, as typed on this laptop (kept for next time). */
+const driverIn = $<HTMLInputElement>("driver");
+const operatorIn = $<HTMLInputElement>("operator");
+function people() {
+  return { driver: driverIn.value.trim(), operator: operatorIn.value.trim() };
+}
+function showPeople() {
+  const p = loadPeople();
+  if (!driverIn.value) driverIn.value = p.driver;
+  if (!operatorIn.value) operatorIn.value = p.operator;
+  $("people").innerHTML = p.names
+    .map((n) => `<option value="${esc(n)}"></option>`)
+    .join("");
+}
+for (const el of [driverIn, operatorIn])
+  el.onchange = () => {
+    savePeople(driverIn.value, operatorIn.value);
+    showPeople();
+  };
+
+/** The team sheet's line: where runs go, and what is waiting to. */
+function sheetStatus(
+  res?: { sent: number; waiting: number; url: string },
+  target = "sheet-status",
+) {
+  const el = document.getElementById(target);
+  if (!el) return;
+  const url = res?.url ?? sheetUrl();
+  if (!url) {
+    el.textContent = `No team sheet set up on this laptop yet: runs are kept here${res?.waiting ? ` (${res.waiting} waiting)` : ""} and go once it is (docs/drill-stats.md).`;
+    return;
+  }
+  el.textContent = res
+    ? res.waiting
+      ? `Couldn't reach the team sheet: ${res.waiting} run${res.waiting === 1 ? "" : "s"} waiting, sent with the next run.`
+      : res.sent
+        ? `Sent to the team sheet (${res.sent} run${res.sent === 1 ? "" : "s"}).`
+        : "Nothing new to send to the team sheet."
+    : "Runs go to the team sheet when they finish.";
+}
+
 function showResults(r: RunResult) {
-  const list = saveRun(summarize(r));
+  const list = saveRun(summarize(r, people()));
+  void sendRows([rowFromRun(r, people())]).then((res) => {
+    sheetStatus(res, "results-sheet");
+    sheetStatus(res);
+  });
   showHistory(list);
   const best = bestRun(list, r.team, r.mode, r.tipTiming, r.auto?.name ?? "");
   const total = r.tips + (r.auto?.tips ?? 0) + (r.openingTips ?? 0);
@@ -351,10 +413,11 @@ function showResults(r: RunResult) {
     ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
     <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}${r.cornerWheels ? ", corner wheels on" : ""}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
-    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. Our partner stood dead at its start.</p>` : ""}
+    ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. ${session.deadPartnerAuto ? ` Our partner stood dead at ${esc(session.deadPartnerAuto)}'s start.` : ""}</p>` : ""}
     ${nectarLine}
     ${robots}
     ${best && !isBest ? `<p class="dim">Best ${modeName(r.mode)} run on this laptop: ${best.tips} TIPs${best.goalAtS != null ? `, 7th at ${clock(best.goalAtS)}` : ""}, median cycle ${f1(best.medianCycleS ?? NaN)} s.</p>` : ""}
+    <p class="dim">${esc(people().driver || "No driver named")}${people().operator ? ` with ${esc(people().operator)} operating` : ""} · <span id="results-sheet">Sending to the team sheet…</span></p>
     <p><button class="primary" id="again">Run again (Options)</button></p>`;
   $("results").hidden = false;
   $("again").onclick = () => {
@@ -604,6 +667,15 @@ function cycleCamera() {
 }
 
 async function main() {
+  showPeople();
+  // Anything that could not go last time goes now.
+  void sendRows([]).then((res) => sheetStatus(res));
+  $("send-saved").onclick = () => {
+    $("sheet-status").textContent = "Sending this laptop's saved runs…";
+    void sendRows(loadHistory().map((x) => rowFromStored(x))).then((res) =>
+      sheetStatus(res),
+    );
+  };
   try {
     await RAPIER.init();
     const loaded = await loadControls();
@@ -625,6 +697,7 @@ async function main() {
   );
   view.mode = (camSel.value as CameraMode) || "driver";
   await ensureTrace(OPENING_AUTO);
+  await ensureTrace(partnerAutoFor(OPENING_AUTO) ?? "");
   newSession();
   $("start").onclick = () => start();
   $("reset").onclick = () => newSession();
@@ -648,6 +721,7 @@ async function main() {
   matchSel.onchange = async () => {
     savePrefs();
     await ensureTrace(matchSel.value);
+    await ensureTrace(partnerAutoFor(matchSel.value) ?? "");
     newSession();
   };
   // The Autos for Full Match, from public/drill/autos/index.json (scripts/drill-auto-traces.py).
@@ -663,6 +737,7 @@ async function main() {
       if (want && autos.some((a) => a.auto === want)) {
         matchSel.value = want;
         await ensureTrace(want);
+        await ensureTrace(partnerAutoFor(want) ?? "");
         newSession();
       }
     })
