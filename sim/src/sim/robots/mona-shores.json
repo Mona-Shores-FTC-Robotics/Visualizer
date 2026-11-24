@@ -134,6 +134,10 @@
       "stickWidthIn": {
         "value": 12.6,
         "source": "biobuzz cad/advantagescope/Robot_BIOBUZZ (the Onshape CAD): model_1.glb, the FLOWER stick, swung 162 deg out about its axis in components.json: the shaft on the floor spans y -0.160 to 0.161 m. Pressed on the side wall it covers 1.8 to 14.4 in from it, so the corner POLLEN (centre 1.4 in out) stays, as the mentor saw (13 Nov 2026)"
+      },
+      "stickGuidePlaceholderIn": {
+        "value": 0.5,
+        "source": "PLACEHOLDER, to be replaced by the measured GARDEN guides (biobuzz doc/robot-todo.md): the blue/white guides on both sticks are not in the 31 Oct CAD (doc/corner-wheels.md). How far past the stick's edge, each side, a piece is swept onto it. 0.5 in is the least that takes a GARDEN row POLLEN (6.1 to 6.6 in off centre) facing the side wall"
       }
     }
   },

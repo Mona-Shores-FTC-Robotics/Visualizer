@@ -26,7 +26,7 @@ export function monaShoresConfig(team: Team, opts: { mouth?: 'cad' | 'frame' } =
   const i = s.intake;
   c.intake.width = ((opts.mouth ?? INTAKE_MOUTH.model) === 'frame' ? i.widthFrameIn.value : i.widthIn.value) * IN; c.intake.reach = i.contactSlackIn.value * IN;
   c.intake.successP = i.grabChance.value; c.intake.intervalSec = i.intervalS.value; c.intake.maxRelSpeed = i.maxRelSpeedInPerS.value * IN;
-  c.intake.stick = { reach: i.stickReachIn.value * IN, width: i.stickWidthIn.value * IN };
+  c.intake.stick = { reach: i.stickReachIn.value * IN, width: i.stickWidthIn.value * IN, guide: i.stickGuidePlaceholderIn.value * IN }; // the guide is a PLACEHOLDER
   c.intake.flowerPeriodSec = model.routines.flowerPick.flowerPullS.value;
   void team; // the two robots' sticks (19429 roller, 20245 passive) pull at the same placeholder rate until timed
   return c;

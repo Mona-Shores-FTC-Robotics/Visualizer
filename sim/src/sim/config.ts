@@ -98,10 +98,11 @@ export interface RobotConfig {
    * Mona Shores additions, each optional (unset: upstream's intake): `intervalSec`, the least time between two pieces
    * through the intake; `maxRelSpeed`, m/s, a piece moving faster than this relative to the robot isn't taken; `stick`,
    * the FLOWER stick lowered in front (RobotState.stickDown): pieces within `reach` m ahead of the front face and
-   * `width` m across are lifted over it into the intake, the ramp a GARDEN's POLLEN pop over.
+   * `width` m across are lifted over it into the intake, the ramp a GARDEN's POLLEN pop over; `guide` m more on each side
+   * is the GARDEN guides' reach, which sweep a piece beside the stick onto it.
    */
   intake: { width: number; reach: number; successP: number; retrySec: number; flowerReach: number; flowerPeriodSec: number; dualSided?: boolean;
-    intervalSec?: number; maxRelSpeed?: number; stick?: { reach: number; width: number } };
+    intervalSec?: number; maxRelSpeed?: number; stick?: { reach: number; width: number; guide?: number } };
   /** `facing: 'rear'` launches out of the side opposite the intake, so the robot turns less between pickup and launch. */
   /**
    * `dualSided` lets the robot launch out of either end, for example with a two-position turret or two catapults. It

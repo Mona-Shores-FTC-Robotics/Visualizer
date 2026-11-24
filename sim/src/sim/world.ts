@@ -540,7 +540,7 @@ export class Sim {
       // Mona Shores: with the stick down, a piece in front of it is lifted over it into the intake.
       const me = this.robots[this.me], st = c.intake.stick && me.stickDown ? c.intake.stick : null;
       const inMouth = !(ahead < c.length / 2 - 0.01 || ahead > c.length / 2 + c.intake.reach + b.radius || Math.abs(r.l) > c.intake.width / 2);
-      const onStick = !!st && ahead >= c.length / 2 - 0.01 && ahead <= c.length / 2 + st.reach + b.radius && Math.abs(r.l) <= st.width / 2;
+      const onStick = !!st && ahead >= c.length / 2 - 0.01 && ahead <= c.length / 2 + st.reach + b.radius && Math.abs(r.l) <= st.width / 2 + (st.guide ?? 0);
       if (!inMouth && !onStick) continue;
       if (c.intake.intervalSec && this.simTime < (me.intakeReadyAt ?? 0)) break;
       if (c.intake.maxRelSpeed !== undefined) { const bv = b.body.linvel(), rv = this.robot.linvel(); if (Math.hypot(bv.x - rv.x, bv.z - rv.z) > c.intake.maxRelSpeed) continue; }
