@@ -63,7 +63,9 @@ function preset(team: TeamNumber): RobotPreset {
     turnRateDegPerS: r.drive.envelope.turnDegPerS.value,
     turnAccelDegPerS2: TURN_ACCEL_PER_S * r.drive.envelope.turnDegPerS.value,
     frameIn: s.frameIn.value,
-    intakeWidthIn: s.intakeWidthIn.value,
+    // The intake mouth the simulator uses (shared.intake.widthIn: the CAD's 9.7 in, #195), not the
+    // older shared.intakeWidthIn (14 in, which predates it).
+    intakeWidthIn: s.intake.widthIn.value,
     laneCapacity: s.laneCapacity.value,
     flowerPick: {
       seconds: r.flowerPick.cardS.value,
