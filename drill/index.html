@@ -36,19 +36,35 @@
       }
       body {
         display: grid;
-        grid-template-columns: 1fr 340px;
-        grid-template-rows: auto 1fr;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        grid-template-rows: auto minmax(0, 1fr);
         height: 100vh;
         overflow: hidden;
+      }
+      /* The side panel (setup, controllers, stats) closes while driving; the field takes its room. */
+      body.panel-closed {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      body.panel-closed #panel {
+        display: none;
       }
       header {
         grid-column: 1 / -1;
         display: flex;
-        gap: 12px;
+        gap: 10px;
         align-items: center;
-        padding: 8px 14px;
+        padding: 6px 12px;
         border-bottom: 1px solid var(--line);
         flex-wrap: wrap;
+      }
+      header .spacer {
+        flex: 1;
+      }
+      header input {
+        width: 7.5em;
+      }
+      body.drive #tips .detail {
+        display: none;
       }
       header h1 {
         font-size: 17px;
@@ -192,8 +208,108 @@
       aside {
         border-left: 1px solid var(--line);
         overflow-y: auto;
-        padding: 10px 14px;
+        padding: 6px 14px 12px;
         font-size: 13px;
+        min-width: 0;
+      }
+      aside .group {
+        border-bottom: 1px solid var(--line);
+        padding: 4px 0 10px;
+      }
+      aside .group > label {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        margin: 6px 0;
+        color: var(--dim);
+      }
+      aside .group select {
+        width: 100%;
+        min-width: 0;
+      }
+      aside details.group > summary {
+        cursor: pointer;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--dim);
+        margin: 10px 0 4px;
+      }
+      #mini,
+      #drive-exit {
+        display: none;
+      }
+      /* Drive mode: the field and a minimal HUD, big enough to read from a couch. */
+      body.drive {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+      }
+      body.drive header,
+      body.drive #panel,
+      body.drive #robot,
+      body.drive #readout,
+      body.drive #progress {
+        display: none;
+      }
+      body.drive #hud {
+        top: 16px;
+        left: 20px;
+        right: 20px;
+      }
+      body.drive #clock,
+      body.drive #tips {
+        font-size: 64px;
+        padding: 12px 20px;
+      }
+      body.drive #clock small,
+      body.drive #tips small {
+        font-size: 18px;
+      }
+      body.drive #mini {
+        display: flex;
+        gap: 26px;
+        align-items: center;
+        font-size: 30px;
+        font-weight: 700;
+        padding: 12px 22px;
+        font-variant-numeric: tabular-nums;
+      }
+      #mini small {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--dim);
+      }
+      #mini .lane {
+        letter-spacing: 0.08em;
+        color: #ffd21f;
+      }
+      #mini .ready {
+        color: var(--ok);
+      }
+      #mini .spinning {
+        color: var(--warn);
+      }
+      #mini .idle {
+        color: var(--dim);
+      }
+      body.drive #note {
+        top: 130px;
+        font-size: 22px;
+      }
+      body.drive #drive-exit {
+        display: block;
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        opacity: 0.55;
+      }
+      body.drive #drive-exit:hover {
+        opacity: 1;
+      }
+      body.drive .card {
+        font-size: 16px;
       }
       .pad-debug {
         margin: 6px 0;
@@ -300,8 +416,9 @@
         font-size: 12px;
       }
       @media (max-width: 900px) {
-        body {
-          grid-template-columns: 1fr;
+        body,
+        body.panel-closed {
+          grid-template-columns: minmax(0, 1fr);
           grid-template-rows: auto 60vh auto;
           overflow: auto;
           height: auto;
@@ -314,9 +431,9 @@
   </head>
   <body>
     <header>
-      <h1>Driver Drill · 7 TIPs</h1>
+      <h1>Driver Drill</h1>
       <label
-        >Robot (gamepad 1)
+        >Robot
         <select id="team">
           <option value="20245">Ultraviolet (20245)</option>
           <option value="19429">Infrared (19429)</option>
@@ -342,88 +459,6 @@
       /></label>
       <datalist id="people"></datalist>
       <label
-        >Players
-        <select id="mode">
-          <option value="two">Driver + operator (gamepad 1 + 2)</option>
-          <option value="driver">Driver only (gamepad 1)</option>
-          <option value="alliance">
-            Alliance: both robots, a driver each (2 controllers)
-          </option>
-          <option value="alliance-ops">
-            Alliance: both robots, driver + operator each (4 controllers)
-          </option>
-        </select></label
-      >
-      <label
-        >Match
-        <select id="match">
-          <option value="">
-            TeleOp drill (2:00), from our R-Solo, in the LOADING ZONE
-          </option>
-        </select></label
-      >
-      <label
-        >Opening
-        <select id="opening">
-          <option value="varied">
-            Varied: 1 TIP + 6 in CELL two runs in 3, else 2 TIPs
-          </option>
-          <option value="two">2 TIPs, CELL empty (R-Solo's best)</option>
-          <option value="one">1 TIP, 6 POLLEN in CELL (typical)</option>
-        </select></label
-      >
-      <label
-        >Field
-        <select id="population">
-          <option value="empty">Empty (no other robots)</option>
-          <option value="random">
-            Match: dead partner, 2 opponents (skill drawn)
-          </option>
-          <option value="1">Match: opponents of 1 TIP a match</option>
-          <option value="3">Match: opponents of 3 TIPs a match</option>
-          <option value="5">Match: opponents of 5 TIPs a match</option>
-          <option value="7">Match: opponents of 7 TIPs a match</option>
-        </select></label
-      >
-      <label
-        >HIVE
-        <select id="tip-timing"></select
-      ></label>
-      <label
-        >NECTAR
-        <select id="human-player"></select
-      ></label>
-      <label
-        >Intake
-        <select id="nectar">
-          <option value="pollen">POLLEN only: reject every NECTAR</option>
-          <option value="ours">POLLEN and our NECTAR (colour gate)</option>
-        </select></label
-      >
-      <label
-        >Corner wheels
-        <select id="corner-wheels">
-          <option value="off">Off (the robot as it is)</option>
-          <option value="on">
-            On: rake POLLEN at the front corners (experiment)
-          </option>
-        </select></label
-      >
-      <label
-        >Robot look
-        <select id="robot-look">
-          <option value="toy">Toy (as it looks in match video)</option>
-          <option value="cad">CAD</option>
-        </select></label
-      >
-      <label
-        >Labels
-        <select id="labels">
-          <option value="off">Off</option>
-          <option value="on">On: team numbers over the robots</option>
-        </select></label
-      >
-      <label
         >View
         <select id="camera">
           <option value="driver">Drive team</option>
@@ -431,19 +466,34 @@
           <option value="chase">Chase</option>
         </select></label
       >
-      <button id="start" class="primary">Start 2:00 (Options)</button>
+      <span class="spacer"></span>
+      <button id="start" class="primary">Start (Options)</button>
       <button id="reset">Reset</button>
+      <button
+        id="drive-btn"
+        type="button"
+        title="Full screen: the field and a minimal HUD (F, or the controller's touchpad)"
+      >
+        Drive mode (F)
+      </button>
+      <button id="panel-btn" type="button" title="Setup, controllers and stats">
+        Setup ⚙
+      </button>
     </header>
     <div id="stage">
       <canvas id="canvas"></canvas>
       <div id="hud">
         <div class="box" id="clock">2:00<small>TeleOp</small></div>
         <div class="box" id="robot"></div>
+        <div class="box" id="mini"></div>
         <div class="box" id="tips">0 / 7<small>TIPs</small></div>
       </div>
       <div id="note" class="box"></div>
       <div id="readout" class="box"></div>
       <div id="progress"></div>
+      <button id="drive-exit" type="button" title="Leave drive mode (F)">
+        Exit drive mode (F)
+      </button>
       <div class="overlay" id="results" hidden>
         <div class="card" id="results-card"></div>
       </div>
@@ -451,36 +501,137 @@
         <div class="card" id="fatal-card"></div>
       </div>
     </div>
-    <aside>
-      <h2>Controllers</h2>
-      <div id="pads" class="dim">
-        Connect a PlayStation controller and press any button.
-      </div>
-      <details id="pad-check">
-        <summary>Controller check (live)</summary>
-        <p class="dim">
-          Raw axes and buttons, and what the drill reads. At rest, drive and
-          turn read 0.00. If not, let go of the sticks and
-          <button id="rezero" type="button">Re-zero sticks</button>
-        </p>
-        <div id="pad-debug"></div>
+    <aside id="panel">
+      <section class="group">
+        <h2>Match</h2>
+        <label
+          >Match
+          <select id="match">
+            <option value="">
+              TeleOp drill (2:00), from our R-Solo, in the LOADING ZONE
+            </option>
+          </select></label
+        >
+        <label
+          >Opening
+          <select id="opening">
+            <option value="varied">
+              Varied: 1 TIP + 6 in CELL two runs in 3, else 2 TIPs
+            </option>
+            <option value="two">2 TIPs, CELL empty (R-Solo's best)</option>
+            <option value="one">1 TIP, 6 POLLEN in CELL (typical)</option>
+          </select></label
+        >
+        <label
+          >Field
+          <select id="population">
+            <option value="empty">Empty (no other robots)</option>
+            <option value="random">
+              Match: dead partner, 2 opponents (skill drawn)
+            </option>
+            <option value="1">Match: opponents of 1 TIP a match</option>
+            <option value="3">Match: opponents of 3 TIPs a match</option>
+            <option value="5">Match: opponents of 5 TIPs a match</option>
+            <option value="7">Match: opponents of 7 TIPs a match</option>
+          </select></label
+        >
+      </section>
+      <section class="group">
+        <h2>Robot</h2>
+        <label
+          >Robot look
+          <select id="robot-look">
+            <option value="toy">Toy (as it looks in match video)</option>
+            <option value="cad">CAD</option>
+          </select></label
+        >
+        <label
+          >Intake
+          <select id="nectar">
+            <option value="pollen">POLLEN only: reject every NECTAR</option>
+            <option value="ours">POLLEN and our NECTAR (colour gate)</option>
+          </select></label
+        >
+        <label
+          >Corner wheels
+          <select id="corner-wheels">
+            <option value="off">Off (the robot as it is)</option>
+            <option value="on">
+              On: rake POLLEN at the front corners (experiment)
+            </option>
+          </select></label
+        >
+      </section>
+      <section class="group">
+        <h2>Driver</h2>
+        <label
+          >Players
+          <select id="mode">
+            <option value="two">Driver + operator (gamepad 1 + 2)</option>
+            <option value="driver">Driver only (gamepad 1)</option>
+            <option value="alliance">
+              Alliance: both robots, a driver each (2 controllers)
+            </option>
+            <option value="alliance-ops">
+              Alliance: both robots, driver + operator each (4 controllers)
+            </option>
+          </select></label
+        >
+        <h2>Controllers</h2>
+        <div id="pads" class="dim">
+          Connect a PlayStation controller and press any button.
+        </div>
+        <details id="pad-check">
+          <summary>Controller check (live)</summary>
+          <p class="dim">
+            Raw axes and buttons, and what the drill reads. At rest, drive and
+            turn read 0.00. If not, let go of the sticks and
+            <button id="rezero" type="button">Re-zero sticks</button>
+          </p>
+          <div id="pad-debug"></div>
+        </details>
+      </section>
+      <section class="group">
+        <h2>Advanced</h2>
+        <label
+          >HIVE
+          <select id="tip-timing"></select
+        ></label>
+        <label
+          >NECTAR
+          <select id="human-player"></select
+        ></label>
+        <label
+          >Labels
+          <select id="labels">
+            <option value="off">Off</option>
+            <option value="on">On: team numbers over the robots</option>
+          </select></label
+        >
+      </section>
+      <details class="group" open>
+        <summary>Controls</summary>
+        <h2>Driver <span class="dim" id="driver-pads">gamepad 1</span></h2>
+        <table id="driver-controls"></table>
+        <div id="operator-section">
+          <h2>Operator <span class="dim">gamepad 2</span></h2>
+          <table id="operator-controls"></table>
+        </div>
+        <p class="dim" id="controls-source"></p>
       </details>
-      <h2>Driver <span class="dim" id="driver-pads">gamepad 1</span></h2>
-      <table id="driver-controls"></table>
-      <div id="operator-section">
-        <h2>Operator <span class="dim">gamepad 2</span></h2>
-        <table id="operator-controls"></table>
-      </div>
-      <p class="dim" id="controls-source"></p>
-      <h2>Best runs</h2>
-      <div id="history" class="dim">None yet.</div>
-      <h2>Team sheet</h2>
-      <p class="dim" id="sheet-status">…</p>
-      <p>
-        <button id="send-saved">Send saved runs to the team sheet</button>
-      </p>
-      <h2>Robot numbers</h2>
-      <div id="numbers" class="dim"></div>
+      <section class="group">
+        <h2>Best runs</h2>
+        <div id="history" class="dim">None yet.</div>
+        <h2>Team sheet</h2>
+        <p class="dim" id="sheet-status">…</p>
+        <p>
+          <button id="send-saved">Send saved runs to the team sheet</button>
+        </p>
+      </section>
+      <details class="group">
+        <summary>Robot numbers</summary>
+        <div id="numbers" class="dim"></div>
+      </details>
       <footer>
         Physics, field and HIVE from
         <a href="https://github.com/teddytennant/ftc-biobuzz-sim"
@@ -490,7 +641,8 @@
         and 22377 (<a href="https://biobuzz.ncssmftc.org/sim/">live</a>). The
         field model is <i>FIRST</i>'s BIOBUZZ field CAD. Not affiliated with
         <i>FIRST</i>. <br />Keys: <kbd>Enter</kbd> start, <kbd>C</kbd> view,
-        <kbd>R</kbd> reset.
+        <kbd>R</kbd> reset, <kbd>F</kbd> drive mode (full screen; the
+        controller's touchpad too), <kbd>S</kbd> this panel.
       </footer>
     </aside>
     <script type="module" src="/src/drill/main.ts"></script>

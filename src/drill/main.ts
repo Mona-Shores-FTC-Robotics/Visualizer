@@ -168,6 +168,71 @@ let view: DrillView;
 let saved = false;
 let startWas = false;
 let viewWas = false;
+let driveBtnWas = false;
+
+// ---------- layout: the side panel and drive mode ----------
+
+/** The side panel's state the user chose (Setup ⚙), or null to follow the run: closed while driving. */
+let panelChoice: boolean | null = null;
+let wasRunning = false;
+const running = () => {
+  const ph = session?.phase;
+  return !!ph && ph !== "pre" && ph !== "ended";
+};
+function layout() {
+  const r = running();
+  // A run starting or ending hands the panel back to the run's own rule.
+  if (r !== wasRunning) {
+    wasRunning = r;
+    panelChoice = null;
+  }
+  const open =
+    !document.body.classList.contains("drive") && (panelChoice ?? !r);
+  document.body.classList.toggle("panel-closed", !open);
+  $("panel-btn").setAttribute("aria-expanded", String(open));
+}
+function togglePanel() {
+  panelChoice = document.body.classList.contains("panel-closed");
+  layout();
+}
+
+/**
+ * Drive mode: only the field, the robots and a minimal HUD (clock, TIPs, lane, launcher, last cycle),
+ * full screen where the browser allows it (a key or a click does; a controller button can't, so
+ * from the controller it fills the window). F, the button, or the controller's touchpad toggle it;
+ * leaving full screen (Esc) leaves it too.
+ */
+function setDrive(on: boolean) {
+  document.body.classList.toggle("drive", on);
+  if (on && !document.fullscreenElement)
+    void document.documentElement.requestFullscreen?.().catch(() => {});
+  if (!on && document.fullscreenElement)
+    void document.exitFullscreen?.().catch(() => {});
+  layout();
+}
+const toggleDrive = () => setDrive(!document.body.classList.contains("drive"));
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && document.body.classList.contains("drive"))
+    setDrive(false);
+});
+
+/** Drive mode's HUD line: the lane, the launcher, and the last cycle. */
+function miniBox(): string {
+  const t = session.teleops[0];
+  if (!t) return "";
+  const st = t.status(),
+    cap = session.presets[0].laneCapacity,
+    c = session.readouts[0].cycles.at(-1);
+  const launcher =
+    st.launcher === "AT SPEED"
+      ? '<span class="ready">READY</span>'
+      : st.launcher === "SPINNING UP"
+        ? '<span class="spinning">SPINNING</span>'
+        : '<span class="idle">IDLE</span>';
+  return `<div><span class="lane">${"●".repeat(st.lane)}${"○".repeat(Math.max(0, cap - st.lane))}</span><small>lane</small></div>
+    <div>${launcher}<small>launcher</small></div>
+    <div>${c ? `${f1(c.cycleS)} s` : "–"}<small>last cycle</small></div>`;
+}
 
 function fatal(msg: string) {
   $("fatal").hidden = false;
@@ -500,7 +565,7 @@ function hud() {
     ? session.totalTips - session.tips.length
     : 0;
   $("tips").innerHTML =
-    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""}${session.replayPieces ? "" : ` · CELL ${session.sim.cellCount(session.sim.alliance)} in`}</small>`;
+    `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs<span class="detail">${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""}${session.replayPieces ? "" : ` · CELL ${session.sim.cellCount(session.sim.alliance)} in`}</span></small>`;
   const all = session.teleops.map((_, k) => k);
   $("robot").innerHTML = all.map(robotBox).join("");
   $("note").textContent = session.teleops
@@ -513,6 +578,8 @@ function hud() {
     .filter(Boolean)
     .join(" · ");
   $("readout").innerHTML = all.map(readoutBox).join("") + humanPlayerBox();
+  if (document.body.classList.contains("drive"))
+    $("mini").innerHTML = miniBox();
 }
 
 /**
@@ -620,6 +687,10 @@ function frame(now: number) {
     start();
   }
   startWas = startBtn;
+  // The touchpad's click (button 17 in the standard mapping) toggles drive mode.
+  const driveBtn = list.some((g, i) => bound[i] && !!g.buttons[17]?.pressed);
+  if (driveBtn && !driveBtnWas) toggleDrive();
+  driveBtnWas = driveBtn;
   const viewBtn = read.some((d, i) => bound[i] && d.share);
   if (viewBtn && !viewWas) cycleCamera();
   viewWas = viewBtn;
@@ -675,6 +746,7 @@ function frame(now: number) {
     session.replayPieces,
   );
   hud();
+  layout();
   requestAnimationFrame(frame);
 }
 
@@ -782,7 +854,12 @@ async function main() {
     if (e.key === "Enter") start();
     else if (e.key === "r" || e.key === "R") newSession();
     else if (e.key === "c" || e.key === "C") cycleCamera();
+    else if (e.key === "f" || e.key === "F") toggleDrive();
+    else if (e.key === "s" || e.key === "S") togglePanel();
   });
+  $("drive-btn").onclick = () => setDrive(true);
+  $("drive-exit").onclick = () => setDrive(false);
+  $("panel-btn").onclick = () => togglePanel();
   requestAnimationFrame(frame);
 }
 
