@@ -26,6 +26,28 @@
   let view = $derived(hiveAt(history, values, seconds));
   let misses = $derived(missesAt(history, values, seconds));
   /**
+   * Fork: a partner's TIP the preview of an Auto alone takes to come (timing/together.ts), labelled
+   * over the HIVE from its swing until a moment after it settles, so it is seen to be assumed.
+   */
+  let assumedLabel = $derived.by(() => {
+    let n = 0;
+    for (const tip of history.tips) {
+      if (tip.assumedAt === undefined) continue;
+      n += 1;
+      if (seconds >= tip.start - 1e-9 && seconds <= tip.settled + 1.5)
+        return `partner TIP ${n} (assumed)`;
+    }
+    return null;
+  });
+  const LABEL_AT = {
+    x: RED_CELLS.left.x + RED_CELLS.left.w / 2,
+    y:
+      Math.max(
+        RED_CELLS.left.y + RED_CELLS.left.h,
+        RED_CELLS.right.y + RED_CELLS.right.h,
+      ) + 3,
+  };
+  /**
    * A volley that does not count: its pieces hit the CELL's outer edge (where the shots come from:
    * LEFT's from the scoring end, RIGHT's from the other) and fall away from it, fading; a red ✕
    * marks the miss. The CELL itself does not change.
@@ -107,6 +129,19 @@
       />
     {/each}
   {/each}
+  {#if assumedLabel}
+    <text
+      transform={`translate(${LABEL_AT.x} ${LABEL_AT.y}) scale(1 -1)`}
+      text-anchor="middle"
+      font-size="3.2"
+      font-weight="700"
+      fill="#ffd23f"
+      stroke="#16181c"
+      stroke-width="0.6"
+      paint-order="stroke"
+      data-testid="assumed-tip-label">{assumedLabel}</text
+    >
+  {/if}
   {#each misses as miss, m (m)}
     {@const drawing = missDrawing(miss)}
     <g opacity={drawing.opacity}>

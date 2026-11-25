@@ -12,6 +12,7 @@ import {
   connectAutoStore,
   parseSelection,
   previewScenario,
+  partnerTipAt,
   resetAutoView,
   selectedCardId,
   setNewPathHandler,
@@ -87,6 +88,7 @@ export class AutoState {
   #getSettings: () => Settings;
   #overlays: Overlays;
   #scenario = fromStore(previewScenario);
+  #partnerTip = fromStore(partnerTipAt);
   #timingValues = fromStore(timingValues);
   #selection = fromStore(selectedCardId);
   /** Fork: the team's spots and which are unlocked (lib/team/spotsStore.ts). */
@@ -137,7 +139,7 @@ export class AutoState {
       [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
       this.match.withTips(this.#timingValues.current),
       true,
-      { tipsCome: true },
+      { tipsCome: true, partnerTip: this.#partnerTip.current },
     );
   });
   preview = $derived(this.together?.previews[0] ?? null);

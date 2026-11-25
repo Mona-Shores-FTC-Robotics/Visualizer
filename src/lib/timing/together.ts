@@ -220,6 +220,12 @@ export function previewTogether(
      * robot the simulator does not describe (the 25 Oct light chassis).
      */
     turning?: "sim" | "drawn";
+    /**
+     * With `tipsCome`, when the partner's TIP comes (Auto Builder, "Partner TIP 1 at"): "auto"
+     * (the default), one swing after a wait for it starts; a number, it settles at that time on
+     * the match clock and nothing else is assumed; "never", nothing is assumed.
+     */
+    partnerTip?: PartnerTip;
   } = {},
 ): TogetherResult {
   const own = entries.map((e) => robotValues(e, values));
@@ -242,9 +248,33 @@ export function previewTogether(
     }
     return catalog;
   });
-  let tips: Tip[] = [];
   let previews: PreviewResult[] = [];
-  let assumed: Volley[] = [];
+  const partnerTip = options.tipsCome
+    ? (options.partnerTip ?? "auto")
+    : "never";
+  const assuming = partnerTip === "auto";
+  // A partner TIP set to settle at a time: its stand-in volley lands one swing before.
+  const fixed: Volley[] =
+    typeof partnerTip === "number"
+      ? [
+          {
+            t:
+              partnerTip -
+              Math.max(0, values.tipSwingS) -
+              Math.max(0, values.tipStartS),
+            robot: 0,
+            assumed: true,
+          },
+        ]
+      : [];
+  let assumed: Volley[] = fixed;
+  let tips: Tip[] = fixed.length
+    ? hiveHistory(fixed, values).tips.map(({ start, settled, assumedAt }) => ({
+        start,
+        settled,
+        assumedAt,
+      }))
+    : [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const guesses: Assumption[][] = entries.map(() => []);
     previews = entries.map((e, i) =>
@@ -255,14 +285,12 @@ export function previewTogether(
             catalogs[i],
             e.startPoint,
             e.scenario,
-            options.tipsCome
+            assuming
               ? tipsCome(previewTiming(own[i], tips), own[i], tips, guesses[i])
               : previewTiming(own[i], tips),
           ),
     );
-    const nextAssumed = options.tipsCome
-      ? assumedVolleys(previews, guesses)
-      : [];
+    const nextAssumed = assuming ? assumedVolleys(previews, guesses) : fixed;
     const next: Tip[] = hiveHistory(
       [...volleysOf(previews, loads), ...nextAssumed],
       values,
@@ -285,7 +313,10 @@ export function previewTogether(
         if (tip.start <= preview.endTime + 1e-9) {
           preview.log.push({
             t: tip.start,
-            text: `TIP ${i + 1} starts (settled ${tip.settled.toFixed(1)} s)${tip.assumedAt === undefined ? "" : ", the partner's, taken to come"}`,
+            text:
+              tip.assumedAt === undefined
+                ? `TIP ${i + 1} starts (settled ${tip.settled.toFixed(1)} s)`
+                : `Partner TIP ${tips.slice(0, i + 1).filter((x) => x.assumedAt !== undefined).length} (assumed) starts, settled ${tip.settled.toFixed(1)} s: ${partnerTipRule(partnerTip, tip.assumedAt, values)}`,
             kind: "event",
           });
         }
@@ -294,6 +325,22 @@ export function previewTogether(
     }
   }
   return { previews, tips, assumed };
+}
+
+/** When the partner's TIP comes in a preview of an Auto alone (see previewTogether's options). */
+export type PartnerTip = "auto" | "never" | number;
+
+/** Why an assumed partner TIP is where it is, in words, with the facts it uses. */
+export function partnerTipRule(
+  partnerTip: PartnerTip,
+  from: number,
+  values: TimingValues,
+): string {
+  const start = Math.max(0, values.tipStartS),
+    swing = Math.max(0, values.tipSwingS);
+  return typeof partnerTip === "number"
+    ? `set to settle at ${partnerTip.toFixed(1)} s ("Partner TIP 1 at")`
+    : `one swing after the wait for it started at ${from.toFixed(1)} s (tipStartS ${start.toFixed(1)} s + tipSwingS ${swing.toFixed(1)} s, Timing → Facts)`;
 }
 
 /**

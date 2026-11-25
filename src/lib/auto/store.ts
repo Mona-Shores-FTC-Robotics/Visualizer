@@ -35,6 +35,13 @@ export const fieldHover = writable<{ x: number; y: number } | null>(null);
 /** The preview's answers: whether each card's condition is true when it asks. Not saved. */
 export const previewScenario = writable<Scenario>({});
 
+/**
+ * Fork: when the partner's TIP comes in a preview of the Auto alone (timing/together.ts
+ * PartnerTip): "auto", one HIVE swing after a wait for it starts; a time on the match clock it
+ * settles at; or "never". Not saved.
+ */
+export const partnerTipAt = writable<"auto" | "never" | number>("auto");
+
 let newPathHandler: ((where: "after" | "branchEnd") => void) | null = null;
 
 /** The app's "add a path here", which needs the Path List (App.svelte). */
@@ -76,6 +83,7 @@ export function parseSelection(
 export function resetAutoView(): void {
   selectedCardId.set(null);
   previewScenario.set({});
+  partnerTipAt.set("auto");
 }
 
 /** The current Auto, for the save paths that build a project document. */

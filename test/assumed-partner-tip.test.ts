@@ -8,11 +8,15 @@ import { DEFAULT_SETTINGS } from "../src/config/defaults";
 import { parseProject, robotConfigOf } from "../src/io";
 import { hiveAt } from "../src/lib/match/hiveView";
 import { fallbackValues, hiveHistory } from "../src/lib/timing/model";
-import { previewTogether, volleysOf } from "../src/lib/timing/together";
+import {
+  previewTogether,
+  volleysOf,
+  type PartnerTip,
+} from "../src/lib/timing/together";
 
 const FILE = "test/fixtures/no-cross-choice/l-no-cross-master.pp";
 
-function alone() {
+function alone(partnerTip: PartnerTip = "auto") {
   const loaded = parseProject(
     readFileSync(FILE, "utf8"),
     robotConfigOf(DEFAULT_SETTINGS),
@@ -32,7 +36,7 @@ function alone() {
     ],
     values,
     true,
-    { tipsCome: true },
+    { tipsCome: true, partnerTip },
   );
   const preview = together.previews[0];
   // As the field draws it (state/auto.svelte.ts hive).
@@ -76,5 +80,39 @@ describe("L-NoCross alone: the partner's TIP it waits for is on the HIVE", () =>
     // No TIP credited to the far CELL from that volley.
     const own = history.tips.filter((tip) => tip.assumedAt === undefined);
     expect(own.every((tip) => tip.start > launch.t1 + 1)).toBe(true);
+  });
+});
+
+describe("Partner TIP 1 at: auto, a time, or never", () => {
+  it("auto: the timeline marks it as the partner's, assumed, with the rule and the facts", () => {
+    const { preview, values } = alone();
+    const mark = preview.log.find((l) =>
+      l.text.startsWith("Partner TIP 1 (assumed)"),
+    )!;
+    expect(mark.kind).toBe("event");
+    expect(mark.text).toContain("one swing after the wait for it started");
+    expect(mark.text).toContain(`tipStartS ${values.tipStartS.toFixed(1)} s`);
+    expect(mark.text).toContain(`tipSwingS ${values.tipSwingS.toFixed(1)} s`);
+  });
+
+  it("a time: the partner's TIP 1 settles then, and the wait ends on it", () => {
+    const { together, preview, history, values } = alone(4);
+    expect(together.tips[0].settled).toBeCloseTo(4, 6);
+    expect(together.tips[0].assumedAt).toBeDefined();
+    const first = preview.waits[0];
+    expect(first.ended).toBe("trigger");
+    expect(first.t1).toBeCloseTo(Math.max(first.t0, 4), 6);
+    expect(hiveAt(history, values, 4.01).left.down).toBe(0);
+    expect(
+      preview.log.some((l) => l.text.includes("set to settle at 4.0 s")),
+    ).toBe(true);
+  });
+
+  it('never: no partner TIP, so the first wait runs to its 9 s limit, as its what-if "no"', () => {
+    const { together, preview } = alone("never");
+    expect(together.assumed).toHaveLength(0);
+    expect(together.tips.every((t) => t.assumedAt === undefined)).toBe(true);
+    expect(preview.waits[0].ended).toBe("time");
+    expect(preview.waits[0].t1).toBeCloseTo(9, 6);
   });
 });
