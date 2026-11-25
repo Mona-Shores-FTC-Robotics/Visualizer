@@ -76,6 +76,11 @@ export function stillPreview(): PreviewResult {
 export interface TogetherResult {
   previews: PreviewResult[];
   tips: Tip[];
+  /**
+   * With `tipsCome`: the stand-in volleys for the partner's TIPs the Autos were taken to wait for
+   * (one per wait that ended on the assumption), so the HIVE drawn has them too. Empty otherwise.
+   */
+  assumed: Volley[];
 }
 
 /** Rounds of preview before giving up on the TIPs settling (each round is cheap). */
@@ -135,7 +140,12 @@ function sameTips(a: Tip[], b: Tip[]): boolean {
  * Auto, so without this a wait for the partner's tip would never end and the good path (every
  * tip comes) could not be shown.
  */
-function tipsCome(timing: PreviewTiming, values: TimingValues): PreviewTiming {
+function tipsCome(
+  timing: PreviewTiming,
+  values: TimingValues,
+  tips: Tip[],
+  guesses: Assumption[],
+): PreviewTiming {
   const swing = Math.max(0, values.tipStartS) + Math.max(0, values.tipSwingS);
   return {
     ...timing,
@@ -143,9 +153,59 @@ function tipsCome(timing: PreviewTiming, values: TimingValues): PreviewTiming {
       // Pass the robot's position on: CellUp is the CELL at the robot's end of the field.
       const modelled = timing.trueAt(condition, t0, at);
       if (!TIP_CONDITIONS.includes(condition)) return modelled;
-      return Math.min(modelled ?? t0, t0 + swing);
+      const assumedAt = t0 + swing;
+      const when = Math.min(modelled ?? t0, assumedAt);
+      // Note what the answer rests on, for the HIVE: a TIP taken to come from this wait's start, or
+      // one taken to come for an earlier wait (whose stand-in volley is already in `tips`).
+      if (assumedAt < (modelled ?? t0) - 1e-9)
+        guesses.push({ from: t0, at: when });
+      else {
+        const earlier = tips.find(
+          (tip) =>
+            tip.assumedAt !== undefined &&
+            (Math.abs(tip.settled - when) < 1e-6 ||
+              Math.abs(tip.start - when) < 1e-6),
+        );
+        if (earlier) guesses.push({ from: earlier.assumedAt!, at: when });
+      }
+      return when;
     },
   };
+}
+
+/** A wait's answer that rests on a partner's TIP taken to come: the TIP's stand-in volley lands at `from`. */
+interface Assumption {
+  from: number;
+  /** When the wait would end on it. */
+  at: number;
+}
+
+/**
+ * The stand-in volleys for the partner's TIPs the previews were taken to wait for: one for each
+ * wait that really ended on an assumption (a wait asks for times it does not end on, when a time
+ * row or another trigger comes first).
+ */
+function assumedVolleys(
+  previews: PreviewResult[],
+  guesses: Assumption[][],
+): Volley[] {
+  const out: Volley[] = [];
+  previews.forEach((preview, robot) => {
+    for (const g of guesses[robot]) {
+      const ended = preview.waits.some(
+        (w) => w.ended === "trigger" && Math.abs(w.t1 - g.at) < 1e-6,
+      );
+      if (ended && !out.some((v) => Math.abs(v.t - g.from) < 1e-6))
+        out.push({ t: g.from, robot, assumed: true });
+    }
+  });
+  return out.sort((a, b) => a.t - b.t);
+}
+
+function sameVolleys(a: Volley[], b: Volley[]): boolean {
+  return (
+    a.length === b.length && a.every((v, i) => Math.abs(v.t - b[i].t) < 1e-6)
+  );
 }
 
 export function previewTogether(
@@ -184,7 +244,9 @@ export function previewTogether(
   });
   let tips: Tip[] = [];
   let previews: PreviewResult[] = [];
+  let assumed: Volley[] = [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    const guesses: Assumption[][] = entries.map(() => []);
     previews = entries.map((e, i) =>
       e.still
         ? stillPreview()
@@ -194,15 +256,27 @@ export function previewTogether(
             e.startPoint,
             e.scenario,
             options.tipsCome
-              ? tipsCome(previewTiming(own[i], tips), own[i])
+              ? tipsCome(previewTiming(own[i], tips), own[i], tips, guesses[i])
               : previewTiming(own[i], tips),
           ),
     );
-    const next = hiveHistory(volleysOf(previews, loads), values).tips.map(
-      ({ start, settled, lastBall }) => ({ start, settled, lastBall }),
-    );
-    if (sameTips(next, tips)) break;
+    const nextAssumed = options.tipsCome
+      ? assumedVolleys(previews, guesses)
+      : [];
+    const next: Tip[] = hiveHistory(
+      [...volleysOf(previews, loads), ...nextAssumed],
+      values,
+    ).tips.map(({ start, settled, lastBall, assumedAt }) => ({
+      start,
+      settled,
+      lastBall,
+      ...(assumedAt === undefined ? {} : { assumedAt }),
+    }));
+    const settledDown =
+      sameTips(next, tips) && sameVolleys(nextAssumed, assumed);
     tips = next;
+    assumed = nextAssumed;
+    if (settledDown) break;
   }
   if (withLog) {
     // Each preview's log shows the TIPs, on the field's clock.
@@ -211,7 +285,7 @@ export function previewTogether(
         if (tip.start <= preview.endTime + 1e-9) {
           preview.log.push({
             t: tip.start,
-            text: `TIP ${i + 1} starts (settled ${tip.settled.toFixed(1)} s)`,
+            text: `TIP ${i + 1} starts (settled ${tip.settled.toFixed(1)} s)${tip.assumedAt === undefined ? "" : ", the partner's, taken to come"}`,
             kind: "event",
           });
         }
@@ -219,7 +293,7 @@ export function previewTogether(
       preview.log.sort((a, b) => a.t - b.t);
     }
   }
-  return { previews, tips };
+  return { previews, tips, assumed };
 }
 
 /**

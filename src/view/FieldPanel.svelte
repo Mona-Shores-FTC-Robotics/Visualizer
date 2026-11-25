@@ -12,6 +12,7 @@
   import { atomicSegments, segmentStartById } from "../utils/pathTraversal";
   import { boxCentre, robotFootprint } from "../model/collision";
   import { generateGhostPathPoints, generateOnionLayers } from "../model/sweep";
+  import { volleysIn } from "../lib/timing/model";
   import { robotPoseAt } from "../sim/pose";
   import { smoothStrokePreview } from "../lib/pen/strokeFitting";
   import { selectVisibleOnionLayers } from "../lib/scene/onion";
@@ -244,6 +245,32 @@
     };
   };
   let showTurret = $derived(drawsTeamRobot(settings));
+  /**
+   * Fork: the volley the robot is firing at the playback clock (a Launch all step, or LaunchAll
+   * alongside a wait), with the pieces still to leave, so a shot is never mistaken for a skipped one.
+   * Pieces leave evenly over the volley; null when it is not firing.
+   */
+  let launching = $derived.by(() => {
+    const preview = auto.preview;
+    if (!preview || overlays.active) return null;
+    const t = playback.seconds;
+    const shot = [...preview.actions, ...preview.launches].find(
+      (a) =>
+        volleysIn(a.command) > 0 &&
+        !("unfired" in a && a.unfired) &&
+        t >= a.t0 - 1e-9 &&
+        t < a.t1,
+    );
+    if (!shot) return null;
+    const pieces = Math.max(
+      1,
+      Math.round((auto.hive?.values.volleyLoad ?? 4) * volleysIn(shot.command)),
+    );
+    const left = Math.ceil(
+      pieces * (1 - (t - shot.t0) / Math.max(1e-6, shot.t1 - shot.t0)),
+    );
+    return { pieces, left: Math.max(0, Math.min(pieces, left)) };
+  });
 
   /** Screen pose for a robot sprite; sprites rotate clockwise. */
   const sprite = (pose: { x: number; y: number; heading: number }) => ({
@@ -638,6 +665,19 @@
               aim={turret.aim}
               {pixels}
             />
+          {/if}
+          {#if launching}
+            {@const at = sprite(playback.robotPose).xy}
+            <div
+              class="pointer-events-none absolute rounded bg-amber-400 px-1.5 py-0.5 font-mono text-[11px] font-bold whitespace-nowrap text-black shadow"
+              style={`left: ${at.x}px; top: ${at.y - x(settings.rLength) * 0.75}px; transform: translate(-50%, -100%); z-index: 25;`}
+              data-testid="launch-marker"
+              title="Launch all: the pieces still in the robot leave over the volley"
+            >
+              LAUNCH {"●".repeat(launching.left)}{"○".repeat(
+                launching.pieces - launching.left,
+              )}
+            </div>
           {/if}
         {/if}
 
