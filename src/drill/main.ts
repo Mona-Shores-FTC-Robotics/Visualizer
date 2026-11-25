@@ -27,7 +27,12 @@ import {
   sheetUrl,
 } from "./stats";
 import { PRESETS, IN, type TeamNumber } from "./presets";
-import { BUDGET_PIECES, BUDGET_S } from "./readout";
+import {
+  BUDGET_PIECES,
+  BUDGET_S,
+  lockComparison,
+  type CycleResult,
+} from "./readout";
 import {
   DrillSession,
   GOAL_TIPS,
@@ -405,11 +410,22 @@ function showHistory(list: StoredRun[] = loadHistory()) {
     `<table>${mine.map((r) => `<tr><td>${r.date.slice(5, 16).replace("T", " ")}</td><td>${r.tips} TIPs · ${r.cycles} cycles · med ${f1(r.medianCycleS ?? NaN)} s</td></tr>`).join("")}</table>`;
 }
 
+/**
+ * The heading-lock comparison (R1 held at some point in a cycle, or not), once a run has both, so a
+ * driver can feel the difference; "" before.
+ */
+function lockLine(cycles: CycleResult[]): string {
+  const k = lockComparison(cycles);
+  if (!k) return "";
+  const d = k.withMedianS - k.withoutMedianS;
+  return `<div class="dim">R1 heading lock: median ${f1(k.withMedianS)} s (${k.withN}) · without ${f1(k.withoutMedianS)} s (${k.withoutN}) · ${d <= 0 ? `${f1(-d)} s faster` : `${f1(d)} s slower`} with it</div>`;
+}
+
 function cycleTable(x: RobotRunResult) {
   const rows = x.cycles
     .map(
       (c) =>
-        `<tr><td>${c.n}</td><td>${f1(c.atS)}</td><td class="${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "goal" : ""}">${f1(c.cycleS)}</td><td>${f1(c.toPiecesS)}</td><td>${f1(c.pickUpS)}</td><td>${f1(c.driveLoadedS)}</td><td>${f1(c.spinUpAimS)}</td><td>${f1(c.feedS)}</td><td>${c.balls}${c.emptyFeeds ? ` (+${c.emptyFeeds} empty)` : ""}</td></tr>`,
+        `<tr><td>${c.n}</td><td>${f1(c.atS)}</td><td class="${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "goal" : ""}">${f1(c.cycleS)}</td><td>${f1(c.toPiecesS)}</td><td>${f1(c.pickUpS)}</td><td>${f1(c.driveLoadedS)}</td><td>${f1(c.spinUpAimS)}</td><td>${f1(c.feedS)}</td><td>${c.balls}${c.emptyFeeds ? ` (+${c.emptyFeeds} empty)` : ""}</td><td>${c.headingLock ? "R1" : ""}</td></tr>`,
     )
     .join("");
   const picks = x.pickUps
@@ -418,7 +434,7 @@ function cycleTable(x: RobotRunResult) {
   const c = x.cycles.map((q) => q.cycleS).sort((a, b) => a - b);
   const p = x.pickUps.map((q) => q.s).sort((a, b) => a - b);
   return `<p>Cycles: best ${f1(c[0] ?? NaN)} s, median ${f1(c[Math.floor(c.length / 2)] ?? NaN)} s against the ${BUDGET_S} s budget with ${BUDGET_PIECES} pieces. Pick-ups: best ${f1(p[0] ?? NaN)} s, median ${f1(p[Math.floor(p.length / 2)] ?? NaN)} s.</p>
-    <table><tr><th>#</th><th>at</th><th>cycle</th><th>to pieces</th><th>pick up</th><th>drive loaded</th><th>spin-up and aim</th><th>feed</th><th>balls</th></tr>${rows || '<tr><td colspan="9">No volley this run.</td></tr>'}</table>
+    <table><tr><th>#</th><th>at</th><th>cycle</th><th>to pieces</th><th>pick up</th><th>drive loaded</th><th>spin-up and aim</th><th>feed</th><th>balls</th><th>lock</th></tr>${rows || '<tr><td colspan="10">No volley this run.</td></tr>'}</table>${lockLine(x.cycles)}
     <p class="dim">Pick-ups: ${picks || "–"}</p>`;
 }
 
@@ -516,7 +532,7 @@ function robotBox(k: number) {
   return `<div class="robot-box">${head}${st.nearCellUp ? '<b style="color:var(--ok)">OUR CELL UP</b>' : '<b style="color:var(--warn)">OUR CELL DOWN: LOAD 4</b>'} <span class="dim">(${st.nearCell} end)</span><br>
     Turret <span class="tag ${st.turretMode === "AIM" ? "aim" : "locked"}">${st.turretMode}</span> ${st.insideArc ? "" : '<span style="color:var(--warn)">aim behind the arc</span>'}<br>
     Lane ${"●".repeat(st.lane)}${"○".repeat(Math.max(0, session.presets[k].laneCapacity - st.lane))}${session.teleops[k].rejectAllNectar ? ' <span class="dim">POLLEN only</span>' : ""} · launcher ${st.launcher}${st.gateOpen ? " · <b>feeding</b>" : ""}<br>
-    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}${st.nectarGate ? `<br><span style="color:var(--warn)">${st.nectarGate}</span>` : ""}</div>`;
+    ${st.routine ?? (st.arcTurning ? "arc turn" : st.chassisAiming ? "turning onto the CELL" : st.headingLock ? `heading lock: ${st.headingLock}` : st.slow ? "slow" : "&nbsp;")}${st.aimTrimDeg ? ` · aim trim ${st.aimTrimDeg.toFixed(1)}°` : ""}${st.nectarGate ? `<br><span style="color:var(--warn)">${st.nectarGate}</span>` : ""}</div>`;
 }
 
 function readoutBox(k: number) {
@@ -536,6 +552,7 @@ function readoutBox(k: number) {
       ? `<div class="big ${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "ok" : ""}">CYCLE ${f1(c.cycleS)} s · ${c.balls} ball${c.balls === 1 ? "" : "s"}</div><div>to pieces ${f1(c.toPiecesS)} | pick ${f1(c.pickUpS)} | loaded ${f1(c.driveLoadedS)} | spin+aim ${f1(c.spinUpAimS)} | feed ${f1(c.feedS)}${c.emptyFeeds ? ` · +${c.emptyFeeds} empty feed${c.emptyFeeds === 1 ? "" : "s"}` : ""}${c.earlyPresses ? ` · ${c.earlyPresses} early press${c.earlyPresses === 1 ? "" : "es"}` : ""}</div>`
       : "",
     `<div class="dim">${r.cycles.length ? `cycle best ${f1(s.bestCycleS)} · median ${f1(s.medianCycleS)} s (${r.cycles.length})` : "PRACTICE: fire a volley to time a cycle"}${r.pickUps.length ? ` · pick-up best ${f1(s.bestPickUpS)} · median ${f1(s.medianPickUpS)}` : ""}</div>`,
+    lockLine(r.cycles),
   ].join("")}</div>`;
 }
 

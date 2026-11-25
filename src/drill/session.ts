@@ -456,6 +456,7 @@ export class DrillSession {
     else if (this.opensAfterAuto) this.openAfterAuto();
     this.sim.start();
     for (const r of this.readouts) r.start(0);
+    for (const t of this.teleops) t.lockUsed = t.lock.held;
   }
 
   private openOnAuto(trace: AutoTrace) {
@@ -546,6 +547,7 @@ export class DrillSession {
       if (!this.playback.advance(seconds)) return;
       this.sim.start();
       for (const r of this.readouts) r.start(0);
+      for (const t of this.teleops) t.lockUsed = t.lock.held;
       this.lastCarried = this.sim.robots.map((r) => r.carried.length);
       seconds -= this.playback.t - before;
       if (seconds <= 1e-9) return;
@@ -587,6 +589,7 @@ export class DrillSession {
           const n = this.sim.robots[k].carried.length;
           const pieceIn = n > this.lastCarried[k] && !this.finished;
           this.lastCarried[k] = n;
+          const before = this.readouts[k].cycles.length;
           if (!this.finished)
             this.readouts[k].update(
               this.t,
@@ -597,6 +600,13 @@ export class DrillSession {
               tele.launched,
             );
           tele.firePress = false;
+          // The heading-lock comparison: a cycle that just ended is tagged with whether R1 was
+          // held in it; the next starts with R1 as it is now.
+          const cycles = this.readouts[k].cycles;
+          if (cycles.length > before) {
+            cycles[cycles.length - 1].headingLock = tele.lockUsed;
+            tele.lockUsed = tele.lock.held;
+          }
         });
         if (this.hp && !this.finished) {
           const fed = this.teleops[this.fedRobot];

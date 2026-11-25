@@ -33,6 +33,8 @@ export interface CycleResult {
   feedS: number;
   emptyFeeds: number;
   earlyPresses: number;
+  /** The drill's own: the driver held R1 (HEADING_LOCK) at some point in the cycle. */
+  headingLock?: boolean;
 }
 
 export interface PickUpResult {
@@ -219,6 +221,27 @@ export class CycleReadout {
       medianPickUpS: median(p),
     };
   }
+}
+
+/**
+ * The drill's heading-lock comparison: the cycles with R1 held at some point, and those without,
+ * each with its count and median. Null until both kinds have at least one.
+ */
+export function lockComparison(cycles: CycleResult[]): {
+  withN: number;
+  withMedianS: number;
+  withoutN: number;
+  withoutMedianS: number;
+} | null {
+  const w = cycles.filter((c) => c.headingLock).map((c) => c.cycleS);
+  const wo = cycles.filter((c) => !c.headingLock).map((c) => c.cycleS);
+  if (!w.length || !wo.length) return null;
+  return {
+    withN: w.length,
+    withMedianS: median(w),
+    withoutN: wo.length,
+    withoutMedianS: median(wo),
+  };
 }
 
 /** The report's median: the sorted middle, the upper one of an even count. NaN when empty. */
