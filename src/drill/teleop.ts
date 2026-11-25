@@ -7,10 +7,13 @@
  *   L1 slow (`slowSpeed`, which also caps the turn).
  * - The intake runs all the time (`intakeAlwaysOn`) until the lane is full; R2 holds it in, L2
  *   (either pad) unjams.
- * - Circle fires. R1 toggles the turret: AIM, the turret tracks the raised CELL and Circle fires;
+ * - Circle fires. TURRET_LOCK (the operator's Triangle held `turretModeHoldMs`; the driver's R1 in a
+ *   file from before biobuzz #748) toggles the turret: AIM, the turret tracks the raised CELL and Circle fires;
  *   LOCKED, the turret holds forward and Circle turns the robot onto the CELL, then fires.
  *   In AIM with `circleTurnsIntoArc`, an aim behind the firing arc turns the robot just far
  *   enough to bring it in (`ArcTurn`), and the feed waits for it.
+ * - R1 held (HEADING_LOCK, ./headingLock.ts): the robot turns to the nearest cardinal and holds it,
+ *   and the left stick snaps to a field axis. Circle's turns win over its turn.
  * - Cross held picks at the nearest FLOWER; Triangle held gathers at our GARDEN. A stick moved
  *   after the press (`CANCEL_STICK`) hands the robot back.
  * - The operator: Cross spins the launcher up or idles it, L1/R1 trim its speed, the D-pad trims
@@ -26,6 +29,7 @@ import robotModel from "../../sim/src/sim/robots/mona-shores.json";
 import { LaunchSpotDrive, stallRefusal, type SpotStep } from "./launchSpot";
 import { FreshSticks } from "./freshSticks";
 import { Indicator } from "./indicator";
+import { HeadingLock, headingLockNumbers } from "./headingLock";
 import {
   CornerGather,
   FlowerPick,
@@ -117,6 +121,8 @@ export interface TeleOpStatus {
   note: string;
   /** "" or what the NECTAR gate is doing: rejecting a wrong one, or holding the feed shut. */
   nectarGate: string;
+  /** "" or the heading lock's hold ("holding 90°"), as the Driver Station shows it. */
+  headingLock: string;
 }
 
 /** One gauss draw. */
@@ -187,6 +193,12 @@ export class TeleOp {
   readonly volleys: { atS: number; cell: CellSide; up: boolean }[] = [];
   /** This loop, for the readout. */
   firePress = false;
+  /** The driver's R1 (HEADING_LOCK). */
+  readonly lock: HeadingLock;
+  /** R1 was held since the session last cleared it: the readout tags each cycle with it. */
+  lockUsed = false;
+  /** When the TURRET_LOCK hold started (LongPress), or -Infinity once it fired, null when up. */
+  private turretHoldStart: number | null = null;
 
   constructor(
     private sim: Sim,
@@ -200,6 +212,7 @@ export class TeleOp {
     // INIT, before PLAY: the alliance's colour, steady.
     this.light.init(sim.alliance);
     const t = controls.teleOp;
+    this.lock = new HeadingLock(headingLockNumbers(t));
     this.turretMode = t.startTurretAiming === false ? "LOCKED" : "AIM";
     this.fieldForward = sim.alliance === "red" ? 0 : Math.PI;
     const spots = controls.launchSpots;
@@ -272,8 +285,46 @@ export class TeleOp {
       Math.abs(fwd) > CANCEL_STICK || Math.abs(right) > CANCEL_STICK;
     const rightStick = Math.abs(turn) > CANCEL_STICK;
 
-    // --- turret mode (driver's R1) ------------------------------------------------------
-    if (c.on("TURRET_LOCK")) {
+    // --- heading lock (driver's R1) ----------------------------------------------------------
+    // Every loop, as BasicDriveTeleOp.updateHeadingLock: the drive's heading is the field-centric
+    // one (0 = the driver's forward, set at PLAY or by a gyro reset), which the drill always has.
+    // + strafe is left in the robot's terms.
+    this.lock.update(
+      c.held("HEADING_LOCK"),
+      true,
+      Math.atan2(
+        Math.sin(sim.heading - this.fieldForward),
+        Math.cos(sim.heading - this.fieldForward),
+      ),
+      sim.robot.angvel().y,
+      fwd,
+      -right,
+      turn,
+    );
+    if (this.lock.held) this.lockUsed = true;
+    if (this.lock.pressed)
+      this.say(
+        `Heading lock: holding ${Math.round((this.lock.targetRad * 180) / Math.PI)}°`,
+        now,
+      );
+    const driveFwd = this.lock.forward,
+      driveRight = -this.lock.strafe;
+
+    // --- turret mode (TURRET_LOCK: a LongPress of turretModeHoldMs; 0 in an older file, a press) ----
+    let turretToggle = false;
+    if (!c.held("TURRET_LOCK")) this.turretHoldStart = null;
+    else {
+      this.turretHoldStart ??= now;
+      if (
+        this.turretHoldStart > -Infinity &&
+        now - this.turretHoldStart >=
+          Math.max(0, this.num("turretModeHoldMs", 0)) / 1000 - 1e-9
+      ) {
+        this.turretHoldStart = -Infinity;
+        turretToggle = true;
+      }
+    }
+    if (turretToggle) {
       this.turretMode = this.turretMode === "AIM" ? "LOCKED" : "AIM";
       this.say(
         `Turret ${this.turretMode}${this.turretMode === "AIM" ? " (1 buzz)" : " (2 buzzes)"}`,
@@ -396,7 +447,10 @@ export class TeleOp {
 
     // The arc turn (AIM) and the chassis aim (LOCKED): either holds the feed until the shot is on.
     const tol = this.num("aimToleranceDeg", 3);
-    let turnCmd = turn;
+    // R1 held: the lock's turn (the speed scale caps it, as the wheel cap does); Circle's win below.
+    let turnCmd = this.lock.holding
+      ? clamp(this.lock.turn, -scale, scale)
+      : turn;
     this.arcTurning = false;
     this.chassisAiming = false;
     if (fireHeld && !this.routine) {
@@ -461,8 +515,8 @@ export class TeleOp {
       const a = this.fieldForward;
       const F = { x: Math.cos(a), z: -Math.sin(a) },
         R = { x: Math.sin(a), z: Math.cos(a) };
-      let vx = (F.x * fwd + R.x * right) * vmax,
-        vz = (F.z * fwd + R.z * right) * vmax;
+      let vx = (F.x * driveFwd + R.x * driveRight) * vmax,
+        vz = (F.z * driveFwd + R.z * driveRight) * vmax;
       const sp = Math.hypot(vx, vz),
         cap = vmax * scale;
       if (sp > cap) {
@@ -1021,6 +1075,9 @@ export class TeleOp {
           : this.sim.time < this.suspectUntil
             ? "feed held: a wrong NECTAR may be in"
             : "",
+      headingLock: this.lock.holding
+        ? `holding ${Math.round((this.lock.targetRad * 180) / Math.PI)}°`
+        : "",
     };
   }
 
