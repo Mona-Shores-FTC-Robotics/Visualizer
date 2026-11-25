@@ -12,6 +12,7 @@ import {
   connectAutoStore,
   parseSelection,
   previewScenario,
+  partnerTipAt,
   resetAutoView,
   selectedCardId,
   setNewPathHandler,
@@ -30,6 +31,7 @@ import {
   robotValues,
   volleysOf,
   type FieldEntry,
+  type TogetherResult,
 } from "../lib/timing/together";
 import { hiveHistory, type TimingValues } from "../lib/timing/model";
 import type { HiveHistory } from "../lib/match/hiveView";
@@ -86,6 +88,7 @@ export class AutoState {
   #getSettings: () => Settings;
   #overlays: Overlays;
   #scenario = fromStore(previewScenario);
+  #partnerTip = fromStore(partnerTipAt);
   #timingValues = fromStore(timingValues);
   #selection = fromStore(selectedCardId);
   /** Fork: the team's spots and which are unlocked (lib/team/spotsStore.ts). */
@@ -125,22 +128,20 @@ export class AutoState {
       : [],
   );
   /** The Auto being edited, previewed alone (its own volleys TIP the HIVE). */
-  together = $derived.by(
-    (): { previews: PreviewResult[]; tips: Tip[] } | null => {
-      const auto = this.auto;
-      const catalog = this.catalog;
-      if (!auto || !catalog) return null;
-      const doc = this.#project.doc;
-      // Alone, nothing models the partner's Auto, so a tip we wait for is
-      // taken to come.
-      return previewTogether(
-        [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
-        this.match.withTips(this.#timingValues.current),
-        true,
-        { tipsCome: true },
-      );
-    },
-  );
+  together = $derived.by((): TogetherResult | null => {
+    const auto = this.auto;
+    const catalog = this.catalog;
+    if (!auto || !catalog) return null;
+    const doc = this.#project.doc;
+    // Alone, nothing models the partner's Auto, so a tip we wait for is
+    // taken to come.
+    return previewTogether(
+      [this.#entry(doc, this.#getSettings(), this.#scenario.current)],
+      this.match.withTips(this.#timingValues.current),
+      true,
+      { tipsCome: true, partnerTip: this.#partnerTip.current },
+    );
+  });
   preview = $derived(this.together?.previews[0] ?? null);
   worst = $derived(
     this.auto && this.catalog ? worstCase(this.auto, this.catalog) : null,
@@ -318,7 +319,11 @@ export class AutoState {
       if (!together) return null;
       const values = this.match.withTips(this.#timingValues.current);
       return {
-        history: hiveHistory(volleysOf(together.previews), values),
+        // With the partner's TIPs the Auto was taken to wait for, so its own CELL is drawn up.
+        history: hiveHistory(
+          [...volleysOf(together.previews), ...together.assumed],
+          values,
+        ),
         values,
       };
     },

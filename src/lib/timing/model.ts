@@ -255,6 +255,11 @@ export interface Tip {
    * last ball). Unset for a TIP nothing on the field caused (an Auto alone, waiting on its partner).
    */
   lastBall?: number;
+  /**
+   * Set for the partner's TIP an Auto previewed alone takes to come (together.ts tipsCome): when
+   * the wait that assumed it started, which is when its stand-in volley lands.
+   */
+  assumedAt?: number;
 }
 
 /**
@@ -281,6 +286,11 @@ export interface Volley {
   load?: number;
   /** How many volleys' worth it is, when not one (a Pick flower and launch is two). */
   volleys?: number;
+  /**
+   * The stand-in for the partner's volley an Auto previewed alone takes to come (together.ts
+   * tipsCome): it lands whatever the raised CELL still needs to TIP.
+   */
+  assumed?: boolean;
 }
 
 /** What one volley did to the HIVE. */
@@ -340,8 +350,11 @@ export function hiveHistory(
       effects.push({ ...volley, counted: false, load, tip: null });
       continue;
     }
-    const landed = (volley.load ?? values.volleyLoad) * (volley.volleys ?? 1);
+    const landed = volley.assumed
+      ? Math.max(0, values.tipLoad - load)
+      : (volley.load ?? values.volleyLoad) * (volley.volleys ?? 1);
     if (
+      !volley.assumed &&
       load + landed >= values.tipLoad - 1e-9 &&
       missed < tipMisses(values, tips.length + 1)
     ) {
@@ -368,7 +381,7 @@ export function hiveHistory(
     tips.push({
       start,
       settled,
-      lastBall: volley.t,
+      ...(volley.assumed ? { assumedAt: volley.t } : { lastBall: volley.t }),
       cause: effects.length - 1,
     });
     settledAt = settled;
@@ -380,7 +393,10 @@ export function hiveHistory(
  * The TIPs a set of volley end times makes: each volley ending on a settled HIVE adds to the raised
  * CELL, and the one that brings it to `tipLoad` TIPs it.
  */
-export function tipsFrom(volleyEnds: number[], values: TimingValues): Tip[] {
+export function tipsFrom(
+  volleyEnds: number[],
+  values: TimingValues,
+): Pick<Tip, "start" | "settled" | "lastBall">[] {
   return hiveHistory(
     volleyEnds.map((t) => ({ t, robot: 0 })),
     values,
