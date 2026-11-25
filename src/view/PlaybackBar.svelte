@@ -136,9 +136,9 @@
       {#if auto.worst}
         <span
           class={[auto.worst.total > AUTO_LENGTH_S && "text-danger"]}
-          title="Every wait runs to its time row"
+          title="The latest the Auto could end if every wait ran to its time limit and every step took its own limit, counted before the endgame guard. On the robot the guard parks it in time: when what is left would not fit before the end of AUTO, it drives to the park instead (the preview runs the guard, so a branch it cuts short shows as a guard marker)."
         >
-          · worst {formatSeconds(auto.worst.total)}
+          · worst {formatSeconds(auto.worst.total)}, before the endgame guard
         </span>
       {/if}
     {:else if playback.prediction.totalDistance > 0}
