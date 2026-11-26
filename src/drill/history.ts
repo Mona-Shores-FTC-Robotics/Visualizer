@@ -3,6 +3,7 @@
  * and write is guarded, so a private window or blocked storage only loses the history.
  */
 import type { DrillMode, RunResult, TipTiming } from "./session";
+import { fullPickUps } from "./readout";
 
 export const HISTORY_KEY = "biobuzz-drill-history-v1";
 const KEEP = 200;
@@ -34,7 +35,8 @@ export function summarize(
   who: { driver?: string; operator?: string } = {},
 ): StoredRun {
   const c = r.cycles.map((x) => x.cycleS).sort((a, b) => a - b);
-  const p = r.pickUps.map((x) => x.s);
+  // Full pick-ups only (readout.ts fullPickUps): one that fired short never sets the best.
+  const p = fullPickUps(r.pickUps);
   return {
     team: r.team,
     teams: r.robots.map((x) => x.team),

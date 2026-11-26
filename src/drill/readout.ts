@@ -213,7 +213,7 @@ export class CycleReadout {
     medianPickUpS: number;
   } {
     const c = this.cycles.map((x) => x.cycleS);
-    const p = this.pickUps.map((x) => x.s);
+    const p = fullPickUps(this.pickUps);
     return {
       bestCycleS: c.length ? Math.min(...c) : NaN,
       medianCycleS: median(c),
@@ -221,6 +221,16 @@ export class CycleReadout {
       medianPickUpS: median(p),
     };
   }
+}
+
+/**
+ * The pick-ups that count for the best and the median: full ones (the lane read full), each first
+ * piece in to the lane reading full (mentor, 26 Nov 2026). One that fired short (the gate opened on a
+ * lane not yet full) stays in the run's list, marked so, but never sets them: a 1-ball pick-up is
+ * 0 s, which rewarded firing short.
+ */
+export function fullPickUps(pickUps: PickUpResult[]): number[] {
+  return pickUps.filter((p) => p.full).map((p) => p.s);
 }
 
 /**

@@ -47,26 +47,27 @@ The first run that arrives creates a **Runs** tab with a header row.
 
 ## The columns
 
-| Column                                | What it is                                                                                                       |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| id                                    | the run's id: the laptop and the time it finished (a run sent twice is kept once)                                |
-| date                                  | when the run finished (UTC)                                                                                      |
-| driver, operator                      | as typed on the page                                                                                             |
-| robot                                 | 20245 or 19429 (both in an alliance run)                                                                         |
-| players                               | driver only, driver + operator, or an alliance mode                                                              |
-| match                                 | the 2:00 drill and its opening (for example "2:00 from r-solo (1 TIP, 6 in CELL)"), or a full match and its Auto |
-| field                                 | empty, or a match and the opponents' skill                                                                       |
-| intake                                | POLLEN only, or the colour gate                                                                                  |
-| cornerWheels                          | on or off                                                                                                        |
-| totalTips, autoTips, teleopTips       | TIPs: all, from the Auto or opening, and in TeleOp                                                               |
-| reached7                              | whether the run reached 7 TIPs                                                                                   |
-| seventhAtS                            | seconds into TeleOp when the 7th TIP settled                                                                     |
-| balls, cycles                         | balls launched, and cycles timed                                                                                 |
-| bestCycleS, medianCycleS, bestPickUpS | the practice readout's best and median cycle, and best pick-up, in seconds                                       |
-| nectarEntered                         | NECTAR the human player entered                                                                                  |
-| opponentsTips                         | the opponents' TIPs, in a match field                                                                            |
-| laptop                                | a random name for the browser it came from                                                                       |
-| source                                | "drill", or "saved on this laptop" for a run sent from the saved history                                         |
+| Column                          | What it is                                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| id                              | the run's id: the laptop and the time it finished (a run sent twice is kept once)                                |
+| date                            | when the run finished (UTC)                                                                                      |
+| driver, operator                | as typed on the page                                                                                             |
+| robot                           | 20245 or 19429 (both in an alliance run)                                                                         |
+| players                         | driver only, driver + operator, or an alliance mode                                                              |
+| match                           | the 2:00 drill and its opening (for example "2:00 from r-solo (1 TIP, 6 in CELL)"), or a full match and its Auto |
+| field                           | empty, or a match and the opponents' skill                                                                       |
+| intake                          | POLLEN only, or the colour gate                                                                                  |
+| cornerWheels                    | on or off                                                                                                        |
+| totalTips, autoTips, teleopTips | TIPs: all, from the Auto or opening, and in TeleOp                                                               |
+| reached7                        | whether the run reached 7 TIPs                                                                                   |
+| seventhAtS                      | seconds into TeleOp when the 7th TIP settled                                                                     |
+| balls, cycles                   | balls launched, and cycles timed                                                                                 |
+| bestCycleS, medianCycleS        | the practice readout's best and median cycle, in seconds                                                         |
+| bestPickUpS                     | fastest full load of 4: first piece in to the lane reading full, s (fired short never counts; empty if none)     |
+| nectarEntered                   | NECTAR the human player entered                                                                                  |
+| opponentsTips                   | the opponents' TIPs, in a match field                                                                            |
+| laptop                          | a random name for the browser it came from                                                                       |
+| source                          | "drill", or "saved on this laptop" for a run sent from the saved history                                         |
 
 ## A summary per driver
 

@@ -30,6 +30,7 @@ import { PRESETS, IN, type TeamNumber } from "./presets";
 import {
   BUDGET_PIECES,
   BUDGET_S,
+  fullPickUps,
   lockComparison,
   type CycleResult,
 } from "./readout";
@@ -433,8 +434,8 @@ function cycleTable(x: RobotRunResult) {
     .map((p) => `${f1(p.s)} s (${p.pieces} in${p.full ? "" : ", fired short"})`)
     .join(" · ");
   const c = x.cycles.map((q) => q.cycleS).sort((a, b) => a - b);
-  const p = x.pickUps.map((q) => q.s).sort((a, b) => a - b);
-  return `<p>Cycles: best ${f1(c[0] ?? NaN)} s, median ${f1(c[Math.floor(c.length / 2)] ?? NaN)} s against the ${BUDGET_S} s budget with ${BUDGET_PIECES} pieces. Pick-ups: best ${f1(p[0] ?? NaN)} s, median ${f1(p[Math.floor(p.length / 2)] ?? NaN)} s.</p>
+  const p = fullPickUps(x.pickUps).sort((a, b) => a - b);
+  return `<p>Cycles: best ${f1(c[0] ?? NaN)} s, median ${f1(c[Math.floor(c.length / 2)] ?? NaN)} s against the ${BUDGET_S} s budget with ${BUDGET_PIECES} pieces. Pick-ups (full loads of ${BUDGET_PIECES}): ${p.length ? `best ${f1(p[0])} s, median ${f1(p[Math.floor(p.length / 2)])} s` : "none yet"}.</p>
     <table><tr><th>#</th><th>at</th><th>cycle</th><th>to pieces</th><th>pick up</th><th>drive loaded</th><th>spin-up and aim</th><th>feed</th><th>balls</th><th>lock</th></tr>${rows || '<tr><td colspan="10">No volley this run.</td></tr>'}</table>${lockLine(x.cycles)}
     <p class="dim">Pick-ups: ${picks || "–"}</p>`;
 }
@@ -552,7 +553,7 @@ function readoutBox(k: number) {
     c
       ? `<div class="big ${c.cycleS <= BUDGET_S && c.balls >= BUDGET_PIECES ? "ok" : ""}">CYCLE ${f1(c.cycleS)} s · ${c.balls} ball${c.balls === 1 ? "" : "s"}</div><div>to pieces ${f1(c.toPiecesS)} | pick ${f1(c.pickUpS)} | loaded ${f1(c.driveLoadedS)} | spin+aim ${f1(c.spinUpAimS)} | feed ${f1(c.feedS)}${c.emptyFeeds ? ` · +${c.emptyFeeds} empty feed${c.emptyFeeds === 1 ? "" : "s"}` : ""}${c.earlyPresses ? ` · ${c.earlyPresses} early press${c.earlyPresses === 1 ? "" : "es"}` : ""}</div>`
       : "",
-    `<div class="dim">${r.cycles.length ? `cycle best ${f1(s.bestCycleS)} · median ${f1(s.medianCycleS)} s (${r.cycles.length})` : "PRACTICE: fire a volley to time a cycle"}${r.pickUps.length ? ` · pick-up best ${f1(s.bestPickUpS)} · median ${f1(s.medianPickUpS)}` : ""}</div>`,
+    `<div class="dim">${r.cycles.length ? `cycle best ${f1(s.bestCycleS)} · median ${f1(s.medianCycleS)} s (${r.cycles.length})` : "PRACTICE: fire a volley to time a cycle"}${fullPickUps(r.pickUps).length ? ` · pick-up best ${f1(s.bestPickUpS)} · median ${f1(s.medianPickUpS)}` : ""}</div>`,
     lockLine(r.cycles),
   ].join("")}</div>`;
 }
