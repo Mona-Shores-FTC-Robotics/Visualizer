@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CycleReadout } from "../../src/drill/readout";
+import { CycleReadout, fullPickUps } from "../../src/drill/readout";
 
 // The cases of biobuzz's CycleReadoutTest (TeamCode/src/test/.../opmodes/CycleReadoutTest.java),
 // on the drill's port: the same events give the same split as the Driver Station and
@@ -127,5 +127,26 @@ describe("practice readout, as the robot's", () => {
     expect(g.log[0]).toBe("practice: pick-up 1.8 s, 3 in, fired short");
     g.runTo(8);
     expect(last(g).balls).toBe(3);
+  });
+
+  test("best and median pick-up count full loads only: a short one stays listed but never sets them (mentor, 26 Nov 2026)", () => {
+    // A 1-ball fire short (0 s), then a full load of 4 in 1.5 s.
+    const g = new Rig()
+      .in(2)
+      .press(3)
+      .feed(3.3, 4.3, 1)
+      .in(8, 8.5, 9, 9.5)
+      .press(11)
+      .feed(11.3, 12.5, 4);
+    g.runTo(5);
+    expect(g.r.pickUps).toHaveLength(1);
+    expect(g.r.pickUps[0]).toMatchObject({ pieces: 1, full: false, s: 0 });
+    expect(fullPickUps(g.r.pickUps)).toEqual([]);
+    expect(g.r.stats().bestPickUpS).toBeNaN();
+    g.runTo(15);
+    expect(g.r.pickUps).toHaveLength(2);
+    expect(fullPickUps(g.r.pickUps)).toHaveLength(1);
+    expect(g.r.stats().bestPickUpS).toBeCloseTo(1.5, 1);
+    expect(g.r.stats().medianPickUpS).toBeCloseTo(1.5, 1);
   });
 });
