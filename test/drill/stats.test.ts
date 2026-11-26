@@ -9,6 +9,7 @@ import {
   sendRows,
   sheetUrl,
   type StatsRow,
+  TEAM_SHEET_URL,
 } from "../../src/drill/stats";
 import { CONTROLS, rapier } from "./helpers";
 
@@ -137,9 +138,13 @@ describe("the team sheet", () => {
     expect(row.source).toBe("saved on this laptop");
   }, 60000);
 
-  test("?stats=<url> points this browser at a sheet; only Apps Script URLs are taken", () => {
+  test("the team's sheet by default; ?stats=<url> points this browser at another; only Apps Script URLs are taken", () => {
     const storage = mem();
-    expect(sheetUrl("", storage)).toBe("");
+    // The team's sheet, with nothing set in this browser.
+    expect(sheetUrl("", storage)).toBe(TEAM_SHEET_URL);
+    expect(TEAM_SHEET_URL).toMatch(
+      /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/,
+    );
     expect(sheetUrl(`?stats=${encodeURIComponent(URL)}`, storage)).toBe(URL);
     expect(sheetUrl("", storage)).toBe(URL); // remembered
     expect(sheetUrl("?stats=https://example.com/x", storage)).toBe("");

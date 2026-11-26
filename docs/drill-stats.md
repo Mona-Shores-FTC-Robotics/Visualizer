@@ -7,6 +7,9 @@ same sheet, so you can see each driver's runs and progress in one place.
 The site has no server of its own. The sheet takes the rows through a small Google Apps Script attached to it.
 Setting that up takes about 5 minutes, once, by whoever owns the team's Google account.
 
+**Set up 26 Nov 2026:** the team's sheet is "Team Sim Stats", and its web app is the drill's `TEAM_SHEET_URL`, so
+every laptop sends there. The steps below are for setting it up again (a new sheet or a new deployment).
+
 ## Set it up (once)
 
 1. **Make the sheet.** In the team's Google Drive, create a new Google Sheet, for example "Driver Drill stats".

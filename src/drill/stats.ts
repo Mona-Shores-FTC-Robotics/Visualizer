@@ -14,10 +14,12 @@ import type { RunResult } from "./session";
 import type { StoredRun } from "./history";
 
 /**
- * The team sheet's Apps Script web app (docs/drill-stats.md): "" until it is set up, and then
- * every laptop sends there without setup of its own.
+ * The team sheet's Apps Script web app (docs/drill-stats.md), deployed by the mentor on 26 Nov 2026
+ * on the "Team Sim Stats" sheet: every laptop sends there without setup of its own. A browser opened
+ * once with ?stats=<url> sends there instead.
  */
-export const TEAM_SHEET_URL = "";
+export const TEAM_SHEET_URL =
+  "https://script.google.com/macros/s/AKfycbylLNjsB6fiHWqVCy4tHg4skzxZxdLznO9bHhfmqxGKYCNpiETJg2ZHkWhio6C5Bgd_7A/exec";
 
 const URL_KEY = "biobuzz-drill-stats-url";
 const OUTBOX_KEY = "biobuzz-drill-stats-outbox";
