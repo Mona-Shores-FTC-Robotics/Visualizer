@@ -237,8 +237,21 @@
         margin: 10px 0 4px;
       }
       #mini,
+      #hp-mini,
       #drive-exit {
         display: none;
+      }
+      /* The human player's card: in the side panel, off the field (mentor, 26 Nov 2026: the field's
+         bottom-left is where the robot drives, the LOADING ZONE and the GARDEN corner). */
+      #hp-card {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      #hp-card .nectar {
+        letter-spacing: 0.08em;
+      }
+      #hp-btn[aria-pressed="true"] {
+        border-color: var(--accent, #a855f7);
       }
       /* Drive mode: the field and a minimal HUD, big enough to read from a couch. */
       body.drive {
@@ -265,6 +278,14 @@
       body.drive #clock small,
       body.drive #tips small {
         font-size: 18px;
+      }
+      /* Drive mode: H shows the card in the top bar, beside the clock; off by default. */
+      body.drive #hp-mini:not([hidden]) {
+        display: block;
+        font-size: 18px;
+        line-height: 1.35;
+        padding: 10px 16px;
+        max-width: 320px;
       }
       body.drive #mini {
         display: flex;
@@ -476,6 +497,13 @@
       >
         Drive mode (F)
       </button>
+      <button
+        id="hp-btn"
+        type="button"
+        title="The human player's NECTAR and what they wait for, in the side panel (H)"
+      >
+        Human player (H)
+      </button>
       <button id="panel-btn" type="button" title="Setup, controllers and stats">
         Setup ⚙
       </button>
@@ -486,6 +514,7 @@
         <div class="box" id="clock">2:00<small>TeleOp</small></div>
         <div class="box" id="robot"></div>
         <div class="box" id="mini"></div>
+        <div class="box" id="hp-mini" hidden></div>
         <div class="box" id="tips">0 / 7<small>TIPs</small></div>
       </div>
       <div id="note" class="box"></div>
@@ -502,6 +531,10 @@
       </div>
     </div>
     <aside id="panel">
+      <section class="group" id="hp-section">
+        <h2>Human player</h2>
+        <div id="hp-card"></div>
+      </section>
       <section class="group">
         <h2>Match</h2>
         <label

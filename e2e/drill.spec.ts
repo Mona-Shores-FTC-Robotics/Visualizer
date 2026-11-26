@@ -210,6 +210,26 @@ test("the drill lists the robot's own controls, from biobuzz's export", async ({
   );
 });
 
+test("the human player's card is off the field: in the side panel, and by the clock in drive mode on H", async ({
+  page,
+}) => {
+  await open(page);
+  await expect(page.locator("#hp-card")).toContainText("NECTAR");
+  await expect(page.locator("#readout")).not.toContainText("Human player");
+  // The button brings the panel up at it.
+  await page.locator("#panel-btn").click(); // closed
+  await page.locator("#hp-btn").click();
+  await expect(page.locator("#hp-section")).toBeInViewport();
+  // Drive mode: hidden until H.
+  await page.keyboard.press("f");
+  await expect(page.locator("#hp-mini")).toBeHidden();
+  await page.keyboard.press("h");
+  await expect(page.locator("#hp-mini")).toBeVisible();
+  await expect(page.locator("#hp-mini")).toContainText("NECTAR");
+  await page.keyboard.press("h");
+  await expect(page.locator("#hp-mini")).toBeHidden();
+});
+
 test("a simulated PS controller drives, toggles the turret and fires a volley", async ({
   page,
 }) => {
