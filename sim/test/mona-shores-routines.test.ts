@@ -23,7 +23,29 @@ function run(team: '19429' | '20245', make: (s: Sim) => { step(dt: number): { dr
 const at = (s: Sim, x: number, z: number, h: number) => { s.robot.setTranslation({ x, y: s.robot.translation().y, z }, true); s.robot.setRotation({ x: 0, y: Math.sin(h / 2), z: 0, w: Math.cos(h / 2) }, true); };
 
 describe('our robot, master\'s grab routines', () => {
-  it('GARDEN gather: lines up on the wall, drives in with the stick down, and the stick lifts three of the four POLLEN', () => {
+  // biobuzz #756 (mentor, 26 Nov 2026): the gather keeps the stick up and the corner wheels rake. The wheels are the
+  // drill's (src/drill/cornerWheels.ts), so here, with the stick up, the robot takes only what its mouth meets.
+  it('GARDEN gather, stick up (useStick off, the default): no stick wait or raise, the stick never down, the intake on throughout', () => {
+    expect(MONA_SHORES.routines.gardenGather.useStick.value).toBe(false);
+    const s = new Sim(RAPIER, monaShoresConfig('20245'), 'practice', 1, { flowerPullByPush: false });
+    at(s, -1.0, 0.6, Math.PI / 2 * 3 - Math.PI); s.carried.length = 0;
+    const r = new GardenGather(s, '20245'), me = s.robots[0], phases: string[] = [];
+    let stickEver = false, intakeOff = false;
+    for (let t = 0; t < 15; t += DT) {
+      const st = r.step(DT); me.velDrive = st.drive; me.stickDown = st.stickDown;
+      stickEver ||= st.stickDown; if (!st.done && !st.intake) intakeOff = true;
+      if (phases[phases.length - 1] !== st.phase) phases.push(st.phase);
+      s.step({ ...NO_INPUT, intake: st.intake ? 'all' : 'none' });
+      if (st.done) break;
+    }
+    expect(phases).toEqual(['lineup', 'in', 'dwell', 'back', 'done']);
+    expect(stickEver).toBe(false);
+    expect(intakeOff).toBe(false);
+  });
+  it('GARDEN gather with the stick (useStick on, as before #756): lines up on the wall, drives in with the stick down, and the stick lifts three of the four POLLEN', () => {
+    const G = MONA_SHORES.routines.gardenGather;
+    G.useStick.value = true;
+    try {
     const g = FIELD.garden.red;
     const pollenIn = (s: Sim) => [...s.balls.values()].filter(b => b.kind === 'pollen' && b.body.translation().x < g[1] + 0.1 && b.body.translation().z > g[2] - 0.15).length;
     const s0 = new Sim(RAPIER, monaShoresConfig('20245'), 'practice', 1); console.log('GARDEN POLLEN staged', pollenIn(s0));
@@ -33,6 +55,7 @@ describe('our robot, master\'s grab routines', () => {
       expect(r.phases.at(-1)).toMatch(/^done/);
       expect(r.got).toBe(3);
     }
+    } finally { G.useStick.value = false; }
   });
   it('FLOWER pick: stages square to the FLOWER 24 in back, pushes in, pulls POLLEN, backs out', () => {
     const f = FIELD.flowers.find(q => q.id === 'red')!;

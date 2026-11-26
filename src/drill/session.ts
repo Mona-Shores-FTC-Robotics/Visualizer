@@ -125,7 +125,7 @@ export interface RunResult {
   openingAuto?: string;
   /** Our robots rejected every NECTAR (POLLEN only, DrillSession.pollenOnly). */
   pollenOnly?: boolean;
-  /** Our robots had the corner wheels (an experiment, DrillSession.cornerWheels). */
+  /** Our robots had the corner wheels (DrillSession.cornerWheels; on by default since 26 Nov 2026). */
   cornerWheels?: boolean;
   /** POLLEN in our raised CELL at the opening (the 1-TIP opening's ONE_TIP_CELL), with openingAuto. */
   openingCell?: number;
@@ -329,7 +329,7 @@ export class DrillSession {
     for (const t of this.teleops) t.rejectAllNectar = on;
   }
 
-  /** Corner wheels on our robots' intakes (an experiment: TeleOp.cornerWheels). Off by default. */
+  /** Corner wheels on our robots' intakes (TeleOp.cornerWheels). On by default: both robots have them. */
   get cornerWheels(): boolean {
     return this.teleops.some((t) => t.cornerWheels);
   }

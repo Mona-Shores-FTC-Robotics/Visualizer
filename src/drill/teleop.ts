@@ -29,6 +29,11 @@ import robotModel from "../../sim/src/sim/robots/mona-shores.json";
 import { LaunchSpotDrive, stallRefusal, type SpotStep } from "./launchSpot";
 import { FreshSticks } from "./freshSticks";
 import { Indicator } from "./indicator";
+import {
+  CORNER_WHEEL_RAKE_IN_PER_S,
+  pressedOn,
+  wheelIntakeReach,
+} from "./cornerWheels";
 import { HeadingLock, headingLockNumbers } from "./headingLock";
 import {
   CornerGather,
@@ -61,25 +66,6 @@ const UNJAM_EJECT_S = 0.4;
  * (`wrongNectarClearS`) or an eject has run that long (`wrongNectarEjectClearS`).
  */
 const REJECT_BURST_S = 0.5;
-/**
- * Corner wheels (an experiment, Hub 24 Nov 2026): a 2.5 in wheel at each front corner, vertical
- * axle, spinning inward, where biobuzz's study puts them (doc/corner-wheels.md, from the 31 Oct
- * CAD): ahead of the front drive wheels, axles at X 8.94 in with the drive wheels' fronts at
- * X 7.57 (so 1.37 in ahead of the robot's front), |Y| 6.85 (left) and 6.95 (right). The mouth is
- * the rails' inner faces at |Y| 4.87 (the simulator's 9.7 in). A CR servo at about 60 rpm (REV Smart
- * Robot Servo about 70, goBILDA Torque about 50): an edge speed of 2.5 pi in/s, 7.85 in/s (0.20 m/s).
- */
-export const CORNER_WHEEL_RPM = 60;
-export const CORNER_WHEEL_DIAMETER_IN = 2.5;
-const CORNER_WHEEL_EDGE_MPS =
-  (CORNER_WHEEL_RPM / 60) * Math.PI * CORNER_WHEEL_DIAMETER_IN * 0.0254;
-/** Each axle: inches ahead of the robot's front, and out from its centre line (+ left). */
-export const CORNER_WHEEL_AXLES_IN: readonly (readonly [number, number])[] = [
-  [8.94 - 7.57, 6.85],
-  [8.94 - 7.57, -6.95],
-];
-/** A POLLEN this far past touching the rim still counts as in contact (the wheel's flaps). */
-const CORNER_WHEEL_SLACK_IN = 0.1;
 const REJECT_HOLD_OFF_S = 0.3;
 const WRONG_NECTAR_CLEAR_S = 1.0;
 const WRONG_NECTAR_EJECT_CLEAR_S = 1.0;
@@ -561,6 +547,7 @@ export class TeleOp {
           ? "pollen"
           : "all";
 
+    this.loopS = dt;
     this.rakeCorners();
 
     // --- the feed ---------------------------------------------------------------------------------
@@ -637,11 +624,12 @@ export class TeleOp {
    */
   rejectAllNectar = false;
   /**
-   * Corner wheels (an experiment; off is the robot as it is): with the intake taking in, a POLLEN
-   * touching either corner wheel (CORNER_WHEEL_AXLES_IN) is swept in toward the mouth at the rim's
-   * speed. A POLLEN pinned against a wall there counts: the wheel drives it along the wall.
+   * Corner wheels (./cornerWheels.ts): fitted on both robots since 26 Nov 2026 (biobuzz #756), so on
+   * by default. Off draws and runs the robot without them, as it was before.
    */
-  cornerWheels = false;
+  cornerWheels = true;
+  /** The simulator's intake reach without the wheels, kept to put back when they are turned off. */
+  private reachWithout: number | null = null;
   /** The robot's indicator light (biobuzz `IndicatorSubsystem`, ./indicator.ts). */
   readonly light: Indicator;
 
@@ -690,72 +678,69 @@ export class TeleOp {
   }
 
   /**
-   * The corner wheels (cornerWheels): a POLLEN touching either wheel's rim moves, relative to the
-   * robot, at the rim's speed where they touch. The wheels spin inward: across the front toward the
-   * centre line, and back toward the robot along their inner sides, which lie inside the mouth. So a
-   * piece met by the front of a wheel is swept in and back to the intake. They run only with the
-   * intake taking in and fewer than 4 held (G407), and not during a FLOWER pick or GARDEN gather or
-   * with the stick down (G418, and the stick's arm then lies between the wheels and the mouth): the
-   * study's rules. The wheels have no collider: only their rake is modelled.
+   * The corner wheels (cornerWheels, ./cornerWheels.ts): a POLLEN pressed on either wheel's front face
+   * moves inward, relative to the robot, at CORNER_WHEEL_RAKE_IN_PER_S, toward the mouth; its motion
+   * along the robot is the robot's. With the wheels fitted the intake grabs a ball
+   * CORNER_WHEEL_GRAB_AHEAD_IN ahead of their faces (the simulator's intake reach). They run by
+   * CornerWheelSubsystem.stopFor's rules: the intake taking in, fewer than 4 held (G407), no wrong
+   * NECTAR in or being spat out (G408), and the FLOWER stick up (G418): so through a GARDEN gather
+   * (the stick stays up) and not through a FLOWER pick (it lowers the stick).
    */
   private rakeCorners(): void {
     const sim = this.sim,
       c = sim.cfg;
+    this.reachWithout ??= c.intake.reach;
+    c.intake.reach = this.cornerWheels
+      ? wheelIntakeReach(c.length / 2)
+      : this.reachWithout;
     if (!this.cornerWheelsRunning) return;
-    const hl = c.length / 2,
-      th = sim.heading,
-      fwd = { x: Math.cos(th), z: -Math.sin(th) },
+    const th = sim.heading,
       left = { x: -Math.sin(th), z: -Math.cos(th) },
       rv = sim.robot.linvel(),
-      rim = (CORNER_WHEEL_DIAMETER_IN / 2) * IN;
+      v = CORNER_WHEEL_RAKE_IN_PER_S * IN;
     for (const b of sim.balls.values()) {
       if (b.kind !== "pollen" || !b.body.isEnabled()) continue;
       const p = b.body.translation();
       if (p.y > 0.13) continue;
       const r = sim.toRobot(p.x, p.z);
-      for (const [aheadIn, outIn] of CORNER_WHEEL_AXLES_IN) {
-        const df = r.f - (hl + aheadIn * IN),
-          dl = r.l - outIn * IN,
-          d = Math.hypot(df, dl);
-        if (d > rim + b.radius + CORNER_WHEEL_SLACK_IN * IN || d < 1e-6)
-          continue;
-        // The rim's direction where it meets the piece: the left wheel turns so its front moves
-        // right (inward), the right wheel the mirror.
-        const cf = df / d,
-          cl = dl / d,
-          s = outIn > 0 ? 1 : -1,
-          tf = s * cl,
-          tl = -s * cf;
-        const v = CORNER_WHEEL_EDGE_MPS,
-          bv = b.body.linvel();
-        b.body.setLinvel(
-          {
-            x: rv.x + (fwd.x * tf + left.x * tl) * v,
-            y: bv.y,
-            z: rv.z + (fwd.z * tf + left.z * tl) * v,
-          },
-          true,
-        );
-        this.cornerRakes++;
-        break;
-      }
+      const hit = pressedOn(r.f, r.l, b.radius);
+      if (!hit) continue;
+      // The paddles carry it inward at the wheel's rate, moved by the loop's step itself: a ball the
+      // robot's front presses on is held by friction against the frame, which the paddles' grip beats
+      // on the robot. Its velocity is the robot's, so it does not coast on after the wheel lets go;
+      // the contact solver still keeps it out of anything solid.
+      const bv = b.body.linvel();
+      b.body.setLinvel({ x: rv.x, y: bv.y, z: rv.z }, true);
+      b.body.setTranslation(
+        {
+          x: p.x + left.x * hit.inward * v * this.loopS,
+          y: p.y,
+          z: p.z + left.z * hit.inward * v * this.loopS,
+        },
+        true,
+      );
+      this.cornerRakes++;
     }
   }
   /**
-   * Whether the corner wheels turn now (rakeCorners' rules): fitted, the intake taking in, fewer
-   * than 4 held, no FLOWER pick or GARDEN gather running and the stick up. The drill draws them
-   * turning while this holds.
+   * Whether the corner wheels turn now (CornerWheelSubsystem.stopFor): fitted, the intake taking in,
+   * fewer than 4 held, no wrong NECTAR in or being spat out, and the FLOWER stick up. The drill draws
+   * them turning while this holds.
    */
   get cornerWheelsRunning(): boolean {
-    const sim = this.sim;
+    const sim = this.sim,
+      now = this.lastNow;
     return (
       this.cornerWheels &&
       this.intakeFilter !== "none" &&
-      !this.routine &&
+      now >= this.rejectUntil &&
+      now >= this.suspectUntil &&
       !sim.robots[sim.me].stickDown &&
       sim.carried.length < this.preset.laneCapacity
     );
   }
+  /** This loop's length, s (rakeCorners moves a raked ball by its speed over it). */
+  private loopS = 0;
   /** Loops in which a corner wheel was raking a POLLEN. */
   cornerRakes = 0;
 

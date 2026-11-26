@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { MonaShoresRobotModel } from "../../sim/src/render/mona-shores-robot";
 import type { LightColour } from "./indicator";
 import { ToyRobotModel } from "./toy-robot";
+import { CornerWheelMeshes } from "./cornerWheels";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FIELD, HIVE } from "../../sim/src/sim/config";
 import {
@@ -318,6 +319,9 @@ export class DrillView {
       team > 0 && look === "toy"
         ? new ToyRobotModel(team, alliance, frame)
         : null;
+    // Ours: the corner wheels, the same on the toy and the CAD (whose model predates them).
+    const corners = team > 0 ? new CornerWheelMeshes() : null;
+    if (corners) group.add(corners.group);
     if (toy) {
       group.add(toy.group);
       for (const o of box) o.visible = false;
@@ -365,6 +369,7 @@ export class DrillView {
       aimLine,
       model: toy ?? model,
       toy,
+      corners,
       light,
       lightMat,
       haloMat,
@@ -408,7 +413,7 @@ export class DrillView {
       aim?: boolean;
       /** The indicator light's colour now; null off, undefined: no light (not ours). */
       light?: LightColour | null;
-      /** The corner wheels (the drill's experiment): fitted, and turning now. */
+      /** The corner wheels: fitted, and turning now. */
       cornerWheels?: boolean;
       cornerWheelsTurning?: boolean;
       /** The FLOWER stick's swing, degrees, when something other than the simulator sets it (the AUTO replay). */
@@ -436,7 +441,7 @@ export class DrillView {
         if (have) this.scene.remove(have.group, have.aimLine);
         this.robots[i] = this.buildRobot(r.team, alliance);
       }
-      this.robots[i].toy?.setCornerWheels(
+      this.robots[i].corners?.set(
         !!r.cornerWheels,
         !!r.cornerWheelsTurning,
         dt,
@@ -598,8 +603,10 @@ interface RobotMesh {
   aimLine: THREE.Line;
   /** Ours only: an opponent is drawn as a box. */
   model: MonaShoresRobotModel | ToyRobotModel | null;
-  /** The toy, when ours is drawn as one (its corner wheels and roller follow the drill). */
+  /** The toy, when ours is drawn as one (its roller follows the drill). */
   toy: ToyRobotModel | null;
+  /** Ours only: the corner wheels (./cornerWheels.ts), on either look. */
+  corners: CornerWheelMeshes | null;
   /** Both indicator lights, which always show the same colour. */
   light: THREE.Group;
   lightMat: THREE.MeshBasicMaterial;

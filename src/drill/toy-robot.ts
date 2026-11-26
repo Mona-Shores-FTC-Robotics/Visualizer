@@ -9,19 +9,13 @@
  * Fruitport 21 Nov 2026), the Limelight on a post at the front, and the indicator light glowing
  * green through the panels. The places and sizes
  * come from the same numbers the CAD gives (sim/public/robots/mona-shores/components.json: the
- * turret's and the FLOWER stick's axes) and from the drill's own (LIGHT_SPOTS, the corner wheels'
- * axles); the rest is drawn to look right, not measured.
+ * turret's and the FLOWER stick's axes) and from the drill's own (LIGHT_SPOTS); the rest is drawn to look right, not measured.
  *
  * Frame: the drill robot group's own, metres, +X forward, +Y up, -Z to the robot's left, origin on
  * the floor under the robot's centre. A CAD point (x, y, z) (+Y left, +Z up) is (x, z, -y) here.
  * The indicator lights are the drill's own (DrillView), drawn over this model, not part of it.
  */
 import * as THREE from "three";
-import {
-  CORNER_WHEEL_AXLES_IN,
-  CORNER_WHEEL_DIAMETER_IN,
-  CORNER_WHEEL_RPM,
-} from "./teleop";
 
 const IN = 0.0254;
 
@@ -38,7 +32,6 @@ const C = {
   limelight: 0x16181c,
   lens: 0x58e1ff,
   stick: 0xffd21f,
-  cornerWheel: 0x35d46a,
   outline: 0x101216,
   plateText: "#ffffff",
 };
@@ -132,15 +125,13 @@ function plateTexture(team: number, color: number): THREE.CanvasTexture | null {
   return t;
 }
 
-/** One of our robots as a toy. Add `group` to the robot's group; set the turret, stick and corner wheels each frame. */
+/** One of our robots as a toy. Add `group` to the robot's group; set the turret and stick each frame (the corner wheels are ./cornerWheels.ts, on both looks). */
 export class ToyRobotModel {
   readonly group = new THREE.Group();
   /** Built at once; a promise only so it stands in for the CAD model's. */
   readonly ready = Promise.resolve();
   private turret = new THREE.Group();
   private stick = new THREE.Group();
-  private corners: THREE.Group[] = [];
-  private cornerSpin = 0;
 
   /** `frame`: the robot's frame width, metres. `alliance` colours the number plates. */
   constructor(team: number, alliance: "red" | "blue", frame: number) {
@@ -383,38 +374,6 @@ export class ToyRobotModel {
     this.stick.add(arm, shaft);
     g.add(this.stick);
 
-    // The corner wheels (the drill's experiment): a 2.5 in wheel at each front corner on a vertical
-    // axle, with flaps, so a spin shows. Hidden unless the experiment is on.
-    const r = (CORNER_WHEEL_DIAMETER_IN / 2) * IN;
-    for (const [aheadIn, outIn] of CORNER_WHEEL_AXLES_IN) {
-      const w = new THREE.Group();
-      w.position.set(half + aheadIn * IN, 0.9 * IN, -outIn * IN);
-      w.add(
-        inked(
-          new THREE.CylinderGeometry(r * 0.4, r * 0.4, 1.3 * IN, 16),
-          toon(C.flywheel),
-          50,
-        ),
-      );
-      // Six flaps through the axle, twelve tips out to the rim.
-      for (let k = 0; k < 6; k++) {
-        const flap = box(
-          2 * r,
-          1.1 * IN,
-          0.18 * IN,
-          toon(C.cornerWheel),
-          0,
-          0,
-          0,
-        );
-        flap.rotation.y = (k * Math.PI) / 6;
-        w.add(flap);
-      }
-      w.visible = false;
-      this.corners.push(w);
-      g.add(w);
-    }
-
     this.setTurretDeg(0);
     this.setStickOut(false);
   }
@@ -432,18 +391,5 @@ export class ToyRobotModel {
     const deg = typeof out === "number" ? out : out ? STICK_OUT_DEG : 0;
     // Out swings the upright arm forward and down: about the robot's left axis, up toward forward.
     this.stick.rotation.z = (-deg * Math.PI) / 180;
-  }
-
-  /** The corner wheels: shown while the experiment is on, turning inward while they rake. `dt` in seconds. */
-  setCornerWheels(shown: boolean, spinning: boolean, dt: number) {
-    if (spinning)
-      this.cornerSpin +=
-        ((CORNER_WHEEL_RPM / 60) * 2 * Math.PI * dt) % (2 * Math.PI);
-    this.corners.forEach((w, i) => {
-      w.visible = shown;
-      // Inward: the left wheel's front moves right, the right wheel's the mirror.
-      w.rotation.y =
-        (CORNER_WHEEL_AXLES_IN[i][1] > 0 ? -1 : 1) * this.cornerSpin;
-    });
   }
 }

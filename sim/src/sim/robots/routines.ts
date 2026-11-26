@@ -121,6 +121,15 @@ export class FlowerPick {
 }
 
 /**
+ * Whether the GARDEN gathers lower the FLOWER stick (GardenGather.Stick.useStick). Off since biobuzz #756 (mentor,
+ * 26 Nov 2026): the robot drives in with the intake on and the stick stowed, and the corner wheels rake; there is no
+ * stick wait, no stick on the wall to stop the drive in (the robot's own front meets it), and no wait to raise it after.
+ * The drive in then aims `noStickExtraDepthIn` deeper. On: the gathers below as they were.
+ */
+const gatherUsesStick = () => R.gardenGather.useStick?.value !== false;
+const noStickDepthIn = () => (gatherUsesStick() ? 0 : (R.gardenGather.noStickExtraDepthIn?.value ?? 0));
+
+/**
  * The GARDEN gather (GardenGather, the driver's button): line up at the GARDEN's line-up pose moved `lineUpBackIn` back
  * and `lineUpOutIn` toward the side wall (negative: into it, so the robot presses onto the wall), facing the audience
  * wall; the stick comes down within `lowerWithinIn`, and the drive in waits `stickDownMs` for it; drive in along the
@@ -144,7 +153,7 @@ export class GardenGather {
     // The robot can go no nearer the side wall than its half frame: pressed on it.
     const sideX = (x: number) => Math.max(x, -FIELD.half + frameHalf * IN);
     // extraDepthIn: negative ends the drive in short of the gather pose (further from the audience wall, +Z for red).
-    gather = { ...gather, x: sideX(gather.x), z: gather.z + (team === '19429' ? G.extraDepthIn19429.value : G.extraDepthIn.value) * IN };
+    gather = { ...gather, x: sideX(gather.x), z: gather.z + ((team === '19429' ? G.extraDepthIn19429.value : G.extraDepthIn.value) + noStickDepthIn()) * IN };
     lineUp = { ...lineUp, x: sideX(lineUp.x) };
     this.gather = red ? gather : turned(gather); this.lineUp = red ? lineUp : turned(lineUp);
     this.stickStop = G.stickStopIn.value * IN; this.wallZ = FIELD.half;
@@ -152,7 +161,7 @@ export class GardenGather {
   /** Distance from the robot's centre to the audience wall it faces (red) or the rear wall (blue). */
   private fromWall() { const z = this.sim.robot.translation().z; return this.wallZ - (this.sim.alliance === 'red' ? z : -z); }
   step(dt: number): RoutineStep {
-    const s = this.sim, G = R.gardenGather; this.t += dt;
+    const s = this.sim, G = R.gardenGather, useStick = gatherUsesStick(); this.t += dt;
     const p = s.robot.translation(), toLine = Math.hypot(this.lineUp.x - p.x, this.lineUp.z - p.z);
     let drive: Drive = { vx: 0, vz: 0, w: 0 };
     const headingOk = Math.abs(wrap(this.lineUp.h - s.heading)) < (G.lowerWithinDeg.value * Math.PI) / 180;
@@ -161,7 +170,7 @@ export class GardenGather {
     switch (this.phase) {
       case 'lineup':
         drive = this.m.step(s, this.lineUp, 1, dt);
-        if (near(s, this.lineUp, 0.03, G.atLineUpDeg.value)) go('stick');
+        if (near(s, this.lineUp, 0.03, G.atLineUpDeg.value)) go(useStick ? 'stick' : 'in');
         break;
       case 'stick':
         drive = this.m.stop();
@@ -172,7 +181,7 @@ export class GardenGather {
         // The stick on the wall stops the drive in (stickStopIn): the robot gets no nearer.
         const target = { ...this.gather, z: this.gather.z };
         drive = this.m.step(s, target, G.inSpeed.value, dt);
-        const atStick = this.fromWall() <= this.stickStop;
+        const atStick = useStick && this.fromWall() <= this.stickStop;
         if (atStick) { drive = { vx: 0, vz: 0, w: drive.w }; this.m.stop(); }
         const d = this.fromWall();
         if (d < this.best - G.stallProgressIn.value * IN) { this.best = d; this.bestAt = this.t; }
@@ -185,15 +194,16 @@ export class GardenGather {
         break;
       case 'back':
         drive = this.m.step(s, this.lineUp, G.backSpeed.value, dt);
-        if (toLine < 0.03) go('raise');
+        if (toLine < 0.03) go(useStick ? 'raise' : 'done');
         break;
       case 'raise':
         drive = this.m.stop();
         if (this.t - this.phaseAt >= G.raiseAfterStopMs.value / 1000) go('done');
         break;
     }
-    const stick = !Number.isNaN(this.stickAt) && this.phase !== 'done';
-    return { drive, stickDown: stick, intake: stick, phase: this.phase, done: this.phase === 'done', note: `GARDEN gather: ${this.phase}` };
+    // Stick up: the intake runs the whole gather (the card starts it itself), and the stick never comes down.
+    const stick = useStick && !Number.isNaN(this.stickAt) && this.phase !== 'done';
+    return { drive, stickDown: stick, intake: useStick ? stick : this.phase !== 'done', phase: this.phase, done: this.phase === 'done', note: `GARDEN gather: ${this.phase}` };
   }
 }
 
@@ -269,6 +279,8 @@ const simPose = (p: PedroPose): Pose => fromPedro(p.x, p.y, p.h);
  * - **dwell**: `dwellMs`, or until the lane is full, pushing forward at `dwellPushPower`, steered onto the line.
  * - **back**: to where the line-up ended at `backSpeed`, ending there, on a `backStallMs` stall or after `backTimeoutMs`;
  *   the stick up `raiseAfterStopMs` after.
+ * With `useStick` off (the default since biobuzz #756), none of the stick: no stick wait in prep, nothing stops the drive
+ * in short of the wall but the robot's own front, no raise after, and the intake on throughout (gatherUsesStick).
  * The stick on the wall ahead stops the robot `stickStopIn` out (the logged stop), as the GARDEN gather's does. Not
  * modelled: the drive in's curve to the wall (the line-up already presses onto it, so it runs along the wall) and the
  * two-step drive in.
@@ -311,7 +323,7 @@ export class CornerGather {
   /** GardenGather.inPose: the gather pose deeper by extraDepthIn, toward the wall along the line-up's line, angled into the corner. */
   private planIn(from: Pose): Pose {
     const G = R.gardenGather, w = this.way!, g = w.gather, h = rad(g.h), side = w.wallOnRight ? 1 : -1;
-    const deeper = this.team === '19429' ? G.extraDepthIn19429.value : G.extraDepthIn.value;
+    const deeper = (this.team === '19429' ? G.extraDepthIn19429.value : G.extraDepthIn.value) + noStickDepthIn();
     let wall = side * G.laneTowardWallIn.value;
     if (G.followWallLine.value && G.lineUpOutIn.value < 0) {
       // GardenGather.wallLineShiftIn: how far the line-up's end is off the pose's line toward the wall, held to the shift.
@@ -337,7 +349,7 @@ export class CornerGather {
     const lateral = ((p.x - to.x) * -Math.sin(to.h) + (p.z - to.z) * -Math.cos(to.h)) / IN;
     const mc = G.maxCorrection.value, clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
     let f = clamp(forward, 1);
-    if (this.toWallAhead() <= R.gardenGather.stickStopIn.value * IN) f = Math.min(f, 0); // the stick on the wall
+    if (gatherUsesStick() && this.toWallAhead() <= R.gardenGather.stickStopIn.value * IN) f = Math.min(f, 0); // the stick on the wall
     const strafeLeft = clamp(-G.lateralKp.value * lateral, mc), turn = clamp(G.headingKp.value * wrap(to.h - h), mc);
     const fw = { x: Math.cos(h), z: -Math.sin(h) }, lf = { x: -Math.sin(h), z: -Math.cos(h) };
     const want = { vx: fw.x * f * this.envFwd + lf.x * strafeLeft * this.envSide, vz: fw.z * f * this.envFwd + lf.z * strafeLeft * this.envSide, w: turn * this.turnRate };
@@ -348,7 +360,7 @@ export class CornerGather {
   private go(ph: CornerGather['phase']) { this.phase = ph; this.phaseAt = this.t; this.best = Infinity; this.bestAt = this.t; }
 
   step(dt: number): RoutineStep {
-    const s = this.sim, G = R.gardenGather; this.t += dt;
+    const s = this.sim, G = R.gardenGather, useStick = gatherUsesStick(); this.t += dt;
     let drive: Drive = this.m.stop();
     if (this.phase === 'refused') return { drive, stickDown: false, intake: false, phase: 'refused', done: true, note: `GARDEN gather refused: ${this.refusal}` };
     const p = s.robot.translation(), v = s.robot.linvel();
@@ -379,14 +391,15 @@ export class CornerGather {
       }
       case 'prep':
         if (Number.isNaN(this.stickAt) && (turnDeg <= G.lowerMaxTurnDegPerSec.value || since(this.phaseAt) >= G.settleMaxMs.value)) this.stickAt = this.t;
-        if (!Number.isNaN(this.stickAt) && since(this.stickAt) >= G.stickDownMs.value
+        // Stick up: no stick to wait for, only the settle.
+        if (!Number.isNaN(this.stickAt) && (!useStick || since(this.stickAt) >= G.stickDownMs.value)
             && (speedIn < G.settledInPerSec.value || since(this.phaseAt) >= G.settleMaxMs.value)) this.go('in');
         break;
       case 'in': {
         const d = Math.hypot(this.inPose.x - p.x, this.inPose.z - p.z);
         progress(d);
         drive = this.m.step(s, this.inPose, G.inSpeed.value, dt);
-        if (this.toWallAhead() <= G.stickStopIn.value * IN) drive = this.steer(0, dt); // the stick on the wall: no further
+        if (useStick && this.toWallAhead() <= G.stickStopIn.value * IN) drive = this.steer(0, dt); // the stick on the wall: no further
         if (d <= 0.5 * IN || stalled() || since(this.phaseAt) > G.inTimeoutMs.value) this.go('dwell');
         break;
       }
@@ -398,14 +411,18 @@ export class CornerGather {
         const d = Math.hypot(this.home.x - p.x, this.home.z - p.z);
         progress(d);
         drive = this.m.step(s, this.home, G.backSpeed.value, dt);
-        if (d < 0.5 * IN || since(this.phaseAt) > G.backTimeoutMs.value || (since(this.phaseAt) > G.backStallMs.value && since(this.bestAt) > G.backStallMs.value)) this.go('raise');
+        if (d < 0.5 * IN || since(this.phaseAt) > G.backTimeoutMs.value || (since(this.phaseAt) > G.backStallMs.value && since(this.bestAt) > G.backStallMs.value)) {
+          if (useStick) this.go('raise');
+          else this.phase = 'done';
+        }
         break;
       }
       case 'raise':
         if (since(this.phaseAt) >= G.raiseAfterStopMs.value) this.phase = 'done';
         break;
     }
-    const stick = !Number.isNaN(this.stickAt) && this.phase !== 'done';
-    return { drive, stickDown: stick, intake: stick, phase: this.phase, done: this.phase === 'done', note: `GARDEN gather (${this.way!.name}): ${this.phase}` };
+    // Stick up: the stick stays stowed and the intake runs the whole gather; stick down: both from stickAt.
+    const started = !Number.isNaN(this.stickAt) && this.phase !== 'done';
+    return { drive, stickDown: useStick && started, intake: useStick ? started : this.phase !== 'done', phase: this.phase, done: this.phase === 'done', note: `GARDEN gather (${this.way!.name}): ${this.phase}` };
   }
 }

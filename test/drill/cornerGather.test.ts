@@ -48,7 +48,10 @@ function clearCorner(s: DrillSession, w: CornerWayIn) {
     .filter((b) => b.body.isEnabled())
     .map((b) => ({ kind: b.kind, ...b.body.translation() }))
     .filter((p) => Math.abs(p.x) < 1.79 && Math.abs(p.z) < 1.79 && p.y < 0.2)
-    .filter((p) => Math.hypot(p.x / IN + C - w.gather.x, C - p.z / IN - w.gather.y) > 30);
+    .filter(
+      (p) =>
+        Math.hypot(p.x / IN + C - w.gather.x, C - p.z / IN - w.gather.y) > 30,
+    );
   s.sim.handoff({}, 1, { pieces: keep });
 }
 /** Holds Triangle until the gather ends; the closest the robot came to the gather pose, inches. */
@@ -111,9 +114,9 @@ describe("Triangle held: the corner gather", () => {
       const r = holdGather(s, w);
       expect(s.teleop.status().note).toMatch(/GARDEN gather done/);
       expect(r.phases[0]).toBe("lineup");
-      expect(r.phases).toEqual(
-        expect.arrayContaining(["in", "dwell", "back", "raise"]),
-      );
+      // The stick stays up (biobuzz #756): no raise after the back-out.
+      expect(r.phases).toEqual(expect.arrayContaining(["in", "dwell", "back"]));
+      expect(r.phases).not.toContain("raise");
       expect(r.closest).toBeLessThan(4);
       expect(r.t).toBeLessThan(6);
       expect(s.sim.robots[s.sim.me].stickDown).toBe(false);

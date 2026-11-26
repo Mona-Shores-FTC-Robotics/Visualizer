@@ -28,7 +28,7 @@ import type { PadRead } from "../src/drill/controls";
 import {
   CORNER_WHEEL_DIAMETER_IN,
   CORNER_WHEEL_RPM,
-} from "../src/drill/teleop";
+} from "../src/drill/cornerWheels";
 import { CONTROLS, rapier } from "../test/drill/helpers";
 
 const IN = 0.0254;
