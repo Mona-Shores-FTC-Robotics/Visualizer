@@ -85,7 +85,8 @@ const prefs = (() => {
       population?: string;
       opening?: string;
       nectar?: string;
-      cornerWheels?: string;
+      /** Was `cornerWheels` while the wheels were an experiment (off by default); renamed so that choice is not kept. */
+      cornerWheelsFitted?: string;
       look?: string;
       labels?: string;
     };
@@ -107,7 +108,7 @@ function savePrefs() {
         population: popSel.value,
         opening: openSel.value,
         nectar: nectarSel.value,
-        cornerWheels: wheelSel.value,
+        cornerWheelsFitted: wheelSel.value,
         look: lookSel.value,
         labels: labelSel.value,
       }),
@@ -142,7 +143,7 @@ function population(): Population {
 const openSel = $<HTMLSelectElement>("opening");
 /** Our robots' NECTAR gate: "pollen" rejects every NECTAR (on for now), "ours" only the other alliance's. */
 const nectarSel = $<HTMLSelectElement>("nectar");
-/** Corner wheels on the intake (an experiment): "off" is the robot as it is. */
+/** Corner wheels on the intake: "on" is the robot as it is (both robots, 26 Nov 2026). */
 const wheelSel = $<HTMLSelectElement>("corner-wheels");
 const traces = new Map<string, AutoTrace>();
 hpSel.innerHTML = HUMAN_PLAYERS.map(
@@ -156,8 +157,8 @@ if (prefs.opening) openSel.value = prefs.opening;
 if (!openSel.value) openSel.value = "varied";
 if (prefs.nectar) nectarSel.value = prefs.nectar;
 if (!nectarSel.value) nectarSel.value = "pollen";
-if (prefs.cornerWheels) wheelSel.value = prefs.cornerWheels;
-if (!wheelSel.value) wheelSel.value = "off";
+if (prefs.cornerWheelsFitted) wheelSel.value = prefs.cornerWheelsFitted;
+if (!wheelSel.value) wheelSel.value = "on";
 /** How our robots are drawn: the toy (as they look in match video) or the team's CAD. */
 const lookSel = $<HTMLSelectElement>("robot-look");
 /** The floating team-number labels: off by default (the toy's number plates name the robots). */
@@ -508,7 +509,7 @@ function showResults(r: RunResult) {
     <h2>${total >= GOAL_TIPS ? `<span class="goal">${total} TIPs: goal!</span>` : `<span class="miss">${total} of ${GOAL_TIPS} TIPs</span>`}${isBest ? ' <span class="goal">· new best</span>' : ""}</h2>
     ${r.auto ? `<p><b>Full match, ${esc(r.auto.name)}:</b> AUTO ${r.auto.tips} TIP${r.auto.tips === 1 ? "" : "s"} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}. <span class="dim">The AUTO is the Java AutoSim's typical run (seed ${r.auto.seed}, design "${esc(r.auto.design ?? "?")}").</span></p>` : ""}
     ${r.openingTips ? `<p>${r.openingAuto ? `Opened on ${esc(r.openingAuto)}'s ${r.openingTips}-TIP outcome (AUTO: ${r.openingTips} TIP${r.openingTips === 1 ? "" : "s"}${r.openingCell ? `, ${r.openingCell} in CELL` : ""}), our robot in our LOADING ZONE` : `Opened after a ${r.openingTips}-TIP Auto (our 4 preloads tipped our CELL before 2:00)`}: AUTO ${r.openingTips} + TeleOp ${r.tips} = <b>${total}</b>, 7 ${total >= GOAL_TIPS ? "reached" : "not reached"}.</p>` : ""}
-    <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}${r.cornerWheels ? ", corner wheels on" : ""}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
+    <p>${who}, ${timingLabel}${r.pollenOnly ? ", POLLEN only (every NECTAR rejected at the intake)" : ""}${r.cornerWheels ? "" : ", without the corner wheels"}. ${r.balls} balls launched${r.goalAtS != null ? `; the 7th TIP settled at ${clock(r.goalAtS)} of 2:00` : ""}.
     TIPs settled at ${r.tipTimes.map((t) => f1(t)).join(", ") || "–"} s.</p>
     ${r.opponents ? `<p>Opponents (planner, ${r.opponents.skill}-TIP skill): ${r.opponents.tips} TIP${r.opponents.tips === 1 ? "" : "s"}. ${session.deadPartnerAt ? ` Our partner stood dead at ${esc(session.deadPartnerAt)}.` : ""}</p>` : ""}
     ${nectarLine}

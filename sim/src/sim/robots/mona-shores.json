@@ -495,6 +495,14 @@
         "value": 250,
         "source": "biobuzz opmodes/GardenGather.java Stick.raiseAfterStopMs"
       },
+      "useStick": {
+        "value": false,
+        "source": "biobuzz opmodes/GardenGather.java Stick.useStick, off since #756 (mentor, 26 Nov 2026, after robot testing): the gather drives in with the intake on and the FLOWER stick stowed, and the corner wheels rake (CornerWheelSubsystem.fitted on both robots). On brings the stick gather back"
+      },
+      "noStickExtraDepthIn": {
+        "value": 0.0,
+        "source": "biobuzz opmodes/GardenGather.java DriveIn.noStickExtraDepthIn (#756: 0, was 2): with the stick up the drive in aims this much deeper on top of extraDepthIn"
+      },
       "anyCorner": {
         "value": true,
         "source": "biobuzz opmodes/GardenGather.java Button.anyCorner: the TeleOp button gathers in the nearest of all four field corners (localization/GardenFieldPoints.nearestCorner), facing whichever of its two walls is nearer the heading; an Auto card never does"
