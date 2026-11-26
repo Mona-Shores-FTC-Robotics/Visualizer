@@ -109,6 +109,20 @@ export interface TeleOpStatus {
   nectarGate: string;
   /** "" or the heading lock's hold ("holding 90°"), as the Driver Station shows it. */
   headingLock: string;
+  /**
+   * What the Match page's Fire line says about the firing arc (BasicDriveTeleOp.onLoop): "blocked"
+   * while a fire is refused by it (enforced), "outside" while the turret or its aim is outside it on a
+   * robot that does not enforce it; null otherwise.
+   */
+  firingArc: "blocked" | "outside" | null;
+  /** A wrong NECTAR may be in the lane: the gate is shut (ColorSensorSubsystem.wrongNectarMayBeIn). */
+  wrongNectar: boolean;
+  /** The operator's FLOWER stick is out (the Match page's FLOWER STICK OUT alert). */
+  stickOut: boolean;
+  /** A held reset (gyro, corner, camera, turret zero) is down but not yet for its time. */
+  resetHeld: boolean;
+  /** The launcher trim in ticks/s, as the robot keeps it. */
+  launcherTrimTps: number;
 }
 
 /** One gauss draw. */
@@ -605,6 +619,17 @@ export class TeleOp {
     const outsideArc =
       !(turretRel <= arcLeft && turretRel >= -arcRight) ||
       (this.turretMode === "AIM" && !insideArc);
+    // The Match page's Fire line (BasicDriveTeleOp: arcBlocked, else outsideArc): a held fire the
+    // arc refuses, where it is enforced; outside it, where it is not. An arc turn under way is the
+    // robot fixing it, not a refusal.
+    const enforced =
+      this.flag("enforceFiringArc", true) && this.preset.enforceFiringArc;
+    this.firingArc =
+      enforced && fireHeld && !arcOk && !this.arcTurning
+        ? "blocked"
+        : !enforced && outsideArc
+          ? "outside"
+          : null;
     this.light.update(
       now * 1000,
       outsideArc,
@@ -615,6 +640,7 @@ export class TeleOp {
     );
   }
   private arcTurningWas = false;
+  private firingArc: TeleOpStatus["firingArc"] = null;
   /** What the simulator's intake takes this loop. */
   intakeFilter: "all" | "pollen" | "none" = "all";
   /**
@@ -1036,7 +1062,12 @@ export class TeleOp {
       insideArc: rel <= arcLeft && rel >= -arcRight,
       launcher:
         this.gate ||
-        (Number.isFinite(now) && this.fireHeldWas && this.sim.time >= now)
+        (Number.isFinite(now) && this.fireHeldWas && this.sim.time >= now) ||
+        // Spun up by the operator (or Square) long enough, with no fire held: at speed too, as
+        // LauncherSubsystem.atSpeed() reads it.
+        (this.spinning(this.lastNow) &&
+          this.spinSince > -Infinity &&
+          this.lastNow - this.spinSince >= this.preset.spinUpFromIdleS)
           ? "AT SPEED"
           : this.fireHeldWas || this.spinning(this.lastNow)
             ? "SPINNING UP"
@@ -1060,6 +1091,12 @@ export class TeleOp {
           : this.sim.time < this.suspectUntil
             ? "feed held: a wrong NECTAR may be in"
             : "",
+      firingArc: this.firingArc,
+      wrongNectar:
+        this.sim.time < this.rejectUntil || this.sim.time < this.suspectUntil,
+      stickOut: this.stickOut,
+      resetHeld: Object.values(this.holdStart).some((t) => t > -Infinity),
+      launcherTrimTps: this.launcherTrim * this.num("launcherTargetTps", 1595),
       headingLock: this.lock.holding
         ? `holding ${Math.round((this.lock.targetRad * 180) / Math.PI)}°`
         : "",

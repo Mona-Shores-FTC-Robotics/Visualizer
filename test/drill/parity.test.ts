@@ -72,7 +72,8 @@ describe("the launcher after Square (LauncherOwner)", () => {
     expect(s.teleop.status().launcher).not.toBe("IDLE");
     s.advance(0.05);
     s.advance(T.launcherKeepSpinningAfterSquareS - 0.3);
-    expect(s.teleop.status().launcher).toBe("SPINNING UP");
+    // Still spinning: at speed by now (LauncherSubsystem.atSpeed, the Match page's READY).
+    expect(s.teleop.status().launcher).toBe("AT SPEED");
     s.advance(0.5);
     expect(s.teleop.status().launcher).toBe("IDLE");
   }, 60000);
