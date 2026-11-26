@@ -12,6 +12,7 @@
  */
 import type { RunResult } from "./session";
 import type { StoredRun } from "./history";
+import { fullPickUps } from "./readout";
 
 /**
  * The team sheet's Apps Script web app (docs/drill-stats.md), deployed by the mentor on 26 Nov 2026
@@ -100,7 +101,8 @@ export function rowFromRun(
   laptop = laptopId(),
 ): StatsRow {
   const c = r.cycles.map((x) => x.cycleS).sort((a, b) => a - b);
-  const p = r.pickUps.map((x) => x.s);
+  // Full pick-ups only (readout.ts fullPickUps); "" when the run had none.
+  const p = fullPickUps(r.pickUps);
   const autoTips = (r.auto?.tips ?? 0) + (r.openingTips ?? 0);
   const total = r.tips + autoTips;
   return {
