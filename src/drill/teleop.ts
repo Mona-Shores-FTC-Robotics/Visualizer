@@ -547,6 +547,7 @@ export class TeleOp {
           ? "pollen"
           : "all";
 
+    this.loopS = dt;
     this.rakeCorners();
 
     // --- the feed ---------------------------------------------------------------------------------
@@ -704,12 +705,17 @@ export class TeleOp {
       const r = sim.toRobot(p.x, p.z);
       const hit = pressedOn(r.f, r.l, b.radius);
       if (!hit) continue;
+      // The paddles carry it inward at the wheel's rate, moved by the loop's step itself: a ball the
+      // robot's front presses on is held by friction against the frame, which the paddles' grip beats
+      // on the robot. Its velocity is the robot's, so it does not coast on after the wheel lets go;
+      // the contact solver still keeps it out of anything solid.
       const bv = b.body.linvel();
-      b.body.setLinvel(
+      b.body.setLinvel({ x: rv.x, y: bv.y, z: rv.z }, true);
+      b.body.setTranslation(
         {
-          x: rv.x + left.x * hit.inward * v,
-          y: bv.y,
-          z: rv.z + left.z * hit.inward * v,
+          x: p.x + left.x * hit.inward * v * this.loopS,
+          y: p.y,
+          z: p.z + left.z * hit.inward * v * this.loopS,
         },
         true,
       );
@@ -733,6 +739,8 @@ export class TeleOp {
       sim.carried.length < this.preset.laneCapacity
     );
   }
+  /** This loop's length, s (rakeCorners moves a raked ball by its speed over it). */
+  private loopS = 0;
   /** Loops in which a corner wheel was raking a POLLEN. */
   cornerRakes = 0;
 

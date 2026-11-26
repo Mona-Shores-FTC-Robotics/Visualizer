@@ -35,9 +35,12 @@ const PRESS_SLACK_IN = 0.15;
 
 /**
  * Where a ball (centre in the robot frame, metres: `f` forward, `l` left) meets a wheel, or null.
- * It is pressed on the wheel's front face where the face reaches it: within the ball's radius (plus
- * the paddles) ahead of the face, and across the face as far as the wheel spans at the ball's
- * centre height. Returns the wheel (its Y, inches) and the inward direction (+1 left, -1 right).
+ * The wheel stands across the robot's front, its face at FACE_X. A ball pressed on the face touches
+ * it where the face reaches the ball's nearest point: across the wheel's span at the ball's centre
+ * height. A ball nearer than its radius sits partly across the wheel's plane, so the paddles' inner
+ * edge still meets its side further in: by the ball's half-width at the plane. That carries a ball
+ * from the wheel to the mouth (|l| 4.87 in) instead of leaving it just outside. Returns the wheel
+ * (its Y, inches) and the inward direction (+1 left, -1 right).
  */
 export function pressedOn(
   f: number,
@@ -45,15 +48,18 @@ export function pressedOn(
   ballRadius: number,
 ): { wheelYIn: number; inward: number } | null {
   const IN = 0.0254;
-  const face = CORNER_WHEEL_FACE_X_IN * IN;
-  if (f < face - 1e-3 || f > face + ballRadius + PRESS_SLACK_IN * IN)
+  const face = CORNER_WHEEL_FACE_X_IN * IN,
+    d = f - face;
+  if (d < -CORNER_WHEEL_WIDTH_IN * IN || d > ballRadius + PRESS_SLACK_IN * IN)
     return null;
-  // The wheel's half span at the ball's centre height.
+  // The wheel's half span at the ball's centre height, and how far the ball's side reaches past it.
   const r = (CORNER_WHEEL_DIAMETER_IN / 2) * IN,
     dz = CORNER_WHEEL_CENTRE_Z_IN * IN - ballRadius,
-    half = Math.sqrt(Math.max(0, r * r - dz * dz));
+    half = Math.sqrt(Math.max(0, r * r - dz * dz)),
+    side =
+      d <= 0 ? ballRadius : Math.sqrt(Math.max(0, ballRadius ** 2 - d * d));
   for (const y of CORNER_WHEEL_Y_IN) {
-    if (Math.abs(l - y * IN) <= half)
+    if (Math.abs(l - y * IN) <= half + side)
       return { wheelYIn: y, inward: y > 0 ? -1 : 1 };
   }
   return null;

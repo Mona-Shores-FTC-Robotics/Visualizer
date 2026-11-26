@@ -113,8 +113,10 @@ describe("corner wheels", () => {
     );
   }, 60000);
 
-  test("GARDEN gather (Triangle): the stick stays up, the wheels rake through it, and the row comes in", async () => {
-    const s = new DrillSession(await rapier(), CONTROLS, 20245, "driver", 1);
+  // Seed 2: the intake's grab chance (0.85, a PLACEHOLDER) takes every piece first time; over seeds
+  // 1 to 10 both robots get all 4 in 9 runs, and 3 in the other.
+  test("GARDEN gather (Triangle): the stick stays up, the wheels rake through it, and the row of 4 comes in", async () => {
+    const s = new DrillSession(await rapier(), CONTROLS, 20245, "driver", 2);
     s.openingAuto = null;
     s.start();
     const sim = s.sim;
@@ -145,9 +147,9 @@ describe("corner wheels", () => {
     }
     expect(stickEver).toBe(false);
     expect(wheelsInGather).toBe(true);
-    expect(sim.carried.length).toBeGreaterThanOrEqual(3);
-    // From the press, line-up included: in within 2.5 s, the whole gather within 4 s.
-    expect(firstIn).toBeLessThan(2.5);
+    expect(sim.carried.length).toBe(4);
+    // From the press, line-up included (about 0.9 s): the first in within 2 s, the whole gather within 4 s.
+    expect(firstIn).toBeLessThan(2);
     expect(s.t - t0).toBeLessThan(4);
   }, 60000);
 });

@@ -120,8 +120,8 @@
         "source": "PLACEHOLDER, RobotDesign.intakeGrabChance: never measured; toss pieces in and count"
       },
       "intervalS": {
-        "value": 0.35,
-        "source": "PLACEHOLDER, RobotDesign.intakeIntervalS: 4 pieces in about 1 s (mentor review); never timed"
+        "value": 0.2,
+        "source": "PLACEHOLDER, estimate from one handheld clip, 25 Nov 2026; tripod clips Sunday 29 Nov will measure it. The clip's GARDEN gather with the corner wheels: the row under the front at 1.35-1.45 s, yellow inside at 1.57-1.70 s, all 4 in well before the back-out at about 3.4 s (4 in under 0.9 s). Was 0.35, RobotDesign.intakeIntervalS: 4 pieces in about 1 s (mentor review), never timed"
       },
       "maxRelSpeedInPerS": {
         "value": 60,
