@@ -12,6 +12,11 @@ const CONTROLS = readFileSync(
   `${import.meta.dirname}/../test/fixtures/biobuzz/controls.json`,
   "utf8",
 );
+/** biobuzz's Match page export, for the Driver Station panel. */
+const MATCH_PAGE = readFileSync(
+  `${import.meta.dirname}/../test/fixtures/biobuzz/match-page.json`,
+  "utf8",
+);
 
 /** Buttons in the standard mapping: Cross 0, Circle 1, Square 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Share 8, Options 9. */
 const BTN = {
@@ -42,7 +47,12 @@ async function open(
   shape: PadShape = { mapping: "standard", axes: [0, 0, 0, 0] },
 ) {
   await page.route("https://raw.githubusercontent.com/**", (route) =>
-    route.fulfill({ contentType: "application/json", body: CONTROLS }),
+    route.fulfill({
+      contentType: "application/json",
+      body: route.request().url().endsWith("/match-page.json")
+        ? MATCH_PAGE
+        : CONTROLS,
+    }),
   );
   // The team sheet (src/drill/stats.ts TEAM_SHEET_URL): a finished run is posted there, so a test
   // run never reaches the real sheet; the stand-in takes it as the web app would.
@@ -208,6 +218,26 @@ test("the drill lists the robot's own controls, from biobuzz's export", async ({
   await expect(page.locator("#pads")).toContainText(
     "DualSense Wireless Controller",
   );
+});
+
+test("the robot's Match page is a Driver Station in the corner, from biobuzz's export, in drive mode too", async ({
+  page,
+}) => {
+  await open(page);
+  const ds = page.locator("#ds");
+  await expect(ds).toBeVisible();
+  await expect(ds).toContainText("MATCH");
+  await expect(ds).toContainText("AIM: Circle fires");
+  await expect(ds).toContainText("LAUNCH TRIM 0");
+  await expect(ds).toContainText("PINPOINT OK");
+  // It replaces the drill's own status box.
+  await expect(page.locator("#robot")).toBeHidden();
+  await page.keyboard.press("f");
+  await expect(ds).toBeVisible();
+  const box = await ds.boundingBox();
+  const vp = page.viewportSize()!;
+  expect(box!.x + box!.width).toBeGreaterThan(vp.width - 40);
+  expect(box!.y + box!.height).toBeGreaterThan(vp.height - 80);
 });
 
 test("the human player's card is off the field: in the side panel, and by the clock in drive mode on H", async ({

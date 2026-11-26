@@ -35,6 +35,12 @@ import {
   type CycleResult,
 } from "./readout";
 import {
+  dsHtml,
+  loadMatchPage,
+  matchPageLines,
+  type MatchPageFile,
+} from "./matchPage";
+import {
   DrillSession,
   GOAL_TIPS,
   TEAM_NAMES,
@@ -525,6 +531,29 @@ function showResults(r: RunResult) {
   };
 }
 
+/** biobuzz's Match page export (./matchPage.ts), or null until it loads or with an older biobuzz. */
+let matchPage: MatchPageFile | null = null;
+
+/**
+ * The simulated Driver Station (mentor, 26 Nov 2026): robot k's Match page as the robot writes it,
+ * from biobuzz's export, in the field's bottom-right corner (small in drive mode, like the phone on
+ * the drive team's table). It replaces the drill's own status box, so drivers practise reading the
+ * real thing.
+ */
+function driverStation(k: number): string {
+  const t = session.teleops[k];
+  if (!matchPage || !t) return "";
+  const st = t.status(),
+    cap = session.presets[k].laneCapacity;
+  const lines = matchPageLines(matchPage, {
+    status: st,
+    lane: st.lane,
+    laneFull: st.lane >= cap,
+    intakeRunning: true,
+  });
+  return `<div class="ds-bar">Driver Station · ${session.slots[k].team} TeleOp</div><div class="ds-page">${lines.map((l) => `<div>${dsHtml(l)}</div>`).join("")}</div>`;
+}
+
 function robotBox(k: number) {
   const st = session.teleops[k].status();
   const head =
@@ -615,6 +644,7 @@ function hud() {
     `${session.totalTips} / ${GOAL_TIPS}<small>${session.teleops.length > 1 ? "alliance " : ""}TIPs<span class="detail">${session.playback ? ` (AUTO ${autoTips})` : ""}${openingLabel() ? ` · ${openingLabel()}` : ""}${session.replayPieces ? "" : ` · CELL ${session.sim.cellCount(session.sim.alliance)} in`}</span></small>`;
   const all = session.teleops.map((_, k) => k);
   $("robot").innerHTML = all.map(robotBox).join("");
+  if (matchPage) $("ds").innerHTML = driverStation(0);
   $("note").textContent = session.teleops
     .map((t, k) => {
       const n = t.status().note;
@@ -822,6 +852,11 @@ async function main() {
     await RAPIER.init();
     const loaded = await loadControls();
     file = loaded.file;
+    // The robot's Match page (biobuzz's export); the old status box stays until it loads.
+    void loadMatchPage().then((m) => {
+      matchPage = m;
+      document.body.classList.toggle("has-ds", !!m);
+    });
     $("controls-source").textContent =
       `From biobuzz's controls export (${loaded.from.includes("raw.githubusercontent") ? "GitHub, master" : "this site's mirror"}): ${file.about}`;
   } catch (e) {

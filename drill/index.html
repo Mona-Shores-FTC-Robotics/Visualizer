@@ -195,6 +195,51 @@
       #note:empty {
         display: none;
       }
+      /* The simulated Driver Station (src/drill/matchPage.ts): the robot's Match page as a REV
+         Driver Hub shows it, bottom-right. It replaces the status box once biobuzz's export loads. */
+      #ds {
+        display: none;
+      }
+      body.has-ds #robot {
+        display: none;
+      }
+      body.has-ds #ds {
+        display: block;
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 330px;
+        max-height: calc(100% - 140px);
+        overflow: hidden;
+        background: #000;
+        color: #fff;
+        border: 6px solid #2b2b2b;
+        border-radius: 10px;
+        font-family: Roboto, "Segoe UI", system-ui, sans-serif;
+        font-size: 12px;
+        line-height: 1.3;
+        pointer-events: none;
+        box-shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+      }
+      #ds .ds-bar {
+        background: #2b2b2b;
+        color: #bbb;
+        font-size: 10px;
+        padding: 2px 6px 4px;
+      }
+      #ds .ds-page {
+        padding: 6px 8px 8px;
+      }
+      #ds .ds-page > div {
+        overflow-wrap: anywhere;
+      }
+      /* Drive mode: small, in the corner, like the phone on the drive team's table. */
+      body.drive.has-ds #ds {
+        bottom: 56px; /* clear of the Exit drive mode button */
+        width: 240px;
+        font-size: 9px;
+        opacity: 0.92;
+      }
       #progress {
         position: absolute;
         right: 12px;
@@ -519,6 +564,7 @@
       </div>
       <div id="note" class="box"></div>
       <div id="readout" class="box"></div>
+      <div id="ds" aria-label="Driver Station: the robot's Match page"></div>
       <div id="progress"></div>
       <button id="drive-exit" type="button" title="Leave drive mode (F)">
         Exit drive mode (F)
