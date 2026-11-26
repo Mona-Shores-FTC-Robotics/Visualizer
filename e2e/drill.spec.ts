@@ -44,6 +44,15 @@ async function open(
   await page.route("https://raw.githubusercontent.com/**", (route) =>
     route.fulfill({ contentType: "application/json", body: CONTROLS }),
   );
+  // The team sheet (src/drill/stats.ts TEAM_SHEET_URL): a finished run is posted there, so a test
+  // run never reaches the real sheet; the stand-in takes it as the web app would.
+  for (const host of [
+    "https://script.google.com/**",
+    "https://script.googleusercontent.com/**",
+  ])
+    await page.route(host, (route) =>
+      route.fulfill({ status: 200, contentType: "text/plain", body: "" }),
+    );
   // The 2:00 drill's opening, fixed so a run's TIPs can be counted: R-Solo's 2-TIP outcome, the
   // audience CELL raised and empty (the page draws it otherwise).
   await page.addInitScript(() => {
