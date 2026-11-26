@@ -558,15 +558,43 @@ function readoutBox(k: number) {
   ].join("")}</div>`;
 }
 
-/** The human player: NECTAR left, and what they wait for, in the playbook's words. */
-function humanPlayerBox() {
+/**
+ * The human player: NECTAR left, and what they wait for, in the playbook's words. Off the field
+ * (mentor, 26 Nov 2026): in the side panel's first section, and in drive mode beside the clock while
+ * H shows it.
+ */
+function humanPlayerCard() {
   const hp = session.hp;
   if (!hp) {
     const left = session.sim.stash[session.sim.alliance];
-    return `<div class="readout-box"><div><b>Human player</b> <span class="dim">NCSSM's</span></div><div>NECTAR ${"●".repeat(left)}${"○".repeat(Math.max(0, 5 - left))}</div></div>`;
+    return `<div class="dim">NCSSM's human player</div><div class="nectar">NECTAR ${"●".repeat(left)}${"○".repeat(Math.max(0, 5 - left))}</div>`;
   }
   const v = hp.view(session.remainingS, session.tips.length);
-  return `<div class="readout-box"><div><b>Human player</b> <span class="dim">our playbook</span></div><div>NECTAR ${"●".repeat(v.left)}${"○".repeat(Math.max(0, 5 - v.left))}${v.owed ? ` · ${v.owed} may go in` : ""}</div><div class="dim">${esc(v.waiting) || "&nbsp;"}</div></div>`;
+  return `<div class="dim">our playbook</div><div class="nectar">NECTAR ${"●".repeat(v.left)}${"○".repeat(Math.max(0, 5 - v.left))}${v.owed ? ` · ${v.owed} may go in` : ""}</div><div class="dim">${esc(v.waiting) || "&nbsp;"}</div>`;
+}
+
+/** Shows the human player's card: the side panel open at it, or in drive mode the card by the clock. */
+function toggleHumanPlayer() {
+  if (document.body.classList.contains("drive")) {
+    const mini = $("hp-mini");
+    mini.hidden = !mini.hidden;
+  } else {
+    const panelOpen = !document.body.classList.contains("panel-closed");
+    const top = $("panel").scrollTop < 8;
+    if (panelOpen && top) togglePanel();
+    else {
+      if (!panelOpen) togglePanel();
+      $("hp-section").scrollIntoView({ block: "start" });
+    }
+  }
+  $("hp-btn").setAttribute(
+    "aria-pressed",
+    String(
+      document.body.classList.contains("drive")
+        ? !$("hp-mini").hidden
+        : !document.body.classList.contains("panel-closed"),
+    ),
+  );
 }
 
 /** Which opening this run had, once it has started: "AUTO: 1 TIP, 6 in CELL" or "AUTO: 2 TIPs". */
@@ -596,7 +624,11 @@ function hud() {
     })
     .filter(Boolean)
     .join(" · ");
-  $("readout").innerHTML = all.map(readoutBox).join("") + humanPlayerBox();
+  $("readout").innerHTML = all.map(readoutBox).join("");
+  const hpCard = humanPlayerCard();
+  $("hp-card").innerHTML = hpCard;
+  if (!$("hp-mini").hidden)
+    $("hp-mini").innerHTML = `<b>Human player</b>${hpCard}`;
   if (document.body.classList.contains("drive"))
     $("mini").innerHTML = miniBox();
 }
@@ -875,10 +907,12 @@ async function main() {
     else if (e.key === "c" || e.key === "C") cycleCamera();
     else if (e.key === "f" || e.key === "F") toggleDrive();
     else if (e.key === "s" || e.key === "S") togglePanel();
+    else if (e.key === "h" || e.key === "H") toggleHumanPlayer();
   });
   $("drive-btn").onclick = () => setDrive(true);
   $("drive-exit").onclick = () => setDrive(false);
   $("panel-btn").onclick = () => togglePanel();
+  $("hp-btn").onclick = () => toggleHumanPlayer();
   requestAnimationFrame(frame);
 }
 
