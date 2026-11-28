@@ -46,6 +46,7 @@
   import Obstacles from "./scene/Obstacles.svelte";
   import { polylinePath } from "./scene/svgPath";
   import HiveCells from "../lib/match/HiveCells.svelte";
+  import NectarPieces from "../lib/match/NectarPieces.svelte";
   import {
     COLLISION_COLOR,
     FIELD_POINT_COLOR,
@@ -868,6 +869,10 @@
                 hidden={auto.hiddenIds}
                 onPointDown={onProjectPointDown}
               />
+            {/if}
+            <!-- Fork: the human player's NECTAR, over the paths so a piece on one is seen. -->
+            {#if auto.nectar.length && /biobuzz/.test(fieldMapSrc)}
+              <NectarPieces tracks={auto.nectar} seconds={playback.seconds} />
             {/if}
           </g>
         </svg>

@@ -36,6 +36,11 @@ import {
 import { hiveHistory, type TimingValues } from "../lib/timing/model";
 import type { HiveHistory } from "../lib/match/hiveView";
 import {
+  nectarTracks,
+  type NectarRobot,
+  type NectarTrack,
+} from "../lib/match/nectar";
+import {
   aimMovedLaunchSpots,
   aimOwnLaunchSpots,
   ownSpotsSeen,
@@ -328,6 +333,43 @@ export class AutoState {
       };
     },
   );
+
+  /**
+   * Fork: the human player's NECTAR in what the field shows: one per TIP of the HIVE drawn, and
+   * what the robots' CatchNectar and LaunchOneAimed do with it (lib/match/nectar.ts).
+   */
+  nectar = $derived.by((): NectarTrack[] => {
+    const tips = this.hive?.history.tips ?? [];
+    if (!tips.length) return [];
+    const robot = (
+      preview: PreviewResult,
+      doc: Pick<ProjectDoc, "startPoint" | "lines">,
+      settings: Settings,
+    ): NectarRobot => ({
+      preview,
+      poseAt: (t) =>
+        previewPose(preview, Math.min(t, preview.endTime), doc, settings),
+      frame: settings,
+    });
+    if (this.#overlays.active) {
+      const { previews, shown } = this.overlayTogether;
+      return nectarTracks(
+        tips,
+        shown.flatMap((overlay) => {
+          const preview = previews.get(overlay);
+          return preview
+            ? [robot(preview, overlay.doc, this.#overlays.settingsFor(overlay))]
+            : [];
+        }),
+      );
+    }
+    const preview = this.preview;
+    return preview
+      ? nectarTracks(tips, [
+          robot(preview, this.#project.doc, this.#getSettings()),
+        ])
+      : [];
+  });
 
   /** Fork: the Match view's answer in one line (lanes.ts matchResult); null outside it. */
   matchResultLine = $derived(
