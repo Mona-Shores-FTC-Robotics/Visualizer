@@ -228,10 +228,40 @@ test("two partner waits are an error: an Auto has one", () => {
   assert(waits.length >= 2, "the sample has two waits");
   waits[0].partnerWait = true;
   waits[1].partnerWait = true;
-  const result = generateAutoJavaFromText(JSON.stringify(sample), "hive-rush.pp");
+  const result = generateAutoJavaFromText(
+    JSON.stringify(sample),
+    "hive-rush.pp",
+  );
   assert(!result.ok);
   assert(
     result.errors.some((e) => e.includes("partner wait")),
     JSON.stringify(result.errors),
   );
+});
+
+test("LaunchAllAimed away from a park exports kit.commandAwayFromPark; right after a park card, kit.command", () => {
+  const auto = clone(loadSample().auto);
+  auto.registry.actions.push("LaunchAllAimed");
+  auto.cards.splice(1, 0, {
+    id: "aimed-away",
+    kind: "action",
+    name: "LaunchAllAimed",
+  });
+  const away = sourceOf(auto);
+  assert(away.includes('kit.commandAwayFromPark("LaunchAllAimed")'), away);
+  assert(!away.includes('kit.command("LaunchAllAimed")'), away);
+
+  // The same card after the Auto's own park card (the last firstOf's park, every row ending parked).
+  const parked = clone(loadSample().auto);
+  parked.registry.actions.push("LaunchAllAimed");
+  const parkLine = JSON.stringify(parked).match(
+    /"lineId":"([^"]+)","park":true/,
+  );
+  assert(parkLine, "the sample has a park card");
+  parked.cards.push(
+    { id: "drive-park", kind: "path", lineId: parkLine![1], park: true },
+    { id: "aimed-parked", kind: "action", name: "LaunchAllAimed" },
+  );
+  const after = sourceOf(parked);
+  assert(after.includes('kit.command("LaunchAllAimed")'), after);
 });
