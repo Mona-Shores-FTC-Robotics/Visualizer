@@ -25,9 +25,31 @@ export interface AutoTraceHive {
   raisedCellPieces: number;
 }
 
+/** What a trace was matched against on biobuzz master (scripts/drill-auto-traces.py). */
+export interface AutoTraceMaster {
+  /** The run is of master's .pp (the same file); false: master changed it since, no run yet. */
+  fresh: boolean;
+  /** For a pair run: the partner's .pp is master's too; null without a partner. */
+  partnerFresh: boolean | null;
+  /** Master's commit that last changed the Auto's .pp, its date (ISO) and subject. */
+  commit: string;
+  date: string;
+  subject: string;
+}
+
 export interface AutoTrace {
   auto: string;
+  /** As the Driver Station's menu has it (R-RightUnderHive); older traces have none. */
+  name?: string;
   source: string;
+  /** The run's scenario ("best": every shot lands), and its entry ("alone", "pair: …"). */
+  scenario?: string | null;
+  entry?: string | null;
+  /** The partner Auto the run had beside ours (a pair run), or null. */
+  partnerAuto?: string | null;
+  /** The run's folder of logs on biobuzz's sim-results branch. */
+  logsUrl?: string;
+  master?: AutoTraceMaster;
   design: string | null;
   calibration: string | null;
   alliance: "RED" | "BLUE";
@@ -40,9 +62,14 @@ export interface AutoTrace {
   tipsAt: number[] | null;
   launched: number | null;
   scored: number | null;
-  /** t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips, stickDeg (newer traces). */
+  /**
+   * t, x, y (Pedro inches), headingDeg, held, redAngleDeg, redTips, blueAngleDeg, blueTips, stickDeg
+   * (newer traces), heldNectar (of `held`, the NECTAR; newer traces).
+   */
   columns: string[];
   frames: number[][];
+  /** A pair run's partner robot, frame by frame: x, y, headingDeg, held, heldNectar, stickDeg. */
+  partnerFrames?: number[][];
   /**
    * Every game piece on the field each frame (not those in a robot), so the replay shows the
    * volleys and the CELLs filling: per kind, per frame, X, height, Z flattened, in centimetres in
@@ -52,6 +79,7 @@ export interface AutoTrace {
   handoff: {
     pose: { x: number; y: number; headingDeg: number };
     held: number;
+    heldNectar?: number;
     hives: { red: AutoTraceHive; blue: AutoTraceHive };
     pieces: {
       pollen: number[][];
@@ -63,12 +91,60 @@ export interface AutoTrace {
 
 export interface AutoIndexEntry {
   auto: string;
+  name?: string;
   alliance: string;
   design: string | null;
   seed: number;
+  scenario?: string | null;
+  entry?: string | null;
+  partnerAuto?: string | null;
   autoTips: number;
+  tipsAt?: number[] | null;
   finishedAt: string | null;
   commit: string | null;
+  branch?: string | null;
+  runUrl?: string | null;
+  logsUrl?: string;
+  master?: AutoTraceMaster;
+}
+
+/** r-right-under-hive → R-RightUnderHive, as the Driver Station's menu has it. */
+export function autoDisplayName(a: { auto: string; name?: string }): string {
+  if (a.name) return a.name;
+  const [side, ...rest] = a.auto.split("-");
+  return `${side.toUpperCase()}-${rest.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("")}`;
+}
+
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Detroit",
+  });
+
+/**
+ * What the drill plays for an Auto, in words, for the picker and the HUD: "as on master, Nov 28"
+ * (the run is of master's .pp, simulated that day), or "not simulated since <change> (Nov 28);
+ * plays the run of Nov 27" when master's version has no run yet.
+ */
+export function autoFreshness(a: AutoIndexEntry | AutoTrace): {
+  fresh: boolean | null;
+  words: string;
+} {
+  const run = a.finishedAt ? shortDate(a.finishedAt) : "an unknown day";
+  const m = a.master;
+  if (!m) return { fresh: null, words: `simulated ${run}` };
+  if (!m.fresh) {
+    const pr = /\(#(\d+)\)\s*$/.exec(m.subject)?.[1];
+    return {
+      fresh: false,
+      words: `not simulated since ${pr ? `#${pr}` : m.commit.slice(0, 7)} (${shortDate(m.date)}); plays the run of ${run}`,
+    };
+  }
+  return {
+    fresh: true,
+    words: `as on master, ${run}${m.partnerFresh === false ? " (partner not master's)" : ""}`,
+  };
 }
 
 /** The Autos the drill offers: public/drill/autos/index.json, beside the page. */
@@ -180,10 +256,15 @@ export class AutoPlayback {
   t = 0;
   handedOver = false;
 
+  /**
+   * `partner`: the robot a pair run's partner (`trace.partnerFrames`) is posed onto during the
+   * replay, where it stays, dead, for TeleOp; -1 for none.
+   */
   constructor(
     readonly trace: AutoTrace,
     private sim: Sim,
     private k = 0,
+    private partner = -1,
   ) {
     this.pose(0);
   }
@@ -254,9 +335,12 @@ export class AutoPlayback {
 
   /** The frame at or before `t`. */
   private frame(t: number): number[] {
-    const f = this.trace.frames;
-    const i = Math.max(0, Math.min(f.length - 1, Math.floor(t * 10 + 1e-6)));
-    return f[i];
+    return this.trace.frames[this.frameIndex(t)];
+  }
+
+  private frameIndex(t: number): number {
+    const n = this.trace.frames.length;
+    return Math.max(0, Math.min(n - 1, Math.floor(t * 10 + 1e-6)));
   }
 
   private pose(t: number) {
@@ -271,7 +355,14 @@ export class AutoPlayback {
     );
     b.setLinvel({ x: 0, y: 0, z: 0 }, true);
     b.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    v.carried = Array.from({ length: fr[4] }, () => "pollen" as const);
+    v.carried = carriedOf(fr[4], fr[10]);
+    // A pair run's partner: robot `partner`, posed from the trace as ours is.
+    const pf = this.trace.partnerFrames;
+    if (pf && this.partner >= 0) {
+      const q = pf[Math.min(pf.length - 1, this.frameIndex(t))];
+      placeRobot(this.sim, this.partner, fromPedro([q[0], q[1], q[2]]));
+      this.sim.robots[this.partner].carried = carriedOf(q[3], q[4]);
+    }
     // The HIVEs' tilt (positive with the rear CELL up, as the simulator has it).
     for (const [a, i] of [
       ["red", 5],
@@ -301,7 +392,7 @@ export class AutoPlayback {
     const h = this.trace.handoff;
     this.pose(HANDOFF_S);
     const v = this.sim.view(this.k);
-    v.carried = Array.from({ length: h.held }, () => "pollen" as const);
+    v.carried = carriedOf(h.held, h.heldNectar);
     // A HIVE that has not tipped still has its own 3 NECTAR racked in the raised CELL (as the
     // simulator staged them, and counted in the trace's pieces): seed only the rest.
     const seed = (a: "red" | "blue") => {
@@ -310,6 +401,29 @@ export class AutoPlayback {
       return Math.max(0, Math.min(12, st.raisedCellPieces - racked));
     };
     const field = fieldAtHandoff(this.trace, this.sim);
+    // A pair run's partner holds pieces at the hand-off. With no robot to pose it on (a field without
+    // our dead partner), they go on the floor where it stood, so every piece stays in play.
+    const pf = this.trace.partnerFrames;
+    const q = pf?.[pf.length - 1];
+    if (q && this.partner < 0) {
+      const p = fromPedro([q[0], q[1], q[2]]);
+      carriedOf(q[3], q[4]).forEach((kind, i) => {
+        const r = kind === "pollen" ? FIELD.pollenRadius : FIELD.nectarRadius;
+        const d = (i - (q[3] - 1) / 2) * 0.14;
+        field.pieces.push({
+          kind,
+          x: Math.max(
+            -FIELD.half + r,
+            Math.min(FIELD.half - r, p.x + d * Math.sin(p.h)),
+          ),
+          y: r,
+          z: Math.max(
+            -FIELD.half + r,
+            Math.min(FIELD.half - r, p.z + d * Math.cos(p.h)),
+          ),
+        });
+      });
+    }
     // A HIVE that tipped twice (or 4 times) has its starting CELL raised again, but its staged NECTAR
     // spilled at the first TIP and are among the trace's pieces. The replay never ran the physics,
     // so the simulator still has them racked: raise the other CELL first, and the hand-off clears
@@ -349,6 +463,13 @@ export class AutoPlayback {
     );
     this.handedOver = true;
   }
+}
+
+/** A robot's lane: `held` pieces, the first `nectar` of them our NECTAR (red: the drill plays red). */
+function carriedOf(held: number, nectar = 0): BallKind[] {
+  return Array.from({ length: held }, (_, i) =>
+    i < (nectar ?? 0) ? ("nectar_red" as const) : ("pollen" as const),
+  );
 }
 
 /** Each HIVE's raised CELL at the start, and the NECTAR staged in it (Competition Manual 10.3.1). */

@@ -419,7 +419,12 @@ export class DrillSession {
    */
   playAuto(trace: AutoTrace): void {
     if (this.started) throw new Error("playAuto: the run has started");
-    this.playback = new AutoPlayback(trace, this.sim, 0);
+    // A pair run carries its partner too: our dead partner (a match field) runs that Auto in the
+    // replay, and stays where it ended for TeleOp.
+    const k = trace.partnerFrames ? this.deadPartnerIndex() : -1;
+    this.playback = new AutoPlayback(trace, this.sim, 0, k);
+    if (k >= 0 && trace.partnerAuto)
+      this.deadPartnerAt = `the end of ${trace.partnerAuto}'s AUTO`;
   }
 
   /**

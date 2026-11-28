@@ -57,6 +57,19 @@
         border-bottom: 1px solid var(--line);
         flex-wrap: wrap;
       }
+      /* Under the Match picker: which run of the Auto plays (src/drill/main.ts showMatchInfo). */
+      #match-info {
+        margin: 2px 0 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--dim);
+      }
+      #match-info a {
+        color: var(--accent);
+      }
+      .stale {
+        color: var(--warn);
+      }
       header .spacer {
         flex: 1;
       }
@@ -591,6 +604,7 @@
             </option>
           </select></label
         >
+        <p id="match-info" class="note" hidden></p>
         <label
           >Opening
           <select id="opening">
