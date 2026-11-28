@@ -15,7 +15,7 @@
  * - a catch whose wait ends any other way (✗, its time limit or the endgame guard) sends it only
  *   {@link NECTAR_SHORT} of the way: it stops there and stays, and no later catch takes it;
  * - a caught NECTAR rides in the robot until that robot's next `LaunchOneAimed` that fires, then
- *   flies to the CELL at the robot's end over the launch's last {@link NECTAR_FLIGHT_S}, landing
+ *   flies from the turret to the CELL at the robot's end over the launch's last {@link NECTAR_FLIGHT_S}, landing
  *   as the launch ends (when the preview's HIVE counts it), and is drawn no more: it is the CELL's;
  * - one nobody catches stays where it is.
  *
@@ -27,6 +27,7 @@ import { boxCentre, robotFootprint } from "../../model/collision";
 import { polygonsOverlap } from "../../utils/geometry";
 import { aimedLeft } from "../timing/model";
 import { RED_CELLS } from "./hiveView";
+import { TURRET_AXIS } from "../simple/aim";
 
 interface Point {
   x: number;
@@ -146,6 +147,25 @@ function zoneClearFrom(robots: NectarRobot[], t0: number): number | null {
   return null;
 }
 
+/** The turret's axis at `t`, where a launched piece leaves the robot. */
+export function turretAxisAt(
+  robot: Pick<NectarRobot, "poseAt">,
+  t: number,
+): Point {
+  const pose = robot.poseAt(t);
+  const h = (pose.heading * Math.PI) / 180;
+  return {
+    x:
+      pose.x +
+      TURRET_AXIS.forwardIn * Math.cos(h) -
+      TURRET_AXIS.leftIn * Math.sin(h),
+    y:
+      pose.y +
+      TURRET_AXIS.forwardIn * Math.sin(h) +
+      TURRET_AXIS.leftIn * Math.cos(h),
+  };
+}
+
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 const lerp = (a: Point, b: Point, p: number): Point => ({
   x: a.x + (b.x - a.x) * p,
@@ -231,7 +251,7 @@ export function nectarTracks(
     track.flight = {
       t0,
       t1: shot.t1,
-      from: track.heldAt(t0),
+      from: turretAxisAt(robot, t0),
       to: { x: cell.x + cell.w / 2, y: cell.y + cell.h / 2 },
     };
   }

@@ -7,7 +7,12 @@
  * Only the red HIVE: the Visualizer draws the red alliance. Blue is red turned half a turn about
  * the field's centre, so a blue view turns the whole drawing.
  */
-import type { CausedTip, TimingValues, VolleyEffect } from "../timing/model";
+import {
+  NECTAR_WEIGHT,
+  type CausedTip,
+  type TimingValues,
+  type VolleyEffect,
+} from "../timing/model";
 
 export type Cell = "right" | "left";
 
@@ -25,6 +30,8 @@ export interface CellView {
   pollen: number;
   /** Whether its 3 NECTAR are still in it (only the CELL up at the start has any, until TIP 1). */
   nectar: boolean;
+  /** The human player's NECTAR shot into it since it came up (LaunchOneAimed); not in `pollen`. */
+  scored: number;
 }
 
 export type HiveView = Record<Cell, CellView>;
@@ -49,24 +56,35 @@ export function hiveAt(
       ? tips[started - 1]
       : null;
   const view: HiveView = {
-    right: { down: 0, pollen: 0, nectar: false },
-    left: { down: 0, pollen: 0, nectar: false },
+    right: { down: 0, pollen: 0, nectar: false, scored: 0 },
+    left: { down: 0, pollen: 0, nectar: false, scored: 0 },
   };
-  /** Weight in the CELL raised after `n` TIPs, as at `t`: what landed since the TIP that raised it. */
-  const loadAfter = (n: number): number => {
+  /**
+   * The CELL raised after `n` TIPs, as at `t` (or up to the volley `until`): its weight, what landed
+   * since the TIP that raised it, and how many of the human player's NECTAR are in that.
+   */
+  const contentsAfter = (n: number, until = Infinity) => {
     const from = n === 0 ? -1 : tips[n - 1].cause;
     let load = n === 0 ? values.startLoad : 0;
-    for (let i = from + 1; i < volleys.length; i++) {
+    let scored = 0;
+    for (let i = from + 1; i < volleys.length && i <= until; i++) {
       const v = volleys[i];
       if (v.t > t + 1e-9) break;
       if (!v.counted) continue;
       load = v.load;
+      scored += v.nectar ?? 0;
       if (v.tip !== null) break;
     }
-    return load;
+    return { load, scored };
   };
-  const pollenIn = (n: number, load: number) =>
-    Math.max(0, Math.round(n === 0 ? load - values.startLoad : load));
+  const pollenIn = (n: number, c: { load: number; scored: number }) =>
+    Math.max(
+      0,
+      Math.round(
+        (n === 0 ? c.load - values.startLoad : c.load) -
+          c.scored * NECTAR_WEIGHT,
+      ),
+    );
   if (swinging) {
     // The CELL that was up goes down over the swing, with what tipped it; the other comes up empty.
     const n = started - 1;
@@ -79,21 +97,25 @@ export function hiveAt(
           Math.max(1e-6, swinging.settled - swinging.start),
       ),
     );
+    const tipped = contentsAfter(n, swinging.cause);
     view[from] = {
       down: p,
-      pollen: pollenIn(n, volleys[swinging.cause]?.load ?? 0),
+      pollen: pollenIn(n, tipped),
       nectar: n === 0,
+      scored: tipped.scored,
     };
-    view[other(from)] = { down: 1 - p, pollen: 0, nectar: false };
+    view[other(from)] = { down: 1 - p, pollen: 0, nectar: false, scored: 0 };
     return view;
   }
   const up = upAfter(started);
+  const now = contentsAfter(started);
   view[up] = {
     down: 0,
-    pollen: pollenIn(started, loadAfter(started)),
+    pollen: pollenIn(started, now),
     nectar: started === 0,
+    scored: now.scored,
   };
-  view[other(up)] = { down: 1, pollen: 0, nectar: false };
+  view[other(up)] = { down: 1, pollen: 0, nectar: false, scored: 0 };
   return view;
 }
 

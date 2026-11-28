@@ -871,8 +871,12 @@
               />
             {/if}
             <!-- Fork: the human player's NECTAR, over the paths so a piece on one is seen. -->
-            {#if auto.nectar.length && /biobuzz/.test(fieldMapSrc)}
-              <NectarPieces tracks={auto.nectar} seconds={playback.seconds} />
+            {#if (auto.nectar.length || auto.pollen.length) && /biobuzz/.test(fieldMapSrc)}
+              <NectarPieces
+                tracks={auto.nectar}
+                pollen={auto.pollen}
+                seconds={playback.seconds}
+              />
             {/if}
           </g>
         </svg>
