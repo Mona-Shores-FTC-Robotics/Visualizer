@@ -294,7 +294,11 @@ export class ProjectFiles {
       const primary = workspaceFileKey(folder.id, binding.name);
       const paths = [primary];
       for (const name of names) {
-        if (!/^partners\/[A-Za-z0-9._ -]+\.pp$/.test(name))
+        // A stand-in from partners/, or one of our own Autos (a pair's other half).
+        if (
+          !/^(partners\/)?[A-Za-z0-9._ -]+\.pp$/.test(name) ||
+          name === binding.name
+        )
           throw new Error("Choose a partner from the checkout.");
         const text = await folder.folder.readText(`TeamCode/autos/${name}`);
         if (!text || !this.read(text))

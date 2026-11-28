@@ -30,6 +30,7 @@
   } from "../team/spotsStore";
   import { loadTeamTiming } from "../timing/store";
   import { showToast } from "../toast";
+  import { PAIRS_FILE, TEAM_DIR, parsePairs, type TeamPair } from "../team/teamAutos";
 
   let {
     isOpen = $bindable(false),
@@ -40,6 +41,10 @@
   let partners = $state<string[]>([]);
   let selected = $state("");
   let partner = $state("");
+  /** The checkout's pairs.json: a paired Auto opens beside its other half. */
+  let pairs = $state<TeamPair[]>([]);
+  /** The partner the dialog chose from pairs.json, so a pick the user made is left alone. */
+  let pairedPartner = "";
   let checkpointName = $state("");
   let checkpoints = $state<Checkpoint[]>([]);
   let loading = $state(false);
@@ -61,7 +66,19 @@
           ...(await listRepoAutos(checkout.folder)),
           ...(await listRepoDrafts(checkout.folder)),
         ];
-        partners = await listPartners(checkout.folder);
+        // Our own Autos first (a pair's other half), then the stand-ins in partners/.
+        partners = [
+          ...(await listRepoAutos(checkout.folder)),
+          ...(await listPartners(checkout.folder)),
+        ];
+        const pairsText = await checkout.folder.readText(
+          `${TEAM_DIR}/${PAIRS_FILE}`,
+        );
+        try {
+          pairs = pairsText ? parsePairs(pairsText) : [];
+        } catch {
+          pairs = [];
+        }
         checkpoints = (await listCheckpoints(checkout.folder)).filter(
           (p) => p.branch === checkout.branch,
         );
@@ -74,6 +91,24 @@
       loading = false;
     }
   }
+
+  /** The other half of the pair `name` is in, from pairs.json; "" when it is in none. */
+  function otherHalf(name: string): string {
+    const pair = pairs.find((p) => p.files.includes(name));
+    const other = pair?.files.find((f) => f !== name) ?? "";
+    return partners.includes(other) ? other : "";
+  }
+
+  // A paired Auto offers its other half as the partner, unless the user picked another.
+  $effect(() => {
+    const half = otherHalf(selected);
+    untrack(() => {
+      if (partner === "" || partner === pairedPartner) {
+        partner = half;
+        pairedPartner = half;
+      }
+    });
+  });
 
   async function choose() {
     try {
@@ -238,13 +273,17 @@
             bind:value={partner}
             disabled={loading}
             ><option value="">No partner</option
-            >{#each partners as name (name)}<option value={name}
-                >{name.slice(9, -3)}</option
+            >{#each partners.filter((n) => n !== selected) as name (name)}<option
+                value={name}
+                >{name.startsWith("partners/")
+                  ? `${name.slice(9, -3)} (stand-in)`
+                  : name.slice(0, -3)}</option
               >{/each}</select
           >
         </label>
         <p class="text-xs text-body">
-          Partners are references from this checkout. Your current auto stays
+          Partners are references from this checkout: our own Autos (a pair
+          opens with its other half, from pairs.json) and the stand-ins. Your current auto stays
           live while you edit; Save writes that same auto back here.
         </p>
         <div class="flex gap-2">
