@@ -12,6 +12,8 @@ import {
   savedStamp,
 } from "./javaAuto";
 import { buildPathCatalog } from "../../auto/geometry";
+import rSoloNectarText from "./fixtures/r-solo-nectar.pp?raw";
+import { isBuilderAuto, isGuardedAuto } from "../../simple/steps";
 import type { AutoSection, FirstOfCard } from "../../auto/types";
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -264,4 +266,18 @@ test("LaunchAllAimed away from a park exports kit.commandAwayFromPark; right aft
   );
   const after = sourceOf(parked);
   assert(after.includes('kit.command("LaunchAllAimed")'), after);
+});
+
+test("a human NECTAR hold keeps the endgame guards of the steps before it", () => {
+  const data = JSON.parse(rSoloNectarText);
+  const result = generateAutoJavaFromText(rSoloNectarText, "r-solo.pp");
+  assert(result.ok, JSON.stringify(result));
+  // The hold has no builder control, so the step editor treats the Auto as advanced…
+  assert(!isBuilderAuto(data.auto), "the step editor treats it as advanced");
+  // …but the guard still protects the steps before it, as in R-Solo without the hold.
+  assert(isGuardedAuto(data.auto), "guarded as builder steps");
+  assert(
+    result.source.includes('kit.guarded("Auto"'),
+    "the outer guard is there",
+  );
 });
