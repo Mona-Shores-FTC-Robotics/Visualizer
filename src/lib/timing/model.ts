@@ -455,6 +455,10 @@ export function previewTiming(
       if ((name === SPIN_UP_COMMAND || volleysIn(name) > 0) && spunAt === null)
         spunAt = t0;
       if (volleysIn(name) > 0 && fed) full = false;
+      // A GARDEN gather that runs its step takes the row's four (biobuzz's simulator with the
+      // corner wheels, PR #774): the lane is full as it ends, so an IntakeFull check right after
+      // it reads full at once, as on the robot.
+      if (name === GATHER_COMMAND) full = true;
     },
     becameTrue(condition) {
       if (condition === "IntakeFull") full = true;

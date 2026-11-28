@@ -1989,6 +1989,17 @@ describe("Pick flower and launch", () => {
     expect(history.volleys[1].load).toBe(2 * values.volleyLoad);
   });
 
+  it("reads the lane full at once after a GARDEN gather, and empty again after a volley", () => {
+    const values = fallbackValues();
+    const timing = previewTiming(values, []);
+    timing.commandRan?.("LaunchAll", 0, 2.5);
+    expect(timing.trueAt("IntakeFull", 3)).toBeCloseTo(3 + values.intakeFullS, 6);
+    timing.commandRan?.("GardenGather", 3, 3 + values.gardenGatherS);
+    expect(timing.trueAt("IntakeFull", 6)).toBe(6);
+    timing.commandRan?.("LaunchAll", 8, 10.5);
+    expect(timing.trueAt("IntakeFull", 11)).toBeCloseTo(11 + values.intakeFullS, 6);
+  });
+
   it("takes two volleys' feeds and its moves with typical timing, and waits for the launcher", () => {
     const values = fallbackValues();
     const timing = previewTiming(values, []);
