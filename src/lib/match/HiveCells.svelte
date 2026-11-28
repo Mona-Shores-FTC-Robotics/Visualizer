@@ -2,7 +2,7 @@
   /**
    * Fork: the red HIVE's CELLs over the field image, at the playback clock (hiveView.ts). Each CELL
    * is drawn over the image's own (which shows the HIVE as the match starts): up, it is light and
-   * outlined, and holds its pieces (the start's 3 NECTAR, then the POLLEN that land); down, it is
+   * outlined, and holds its pieces (the start's 3 NECTAR, the human player's NECTAR shot in, then the POLLEN that land); down, it is
    * dark and empty, since what was in it spilled out. A TIP crossfades the two over its swing.
    * Drawn inside the field's own group: inches, Pedro's frame.
    */
@@ -69,10 +69,11 @@
   }
   const CELLS: Cell[] = ["left", "right"];
   /** The CELL's pieces, NECTAR first: two rows of four. */
-  function pieces(cell: Cell, nectar: boolean, pollen: number) {
+  function pieces(cell: Cell, nectar: boolean, pollen: number, scored: number) {
     const box = RED_CELLS[cell];
     const kinds = [
       ...(nectar ? Array(3).fill("nectar") : []),
+      ...Array(Math.max(0, scored)).fill("nectar"),
       ...Array(Math.max(0, pollen)).fill("pollen"),
     ].slice(0, 8) as ("nectar" | "pollen")[];
     return kinds.map((kind, i) => ({
@@ -117,7 +118,7 @@
       stroke-width={1}
       opacity={1 - state.down}
     />
-    {#each pieces(cell, state.nectar, state.pollen) as piece, i (i)}
+    {#each pieces(cell, state.nectar, state.pollen, state.scored) as piece, i (i)}
       <circle
         cx={piece.x}
         cy={piece.y}
@@ -139,8 +140,10 @@
       stroke="#16181c"
       stroke-width="0.6"
       paint-order="stroke"
-      data-testid="assumed-tip-label">{assumedLabel}</text
+      data-testid="assumed-tip-label"
     >
+      {assumedLabel}
+    </text>
   {/if}
   {#each misses as miss, m (m)}
     {@const drawing = missDrawing(miss)}

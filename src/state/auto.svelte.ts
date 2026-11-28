@@ -40,6 +40,7 @@ import {
   type NectarRobot,
   type NectarTrack,
 } from "../lib/match/nectar";
+import { pollenFlights, type PieceFlight } from "../lib/match/pollen";
 import {
   aimMovedLaunchSpots,
   aimOwnLaunchSpots,
@@ -341,6 +342,16 @@ export class AutoState {
   nectar = $derived.by((): NectarTrack[] => {
     const tips = this.hive?.history.tips ?? [];
     if (!tips.length) return [];
+    return nectarTracks(tips, this.#fieldRobots);
+  });
+
+  /** Fork: the volleys' POLLEN in what the field shows, from the turret to the CELL (lib/match/pollen.ts). */
+  pollen = $derived.by((): PieceFlight[] =>
+    pollenFlights(this.#fieldRobots, this.hive?.values.volleyLoad ?? 4),
+  );
+
+  /** Fork: the robots the field shows, as the NECTAR and the POLLEN need them. */
+  #fieldRobots = $derived.by((): NectarRobot[] => {
     const robot = (
       preview: PreviewResult,
       doc: Pick<ProjectDoc, "startPoint" | "lines">,
@@ -353,21 +364,16 @@ export class AutoState {
     });
     if (this.#overlays.active) {
       const { previews, shown } = this.overlayTogether;
-      return nectarTracks(
-        tips,
-        shown.flatMap((overlay) => {
-          const preview = previews.get(overlay);
-          return preview
-            ? [robot(preview, overlay.doc, this.#overlays.settingsFor(overlay))]
-            : [];
-        }),
-      );
+      return shown.flatMap((overlay) => {
+        const preview = previews.get(overlay);
+        return preview
+          ? [robot(preview, overlay.doc, this.#overlays.settingsFor(overlay))]
+          : [];
+      });
     }
     const preview = this.preview;
     return preview
-      ? nectarTracks(tips, [
-          robot(preview, this.#project.doc, this.#getSettings()),
-        ])
+      ? [robot(preview, this.#project.doc, this.#getSettings())]
       : [];
   });
 

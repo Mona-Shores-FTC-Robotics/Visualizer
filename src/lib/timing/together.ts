@@ -124,7 +124,12 @@ export function volleysOf(
       .map((l) =>
         oneShotWeight(l.command) > 0
           ? // A one-ball launch lands its one piece (a NECTAR's weight for LaunchOneAimed).
-            { t: l.t1, robot, load: oneShotWeight(l.command) }
+            {
+              t: l.t1,
+              robot,
+              load: oneShotWeight(l.command),
+              ...(l.command === "LaunchOneAimed" ? { nectar: 1 } : {}),
+            }
           : {
               t: l.t1,
               robot,

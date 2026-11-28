@@ -222,23 +222,39 @@ export interface TurretSpan {
   t1: number;
 }
 
+/** The cards that aim the turret at the CELL while they run (biobuzz AimedVolley, FlowerVolley). */
+export const TURRET_AIMED_COMMANDS = new Set([
+  PICK_FLOWER_LAUNCH,
+  "LaunchAllAimed",
+  "LaunchOneAimed",
+]);
+/** The human player's NECTAR hold, through which the turret stays on the CELL for the shot after it. */
+const CATCH_COMMAND = "CatchNectar";
+
 /**
- * When the robot's own cards turn the turret: a Pick flower and launch aims it for as long as it
- * runs, and from the start of the drive right before it (its approach: biobuzz
- * FlowerVolley.approach), so it has swung round by the FLOWER. Every other card leaves it straight
- * ahead.
+ * When the robot's own cards turn the turret: a Pick flower and launch, a Launch all aimed and a
+ * Launch one aimed aim it for as long as they run, and from the start of the drive right before
+ * them (their approach: biobuzz FlowerVolley.approach, AimedVolley), so it has swung round by the
+ * shot. A Launch one aimed after a CatchNectar hold aims it from the drive before the hold (the
+ * turn to the LOADING ZONE), so it holds the CELL while the robot turns and waits. Every other card
+ * leaves it straight ahead.
  */
 export function turretSpans(preview: {
   actions: { command: string; t0: number; t1: number }[];
   drives: { t0: number; t1: number }[];
+  launches?: { command: string; t0: number; t1: number }[];
 }): TurretSpan[] {
-  return preview.actions
-    .filter((action) => action.command === PICK_FLOWER_LAUNCH)
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  return [...preview.actions, ...(preview.launches ?? [])]
+    .filter((action) => TURRET_AIMED_COMMANDS.has(action.command))
     .map((action) => {
-      const before = preview.drives.find(
-        (drive) => Math.abs(drive.t1 - action.t0) < 1e-6,
+      let t0 = action.t0;
+      const hold = (preview.launches ?? []).find(
+        (l) => l.command === CATCH_COMMAND && l.t0 < t0 && l.t1 >= t0 - 0.05,
       );
-      return { t0: before ? before.t0 : action.t0, t1: action.t1 };
+      if (hold && action.command === "LaunchOneAimed") t0 = hold.t0;
+      const before = preview.drives.find((drive) => near(drive.t1, t0));
+      return { t0: before ? before.t0 : t0, t1: action.t1 };
     });
 }
 

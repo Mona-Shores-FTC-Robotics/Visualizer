@@ -132,7 +132,7 @@ describe("the human player's NECTAR", () => {
     expect(nectarAt(track, 6.1)!.state).toBe("rolling");
   });
 
-  it("rides in the robot once caught, then flies to the CELL at the robot's end and lands as the launch ends", () => {
+  it("rides in the robot once caught, then flies from the turret to the CELL at the robot's end and lands as the launch ends", () => {
     // The robot drives on after the catch; the NECTAR goes with it.
     const pose = (t: number): Pose =>
       t <= 9
@@ -164,8 +164,12 @@ describe("the human player's NECTAR", () => {
     });
     const flying = nectarAt(track, 12.2 - NECTAR_FLIGHT_S / 2)!;
     expect(flying.state).toBe("flying");
-    expect(flying.x).toBeCloseTo((41 + NECTAR_HELD_IN + target.x) / 2);
-    expect(flying.y).toBeCloseTo((120 + target.y) / 2);
+    // It leaves from the turret (behind and right of centre: facing 180°, that is +x and +y).
+    const turret = { x: 50 + 3.33, y: 120 + 2.68 };
+    expect(track.flight!.from.x).toBeCloseTo(turret.x);
+    expect(track.flight!.from.y).toBeCloseTo(turret.y);
+    expect(flying.x).toBeCloseTo((turret.x + target.x) / 2);
+    expect(flying.y).toBeCloseTo((turret.y + target.y) / 2);
     // Landed: it is the CELL's now (the preview's HIVE counts it from here).
     expect(nectarAt(track, 12.2)).toBeNull();
   });

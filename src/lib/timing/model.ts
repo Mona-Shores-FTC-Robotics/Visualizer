@@ -305,6 +305,8 @@ export interface Volley {
   load?: number;
   /** How many volleys' worth it is, when not one (a Pick flower and launch is two). */
   volleys?: number;
+  /** Fork: how many of its pieces are the human player's NECTAR (LaunchOneAimed: 1), drawn as NECTAR. */
+  nectar?: number;
   /**
    * The stand-in for the partner's volley an Auto previewed alone takes to come (together.ts
    * tipsCome): it lands whatever the raised CELL still needs to TIP.
