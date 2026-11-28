@@ -28,3 +28,4 @@ playwright-report
 ws_client.html
 
 vite.config.d.ts
+__pycache__/
