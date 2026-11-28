@@ -379,14 +379,23 @@ export const PRIORITY_OPTION = "Priority";
  * the park (`AutoKit.parkComesFirst`, `goForVolleyIfItFits`).
  */
 export function tipBeforePark(auto: AutoSection, scenario: Scenario): boolean {
+  // biobuzz AutoOption.ENDGAME (27 Nov 2026, PR #772): every Auto's INIT menu has the Endgame row,
+  // TIPS FIRST the default, PARK FIRST the drive team's pick; the Priority row follows it.
+  if (scenario[ENDGAME_OPTION] === false) return false;
   for (const card of allCards(auto.cards)) {
     if (card.kind !== "firstOf" || card.choice !== PRIORITY_OPTION) continue;
     const drawn = card.rows.find((row) => "when" in row);
     const trigger = drawn && "when" in drawn ? drawn.when[0] : undefined;
     if (trigger) return answerFor(scenario, card, trigger);
   }
-  return false;
+  return true;
 }
+
+/**
+ * The Endgame row every Auto gets on its INIT menu (biobuzz `AutoOption.ENDGAME`, never drawn):
+ * a scenario's `Endgame` false is PARK FIRST; unset or true, TIPS FIRST, the default.
+ */
+export const ENDGAME_OPTION = "Endgame";
 
 /** Seconds the export writes for a park path: its drive time at the drawing's speed, rounded up to 0.1 s. */
 export function parkSeconds(seconds: number): number {

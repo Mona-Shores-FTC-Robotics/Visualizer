@@ -118,7 +118,8 @@ function rQualsV2(): ProjectDoc {
 function preview(doc: ProjectDoc) {
   const lines = relink(doc.startPoint, doc.lines, doc.auto!, settings).lines;
   const catalog = buildPathCatalog(doc.startPoint, lines, settings);
-  return simulateAuto(doc.auto!, catalog, doc.startPoint, {});
+  // PARK FIRST: these tests are about the guard's park (TIPS FIRST is the default since biobuzz #772).
+  return simulateAuto(doc.auto!, catalog, doc.startPoint, { Endgame: false });
 }
 
 describe("the simple builder", () => {

@@ -51,6 +51,8 @@ describe("a Wait's outcome entered with too little time left", () => {
       };
       const result = simulateAuto(slow, catalog, doc.startPoint, {
         [switchKey(wait.id)]: tipped,
+        // PARK FIRST: the guard's park is what this test is about (TIPS FIRST is the default).
+        Endgame: false,
       });
       expect(result.guard).not.toBeNull();
       const last = result.drives[result.drives.length - 1];
