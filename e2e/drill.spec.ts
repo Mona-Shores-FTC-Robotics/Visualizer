@@ -433,12 +433,17 @@ for (const [auto, name, field] of [
     await page.locator("#population").selectOption(field);
     await page.locator("#match").selectOption(auto);
     const info = page.locator("#match-info");
-    await expect(info).toContainText(`${name}, as on master,`);
+    await expect(info).toContainText(`${name}, as on master,`, {
+      timeout: 20000,
+    });
     await expect(info.locator("a", { hasText: "Logs" })).toHaveAttribute(
       "href",
       /github\.com\/Mona-Shores-FTC-Robotics\/biobuzz\/tree\/sim-results\//,
     );
     await bind(page, 0);
+    await expect(page.locator("#start")).toContainText("Start the match", {
+      timeout: 20000,
+    });
     await setPad(page, 0, [BTN.OPTIONS]);
     await expect(page.locator("#clock")).toContainText(name);
     await setPad(page, 0);

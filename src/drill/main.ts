@@ -949,6 +949,7 @@ async function main() {
     };
   matchSel.onchange = async () => {
     savePrefs();
+    showMatchInfo(); // from the index at once; again once the trace has loaded
     await ensureTrace(matchSel.value);
     await ensureTrace(partnerAutoFor(matchSel.value) ?? "");
     newSession();
