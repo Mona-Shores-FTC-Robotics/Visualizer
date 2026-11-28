@@ -516,12 +516,38 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
     return `kit.path(${javaString(parts.map((p) => p.info.name).join(" → "))}, Paths.path(${parts.map((p) => p.varName).join(", ")}), ${javaNumber(parkSeconds(seconds))})`;
   };
 
+  /**
+   * Fork: the LaunchAllAimed cards drawn where the robot has not parked (no park card since its last
+   * drive): an ordinary aimed volley the guard parks after (biobuzz AutoKit.commandAwayFromPark).
+   * Right after a park card it stays the parked volley (kit.command). After a block, the robot is
+   * parked only if every row ends parked.
+   */
+  const awayFromPark = new Set<string>();
+  const walkParked = (cards: AutoCard[], parked: boolean): boolean => {
+    for (const card of cards) {
+      if (card.kind === "path") parked = card.park === true;
+      else if (card.kind === "action") {
+        if (card.name === "LaunchAllAimed" && !parked)
+          awayFromPark.add(card.id);
+      } else if (card.kind === "firstOf") {
+        const ends = card.rows.map((row) => walkParked(row.cards, parked));
+        parked = ends.length > 0 && ends.every(Boolean);
+      }
+    }
+    return parked;
+  };
+  walkParked(auto.cards, false);
+
   const cardNode = (card: AutoCard): JNode => {
     switch (card.kind) {
-      case "action":
+      case "action": {
+        const call = awayFromPark.has(card.id)
+          ? "kit.commandAwayFromPark"
+          : "kit.command";
         return card.timeoutS
-          ? `kit.command(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
-          : `kit.command(${javaString(card.name)})`;
+          ? `${call}(${javaString(card.name)}, ${javaNumber(card.timeoutS)})`
+          : `${call}(${javaString(card.name)})`;
+      }
       case "path": {
         // Fork: a drive that carries a park from its spot:
         // kit.path(label, path, seconds, park, parkSeconds).
