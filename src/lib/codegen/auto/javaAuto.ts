@@ -32,7 +32,7 @@ import {
   waitParkLine,
 } from "../../auto/tree";
 import { isUsed, pointUses } from "../../auto/pins";
-import { isBuilderAuto } from "../../simple/steps";
+import { isGuardedAuto } from "../../simple/steps";
 import {
   type AutoCard,
   type AutoRow,
@@ -604,7 +604,7 @@ export function generateAutoJava(input: AutoExportInput): AutoExportResult {
 
   // Only in an Auto made of builder steps: a paired Auto's hand-made decisions keep the guards
   // they were drawn and timed with.
-  const builderAuto = isBuilderAuto(auto);
+  const builderAuto = isGuardedAuto(auto);
 
   /** The park for a list whose last card is a wait that parks (tree.ts waitParkLine). */
   const parkOfLastWait = (list: AutoCard[]): string | null =>

@@ -580,12 +580,45 @@ export function isSimple(doc: ProjectDoc): boolean {
  * the steps that lead to a Wait that parks (codegen/auto/javaAuto.ts).
  */
 export function isBuilderAuto(auto: AutoSection): boolean {
+  return builderSteps(auto, false);
+}
+
+/** The command a NECTAR hold runs alongside its wait (biobuzz CatchNectar). */
+const CATCH_NECTAR = "CatchNectar";
+
+/**
+ * Fork: whether the endgame guard treats the Auto as builder steps ({@link isBuilderAuto}), where a
+ * human NECTAR hold (a wait run alongside CatchNectar), the block around it and the checks inside it
+ * also count. They have no builder control, so the step editor still treats the Auto as advanced, but
+ * the guards that protect the steps before them stay: without this, one hold cost R-Solo and
+ * L-RightUnderHive the outer "Auto" guard (28 Nov 2026). Only an Auto with a hold is affected. The
+ * export and the preview ask.
+ */
+export function isGuardedAuto(auto: AutoSection): boolean {
+  return builderSteps(auto, true);
+}
+
+function builderSteps(auto: AutoSection, holdCounts: boolean): boolean {
   const view = structuredClone(auto);
   unfold(view);
-  const steps = (cards: AutoCard[]): boolean =>
+  /** A block is part of a NECTAR hold's logic: the hold, or one that holds one somewhere inside. */
+  const holdsNectar = (card: AutoCard): boolean =>
+    card.kind === "firstOf" &&
+    (card.alongside === CATCH_NECTAR ||
+      card.rows.some((row) => row.cards.some(holdsNectar)));
+  const steps = (cards: AutoCard[], inHold = false): boolean =>
     cards.every((card) => {
       if (card.kind === "action" || card.kind === "path") return true;
       if (card.kind !== "firstOf") return false;
+      // The hold, the block around it and the checks inside it (the NECTAR's "CELL still up?"
+      // before its shot) have no builder control; for the guard they are steps like any other.
+      if (
+        holdCounts &&
+        !card.choice &&
+        !card.shot &&
+        (inHold || holdsNectar(card))
+      )
+        return card.rows.every((row) => steps(row.cards, true));
       const choice = choiceOf(card);
       if (choice) return choice.legs.every((leg) => steps(leg.cards));
       const wait = waitOf(card);

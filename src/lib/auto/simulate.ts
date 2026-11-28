@@ -19,7 +19,7 @@ import {
 import { poseAlong, type Motion } from "./motion";
 import { LOWER_WITHIN_IN, pickFrom, pickMotions } from "../simple/flowers";
 import { gatherPlan } from "../simple/garden";
-import { isBuilderAuto } from "../simple/steps";
+import { isGuardedAuto } from "../simple/steps";
 import {
   DEFAULT_TIMEOUT_S,
   rowKind,
@@ -443,7 +443,7 @@ export function simulateAuto(
    * Fork: an Auto made of builder steps guards a list that ends in a wait that parks with that
    * wait's park, as the export does (javaAuto.ts, tree.ts waitParkLine).
    */
-  const builderAuto = isBuilderAuto(auto);
+  const builderAuto = isGuardedAuto(auto);
 
   let t = 0;
   let pos: BasePoint = { x: startPoint.x, y: startPoint.y };
