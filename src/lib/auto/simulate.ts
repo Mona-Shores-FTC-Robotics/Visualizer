@@ -41,6 +41,7 @@ import {
 export const FEEDING_LAUNCHES: ReadonlySet<string> = new Set([
   "LaunchAll",
   "LaunchOne",
+  "LaunchOneAimed",
   "PickFlowerLaunch",
 ]);
 

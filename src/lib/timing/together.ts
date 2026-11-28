@@ -20,6 +20,7 @@ import {
   ROBOT_FACTS,
   TIP_CONDITIONS,
   volleysIn,
+  oneShotWeight,
   countsInAuto,
   type Tip,
   type TimingValues,
@@ -115,15 +116,24 @@ export function volleysOf(
 ): Volley[] {
   return previews.flatMap((p, robot) =>
     [...p.launches, ...p.actions]
-      .filter((l) => volleysIn(l.command) > 0 && !l.unfired)
-      .map((l) => ({
-        t: l.t1,
-        robot,
-        load: loads[robot],
-        ...(volleysIn(l.command) === 1
-          ? {}
-          : { volleys: volleysIn(l.command) }),
-      })),
+      .filter(
+        (l) =>
+          (volleysIn(l.command) > 0 || oneShotWeight(l.command) > 0) &&
+          !l.unfired,
+      )
+      .map((l) =>
+        oneShotWeight(l.command) > 0
+          ? // A one-ball launch lands its one piece (a NECTAR's weight for LaunchOneAimed).
+            { t: l.t1, robot, load: oneShotWeight(l.command) }
+          : {
+              t: l.t1,
+              robot,
+              load: loads[robot],
+              ...(volleysIn(l.command) === 1
+                ? {}
+                : { volleys: volleysIn(l.command) }),
+            },
+      ),
   );
 }
 
