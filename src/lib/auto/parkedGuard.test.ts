@@ -78,7 +78,11 @@ for (const priority of ["THREE_TIP", "PARK"] as const)
   test(`Clockwise, TIP 2 missing, Priority ${priority}: no guard parks L again once it stands on a park`, () => {
     const r = entry(rClockwise);
     if (priority === "PARK") r.scenario = { Priority: false };
-    const { previews, tips } = previewTogether([r, entry(lClockwise)], values);
+    // L is previewed on PARK FIRST: its park shot is what this test is about (TIPS FIRST is the
+    // Endgame default since biobuzz #772).
+    const l = entry(lClockwise);
+    l.scenario = { Endgame: false };
+    const { previews, tips } = previewTogether([r, l], values);
     const left = previews[1];
     assert(
       !left.log.some((e) => e.kind === "guard"),

@@ -42,7 +42,15 @@ test("Priority is read as the robot reads it: the drawn leg is the TIP", () => {
   const auto = entry(rText).auto;
   assert(tipBeforePark(auto, {}), "THREE_TIP is drawn");
   assert(!tipBeforePark(auto, { Priority: false }), "PARK");
-  assert(!tipBeforePark(entry(lText).auto, {}), "an Auto with no Priority row");
+  assert(
+    tipBeforePark(entry(lText).auto, {}),
+    "an Auto with no Priority row: TIPS FIRST, the Endgame default",
+  );
+  assert(
+    !tipBeforePark(entry(lText).auto, { Endgame: false }),
+    "Endgame PARK FIRST",
+  );
+  assert(!tipBeforePark(auto, { Endgame: false }), "PARK FIRST overrides Priority");
 });
 
 test("THREE_TIP: the guard goes for the third volley, and AUTO ends on the way to the park", () => {
