@@ -388,7 +388,7 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
   await setPad(page, 0, [BTN.OPTIONS]);
   await expect(page.locator("#clock")).toContainText("AUTO");
   await setPad(page, 0);
-  // Stepped to just before R-Solo's first TIP (7.3 s): its first volley is in our HIVE, and the
+  // Stepped to just before R-Solo's first TIP (master's run: 6.3 s): its first volley is in our HIVE, and the
   // page draws the trace's pieces rather than the simulator's (which wait for the hand-off).
   const at = await page.evaluate(() => {
     const s = (
@@ -403,7 +403,7 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
         };
       }
     ).__drill.session;
-    s.advance(7.1 - (s.playback?.t ?? 0));
+    s.advance(5.5 - (s.playback?.t ?? 0));
     const ps = s.replayPieces ?? [];
     return {
       t: s.playback?.t ?? -1,
@@ -414,7 +414,7 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
   expect(at.pieces).toBeGreaterThan(30);
   expect(at.high).toBeGreaterThanOrEqual(3);
   await page.screenshot({
-    path: test.info().outputPath("full-match-r-solo-7s.png"),
+    path: test.info().outputPath("full-match-r-solo-5s.png"),
   });
 });
 
