@@ -1,68 +1,255 @@
 {
- "source": "biobuzz master 629a1a3 (TeamCode/autos) and its sim-results branch",
+ "source": "biobuzz master 8c6dd5d (TeamCode/autos) and its sim-results branch",
+ "master": "8c6dd5d6460b1913697f6a4a39f43cdc1bb82318",
  "autos": [
   {
    "auto": "l-clockwise",
+   "name": "L-Clockwise",
    "alliance": "RED",
    "design": "real robot",
-   "seed": 1,
-   "autoTips": 1,
-   "finishedAt": "2026-11-23T20:54:14.083272+00:00",
-   "commit": "f6481827181d99708e906c28637ddb8f0e9615e2"
+   "seed": 12,
+   "scenario": "best",
+   "entry": "R takes the WALL FLOWER: normal",
+   "partnerAuto": "r-clockwise",
+   "autoTips": 3,
+   "tipsAt": [
+    7.86,
+    20.580000000000002,
+    28.6
+   ],
+   "finishedAt": "2026-11-28T00:58:03.482468+00:00",
+   "commit": "f66c6cdd34140e192eb53844c2a69bda9c21d7c6",
+   "branch": "auto/sim-requests-best-case",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46090267842",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/l-clockwise/f66c6cdd34140e192eb53844c2a69bda9c21d7c6/r-clockwise/r-takes-the-wall-flower-normal",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "c9d14553e8c3f51e8306909d003478edc9396835",
+    "date": "2026-11-20T18:33:50+00:00",
+    "subject": "Clockwise: THREE_TIP backs straight across; L fires from its park, parks on LEFT_AIMED_PARK"
+   }
   },
   {
    "auto": "l-left-under-hive",
-   "alliance": "RED",
-   "design": "real robot",
-   "seed": 19,
-   "autoTips": 0,
-   "finishedAt": "2026-11-23T19:53:41.840210+00:00",
-   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
-  },
-  {
-   "auto": "l-no-cross",
-   "alliance": "RED",
-   "design": "real robot",
-   "seed": 1,
-   "autoTips": 1,
-   "finishedAt": "2026-11-23T20:58:04.264214+00:00",
-   "commit": "f6481827181d99708e906c28637ddb8f0e9615e2"
-  },
-  {
-   "auto": "r-clockwise",
-   "alliance": "RED",
-   "design": "real robot",
-   "seed": 1,
-   "autoTips": 1,
-   "finishedAt": "2026-11-23T21:02:54.042598+00:00",
-   "commit": "f6481827181d99708e906c28637ddb8f0e9615e2"
-  },
-  {
-   "auto": "r-left-under-hive",
+   "name": "L-LeftUnderHive",
    "alliance": "RED",
    "design": "real robot",
    "seed": 10,
-   "autoTips": 1,
-   "finishedAt": "2026-11-23T21:06:29.484947+00:00",
-   "commit": "f6481827181d99708e906c28637ddb8f0e9615e2"
+   "scenario": "best",
+   "entry": "matching R-LeftUnderHive",
+   "partnerAuto": "r-left-under-hive",
+   "autoTips": 3,
+   "tipsAt": [
+    7.9,
+    19.900000000000002,
+    28.46
+   ],
+   "finishedAt": "2026-11-28T01:02:34.380161+00:00",
+   "commit": "f66c6cdd34140e192eb53844c2a69bda9c21d7c6",
+   "branch": "auto/sim-requests-best-case",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46090267842",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/l-left-under-hive/f66c6cdd34140e192eb53844c2a69bda9c21d7c6/r-left-under-hive/matching-r-leftunderhive",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824",
+    "date": "2026-11-20T16:04:35+00:00",
+    "subject": "Rename the lane pair R-LeftUnderHive / L-LeftUnderHive"
+   }
   },
   {
-   "auto": "r-no-cross",
+   "auto": "l-no-cross",
+   "name": "L-NoCross",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 3,
+   "scenario": "best",
+   "entry": "Everything goes smoothly",
+   "partnerAuto": "r-no-cross",
+   "autoTips": 2,
+   "tipsAt": [
+    6.0600000000000005,
+    22.240000000000002
+   ],
+   "finishedAt": "2026-11-28T00:24:38.494513+00:00",
+   "commit": "5494fe5e2184c1fda846a89f5c9389eab9188586",
+   "branch": "claude/confident-gates-m1w6us",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46085181336",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-no-cross/5494fe5e2184c1fda846a89f5c9389eab9188586/l-no-cross/everything-goes-smoothly",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "ba224254e586ebc83e2b31567a42750baa47ec83",
+    "date": "2026-11-25T09:41:08-05:00",
+    "subject": "Auto Builder: l-no-cross.pp"
+   }
+  },
+  {
+   "auto": "l-right-under-hive",
+   "name": "L-RightUnderHive",
    "alliance": "RED",
    "design": "real robot",
    "seed": 5,
-   "autoTips": 1,
-   "finishedAt": "2026-11-23T20:09:42.514428+00:00",
-   "commit": "f911720c79950a2d1a9fa56f7ac8bf9c960d46b9"
+   "scenario": "best",
+   "entry": "pair: every shot lands",
+   "partnerAuto": "r-right-under-hive",
+   "autoTips": 3,
+   "tipsAt": [
+    6.3,
+    16.76,
+    27.560000000000002
+   ],
+   "finishedAt": "2026-11-28T11:49:01.699750+00:00",
+   "commit": "5268eb2aba625e64e822fff639d5e7b1bd7a7794",
+   "branch": "claude/nectar-shared-spots",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46141413397",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-right-under-hive/5268eb2aba625e64e822fff639d5e7b1bd7a7794/l-right-under-hive/pair-every-shot-lands",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "fe08b2a806dc390f66ad430797dfe168f38e1a61",
+    "date": "2026-11-28T06:51:54-05:00",
+    "subject": "NECTAR receives at two shared team spots: NECTAR_LEFT_CATCH and NECTAR_RIGHT_CATCH (#802)"
+   }
+  },
+  {
+   "auto": "r-clockwise",
+   "name": "R-Clockwise",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 12,
+   "scenario": "best",
+   "entry": "R takes the WALL FLOWER: normal",
+   "partnerAuto": "l-clockwise",
+   "autoTips": 3,
+   "tipsAt": [
+    7.86,
+    20.580000000000002,
+    28.6
+   ],
+   "finishedAt": "2026-11-28T01:10:03.231809+00:00",
+   "commit": "f66c6cdd34140e192eb53844c2a69bda9c21d7c6",
+   "branch": "auto/sim-requests-best-case",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46090267842",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-clockwise/f66c6cdd34140e192eb53844c2a69bda9c21d7c6/l-clockwise/r-takes-the-wall-flower-normal",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "c9d14553e8c3f51e8306909d003478edc9396835",
+    "date": "2026-11-20T18:33:50+00:00",
+    "subject": "Clockwise: THREE_TIP backs straight across; L fires from its park, parks on LEFT_AIMED_PARK"
+   }
+  },
+  {
+   "auto": "r-left-under-hive",
+   "name": "R-LeftUnderHive",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 10,
+   "scenario": "best",
+   "entry": "as drawn",
+   "partnerAuto": "l-left-under-hive",
+   "autoTips": 3,
+   "tipsAt": [
+    7.9,
+    19.900000000000002,
+    28.46
+   ],
+   "finishedAt": "2026-11-28T01:15:20.257107+00:00",
+   "commit": "f66c6cdd34140e192eb53844c2a69bda9c21d7c6",
+   "branch": "auto/sim-requests-best-case",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46090267842",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-left-under-hive/f66c6cdd34140e192eb53844c2a69bda9c21d7c6/l-left-under-hive/as-drawn",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "5909a5717e6c7dffadb340c92442c1b9466b6824",
+    "date": "2026-11-20T16:04:35+00:00",
+    "subject": "Rename the lane pair R-LeftUnderHive / L-LeftUnderHive"
+   }
+  },
+  {
+   "auto": "r-no-cross",
+   "name": "R-NoCross",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 3,
+   "scenario": "best",
+   "entry": "Everything goes smoothly",
+   "partnerAuto": "l-no-cross",
+   "autoTips": 2,
+   "tipsAt": [
+    6.0600000000000005,
+    22.240000000000002
+   ],
+   "finishedAt": "2026-11-28T00:24:38.494513+00:00",
+   "commit": "5494fe5e2184c1fda846a89f5c9389eab9188586",
+   "branch": "claude/confident-gates-m1w6us",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46085181336",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-no-cross/5494fe5e2184c1fda846a89f5c9389eab9188586/l-no-cross/everything-goes-smoothly",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "3d0890534bfd916dddf4fec9bee8321cd151f167",
+    "date": "2026-11-27T15:18:33+00:00",
+    "subject": "R-NoCross: the FLOWER and GARDEN volleys from RIGHT_AUTO_OFFSET, leaving RIGHT_AUTO_FIX_TIP to L"
+   }
+  },
+  {
+   "auto": "r-right-under-hive",
+   "name": "R-RightUnderHive",
+   "alliance": "RED",
+   "design": "real robot",
+   "seed": 5,
+   "scenario": "best",
+   "entry": "pair: every shot lands",
+   "partnerAuto": "l-right-under-hive",
+   "autoTips": 3,
+   "tipsAt": [
+    6.3,
+    16.76,
+    27.560000000000002
+   ],
+   "finishedAt": "2026-11-28T11:49:01.699750+00:00",
+   "commit": "5268eb2aba625e64e822fff639d5e7b1bd7a7794",
+   "branch": "claude/nectar-shared-spots",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46141413397",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-right-under-hive/5268eb2aba625e64e822fff639d5e7b1bd7a7794/l-right-under-hive/pair-every-shot-lands",
+   "master": {
+    "fresh": true,
+    "partnerFresh": true,
+    "commit": "50046252c6156d39a9b121d709fd12bc266a6d90",
+    "date": "2026-11-27T23:34:05-05:00",
+    "subject": "RightUnderHive: no FLOWER load row; R always takes TIP 3 (#793)"
+   }
   },
   {
    "auto": "r-solo",
+   "name": "R-Solo",
    "alliance": "RED",
    "design": "real robot",
-   "seed": 4,
+   "seed": 5,
+   "scenario": "best",
+   "entry": "alone",
+   "partnerAuto": null,
    "autoTips": 2,
-   "finishedAt": "2026-11-23T21:09:19.731479+00:00",
-   "commit": "f6481827181d99708e906c28637ddb8f0e9615e2"
+   "tipsAt": [
+    6.3,
+    24.82
+   ],
+   "finishedAt": "2026-11-28T12:00:51.553543+00:00",
+   "commit": "81f619b988753d702a2d352d0b6ee58fd00ae362",
+   "branch": "claude/r-solo-shared-nectar-spot",
+   "runUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/actions/runs/46142344839",
+   "logsUrl": "https://github.com/Mona-Shores-FTC-Robotics/biobuzz/tree/sim-results/r-solo/81f619b988753d702a2d352d0b6ee58fd00ae362",
+   "master": {
+    "fresh": true,
+    "partnerFresh": null,
+    "commit": "8c6dd5d6460b1913697f6a4a39f43cdc1bb82318",
+    "date": "2026-11-28T07:04:52-05:00",
+    "subject": "R-Solo receives its NECTAR at NECTAR_LEFT_CATCH (#803)"
+   }
   }
  ]
 }

@@ -15,9 +15,11 @@ describe("the Full Match Auto traces", () => {
       "l-clockwise",
       "l-left-under-hive",
       "l-no-cross",
+      "l-right-under-hive",
       "r-clockwise",
       "r-left-under-hive",
       "r-no-cross",
+      "r-right-under-hive",
       "r-solo",
     ]);
   });

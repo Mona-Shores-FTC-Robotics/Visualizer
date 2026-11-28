@@ -6,6 +6,8 @@ import {
   HANDOFF_S,
   fieldAtHandoff,
   partnerAutoFor,
+  autoDisplayName,
+  autoFreshness,
   type AutoTrace,
 } from "../../src/drill/fullMatch";
 import { FIELD, TIP_LOAD } from "../../sim/src/sim/config";
@@ -487,4 +489,63 @@ describe("the AUTO replay moves the FLOWER stick as the trace does", () => {
     s.advance(HANDOFF_S);
     expect(s.replayStickDeg).toBeNull();
   }, 60000);
+});
+
+describe("a pair run plays both halves, and says which run of master it is", () => {
+  test("R-RightUnderHive: our dead partner runs L-RightUnderHive in the replay, and stays where it ended", async () => {
+    const t = trace("r-right-under-hive");
+    expect(t.partnerAuto).toBe("l-right-under-hive");
+    expect(t.partnerFrames).toHaveLength(t.frames.length);
+    const s = new DrillSession(
+      await rapier(),
+      CONTROLS,
+      20245,
+      "two",
+      1,
+      undefined,
+      undefined,
+      { kind: "match", skill: 3 },
+    );
+    s.playAuto(t);
+    s.start();
+    const k = s.sim.robots.findIndex((r, i) => i > 0 && r.alliance === "red");
+    expect(k).toBeGreaterThan(0);
+    const partnerPedro = () => {
+      const v = s.sim.view(k);
+      const p = v.robot.translation();
+      return toPedro(p.x, p.z, v.heading);
+    };
+    for (const sec of [5, 15, 25]) {
+      s.advance(sec - s.playback!.t);
+      const q = t.partnerFrames![sec * 10];
+      const at = partnerPedro();
+      expect(at[0], `${sec} s`).toBeCloseTo(q[0], 0);
+      expect(at[1], `${sec} s`).toBeCloseTo(q[1], 0);
+    }
+    s.advance(HANDOFF_S);
+    const end = t.partnerFrames!.at(-1)!;
+    expect(partnerPedro()[0]).toBeCloseTo(end[0], 0);
+    expect(s.deadPartnerAt).toContain("l-right-under-hive");
+  }, 60000);
+
+  test("the trace is of master's .pp, and the picker says so; a stale one says since when", () => {
+    const t = trace("r-solo");
+    expect(t.master?.fresh).toBe(true);
+    expect(autoFreshness(t).words).toMatch(/^as on master, [A-Z][a-z]{2} \d+$/);
+    const stale = {
+      ...t,
+      master: {
+        ...t.master!,
+        fresh: false,
+        subject: "R-Solo: a change (#900)",
+      },
+    };
+    expect(autoFreshness(stale).words).toMatch(
+      /^not simulated since #900 \([A-Z][a-z]{2} \d+\); plays the run of /,
+    );
+    expect(autoDisplayName(t)).toBe("R-Solo");
+    expect(autoDisplayName({ auto: "l-right-under-hive" })).toBe(
+      "L-RightUnderHive",
+    );
+  });
 });

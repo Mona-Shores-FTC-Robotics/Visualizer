@@ -59,6 +59,9 @@ import { DrillView, CAMERAS, type CameraMode } from "./view";
 import {
   loadAutoIndex,
   loadAutoTrace,
+  autoDisplayName,
+  autoFreshness,
+  type AutoIndexEntry,
   partnerAutoFor,
   type AutoTrace,
 } from "./fullMatch";
@@ -287,6 +290,50 @@ const PHASE_LABEL: Record<DrillSession["phase"], string> = {
 /** The Auto the 2:00 drill opens after: ours, as the mentor asked. */
 const OPENING_AUTO = "r-solo";
 
+/** The Autos for Full Match, by name, from public/drill/autos/index.json. */
+const autoIndex = new Map<string, AutoIndexEntry>();
+
+/**
+ * Under the Match picker: which run of the chosen Auto plays, whether it is master's version
+ * (autoFreshness), and links to its logs on sim-results and the workflow run.
+ */
+function showMatchInfo() {
+  const el = $("match-info");
+  const a = matchSel.value
+    ? (traces.get(matchSel.value) ?? autoIndex.get(matchSel.value))
+    : null;
+  if (!a) {
+    el.hidden = true;
+    return;
+  }
+  const f = autoFreshness(a);
+  const tips = a.tipsAt?.length
+    ? ` TIPs at ${a.tipsAt.map((t) => `${t.toFixed(1)} s`).join(", ")}.`
+    : "";
+  const run = [
+    a.entry && a.entry !== "alone" ? esc(a.entry) : "alone",
+    a.partnerAuto
+      ? `beside ${esc(autoDisplayName({ auto: a.partnerAuto }))}`
+      : "",
+    a.scenario === "best" ? "best case" : "",
+    `seed ${a.seed}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const links = [
+    a.logsUrl
+      ? `<a href="${esc(a.logsUrl)}" target="_blank" rel="noopener">Logs</a>`
+      : "",
+    a.runUrl
+      ? `<a href="${esc(a.runUrl)}" target="_blank" rel="noopener">run</a>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  el.innerHTML = `<b>${esc(autoDisplayName(a))}</b>, ${f.fresh === false ? `<span class="stale">⚠ ${esc(f.words)}</span>` : esc(f.words)}: the Java AutoSim's run (${run}).${tips} ${links}`;
+  el.hidden = false;
+}
+
 /** Loads an Auto's trace once; "" (the 2:00 drill) needs none. */
 async function ensureTrace(auto: string) {
   if (!auto || traces.has(auto)) return;
@@ -333,7 +380,10 @@ function newSession() {
   if (ours === "r-solo") session.placeDeadPartnerInCorner();
   const partner = ours === "r-solo" ? null : partnerAutoFor(ours);
   const partnerTrace = partner ? traces.get(partner) : undefined;
-  if (partnerTrace) session.placeDeadPartner(partnerTrace);
+  // A pair run poses the partner itself (it runs its half in the replay).
+  if (partnerTrace && !session.playback?.trace.partnerFrames)
+    session.placeDeadPartner(partnerTrace);
+  showMatchInfo();
   $("start").textContent = session.playback
     ? "Start the match (Options)"
     : "Start 2:00 (Options)";
@@ -636,7 +686,7 @@ function openingLabel(): string {
 
 function hud() {
   $("clock").innerHTML =
-    `${clock(Math.ceil(session.remainingS))}<small>${PHASE_LABEL[session.phase]}${session.playback && session.phase !== "teleop" && session.phase !== "ended" ? ` · ${esc(session.playback.trace.auto)}` : ""}</small>`;
+    `${clock(Math.ceil(session.remainingS))}<small>${PHASE_LABEL[session.phase]}${session.playback && session.phase !== "teleop" && session.phase !== "ended" ? ` · ${esc(autoDisplayName(session.playback.trace))}${session.playback.trace.master ? ` <span class="${session.playback.trace.master.fresh ? "" : "stale"}">${esc(autoFreshness(session.playback.trace).fresh ? "master" : "⚠ not master's")}</span>` : ""}` : ""}</small>`;
   const autoTips = session.playback
     ? session.totalTips - session.tips.length
     : 0;
@@ -899,6 +949,7 @@ async function main() {
     };
   matchSel.onchange = async () => {
     savePrefs();
+    showMatchInfo(); // from the index at once; again once the trace has loaded
     await ensureTrace(matchSel.value);
     await ensureTrace(partnerAutoFor(matchSel.value) ?? "");
     newSession();
@@ -909,8 +960,10 @@ async function main() {
       for (const a of autos) {
         const o = document.createElement("option");
         o.value = a.auto;
-        o.textContent = `Full match: ${a.auto} (${a.autoTips} AUTO TIP${a.autoTips === 1 ? "" : "s"})`;
+        const f = autoFreshness(a);
+        o.textContent = `Full match: ${autoDisplayName(a)} (${a.autoTips} AUTO TIP${a.autoTips === 1 ? "" : "s"}) · ${f.fresh === false ? "⚠ " : ""}${f.words}`;
         matchSel.append(o);
+        autoIndex.set(a.auto, a);
       }
       const want = prefs.match;
       if (want && autos.some((a) => a.auto === want)) {

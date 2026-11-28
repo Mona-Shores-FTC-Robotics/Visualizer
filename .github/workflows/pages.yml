@@ -1,5 +1,8 @@
 # Builds this fork and publishes it with GitHub Pages, on every push to main, and every half hour
-# so the site's copy of biobuzz's Autos and scouting plans (scripts/mirror-biobuzz.mjs) stays fresh.
+# so the site's copy of biobuzz's Autos and scouting plans (scripts/mirror-biobuzz.mjs) and the
+# driver drill's Full Match Autos (scripts/drill-auto-traces.py: master's version of each Auto, from
+# biobuzz's newest "Simulate Auto" runs) stay fresh: a new run plays in the drill within the half hour.
+# (biobuzz cannot start this build itself: its workflow's token reaches only its own repository.)
 # One-time setup in the repository: Settings → Pages → Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
@@ -39,6 +42,17 @@ jobs:
         working-directory: sim
       # For devices that reach this site but not GitHub's file server (src/lib/team/mirror.ts).
       - run: node scripts/mirror-biobuzz.mjs dist/mirror
+      # The drill's Full Match Autos, rebuilt from sim-results for master's Autos. Should biobuzz not
+      # be reachable, the committed copies (public/drill/autos) deploy as they are.
+      - name: Full Match Autos from biobuzz's newest sim runs
+        run: |
+          out="$RUNNER_TEMP/drill-autos"
+          mkdir -p "$out" && cp dist/drill/autos/* "$out/"
+          if python3 -I scripts/drill-auto-traces.py --out "$out"; then
+            rm -f dist/drill/autos/*.json && cp "$out"/*.json dist/drill/autos/
+          else
+            echo "::warning::drill-auto-traces.py failed; deploying the committed Full Match Autos"
+          fi
       # The service worker names its cache after VERSION; a new name per build drops
       # the previous deploy's saved copy (see public/sw.js).
       - name: Stamp the service worker with this commit

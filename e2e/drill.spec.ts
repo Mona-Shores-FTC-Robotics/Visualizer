@@ -388,7 +388,7 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
   await setPad(page, 0, [BTN.OPTIONS]);
   await expect(page.locator("#clock")).toContainText("AUTO");
   await setPad(page, 0);
-  // Stepped to just before R-Solo's first TIP (7.3 s): its first volley is in our HIVE, and the
+  // Stepped to just before R-Solo's first TIP (master's run: 6.3 s): its first volley is in our HIVE, and the
   // page draws the trace's pieces rather than the simulator's (which wait for the hand-off).
   const at = await page.evaluate(() => {
     const s = (
@@ -403,7 +403,7 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
         };
       }
     ).__drill.session;
-    s.advance(7.1 - (s.playback?.t ?? 0));
+    s.advance(5.5 - (s.playback?.t ?? 0));
     const ps = s.replayPieces ?? [];
     return {
       t: s.playback?.t ?? -1,
@@ -414,9 +414,76 @@ test("Full match: the AUTO replay shows R-Solo's volleys flying into our CELL", 
   expect(at.pieces).toBeGreaterThan(30);
   expect(at.high).toBeGreaterThanOrEqual(3);
   await page.screenshot({
-    path: test.info().outputPath("full-match-r-solo-7s.png"),
+    path: test.info().outputPath("full-match-r-solo-5s.png"),
   });
 });
+
+for (const [auto, name, field] of [
+  ["r-solo", "R-Solo", "empty"],
+  ["r-right-under-hive", "R-RightUnderHive", "random"],
+] as const) {
+  test(`Full match: ${name} plays master's version, says so, and links its Logs`, async ({
+    page,
+  }) => {
+    await open(page);
+    const option = page.locator(`#match option[value='${auto}']`);
+    await option.waitFor({ state: "attached" });
+    await expect(option).toContainText(`Full match: ${name}`);
+    await expect(option).toContainText("as on master,");
+    await page.locator("#population").selectOption(field);
+    await page.locator("#match").selectOption(auto);
+    const info = page.locator("#match-info");
+    await expect(info).toContainText(`${name}, as on master,`, {
+      timeout: 20000,
+    });
+    await expect(info.locator("a", { hasText: "Logs" })).toHaveAttribute(
+      "href",
+      /github\.com\/Mona-Shores-FTC-Robotics\/biobuzz\/tree\/sim-results\//,
+    );
+    await bind(page, 0);
+    await expect(page.locator("#start")).toContainText("Start the match", {
+      timeout: 20000,
+    });
+    await setPad(page, 0, [BTN.OPTIONS]);
+    await expect(page.locator("#clock")).toContainText(name);
+    await setPad(page, 0);
+    // The replay's pose and TIPs are the trace's, frame by frame.
+    for (const sec of [6, 12, 21, 29]) {
+      const got = await page.evaluate((sec) => {
+        const s = (
+          window as unknown as {
+            __drill: {
+              session: {
+                playback: {
+                  t: number;
+                  tipsSoFar: number;
+                  trace: { frames: number[][]; partnerFrames?: number[][] };
+                } | null;
+                advance(s: number): void;
+                sim: {
+                  robots: {
+                    body: { translation(): { x: number; z: number } };
+                  }[];
+                };
+              };
+            };
+          }
+        ).__drill.session;
+        s.advance(sec - (s.playback?.t ?? 0));
+        const p = s.sim.robots[0].body.translation();
+        const f = s.playback!.trace.frames[sec * 10];
+        return { x: p.x, z: p.z, f, tips: s.playback!.tipsSoFar };
+      }, sec);
+      expect(got.tips, `${sec} s`).toBe(got.f[6]);
+      // Pedro inches → the simulator's metres (src/drill/launchSpot.ts fromPedro).
+      expect(got.x, `${sec} s`).toBeCloseTo((got.f[1] - 70.75) * 0.0254, 2);
+      expect(got.z, `${sec} s`).toBeCloseTo(-(got.f[2] - 70.75) * 0.0254, 2);
+    }
+    await page.screenshot({
+      path: test.info().outputPath(`full-match-${auto}-29s.png`),
+    });
+  });
+}
 
 test("alliance: two controllers drive Ultraviolet and Infrared on one field", async ({
   page,
