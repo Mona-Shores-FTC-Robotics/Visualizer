@@ -166,6 +166,25 @@ export function volleysIn(command: string): number {
   if (command === PICK_LAUNCH_COMMAND) return 2;
   return 0;
 }
+/**
+ * One-ball launches (biobuzz LaunchCards: LaunchOne, and LaunchOneAimed, the human player's
+ * NECTAR fired with the turret, 28 Nov 2026). Each lands one piece in the raised CELL, not a
+ * volley's worth.
+ */
+export const ONE_SHOT_COMMANDS: ReadonlySet<string> = new Set([
+  "LaunchOne",
+  "LaunchOneAimed",
+]);
+/**
+ * A NECTAR's weight toward a TIP in POLLEN (biobuzz doc/human-player-playbook.md: 1.65), the unit
+ * `volleyLoad` and `tipLoad` count in. LaunchOneAimed is the NECTAR's shot, so it lands this.
+ */
+export const NECTAR_WEIGHT = 1.65;
+/** What one run of a one-ball launch lands in the raised CELL, in POLLEN-weights; 0 for any other command. */
+export function oneShotWeight(command: string): number {
+  if (command === "LaunchOneAimed") return NECTAR_WEIGHT;
+  return ONE_SHOT_COMMANDS.has(command) ? 1 : 0;
+}
 export const GATHER_COMMAND = "GardenGather";
 /** The command that starts the launcher and finishes at once (biobuzz LaunchCards.spinUp). */
 export const SPIN_UP_COMMAND = "SpinUp";
@@ -452,9 +471,10 @@ export function previewTiming(
   let spunAt: number | null = null;
   return {
     commandRan(name, t0, _t1, fed = true) {
-      if ((name === SPIN_UP_COMMAND || volleysIn(name) > 0) && spunAt === null)
+      const launches = volleysIn(name) > 0 || oneShotWeight(name) > 0;
+      if ((name === SPIN_UP_COMMAND || launches) && spunAt === null)
         spunAt = t0;
-      if (volleysIn(name) > 0 && fed) full = false;
+      if (launches && fed) full = false;
       // A GARDEN gather that runs its step takes the row's four (biobuzz's simulator with the
       // corner wheels, PR #774): the lane is full as it ends, so an IntakeFull check right after
       // it reads full at once, as on the robot.
